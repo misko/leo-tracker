@@ -1,0 +1,4514 @@
+{
+  "summary": {
+    "catalog": "/mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history/objects/ff75bd2e53acf9ef1dd61f6612aac5bd8766be9aa67587b732b80cf8d20b8e0f.json",
+    "retrieved_at": "2026-08-04T13:00:53.491555+00:00",
+    "track_count": 90,
+    "tracks_with_match_500": 40,
+    "tracks_with_match_1000": 44,
+    "median_visible_starlinks": 209.0,
+    "median_matches_500": 0.0,
+    "median_matches_1000": 0.0
+  },
+  "tracks": [
+    {
+      "capture": "dwell-00014-20260804T040817Z",
+      "track_id": "s007-t00000",
+      "mid": 1785816865.5602775,
+      "start_utc": "2026-08-04T04:14:23.858321Z",
+      "duration_s": 3.403913412999998,
+      "measured_slope_hz_s": -4460.638755099906,
+      "confidence": 0.9633742168325731,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 223,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 5,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 2.6772845895211503,
+          "predicted_slope_hz_s": -4457.961470510385,
+          "elevation_deg": 82.69103478806696,
+          "name": "STARLINK-37656          ",
+          "norad_id": 69649
+        },
+        {
+          "slope_error_hz_s": 89.78032815811366,
+          "predicted_slope_hz_s": -4550.41908325802,
+          "elevation_deg": 55.91236544810893,
+          "name": "STARLINK-11112 [DTC]    ",
+          "norad_id": 60115
+        },
+        {
+          "slope_error_hz_s": 218.04212047014335,
+          "predicted_slope_hz_s": -4242.596634629763,
+          "elevation_deg": 58.35532475954128,
+          "name": "STARLINK-11583 [DTC]    ",
+          "norad_id": 62991
+        },
+        {
+          "slope_error_hz_s": 344.0386927631462,
+          "predicted_slope_hz_s": -4116.60006233676,
+          "elevation_deg": 66.120953064945,
+          "name": "STARLINK-37664          ",
+          "norad_id": 69044
+        },
+        {
+          "slope_error_hz_s": 753.9239972428786,
+          "predicted_slope_hz_s": -3706.7147578570275,
+          "elevation_deg": 73.13747200254565,
+          "name": "STARLINK-36538          ",
+          "norad_id": 67512
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00014-20260804T040817Z",
+      "track_id": "s007-t00003",
+      "mid": 1785816865.4338126,
+      "start_utc": "2026-08-04T04:14:23.731112Z",
+      "duration_s": 3.4054015840000034,
+      "measured_slope_hz_s": -4491.63980410766,
+      "confidence": 0.8893061294083161,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 223,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 5,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 35.2952164853441,
+          "predicted_slope_hz_s": -4456.344587622316,
+          "elevation_deg": 82.63158847899705,
+          "name": "STARLINK-37656          ",
+          "norad_id": 69649
+        },
+        {
+          "slope_error_hz_s": 60.57351344994822,
+          "predicted_slope_hz_s": -4552.213317557608,
+          "elevation_deg": 55.92419273303467,
+          "name": "STARLINK-11112 [DTC]    ",
+          "norad_id": 60115
+        },
+        {
+          "slope_error_hz_s": 257.53660531862533,
+          "predicted_slope_hz_s": -4234.103198789035,
+          "elevation_deg": 58.28856018951145,
+          "name": "STARLINK-11583 [DTC]    ",
+          "norad_id": 62991
+        },
+        {
+          "slope_error_hz_s": 373.3854830642367,
+          "predicted_slope_hz_s": -4118.254321043423,
+          "elevation_deg": 66.14027718490668,
+          "name": "STARLINK-37664          ",
+          "norad_id": 69044
+        },
+        {
+          "slope_error_hz_s": 783.9556874970531,
+          "predicted_slope_hz_s": -3707.684116610607,
+          "elevation_deg": 73.15501285424791,
+          "name": "STARLINK-36538          ",
+          "norad_id": 67512
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00014-20260804T040817Z",
+      "track_id": "s007-t00008",
+      "mid": 1785816865.496673,
+      "start_utc": "2026-08-04T04:14:23.731112Z",
+      "duration_s": 3.531122646999961,
+      "measured_slope_hz_s": -4203.7128494206045,
+      "confidence": 0.8779042158822893,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 223,
+      "matches_within_500_hz_s": 5,
+      "matches_within_1000_hz_s": 7,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 34.61805211386854,
+          "predicted_slope_hz_s": -4238.330901534473,
+          "elevation_deg": 58.32177231861289,
+          "name": "STARLINK-11583 [DTC]    ",
+          "norad_id": 62991
+        },
+        {
+          "slope_error_hz_s": 86.27615646789127,
+          "predicted_slope_hz_s": -4117.436692952713,
+          "elevation_deg": 66.13072917825693,
+          "name": "STARLINK-37664          ",
+          "norad_id": 69044
+        },
+        {
+          "slope_error_hz_s": 253.4414135765037,
+          "predicted_slope_hz_s": -4457.154262997108,
+          "elevation_deg": 82.66131044667347,
+          "name": "STARLINK-37656          ",
+          "norad_id": 69649
+        },
+        {
+          "slope_error_hz_s": 347.61792532396885,
+          "predicted_slope_hz_s": -4551.330774744573,
+          "elevation_deg": 55.91836306652395,
+          "name": "STARLINK-11112 [DTC]    ",
+          "norad_id": 60115
+        },
+        {
+          "slope_error_hz_s": 496.50451061169724,
+          "predicted_slope_hz_s": -3707.2083388089072,
+          "elevation_deg": 73.14637005143737,
+          "name": "STARLINK-36538          ",
+          "norad_id": 67512
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00014-20260804T040817Z",
+      "track_id": "s007-t00024",
+      "mid": 1785816865.2447581,
+      "start_utc": "2026-08-04T04:14:23.353003Z",
+      "duration_s": 3.9092282830000045,
+      "measured_slope_hz_s": -3589.44471267318,
+      "confidence": 0.651917237898659,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 223,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 17,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 119.63095750777347,
+          "predicted_slope_hz_s": -3709.0756701809537,
+          "elevation_deg": 73.18010301838676,
+          "name": "STARLINK-36538          ",
+          "norad_id": 67512
+        },
+        {
+          "slope_error_hz_s": 181.3182630941792,
+          "predicted_slope_hz_s": -3408.126449579001,
+          "elevation_deg": 74.77910093662842,
+          "name": "STARLINK-3342           ",
+          "norad_id": 50816
+        },
+        {
+          "slope_error_hz_s": 365.45720797565036,
+          "predicted_slope_hz_s": -3223.98750469753,
+          "elevation_deg": 44.55987954070309,
+          "name": "STARLINK-37992          ",
+          "norad_id": 69681
+        },
+        {
+          "slope_error_hz_s": 491.59758491264665,
+          "predicted_slope_hz_s": -3097.8471277605336,
+          "elevation_deg": 66.05163270513641,
+          "name": "STARLINK-36714          ",
+          "norad_id": 67924
+        },
+        {
+          "slope_error_hz_s": 531.2050812479229,
+          "predicted_slope_hz_s": -4120.649793921103,
+          "elevation_deg": 66.16831725094356,
+          "name": "STARLINK-37664          ",
+          "norad_id": 69044
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00014-20260804T040817Z",
+      "track_id": "s017-t00344",
+      "mid": 1785817247.2481346,
+      "start_utc": "2026-08-04T04:20:46.178382Z",
+      "duration_s": 3.774876799000026,
+      "measured_slope_hz_s": -8333.784417746208,
+      "confidence": 0.6727619624124412,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 230,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 4522.920872050847,
+          "predicted_slope_hz_s": -3810.8635456953616,
+          "elevation_deg": 83.41075334316625,
+          "name": "STARLINK-36406          ",
+          "norad_id": 67923
+        },
+        {
+          "slope_error_hz_s": 4762.297956287313,
+          "predicted_slope_hz_s": -3571.4864614588955,
+          "elevation_deg": 66.69220476143258,
+          "name": "STARLINK-31669          ",
+          "norad_id": 59515
+        },
+        {
+          "slope_error_hz_s": 4842.383264025886,
+          "predicted_slope_hz_s": -3491.401153720323,
+          "elevation_deg": 56.4088773697021,
+          "name": "STARLINK-4103           ",
+          "norad_id": 53141
+        },
+        {
+          "slope_error_hz_s": 4903.6443421377635,
+          "predicted_slope_hz_s": -3430.140075608445,
+          "elevation_deg": 56.37942622046243,
+          "name": "STARLINK-34552          ",
+          "norad_id": 64731
+        },
+        {
+          "slope_error_hz_s": 4932.665851834508,
+          "predicted_slope_hz_s": -3401.1185659117,
+          "elevation_deg": 55.281830011211255,
+          "name": "STARLINK-3323           ",
+          "norad_id": 50804
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00016-20260804T044040Z",
+      "track_id": "s017-t00133",
+      "mid": 1785819198.2214355,
+      "start_utc": "2026-08-04T04:53:17.531541Z",
+      "duration_s": 3.011514453000018,
+      "measured_slope_hz_s": -6279.472121474833,
+      "confidence": 0.7755164234908806,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 250,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1211.88105790209,
+          "predicted_slope_hz_s": -5067.591063572743,
+          "elevation_deg": 43.31781885601663,
+          "name": "STARLINK-1728           ",
+          "norad_id": 46582
+        },
+        {
+          "slope_error_hz_s": 1773.5573111586364,
+          "predicted_slope_hz_s": -4505.914810316197,
+          "elevation_deg": 78.87634735836065,
+          "name": "STARLINK-37747          ",
+          "norad_id": 69440
+        },
+        {
+          "slope_error_hz_s": 2512.3743012700743,
+          "predicted_slope_hz_s": -3767.097820204759,
+          "elevation_deg": 77.26849923360203,
+          "name": "STARLINK-6378           ",
+          "norad_id": 57347
+        },
+        {
+          "slope_error_hz_s": 2722.850699423778,
+          "predicted_slope_hz_s": -3556.621422051055,
+          "elevation_deg": 62.427252229977015,
+          "name": "STARLINK-35281          ",
+          "norad_id": 65824
+        },
+        {
+          "slope_error_hz_s": 2757.3075657956356,
+          "predicted_slope_hz_s": -3522.1645556791977,
+          "elevation_deg": 59.44681742875301,
+          "name": "STARLINK-3881           ",
+          "norad_id": 52472
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00017-20260804T045706Z",
+      "track_id": "s016-t00017",
+      "mid": 1785820131.1514254,
+      "start_utc": "2026-08-04T05:08:45.120197Z",
+      "duration_s": 12.188361356000087,
+      "measured_slope_hz_s": -5518.33152320043,
+      "confidence": 0.8171694226826437,
+      "carrier": 11464117187.5,
+      "visible_starlinks": 236,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 1,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 571.2470768333587,
+          "predicted_slope_hz_s": -4947.084446367071,
+          "elevation_deg": 64.16522479868837,
+          "name": "STARLINK-11364 [DTC]    ",
+          "norad_id": 61543
+        },
+        {
+          "slope_error_hz_s": 1382.6078242419953,
+          "predicted_slope_hz_s": -4135.723698958434,
+          "elevation_deg": 88.12136245666994,
+          "name": "STARLINK-34194          ",
+          "norad_id": 64179
+        },
+        {
+          "slope_error_hz_s": 1596.0360446507834,
+          "predicted_slope_hz_s": -3922.2954785496463,
+          "elevation_deg": 54.71020096357159,
+          "name": "STARLINK-31943          ",
+          "norad_id": 59878
+        },
+        {
+          "slope_error_hz_s": 1643.5549964160232,
+          "predicted_slope_hz_s": -3874.7765267844065,
+          "elevation_deg": 74.86009081066796,
+          "name": "STARLINK-34336          ",
+          "norad_id": 64462
+        },
+        {
+          "slope_error_hz_s": 1660.4850740820962,
+          "predicted_slope_hz_s": -3857.8464491183336,
+          "elevation_deg": 89.02164309531673,
+          "name": "STARLINK-32473          ",
+          "norad_id": 62049
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00017-20260804T045706Z",
+      "track_id": "s016-t00079",
+      "mid": 1785820128.3937516,
+      "start_utc": "2026-08-04T05:08:46.278397Z",
+      "duration_s": 4.2307091220000075,
+      "measured_slope_hz_s": -6679.637907214822,
+      "confidence": 0.7384513850729112,
+      "carrier": 11464117187.5,
+      "visible_starlinks": 238,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1748.4646004284068,
+          "predicted_slope_hz_s": -4931.173306786415,
+          "elevation_deg": 64.0216503821666,
+          "name": "STARLINK-11364 [DTC]    ",
+          "norad_id": 61543
+        },
+        {
+          "slope_error_hz_s": 2547.1059604203565,
+          "predicted_slope_hz_s": -4132.5319467944655,
+          "elevation_deg": 87.76697917098902,
+          "name": "STARLINK-34194          ",
+          "norad_id": 64179
+        },
+        {
+          "slope_error_hz_s": 2831.342976280736,
+          "predicted_slope_hz_s": -3848.294930934086,
+          "elevation_deg": 87.43985843161587,
+          "name": "STARLINK-32473          ",
+          "norad_id": 62049
+        },
+        {
+          "slope_error_hz_s": 2842.4745317459106,
+          "predicted_slope_hz_s": -3837.1633754689115,
+          "elevation_deg": 54.08496122135544,
+          "name": "STARLINK-31943          ",
+          "norad_id": 59878
+        },
+        {
+          "slope_error_hz_s": 2861.648212833096,
+          "predicted_slope_hz_s": -3817.989694381726,
+          "elevation_deg": 73.78731376297006,
+          "name": "STARLINK-34336          ",
+          "norad_id": 64462
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00019-20260804T051810Z",
+      "track_id": "s004-t00000",
+      "mid": 1785820934.005237,
+      "start_utc": "2026-08-04T05:22:12.614620Z",
+      "duration_s": 3.032906025000017,
+      "measured_slope_hz_s": -3623.948856569713,
+      "confidence": 0.9443376312057885,
+      "carrier": 11419040264.423077,
+      "visible_starlinks": 239,
+      "matches_within_500_hz_s": 8,
+      "matches_within_1000_hz_s": 14,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 31.613955838142374,
+          "predicted_slope_hz_s": -3655.5628124078553,
+          "elevation_deg": 78.92593820215959,
+          "name": "STARLINK-5646           ",
+          "norad_id": 55461
+        },
+        {
+          "slope_error_hz_s": 183.8475530039109,
+          "predicted_slope_hz_s": -3807.796409573624,
+          "elevation_deg": 75.57149852855822,
+          "name": "STARLINK-34173          ",
+          "norad_id": 64196
+        },
+        {
+          "slope_error_hz_s": 201.9624124294428,
+          "predicted_slope_hz_s": -3825.9112689991557,
+          "elevation_deg": 58.42672939522188,
+          "name": "STARLINK-11618 [DTC]    ",
+          "norad_id": 63185
+        },
+        {
+          "slope_error_hz_s": 303.1230535437835,
+          "predicted_slope_hz_s": -3320.8258030259294,
+          "elevation_deg": 69.2308578839683,
+          "name": "STARLINK-36461          ",
+          "norad_id": 67316
+        },
+        {
+          "slope_error_hz_s": 308.1839187259816,
+          "predicted_slope_hz_s": -3315.7649378437313,
+          "elevation_deg": 62.215857551660775,
+          "name": "STARLINK-32686          ",
+          "norad_id": 62192
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00019-20260804T051810Z",
+      "track_id": "s004-t00127",
+      "mid": 1785820941.4855134,
+      "start_utc": "2026-08-04T05:22:17.656093Z",
+      "duration_s": 7.65884111699998,
+      "measured_slope_hz_s": -3854.6901110659437,
+      "confidence": 0.714864963603647,
+      "carrier": 11419040264.423077,
+      "visible_starlinks": 235,
+      "matches_within_500_hz_s": 2,
+      "matches_within_1000_hz_s": 14,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 46.46874337891768,
+          "predicted_slope_hz_s": -3808.221367687026,
+          "elevation_deg": 84.86870911344825,
+          "name": "STARLINK-5646           ",
+          "norad_id": 55461
+        },
+        {
+          "slope_error_hz_s": 93.48964985582779,
+          "predicted_slope_hz_s": -3948.1797609217715,
+          "elevation_deg": 78.80985990079314,
+          "name": "STARLINK-34173          ",
+          "norad_id": 64196
+        },
+        {
+          "slope_error_hz_s": 612.0699647792712,
+          "predicted_slope_hz_s": -3242.6201462866725,
+          "elevation_deg": 65.72889400957068,
+          "name": "STARLINK-32326          ",
+          "norad_id": 61674
+        },
+        {
+          "slope_error_hz_s": 612.8887769273333,
+          "predicted_slope_hz_s": -4467.578887993277,
+          "elevation_deg": 58.63923345144091,
+          "name": "STARLINK-11596 [DTC]    ",
+          "norad_id": 64321
+        },
+        {
+          "slope_error_hz_s": 641.8492953254872,
+          "predicted_slope_hz_s": -3212.8408157404565,
+          "elevation_deg": 53.12377828113356,
+          "name": "STARLINK-11618 [DTC]    ",
+          "norad_id": 63185
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00019-20260804T051810Z",
+      "track_id": "s017-t00007",
+      "mid": 1785821446.9380236,
+      "start_utc": "2026-08-04T05:30:42.596061Z",
+      "duration_s": 8.683925215000045,
+      "measured_slope_hz_s": -5127.604524688621,
+      "confidence": 0.8095957524374556,
+      "carrier": 11419040264.423077,
+      "visible_starlinks": 220,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 3,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 167.37319322010808,
+          "predicted_slope_hz_s": -4960.2313314685125,
+          "elevation_deg": 69.3411262949896,
+          "name": "STARLINK-11736 [DTC]    ",
+          "norad_id": 64317
+        },
+        {
+          "slope_error_hz_s": 827.8371481521308,
+          "predicted_slope_hz_s": -4299.76737653649,
+          "elevation_deg": 73.4550915357244,
+          "name": "STARLINK-34866          ",
+          "norad_id": 65189
+        },
+        {
+          "slope_error_hz_s": 874.5793502795605,
+          "predicted_slope_hz_s": -4253.02517440906,
+          "elevation_deg": 71.58993077421843,
+          "name": "STARLINK-36628          ",
+          "norad_id": 67595
+        },
+        {
+          "slope_error_hz_s": 1339.972486351338,
+          "predicted_slope_hz_s": -3787.6320383372827,
+          "elevation_deg": 57.27077244084316,
+          "name": "STARLINK-36609          ",
+          "norad_id": 67582
+        },
+        {
+          "slope_error_hz_s": 1344.2891817494665,
+          "predicted_slope_hz_s": -3783.315342939154,
+          "elevation_deg": 79.40461603168266,
+          "name": "STARLINK-31966          ",
+          "norad_id": 59944
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00019-20260804T051810Z",
+      "track_id": "s017-t00012",
+      "mid": 1785821448.573745,
+      "start_utc": "2026-08-04T05:30:46.119544Z",
+      "duration_s": 5.1604420540001,
+      "measured_slope_hz_s": -9678.777135212214,
+      "confidence": 0.6976919101710922,
+      "carrier": 11419040264.423077,
+      "visible_starlinks": 221,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 4802.1109790378305,
+          "predicted_slope_hz_s": -4876.666156174384,
+          "elevation_deg": 68.4511994764206,
+          "name": "STARLINK-11736 [DTC]    ",
+          "norad_id": 64317
+        },
+        {
+          "slope_error_hz_s": 5402.572821518115,
+          "predicted_slope_hz_s": -4276.204313694099,
+          "elevation_deg": 73.06968987923754,
+          "name": "STARLINK-34866          ",
+          "norad_id": 65189
+        },
+        {
+          "slope_error_hz_s": 5411.98859193806,
+          "predicted_slope_hz_s": -4266.788543274154,
+          "elevation_deg": 71.79970364573376,
+          "name": "STARLINK-36628          ",
+          "norad_id": 67595
+        },
+        {
+          "slope_error_hz_s": 5876.95729610311,
+          "predicted_slope_hz_s": -3801.819839109105,
+          "elevation_deg": 57.39815492322917,
+          "name": "STARLINK-36609          ",
+          "norad_id": 67582
+        },
+        {
+          "slope_error_hz_s": 5906.50849205229,
+          "predicted_slope_hz_s": -3772.268643159924,
+          "elevation_deg": 79.09472895427838,
+          "name": "STARLINK-31966          ",
+          "norad_id": 59944
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00021-20260804T055029Z",
+      "track_id": "s002-t00013",
+      "mid": 1785822784.871716,
+      "start_utc": "2026-08-04T05:53:02.982230Z",
+      "duration_s": 3.778971014999996,
+      "measured_slope_hz_s": -5063.930142714791,
+      "confidence": 0.8019760123613242,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 228,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1180.1227138676386,
+          "predicted_slope_hz_s": -3883.8074288471526,
+          "elevation_deg": 69.56216356088746,
+          "name": "STARLINK-3762           ",
+          "norad_id": 52374
+        },
+        {
+          "slope_error_hz_s": 1214.8433500493838,
+          "predicted_slope_hz_s": -3849.0867926654073,
+          "elevation_deg": 86.65024010929918,
+          "name": "STARLINK-30953          ",
+          "norad_id": 58491
+        },
+        {
+          "slope_error_hz_s": 1299.6799740731217,
+          "predicted_slope_hz_s": -3764.2501686416695,
+          "elevation_deg": 76.54048786305073,
+          "name": "STARLINK-1566           ",
+          "norad_id": 46079
+        },
+        {
+          "slope_error_hz_s": 1315.5172129177663,
+          "predicted_slope_hz_s": -3748.412929797025,
+          "elevation_deg": 75.95351417025853,
+          "name": "STARLINK-2457           ",
+          "norad_id": 48321
+        },
+        {
+          "slope_error_hz_s": 1319.2056151798301,
+          "predicted_slope_hz_s": -3744.724527534961,
+          "elevation_deg": 75.02923297571546,
+          "name": "STARLINK-31531          ",
+          "norad_id": 59477
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00022-20260804T060639Z",
+      "track_id": "s014-t00176",
+      "mid": 1785824217.0418234,
+      "start_utc": "2026-08-04T06:16:56.538612Z",
+      "duration_s": 3.018614379999917,
+      "measured_slope_hz_s": 4304.071738123016,
+      "confidence": 0.5023661793192121,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 216,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 4415.208960488569,
+          "predicted_slope_hz_s": -111.13722236555282,
+          "elevation_deg": 10.691393003052495,
+          "name": "STARLINK-30788          ",
+          "norad_id": 58159
+        },
+        {
+          "slope_error_hz_s": 4421.364060516421,
+          "predicted_slope_hz_s": -117.29232239340462,
+          "elevation_deg": 12.595619342913375,
+          "name": "STARLINK-34720          ",
+          "norad_id": 66449
+        },
+        {
+          "slope_error_hz_s": 4427.90876069111,
+          "predicted_slope_hz_s": -123.8370225680936,
+          "elevation_deg": 11.777089304584814,
+          "name": "STARLINK-35236          ",
+          "norad_id": 66008
+        },
+        {
+          "slope_error_hz_s": 4430.463018902659,
+          "predicted_slope_hz_s": -126.39128077964286,
+          "elevation_deg": 11.445161614657016,
+          "name": "STARLINK-11717 [DTC]    ",
+          "norad_id": 64126
+        },
+        {
+          "slope_error_hz_s": 4431.760195383985,
+          "predicted_slope_hz_s": -127.68845726096913,
+          "elevation_deg": 12.94640497625267,
+          "name": "STARLINK-31728          ",
+          "norad_id": 59496
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00022-20260804T060639Z",
+      "track_id": "s016-t00021",
+      "mid": 1785824301.4936194,
+      "start_utc": "2026-08-04T06:18:17.458440Z",
+      "duration_s": 8.070358492000082,
+      "measured_slope_hz_s": -7546.020325271806,
+      "confidence": 0.8270568275571891,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 221,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3719.33528724019,
+          "predicted_slope_hz_s": -3826.6850380316155,
+          "elevation_deg": 58.05787460693397,
+          "name": "STARLINK-36576          ",
+          "norad_id": 67534
+        },
+        {
+          "slope_error_hz_s": 3929.650914682904,
+          "predicted_slope_hz_s": -3616.3694105889017,
+          "elevation_deg": 38.96708109775554,
+          "name": "STARLINK-1302           ",
+          "norad_id": 45375
+        },
+        {
+          "slope_error_hz_s": 3954.39480948397,
+          "predicted_slope_hz_s": -3591.6255157878354,
+          "elevation_deg": 46.03380449757359,
+          "name": "STARLINK-11671 [DTC]    ",
+          "norad_id": 64319
+        },
+        {
+          "slope_error_hz_s": 4085.7621579772617,
+          "predicted_slope_hz_s": -3460.258167294544,
+          "elevation_deg": 58.65432944074676,
+          "name": "STARLINK-33982          ",
+          "norad_id": 63707
+        },
+        {
+          "slope_error_hz_s": 4138.293170229863,
+          "predicted_slope_hz_s": -3407.727155041943,
+          "elevation_deg": 60.3457786517534,
+          "name": "STARLINK-31903          ",
+          "norad_id": 59845
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00023-20260804T062304Z",
+      "track_id": "s010-t00022",
+      "mid": 1785825054.614162,
+      "start_utc": "2026-08-04T06:30:52.007802Z",
+      "duration_s": 5.2127198739999585,
+      "measured_slope_hz_s": -3549.628243041627,
+      "confidence": 0.7486475789467534,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 221,
+      "matches_within_500_hz_s": 9,
+      "matches_within_1000_hz_s": 17,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 20.48708968615165,
+          "predicted_slope_hz_s": -3570.1153327277784,
+          "elevation_deg": 62.62699566929764,
+          "name": "STARLINK-1554           ",
+          "norad_id": 46055
+        },
+        {
+          "slope_error_hz_s": 121.31944011463384,
+          "predicted_slope_hz_s": -3670.9476831562606,
+          "elevation_deg": 75.22220117646606,
+          "name": "STARLINK-34724          ",
+          "norad_id": 66442
+        },
+        {
+          "slope_error_hz_s": 126.80828254866901,
+          "predicted_slope_hz_s": -3422.8199604929578,
+          "elevation_deg": 67.36631864954674,
+          "name": "STARLINK-4056           ",
+          "norad_id": 53242
+        },
+        {
+          "slope_error_hz_s": 161.4453694592239,
+          "predicted_slope_hz_s": -3711.0736125008507,
+          "elevation_deg": 65.44464351795523,
+          "name": "STARLINK-34496          ",
+          "norad_id": 64476
+        },
+        {
+          "slope_error_hz_s": 209.07950999760396,
+          "predicted_slope_hz_s": -3758.7077530392307,
+          "elevation_deg": 79.38440327550579,
+          "name": "STARLINK-35834          ",
+          "norad_id": 66570
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00024-20260804T063914Z",
+      "track_id": "s001-t00001",
+      "mid": 1785825690.897732,
+      "start_utc": "2026-08-04T06:41:29.449480Z",
+      "duration_s": 3.021924119999994,
+      "measured_slope_hz_s": -3504.4637794622486,
+      "confidence": 0.774880973605535,
+      "carrier": 11248271033.653847,
+      "visible_starlinks": 204,
+      "matches_within_500_hz_s": 7,
+      "matches_within_1000_hz_s": 13,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 4.461053089899906,
+          "predicted_slope_hz_s": -3508.9248325521485,
+          "elevation_deg": 74.10382424702185,
+          "name": "STARLINK-30509          ",
+          "norad_id": 57977
+        },
+        {
+          "slope_error_hz_s": 14.37718182815479,
+          "predicted_slope_hz_s": -3490.086597634094,
+          "elevation_deg": 74.32129780154065,
+          "name": "STARLINK-31950          ",
+          "norad_id": 59863
+        },
+        {
+          "slope_error_hz_s": 23.597915897044004,
+          "predicted_slope_hz_s": -3480.8658635652046,
+          "elevation_deg": 75.72765375116136,
+          "name": "STARLINK-6142           ",
+          "norad_id": 57113
+        },
+        {
+          "slope_error_hz_s": 252.46262463588982,
+          "predicted_slope_hz_s": -3252.0011548263587,
+          "elevation_deg": 59.83648769723945,
+          "name": "STARLINK-5694           ",
+          "norad_id": 55481
+        },
+        {
+          "slope_error_hz_s": 310.87883864981586,
+          "predicted_slope_hz_s": -3815.3426181120644,
+          "elevation_deg": 75.19400143464937,
+          "name": "STARLINK-30829          ",
+          "norad_id": 58158
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00025-20260804T065523Z",
+      "track_id": "s003-t00019",
+      "mid": 1785826743.638715,
+      "start_utc": "2026-08-04T06:59:02.065911Z",
+      "duration_s": 3.5228028200000097,
+      "measured_slope_hz_s": -7310.422500620285,
+      "confidence": 0.6740367414523782,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 197,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3433.006568333866,
+          "predicted_slope_hz_s": -3877.415932286419,
+          "elevation_deg": 68.36974482013659,
+          "name": "STARLINK-32836          ",
+          "norad_id": 62965
+        },
+        {
+          "slope_error_hz_s": 3549.5007810092684,
+          "predicted_slope_hz_s": -3760.9217196110167,
+          "elevation_deg": 72.07323968700076,
+          "name": "STARLINK-2648           ",
+          "norad_id": 48679
+        },
+        {
+          "slope_error_hz_s": 3608.514810237944,
+          "predicted_slope_hz_s": -3701.907690382341,
+          "elevation_deg": 75.0717877463459,
+          "name": "STARLINK-32609          ",
+          "norad_id": 61929
+        },
+        {
+          "slope_error_hz_s": 3962.271247054229,
+          "predicted_slope_hz_s": -3348.151253566056,
+          "elevation_deg": 70.48306049668699,
+          "name": "STARLINK-35693          ",
+          "norad_id": 66490
+        },
+        {
+          "slope_error_hz_s": 3973.07675298196,
+          "predicted_slope_hz_s": -3337.345747638325,
+          "elevation_deg": 61.761364587922415,
+          "name": "STARLINK-1548           ",
+          "norad_id": 46054
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00025-20260804T065523Z",
+      "track_id": "s008-t00107",
+      "mid": 1785826906.926053,
+      "start_utc": "2026-08-04T07:01:43.583890Z",
+      "duration_s": 6.684325850999983,
+      "measured_slope_hz_s": 5878.805333670441,
+      "confidence": 0.6570990209223359,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 199,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5966.809841756117,
+          "predicted_slope_hz_s": -88.00450808567587,
+          "elevation_deg": 10.243692650661819,
+          "name": "STARLINK-30893          ",
+          "norad_id": 58724
+        },
+        {
+          "slope_error_hz_s": 5972.749851220132,
+          "predicted_slope_hz_s": -93.94451754969096,
+          "elevation_deg": 10.04975401000143,
+          "name": "STARLINK-35826          ",
+          "norad_id": 66375
+        },
+        {
+          "slope_error_hz_s": 5982.779717066563,
+          "predicted_slope_hz_s": -103.97438339612224,
+          "elevation_deg": 10.284773921129009,
+          "name": "STARLINK-2731           ",
+          "norad_id": 48651
+        },
+        {
+          "slope_error_hz_s": 5987.4454636640385,
+          "predicted_slope_hz_s": -108.64012999359768,
+          "elevation_deg": 11.179767760189307,
+          "name": "STARLINK-35744          ",
+          "norad_id": 66581
+        },
+        {
+          "slope_error_hz_s": 5998.4237308461925,
+          "predicted_slope_hz_s": -119.61839717575145,
+          "elevation_deg": 12.146518957646107,
+          "name": "STARLINK-32717          ",
+          "norad_id": 62491
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00025-20260804T065523Z",
+      "track_id": "s008-t00306",
+      "mid": 1785826909.007623,
+      "start_utc": "2026-08-04T07:01:47.872591Z",
+      "duration_s": 3.0259176040000284,
+      "measured_slope_hz_s": -5349.614045527503,
+      "confidence": 0.765001143734621,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 201,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 2,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 276.909364418545,
+          "predicted_slope_hz_s": -5072.704681108958,
+          "elevation_deg": 68.11932783278206,
+          "name": "STARLINK-11193 [DTC]    ",
+          "norad_id": 60195
+        },
+        {
+          "slope_error_hz_s": 672.99293233976,
+          "predicted_slope_hz_s": -4676.621113187743,
+          "elevation_deg": 60.036201455374794,
+          "name": "STARLINK-11560 [DTC]    ",
+          "norad_id": 62917
+        },
+        {
+          "slope_error_hz_s": 1523.8754984388765,
+          "predicted_slope_hz_s": -3825.738547088626,
+          "elevation_deg": 85.17344106820387,
+          "name": "STARLINK-30843          ",
+          "norad_id": 58241
+        },
+        {
+          "slope_error_hz_s": 1597.7651095394908,
+          "predicted_slope_hz_s": -3751.848935988012,
+          "elevation_deg": 71.60241483655656,
+          "name": "STARLINK-3128           ",
+          "norad_id": 49441
+        },
+        {
+          "slope_error_hz_s": 1742.612333740129,
+          "predicted_slope_hz_s": -3607.0017117873736,
+          "elevation_deg": 68.46558534237131,
+          "name": "STARLINK-33898          ",
+          "norad_id": 64002
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00027-20260804T072742Z",
+      "track_id": "s006-t00015",
+      "mid": 1785828795.0686085,
+      "start_utc": "2026-08-04T07:33:09.836088Z",
+      "duration_s": 10.46504068400003,
+      "measured_slope_hz_s": -3978.4817384226662,
+      "confidence": 0.7728459454681174,
+      "carrier": 11419040264.423077,
+      "visible_starlinks": 201,
+      "matches_within_500_hz_s": 5,
+      "matches_within_1000_hz_s": 6,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 136.09210123861294,
+          "predicted_slope_hz_s": -3842.3896371840533,
+          "elevation_deg": 89.23272092925416,
+          "name": "STARLINK-32941          ",
+          "norad_id": 63119
+        },
+        {
+          "slope_error_hz_s": 152.04034969563554,
+          "predicted_slope_hz_s": -3826.4413887270307,
+          "elevation_deg": 68.12697497022852,
+          "name": "STARLINK-32833          ",
+          "norad_id": 62873
+        },
+        {
+          "slope_error_hz_s": 193.41025126027716,
+          "predicted_slope_hz_s": -3785.071487162389,
+          "elevation_deg": 69.81239299516093,
+          "name": "STARLINK-35805          ",
+          "norad_id": 66359
+        },
+        {
+          "slope_error_hz_s": 330.7766689148725,
+          "predicted_slope_hz_s": -3647.7050695077937,
+          "elevation_deg": 70.82588854887524,
+          "name": "STARLINK-5491           ",
+          "norad_id": 55332
+        },
+        {
+          "slope_error_hz_s": 436.94663078343956,
+          "predicted_slope_hz_s": -3541.5351076392267,
+          "elevation_deg": 58.31236541587499,
+          "name": "STARLINK-11566 [DTC]    ",
+          "norad_id": 62914
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00028-20260804T074352Z",
+      "track_id": "s017-t00038",
+      "mid": 1785830190.4622521,
+      "start_utc": "2026-08-04T07:56:28.445583Z",
+      "duration_s": 4.033337903000074,
+      "measured_slope_hz_s": 7868.786135916698,
+      "confidence": 0.5431957411314178,
+      "carrier": 11549501802.884615,
+      "visible_starlinks": 206,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 7967.678784413382,
+          "predicted_slope_hz_s": -98.89264849668426,
+          "elevation_deg": 10.640556846132258,
+          "name": "STARLINK-5663           ",
+          "norad_id": 55347
+        },
+        {
+          "slope_error_hz_s": 7995.74481132975,
+          "predicted_slope_hz_s": -126.95867541305181,
+          "elevation_deg": 13.314285754865054,
+          "name": "STARLINK-33835          ",
+          "norad_id": 63645
+        },
+        {
+          "slope_error_hz_s": 8005.562613516701,
+          "predicted_slope_hz_s": -136.77647760000275,
+          "elevation_deg": 12.430139841315247,
+          "name": "STARLINK-3157           ",
+          "norad_id": 49413
+        },
+        {
+          "slope_error_hz_s": 8013.673347502778,
+          "predicted_slope_hz_s": -144.88721158607996,
+          "elevation_deg": 12.903667905138317,
+          "name": "STARLINK-5128           ",
+          "norad_id": 53998
+        },
+        {
+          "slope_error_hz_s": 8016.8412400784555,
+          "predicted_slope_hz_s": -148.05510416175727,
+          "elevation_deg": 10.376107392694028,
+          "name": "STARLINK-36521          ",
+          "norad_id": 67507
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00029-20260804T080000Z",
+      "track_id": "s019-t00015",
+      "mid": 1785831226.2751946,
+      "start_utc": "2026-08-04T08:13:44.824220Z",
+      "duration_s": 3.407425136000029,
+      "measured_slope_hz_s": -3974.7991452225333,
+      "confidence": 0.9047555690116581,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 213,
+      "matches_within_500_hz_s": 3,
+      "matches_within_1000_hz_s": 10,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 162.66128958039462,
+          "predicted_slope_hz_s": -4137.460434802928,
+          "elevation_deg": 88.60454424249946,
+          "name": "STARLINK-35259          ",
+          "norad_id": 66197
+        },
+        {
+          "slope_error_hz_s": 354.535636876496,
+          "predicted_slope_hz_s": -3620.2635083460373,
+          "elevation_deg": 60.84410824592909,
+          "name": "STARLINK-31443          ",
+          "norad_id": 59393
+        },
+        {
+          "slope_error_hz_s": 428.4287189439924,
+          "predicted_slope_hz_s": -3546.370426278541,
+          "elevation_deg": 61.644491029238374,
+          "name": "STARLINK-33751          ",
+          "norad_id": 63512
+        },
+        {
+          "slope_error_hz_s": 508.96718954259813,
+          "predicted_slope_hz_s": -3465.831955679935,
+          "elevation_deg": 52.89130258605654,
+          "name": "STARLINK-1183           ",
+          "norad_id": 45088
+        },
+        {
+          "slope_error_hz_s": 720.2392291641154,
+          "predicted_slope_hz_s": -3254.559916058418,
+          "elevation_deg": 67.06661600535398,
+          "name": "STARLINK-35379          ",
+          "norad_id": 66084
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00029-20260804T080000Z",
+      "track_id": "s019-t00024",
+      "mid": 1785831225.5811744,
+      "start_utc": "2026-08-04T08:13:43.815247Z",
+      "duration_s": 3.531854568999961,
+      "measured_slope_hz_s": -3693.9065595467646,
+      "confidence": 0.8063923363333569,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 214,
+      "matches_within_500_hz_s": 7,
+      "matches_within_1000_hz_s": 13,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 68.0192304142538,
+          "predicted_slope_hz_s": -3625.887329132511,
+          "elevation_deg": 60.90078368571744,
+          "name": "STARLINK-31443          ",
+          "norad_id": 59393
+        },
+        {
+          "slope_error_hz_s": 136.48983887523264,
+          "predicted_slope_hz_s": -3557.416720671532,
+          "elevation_deg": 61.76650062284608,
+          "name": "STARLINK-33751          ",
+          "norad_id": 63512
+        },
+        {
+          "slope_error_hz_s": 229.82667832763673,
+          "predicted_slope_hz_s": -3464.079881219128,
+          "elevation_deg": 52.875846928087384,
+          "name": "STARLINK-1183           ",
+          "norad_id": 45088
+        },
+        {
+          "slope_error_hz_s": 423.8251719927607,
+          "predicted_slope_hz_s": -3270.081387554004,
+          "elevation_deg": 57.403426569047745,
+          "name": "STARLINK-35970          ",
+          "norad_id": 66618
+        },
+        {
+          "slope_error_hz_s": 440.79135068146206,
+          "predicted_slope_hz_s": -4134.697910228227,
+          "elevation_deg": 88.10155672625667,
+          "name": "STARLINK-35259          ",
+          "norad_id": 66197
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00029-20260804T080000Z",
+      "track_id": "s019-t00030",
+      "mid": 1785831219.5969176,
+      "start_utc": "2026-08-04T08:13:37.393723Z",
+      "duration_s": 4.406388825000022,
+      "measured_slope_hz_s": -7798.692154130837,
+      "confidence": 0.6657332940699758,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 217,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3744.119584050569,
+          "predicted_slope_hz_s": -4054.5725700802677,
+          "elevation_deg": 82.91644824141625,
+          "name": "STARLINK-35259          ",
+          "norad_id": 66197
+        },
+        {
+          "slope_error_hz_s": 4163.428496601396,
+          "predicted_slope_hz_s": -3635.263657529441,
+          "elevation_deg": 60.985173428472976,
+          "name": "STARLINK-31443          ",
+          "norad_id": 59393
+        },
+        {
+          "slope_error_hz_s": 4182.76636454747,
+          "predicted_slope_hz_s": -3615.925789583366,
+          "elevation_deg": 62.42163336804952,
+          "name": "STARLINK-33751          ",
+          "norad_id": 63512
+        },
+        {
+          "slope_error_hz_s": 4383.089052898244,
+          "predicted_slope_hz_s": -3415.6031012325934,
+          "elevation_deg": 52.47356696759762,
+          "name": "STARLINK-1183           ",
+          "norad_id": 45088
+        },
+        {
+          "slope_error_hz_s": 4400.196281713974,
+          "predicted_slope_hz_s": -3398.495872416863,
+          "elevation_deg": 58.71274603181619,
+          "name": "STARLINK-35970          ",
+          "norad_id": 66618
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00029-20260804T080000Z",
+      "track_id": "s019-t00032",
+      "mid": 1785831220.1650438,
+      "start_utc": "2026-08-04T08:13:38.655418Z",
+      "duration_s": 3.522899940000002,
+      "measured_slope_hz_s": -4387.162358922218,
+      "confidence": 0.7493832244226438,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 217,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 5,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 320.7826328918327,
+          "predicted_slope_hz_s": -4066.3797260303854,
+          "elevation_deg": 83.41902645273288,
+          "name": "STARLINK-35259          ",
+          "norad_id": 66197
+        },
+        {
+          "slope_error_hz_s": 749.7592822035431,
+          "predicted_slope_hz_s": -3637.403076718675,
+          "elevation_deg": 61.00852180749666,
+          "name": "STARLINK-31443          ",
+          "norad_id": 59393
+        },
+        {
+          "slope_error_hz_s": 773.8775263815951,
+          "predicted_slope_hz_s": -3613.284832540623,
+          "elevation_deg": 62.39127262396291,
+          "name": "STARLINK-33751          ",
+          "norad_id": 63512
+        },
+        {
+          "slope_error_hz_s": 964.4457206489196,
+          "predicted_slope_hz_s": -3422.7166382732985,
+          "elevation_deg": 52.53201798011094,
+          "name": "STARLINK-1183           ",
+          "norad_id": 45088
+        },
+        {
+          "slope_error_hz_s": 998.6589242915566,
+          "predicted_slope_hz_s": -3388.5034346306616,
+          "elevation_deg": 58.61016424520907,
+          "name": "STARLINK-35970          ",
+          "norad_id": 66618
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00029-20260804T080000Z",
+      "track_id": "s019-t00037",
+      "mid": 1785831226.1489663,
+      "start_utc": "2026-08-04T08:13:44.824220Z",
+      "duration_s": 3.4052237550000655,
+      "measured_slope_hz_s": -4764.544991791357,
+      "confidence": 0.9100514695960479,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 213,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 1,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 627.487069159899,
+          "predicted_slope_hz_s": -4137.057922631458,
+          "elevation_deg": 88.520111912478,
+          "name": "STARLINK-35259          ",
+          "norad_id": 66197
+        },
+        {
+          "slope_error_hz_s": 1143.1926290636893,
+          "predicted_slope_hz_s": -3621.3523627276672,
+          "elevation_deg": 60.85512715836129,
+          "name": "STARLINK-31443          ",
+          "norad_id": 59393
+        },
+        {
+          "slope_error_hz_s": 1216.1050720326452,
+          "predicted_slope_hz_s": -3548.4399197587113,
+          "elevation_deg": 61.66735548652462,
+          "name": "STARLINK-33751          ",
+          "norad_id": 63512
+        },
+        {
+          "slope_error_hz_s": 1298.9737822842062,
+          "predicted_slope_hz_s": -3465.5712095071503,
+          "elevation_deg": 52.888981305292354,
+          "name": "STARLINK-1183           ",
+          "norad_id": 45088
+        },
+        {
+          "slope_error_hz_s": 1509.1265160330886,
+          "predicted_slope_hz_s": -3255.418475758268,
+          "elevation_deg": 57.254959363965696,
+          "name": "STARLINK-35970          ",
+          "norad_id": 66618
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00029-20260804T080000Z",
+      "track_id": "s019-t00082",
+      "mid": 1785831225.1407561,
+      "start_utc": "2026-08-04T08:13:43.311057Z",
+      "duration_s": 3.6593972929999836,
+      "measured_slope_hz_s": -4185.942274788305,
+      "confidence": 0.8152483478926263,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 214,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 7,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 53.718974552628424,
+          "predicted_slope_hz_s": -4132.223300235677,
+          "elevation_deg": 87.74980688983024,
+          "name": "STARLINK-35259          ",
+          "norad_id": 66197
+        },
+        {
+          "slope_error_hz_s": 556.9724251202915,
+          "predicted_slope_hz_s": -3628.969849668014,
+          "elevation_deg": 60.93176946629566,
+          "name": "STARLINK-31443          ",
+          "norad_id": 59393
+        },
+        {
+          "slope_error_hz_s": 621.9625095612464,
+          "predicted_slope_hz_s": -3563.979765227059,
+          "elevation_deg": 61.8391881323826,
+          "name": "STARLINK-33751          ",
+          "norad_id": 63512
+        },
+        {
+          "slope_error_hz_s": 723.4004431958897,
+          "predicted_slope_hz_s": -3462.5418315924157,
+          "elevation_deg": 52.862626753914995,
+          "name": "STARLINK-1183           ",
+          "norad_id": 45088
+        },
+        {
+          "slope_error_hz_s": 904.7659552091282,
+          "predicted_slope_hz_s": -3281.1763195791773,
+          "elevation_deg": 57.515926347268206,
+          "name": "STARLINK-35970          ",
+          "norad_id": 66618
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00001",
+      "mid": 1785832680.5913014,
+      "start_utc": "2026-08-04T08:37:57.497283Z",
+      "duration_s": 6.188037268999977,
+      "measured_slope_hz_s": -3605.2587582503284,
+      "confidence": 0.8743282281523305,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 3,
+      "matches_within_1000_hz_s": 13,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 78.13531561548871,
+          "predicted_slope_hz_s": -3683.394073865817,
+          "elevation_deg": 76.37891949620202,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 264.8381824242688,
+          "predicted_slope_hz_s": -3340.4205758260596,
+          "elevation_deg": 58.260735724848445,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 299.1461899187616,
+          "predicted_slope_hz_s": -3306.1125683315668,
+          "elevation_deg": 53.00357734438706,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 549.9077406349775,
+          "predicted_slope_hz_s": -3055.351017615351,
+          "elevation_deg": 53.27919351786193,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 572.3553587319266,
+          "predicted_slope_hz_s": -3032.903399518402,
+          "elevation_deg": 57.0150125032975,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00002",
+      "mid": 1785832681.4128335,
+      "start_utc": "2026-08-04T08:37:57.497283Z",
+      "duration_s": 7.831101364999967,
+      "measured_slope_hz_s": -3697.017965334139,
+      "confidence": 0.7913607779140764,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 3,
+      "matches_within_1000_hz_s": 10,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 17.42580698734082,
+          "predicted_slope_hz_s": -3679.592158346798,
+          "elevation_deg": 76.28873919156443,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 366.2758740315826,
+          "predicted_slope_hz_s": -3330.742091302556,
+          "elevation_deg": 58.163876230631246,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 389.4603842400006,
+          "predicted_slope_hz_s": -3307.557581094138,
+          "elevation_deg": 53.01713678179046,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 636.9936048046966,
+          "predicted_slope_hz_s": -3060.024360529442,
+          "elevation_deg": 53.32222191130636,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 698.1222164770088,
+          "predicted_slope_hz_s": -2998.89574885713,
+          "elevation_deg": 56.65396602888794,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00005",
+      "mid": 1785832680.5277667,
+      "start_utc": "2026-08-04T08:37:57.623007Z",
+      "duration_s": 5.809519351999995,
+      "measured_slope_hz_s": -3506.026921137922,
+      "confidence": 0.9320319542878338,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 5,
+      "matches_within_1000_hz_s": 14,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 164.90165027858484,
+          "predicted_slope_hz_s": -3341.125270859337,
+          "elevation_deg": 58.267783569193874,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 177.6000862337014,
+          "predicted_slope_hz_s": -3683.627007371623,
+          "elevation_deg": 76.38450430356367,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 200.06925142450655,
+          "predicted_slope_hz_s": -3305.9576697134153,
+          "elevation_deg": 53.00216166212065,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 451.07232801370264,
+          "predicted_slope_hz_s": -3054.954593124219,
+          "elevation_deg": 53.275538926646014,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 470.51006590557245,
+          "predicted_slope_hz_s": -3035.5168552323494,
+          "elevation_deg": 57.042784738787105,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00008",
+      "mid": 1785832681.033591,
+      "start_utc": "2026-08-04T08:37:57.497283Z",
+      "duration_s": 7.072616521000015,
+      "measured_slope_hz_s": -4729.660886618494,
+      "confidence": 0.8232665750507642,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1048.1315848637769,
+          "predicted_slope_hz_s": -3681.5293017547174,
+          "elevation_deg": 76.33449492806736,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 1394.3206579700577,
+          "predicted_slope_hz_s": -3335.3402286484366,
+          "elevation_deg": 58.20990560602636,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 1422.6415661179076,
+          "predicted_slope_hz_s": -3307.0193205005867,
+          "elevation_deg": 53.01197312097533,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 1671.6892557176448,
+          "predicted_slope_hz_s": -3057.9716309008495,
+          "elevation_deg": 53.30333567504139,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 1715.0178706317652,
+          "predicted_slope_hz_s": -3014.643015986729,
+          "elevation_deg": 56.821072486650245,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00010",
+      "mid": 1785832681.789968,
+      "start_utc": "2026-08-04T08:37:57.497283Z",
+      "duration_s": 8.585370540000014,
+      "measured_slope_hz_s": -6080.165574447171,
+      "confidence": 0.7554677024816742,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 2402.8086140829923,
+          "predicted_slope_hz_s": -3677.3569603641786,
+          "elevation_deg": 76.23630403666665,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 2754.216022953243,
+          "predicted_slope_hz_s": -3325.949551493928,
+          "elevation_deg": 58.11588250949897,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 2772.2919596166753,
+          "predicted_slope_hz_s": -3307.8736148304956,
+          "elevation_deg": 53.020406890734385,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 3018.278461268748,
+          "predicted_slope_hz_s": -3061.887113178423,
+          "elevation_deg": 53.33933625446075,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 3097.0076902517862,
+          "predicted_slope_hz_s": -2983.1578841953847,
+          "elevation_deg": 56.48708248634972,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00035",
+      "mid": 1785832680.8427665,
+      "start_utc": "2026-08-04T08:37:58.253007Z",
+      "duration_s": 5.809519351999995,
+      "measured_slope_hz_s": -5105.1608463861285,
+      "confidence": 0.7521517832064024,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1422.774846298218,
+          "predicted_slope_hz_s": -3682.3860000879104,
+          "elevation_deg": 76.3548482083117,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 1767.5913250488106,
+          "predicted_slope_hz_s": -3337.569521337318,
+          "elevation_deg": 58.232214148316956,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 1798.4959154448393,
+          "predicted_slope_hz_s": -3306.664930941289,
+          "elevation_deg": 53.00866400471953,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 2048.2899907961273,
+          "predicted_slope_hz_s": -3056.870855590001,
+          "elevation_deg": 53.29319860320759,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 2082.625298504071,
+          "predicted_slope_hz_s": -3022.5355478820575,
+          "elevation_deg": 56.90487504860286,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00069",
+      "mid": 1785832683.0542254,
+      "start_utc": "2026-08-04T08:38:00.780067Z",
+      "duration_s": 4.548317095999948,
+      "measured_slope_hz_s": -3473.875055905197,
+      "confidence": 0.551607461756666,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 15,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 165.56973977508414,
+          "predicted_slope_hz_s": -3308.3053161301127,
+          "elevation_deg": 57.93909260319939,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 166.53770244686257,
+          "predicted_slope_hz_s": -3307.3373534583343,
+          "elevation_deg": 53.017791162990356,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 193.75572875434,
+          "predicted_slope_hz_s": -3667.630784659537,
+          "elevation_deg": 76.01133445583653,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 407.04908741930285,
+          "predicted_slope_hz_s": -3066.825968485894,
+          "elevation_deg": 53.38451984434869,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 506.3017416785601,
+          "predicted_slope_hz_s": -2967.5733142266367,
+          "elevation_deg": 51.2425695900037,
+          "name": "STARLINK-5760           ",
+          "norad_id": 55591
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00082",
+      "mid": 1785832681.979769,
+      "start_utc": "2026-08-04T08:38:00.780067Z",
+      "duration_s": 3.156872997999983,
+      "measured_slope_hz_s": -3568.646421347068,
+      "confidence": 0.6842981465961917,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 3,
+      "matches_within_1000_hz_s": 14,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 107.46580571746745,
+          "predicted_slope_hz_s": -3676.1122270645355,
+          "elevation_deg": 76.20732778840936,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 245.19416744648834,
+          "predicted_slope_hz_s": -3323.4522539005798,
+          "elevation_deg": 58.090897553830544,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 260.69896196974923,
+          "predicted_slope_hz_s": -3307.947459377319,
+          "elevation_deg": 53.021348085664314,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 505.892625520828,
+          "predicted_slope_hz_s": -3062.75379582624,
+          "elevation_deg": 53.34731880049174,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 592.4864046980556,
+          "predicted_slope_hz_s": -2976.1600166490125,
+          "elevation_deg": 51.31891392059406,
+          "name": "STARLINK-5760           ",
+          "norad_id": 55591
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s006-t00104",
+      "mid": 1785832681.032203,
+      "start_utc": "2026-08-04T08:38:00.905871Z",
+      "duration_s": 3.031069350999985,
+      "measured_slope_hz_s": -5180.92630371646,
+      "confidence": 0.8565660575411714,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1499.3941198286066,
+          "predicted_slope_hz_s": -3681.5321838878535,
+          "elevation_deg": 76.33464917578112,
+          "name": "STARLINK-33865          ",
+          "norad_id": 64247
+        },
+        {
+          "slope_error_hz_s": 1845.5725542780401,
+          "predicted_slope_hz_s": -3335.35374943842,
+          "elevation_deg": 58.21006958766162,
+          "name": "STARLINK-35562          ",
+          "norad_id": 66063
+        },
+        {
+          "slope_error_hz_s": 1873.9118431809547,
+          "predicted_slope_hz_s": -3307.0144605355053,
+          "elevation_deg": 53.01195123277299,
+          "name": "STARLINK-35042          ",
+          "norad_id": 65481
+        },
+        {
+          "slope_error_hz_s": 2122.96577809498,
+          "predicted_slope_hz_s": -3057.96052562148,
+          "elevation_deg": 53.303263590441816,
+          "name": "STARLINK-33714          ",
+          "norad_id": 63581
+        },
+        {
+          "slope_error_hz_s": 2166.2277367920365,
+          "predicted_slope_hz_s": -3014.6985669244236,
+          "elevation_deg": 56.821683445687775,
+          "name": "STARLINK-31695          ",
+          "norad_id": 59376
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s007-t00024",
+      "mid": 1785832714.9371195,
+      "start_utc": "2026-08-04T08:38:33.551585Z",
+      "duration_s": 3.2762924130000215,
+      "measured_slope_hz_s": -7530.460343035844,
+      "confidence": 0.7527212283659512,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 198,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3771.9566822174256,
+          "predicted_slope_hz_s": -3758.503660818418,
+          "elevation_deg": 85.6235066027491,
+          "name": "STARLINK-35888          ",
+          "norad_id": 67190
+        },
+        {
+          "slope_error_hz_s": 4009.384766347504,
+          "predicted_slope_hz_s": -3521.07557668834,
+          "elevation_deg": 67.46912605326176,
+          "name": "STARLINK-31225          ",
+          "norad_id": 59040
+        },
+        {
+          "slope_error_hz_s": 4291.198068566577,
+          "predicted_slope_hz_s": -3239.2622744692667,
+          "elevation_deg": 35.992700232523546,
+          "name": "STARLINK-11484 [DTC]    ",
+          "norad_id": 62277
+        },
+        {
+          "slope_error_hz_s": 4315.9512593661,
+          "predicted_slope_hz_s": -3214.509083669743,
+          "elevation_deg": 58.70912761434287,
+          "name": "STARLINK-31662          ",
+          "norad_id": 59584
+        },
+        {
+          "slope_error_hz_s": 4605.18027886444,
+          "predicted_slope_hz_s": -2925.2800641714043,
+          "elevation_deg": 62.54649620152269,
+          "name": "STARLINK-36544          ",
+          "norad_id": 67517
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00031-20260804T083232Z",
+      "track_id": "s011-t00077",
+      "mid": 1785832850.119199,
+      "start_utc": "2026-08-04T08:40:48.986848Z",
+      "duration_s": 3.0201040729999704,
+      "measured_slope_hz_s": 7884.764245828033,
+      "confidence": 0.6482395912102675,
+      "carrier": 11231194110.576923,
+      "visible_starlinks": 210,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 7975.521711310707,
+          "predicted_slope_hz_s": -90.75746548267438,
+          "elevation_deg": 10.651461855861315,
+          "name": "STARLINK-30212          ",
+          "norad_id": 57506
+        },
+        {
+          "slope_error_hz_s": 7979.949347847665,
+          "predicted_slope_hz_s": -95.18510201963156,
+          "elevation_deg": 10.435297607946726,
+          "name": "STARLINK-31513          ",
+          "norad_id": 59529
+        },
+        {
+          "slope_error_hz_s": 7981.627661848138,
+          "predicted_slope_hz_s": -96.8634160201045,
+          "elevation_deg": 11.119137144712411,
+          "name": "STARLINK-32572          ",
+          "norad_id": 61952
+        },
+        {
+          "slope_error_hz_s": 7983.345278206909,
+          "predicted_slope_hz_s": -98.58103237887512,
+          "elevation_deg": 11.02535480569201,
+          "name": "STARLINK-35972          ",
+          "norad_id": 66638
+        },
+        {
+          "slope_error_hz_s": 7987.5856956698,
+          "predicted_slope_hz_s": -102.82144984176666,
+          "elevation_deg": 11.994719049636135,
+          "name": "STARLINK-35863          ",
+          "norad_id": 67170
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00032-20260804T084858Z",
+      "track_id": "s018-t00062",
+      "mid": 1785834108.854697,
+      "start_utc": "2026-08-04T09:01:46.708626Z",
+      "duration_s": 5.1756870770000205,
+      "measured_slope_hz_s": 6669.746939428371,
+      "confidence": 0.7674061070615212,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 210,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 6773.568075001996,
+          "predicted_slope_hz_s": -103.82113557362521,
+          "elevation_deg": 10.780614251588618,
+          "name": "STARLINK-3264           ",
+          "norad_id": 50198
+        },
+        {
+          "slope_error_hz_s": 6773.733727368873,
+          "predicted_slope_hz_s": -103.98678794050151,
+          "elevation_deg": 11.149127454604832,
+          "name": "STARLINK-5578           ",
+          "norad_id": 55374
+        },
+        {
+          "slope_error_hz_s": 6787.750451388382,
+          "predicted_slope_hz_s": -118.00351196001192,
+          "elevation_deg": 12.820018624140033,
+          "name": "STARLINK-36396          ",
+          "norad_id": 67494
+        },
+        {
+          "slope_error_hz_s": 6800.001808227004,
+          "predicted_slope_hz_s": -130.25486879863323,
+          "elevation_deg": 10.14856508248276,
+          "name": "STARLINK-37445          ",
+          "norad_id": 69165
+        },
+        {
+          "slope_error_hz_s": 6811.271971807326,
+          "predicted_slope_hz_s": -141.52503237895462,
+          "elevation_deg": 10.661907822450273,
+          "name": "STARLINK-5519           ",
+          "norad_id": 57223
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00033-20260804T090511Z",
+      "track_id": "s006-t00038",
+      "mid": 1785834645.1579695,
+      "start_utc": "2026-08-04T09:10:42.510710Z",
+      "duration_s": 6.300099564999982,
+      "measured_slope_hz_s": -7462.889595031762,
+      "confidence": 0.8166626472416683,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3426.2436351981405,
+          "predicted_slope_hz_s": -4036.6459598336214,
+          "elevation_deg": 83.12594795849785,
+          "name": "STARLINK-34996          ",
+          "norad_id": 65223
+        },
+        {
+          "slope_error_hz_s": 3712.7827365205067,
+          "predicted_slope_hz_s": -3750.1068585112553,
+          "elevation_deg": 65.75889653808125,
+          "name": "STARLINK-3938           ",
+          "norad_id": 52566
+        },
+        {
+          "slope_error_hz_s": 3902.000078999229,
+          "predicted_slope_hz_s": -3560.889516032533,
+          "elevation_deg": 68.53469142708327,
+          "name": "STARLINK-33880          ",
+          "norad_id": 63686
+        },
+        {
+          "slope_error_hz_s": 4093.1872089946355,
+          "predicted_slope_hz_s": -3369.7023860371264,
+          "elevation_deg": 54.061850856039854,
+          "name": "STARLINK-37035          ",
+          "norad_id": 68180
+        },
+        {
+          "slope_error_hz_s": 4305.927792139604,
+          "predicted_slope_hz_s": -3156.9618028921573,
+          "elevation_deg": 66.52329827171296,
+          "name": "STARLINK-33752          ",
+          "norad_id": 63580
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00033-20260804T090511Z",
+      "track_id": "s009-t00010",
+      "mid": 1785834764.0910964,
+      "start_utc": "2026-08-04T09:12:42.193988Z",
+      "duration_s": 3.7942163079999887,
+      "measured_slope_hz_s": 5890.068770897946,
+      "confidence": 0.8274084184348148,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 204,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5973.633833336158,
+          "predicted_slope_hz_s": -83.56506243821225,
+          "elevation_deg": 10.01834995328727,
+          "name": "STARLINK-5509           ",
+          "norad_id": 57263
+        },
+        {
+          "slope_error_hz_s": 5983.5248882651385,
+          "predicted_slope_hz_s": -93.45611736719242,
+          "elevation_deg": 10.78865098017882,
+          "name": "STARLINK-35033          ",
+          "norad_id": 65468
+        },
+        {
+          "slope_error_hz_s": 6000.803821018263,
+          "predicted_slope_hz_s": -110.73505012031698,
+          "elevation_deg": 11.763643155348287,
+          "name": "STARLINK-5581           ",
+          "norad_id": 55373
+        },
+        {
+          "slope_error_hz_s": 6008.211992778689,
+          "predicted_slope_hz_s": -118.14322188074316,
+          "elevation_deg": 11.402726215810105,
+          "name": "STARLINK-32832          ",
+          "norad_id": 63040
+        },
+        {
+          "slope_error_hz_s": 6008.385330302362,
+          "predicted_slope_hz_s": -118.3165594044161,
+          "elevation_deg": 10.908417209153061,
+          "name": "STARLINK-36224          ",
+          "norad_id": 67203
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00034-20260804T092128Z",
+      "track_id": "s011-t00017",
+      "mid": 1785835804.9107966,
+      "start_utc": "2026-08-04T09:30:02.890769Z",
+      "duration_s": 4.040054570999985,
+      "measured_slope_hz_s": -4305.915080211421,
+      "confidence": 0.6145182540951143,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 207,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 7,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 60.064747164076834,
+          "predicted_slope_hz_s": -4245.850333047344,
+          "elevation_deg": 62.72994256339289,
+          "name": "STARLINK-11711 [DTC]    ",
+          "norad_id": 64378
+        },
+        {
+          "slope_error_hz_s": 315.9839980968609,
+          "predicted_slope_hz_s": -3989.93108211456,
+          "elevation_deg": 73.56800787229567,
+          "name": "STARLINK-31604          ",
+          "norad_id": 59214
+        },
+        {
+          "slope_error_hz_s": 348.88170391415406,
+          "predicted_slope_hz_s": -3957.033376297267,
+          "elevation_deg": 77.09556537768091,
+          "name": "STARLINK-3199           ",
+          "norad_id": 49760
+        },
+        {
+          "slope_error_hz_s": 470.7258205276885,
+          "predicted_slope_hz_s": -3835.1892596837324,
+          "elevation_deg": 85.12859276969948,
+          "name": "STARLINK-33886          ",
+          "norad_id": 63681
+        },
+        {
+          "slope_error_hz_s": 722.1422502144278,
+          "predicted_slope_hz_s": -3583.772829996993,
+          "elevation_deg": 67.14072956845864,
+          "name": "STARLINK-31619          ",
+          "norad_id": 59531
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00034-20260804T092128Z",
+      "track_id": "s019-t00189",
+      "mid": 1785836118.554761,
+      "start_utc": "2026-08-04T09:35:17.230450Z",
+      "duration_s": 3.660222636999947,
+      "measured_slope_hz_s": 313.3001215074336,
+      "confidence": 0.6427517820822718,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 209,
+      "matches_within_500_hz_s": 15,
+      "matches_within_1000_hz_s": 73,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 403.86427588645677,
+          "predicted_slope_hz_s": -90.56415437902322,
+          "elevation_deg": 10.207298246308447,
+          "name": "STARLINK-3277           ",
+          "norad_id": 50182
+        },
+        {
+          "slope_error_hz_s": 409.4827302568078,
+          "predicted_slope_hz_s": -96.18260874937422,
+          "elevation_deg": 10.339377716736777,
+          "name": "STARLINK-30488          ",
+          "norad_id": 57931
+        },
+        {
+          "slope_error_hz_s": 413.0039977901063,
+          "predicted_slope_hz_s": -99.70387628267277,
+          "elevation_deg": 11.629766739232602,
+          "name": "STARLINK-36491          ",
+          "norad_id": 67310
+        },
+        {
+          "slope_error_hz_s": 424.2735755640468,
+          "predicted_slope_hz_s": -110.97345405661322,
+          "elevation_deg": 12.191287923994675,
+          "name": "STARLINK-3286           ",
+          "norad_id": 50171
+        },
+        {
+          "slope_error_hz_s": 429.8866176376238,
+          "predicted_slope_hz_s": -116.58649613019021,
+          "elevation_deg": 12.000802730779832,
+          "name": "STARLINK-5069           ",
+          "norad_id": 55640
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00035-20260804T093750Z",
+      "track_id": "s008-t00055",
+      "mid": 1785836654.6346655,
+      "start_utc": "2026-08-04T09:44:13.118395Z",
+      "duration_s": 3.0325405270000374,
+      "measured_slope_hz_s": -5141.784978536245,
+      "confidence": 0.6843329596526685,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 202,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 2,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 218.2261782657106,
+          "predicted_slope_hz_s": -5360.011156801956,
+          "elevation_deg": 65.88363757979532,
+          "name": "STARLINK-4442           ",
+          "norad_id": 53480
+        },
+        {
+          "slope_error_hz_s": 953.0369953326717,
+          "predicted_slope_hz_s": -4188.747983203573,
+          "elevation_deg": 68.49149816330555,
+          "name": "STARLINK-36870          ",
+          "norad_id": 67897
+        },
+        {
+          "slope_error_hz_s": 1310.1440747733059,
+          "predicted_slope_hz_s": -3831.640903762939,
+          "elevation_deg": 85.53659770269743,
+          "name": "STARLINK-31566          ",
+          "norad_id": 59475
+        },
+        {
+          "slope_error_hz_s": 1619.4945517821861,
+          "predicted_slope_hz_s": -3522.290426754059,
+          "elevation_deg": 65.89514553703674,
+          "name": "STARLINK-5639           ",
+          "norad_id": 55365
+        },
+        {
+          "slope_error_hz_s": 1849.41744198187,
+          "predicted_slope_hz_s": -3292.367536554375,
+          "elevation_deg": 64.27345933425639,
+          "name": "STARLINK-4685           ",
+          "norad_id": 53709
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00036-20260804T095400Z",
+      "track_id": "s005-t00042",
+      "mid": 1785837535.207213,
+      "start_utc": "2026-08-04T09:58:53.694474Z",
+      "duration_s": 3.2762275989999807,
+      "measured_slope_hz_s": -6445.209430099606,
+      "confidence": 0.8187180779119368,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 221,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 2679.9397433439713,
+          "predicted_slope_hz_s": -3765.2696867556347,
+          "elevation_deg": 79.67548295750193,
+          "name": "STARLINK-5684           ",
+          "norad_id": 55453
+        },
+        {
+          "slope_error_hz_s": 2768.5681996061776,
+          "predicted_slope_hz_s": -3676.6412304934283,
+          "elevation_deg": 75.23687218771622,
+          "name": "STARLINK-33914          ",
+          "norad_id": 63774
+        },
+        {
+          "slope_error_hz_s": 2817.5139099455605,
+          "predicted_slope_hz_s": -3627.6955201540454,
+          "elevation_deg": 88.26573451697303,
+          "name": "STARLINK-4768           ",
+          "norad_id": 53806
+        },
+        {
+          "slope_error_hz_s": 2956.0137324598068,
+          "predicted_slope_hz_s": -3489.195697639799,
+          "elevation_deg": 69.07987099056236,
+          "name": "STARLINK-35166          ",
+          "norad_id": 65499
+        },
+        {
+          "slope_error_hz_s": 3210.627780950715,
+          "predicted_slope_hz_s": -3234.581649148891,
+          "elevation_deg": 60.40190579956446,
+          "name": "STARLINK-31620          ",
+          "norad_id": 59460
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00036-20260804T095400Z",
+      "track_id": "s018-t00015",
+      "mid": 1785838019.8284569,
+      "start_utc": "2026-08-04T10:06:58.066799Z",
+      "duration_s": 3.7746072190000177,
+      "measured_slope_hz_s": -2601.1571694392233,
+      "confidence": 0.823241010520316,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 213,
+      "matches_within_500_hz_s": 25,
+      "matches_within_1000_hz_s": 52,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 47.845036164509565,
+          "predicted_slope_hz_s": -2553.3121332747137,
+          "elevation_deg": 56.24124197502795,
+          "name": "STARLINK-35526          ",
+          "norad_id": 65931
+        },
+        {
+          "slope_error_hz_s": 60.90006930559002,
+          "predicted_slope_hz_s": -2662.0572387448133,
+          "elevation_deg": 41.258891865045925,
+          "name": "STARLINK-35556          ",
+          "norad_id": 66238
+        },
+        {
+          "slope_error_hz_s": 63.88520759219364,
+          "predicted_slope_hz_s": -2537.2719618470296,
+          "elevation_deg": 38.24721847541875,
+          "name": "STARLINK-3282           ",
+          "norad_id": 50177
+        },
+        {
+          "slope_error_hz_s": 84.18279859309268,
+          "predicted_slope_hz_s": -2685.339968032316,
+          "elevation_deg": 44.21681948680749,
+          "name": "STARLINK-33814          ",
+          "norad_id": 63582
+        },
+        {
+          "slope_error_hz_s": 106.08341220027887,
+          "predicted_slope_hz_s": -2495.0737572389444,
+          "elevation_deg": 35.12532268842396,
+          "name": "STARLINK-36242          ",
+          "norad_id": 68958
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00036-20260804T095400Z",
+      "track_id": "s018-t00022",
+      "mid": 1785838020.3942146,
+      "start_utc": "2026-08-04T10:06:58.820817Z",
+      "duration_s": 3.2723679160000074,
+      "measured_slope_hz_s": -9366.005727376596,
+      "confidence": 0.7241699896350909,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 213,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 4851.113871942862,
+          "predicted_slope_hz_s": -4514.891855433734,
+          "elevation_deg": 68.90829346673979,
+          "name": "STARLINK-11098 [DTC]    ",
+          "norad_id": 59760
+        },
+        {
+          "slope_error_hz_s": 5508.162688308357,
+          "predicted_slope_hz_s": -3857.8430390682392,
+          "elevation_deg": 88.20577685577435,
+          "name": "STARLINK-31956          ",
+          "norad_id": 59930
+        },
+        {
+          "slope_error_hz_s": 5711.577663119557,
+          "predicted_slope_hz_s": -3654.4280642570393,
+          "elevation_deg": 62.617079637502954,
+          "name": "STARLINK-30529          ",
+          "norad_id": 58047
+        },
+        {
+          "slope_error_hz_s": 5721.092315643024,
+          "predicted_slope_hz_s": -3644.9134117335716,
+          "elevation_deg": 67.37494838076414,
+          "name": "STARLINK-4072           ",
+          "norad_id": 52694
+        },
+        {
+          "slope_error_hz_s": 6073.784681038229,
+          "predicted_slope_hz_s": -3292.221046338367,
+          "elevation_deg": 57.78324918052334,
+          "name": "STARLINK-6250           ",
+          "norad_id": 57230
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00036-20260804T095400Z",
+      "track_id": "s018-t00066",
+      "mid": 1785838020.8340297,
+      "start_utc": "2026-08-04T10:06:58.820817Z",
+      "duration_s": 5.157832173999964,
+      "measured_slope_hz_s": -6223.156493040124,
+      "confidence": 0.6654790149986298,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 212,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1669.5889426977874,
+          "predicted_slope_hz_s": -4553.567550342336,
+          "elevation_deg": 69.36137153891148,
+          "name": "STARLINK-11098 [DTC]    ",
+          "norad_id": 59760
+        },
+        {
+          "slope_error_hz_s": 2363.2825266911227,
+          "predicted_slope_hz_s": -3859.873966349001,
+          "elevation_deg": 88.57940233162155,
+          "name": "STARLINK-31956          ",
+          "norad_id": 59930
+        },
+        {
+          "slope_error_hz_s": 2562.6941563654595,
+          "predicted_slope_hz_s": -3660.462336674664,
+          "elevation_deg": 62.68259204800839,
+          "name": "STARLINK-30529          ",
+          "norad_id": 58047
+        },
+        {
+          "slope_error_hz_s": 2595.272579251376,
+          "predicted_slope_hz_s": -3627.8839137887476,
+          "elevation_deg": 67.14268245112423,
+          "name": "STARLINK-4072           ",
+          "norad_id": 52694
+        },
+        {
+          "slope_error_hz_s": 2932.36579013086,
+          "predicted_slope_hz_s": -3290.7907029092635,
+          "elevation_deg": 57.76915515174887,
+          "name": "STARLINK-6250           ",
+          "norad_id": 57230
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00037-20260804T101019Z",
+      "track_id": "s011-t00139",
+      "mid": 1785838740.001705,
+      "start_utc": "2026-08-04T10:18:58.425603Z",
+      "duration_s": 3.908281724999995,
+      "measured_slope_hz_s": -2870.1570584908386,
+      "confidence": 0.77880772003914,
+      "carrier": 11401963341.346153,
+      "visible_starlinks": 219,
+      "matches_within_500_hz_s": 11,
+      "matches_within_1000_hz_s": 33,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 70.2252211182822,
+          "predicted_slope_hz_s": -2799.9318373725564,
+          "elevation_deg": 49.53813366125083,
+          "name": "STARLINK-6294           ",
+          "norad_id": 57225
+        },
+        {
+          "slope_error_hz_s": 112.41051536103123,
+          "predicted_slope_hz_s": -2757.7465431298074,
+          "elevation_deg": 46.81842972231884,
+          "name": "STARLINK-35899          ",
+          "norad_id": 66497
+        },
+        {
+          "slope_error_hz_s": 122.98183997737169,
+          "predicted_slope_hz_s": -2993.1388984682103,
+          "elevation_deg": 36.51962180421491,
+          "name": "STARLINK-11742 [DTC]    ",
+          "norad_id": 64377
+        },
+        {
+          "slope_error_hz_s": 123.98621723188126,
+          "predicted_slope_hz_s": -2994.14327572272,
+          "elevation_deg": 62.35233733192534,
+          "name": "STARLINK-3250           ",
+          "norad_id": 49749
+        },
+        {
+          "slope_error_hz_s": 177.02258370202344,
+          "predicted_slope_hz_s": -2693.134474788815,
+          "elevation_deg": 49.76352571306066,
+          "name": "STARLINK-11736 [DTC]    ",
+          "norad_id": 64317
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00038-20260804T102620Z",
+      "track_id": "s012-t00008",
+      "mid": 1785839729.3412704,
+      "start_utc": "2026-08-04T10:35:27.641083Z",
+      "duration_s": 3.4003747809999822,
+      "measured_slope_hz_s": -6354.319707562954,
+      "confidence": 0.5460385468109662,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 198,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1999.3326525386938,
+          "predicted_slope_hz_s": -4354.98705502426,
+          "elevation_deg": 51.63725159698932,
+          "name": "STARLINK-11734 [DTC]    ",
+          "norad_id": 64329
+        },
+        {
+          "slope_error_hz_s": 2296.887956229734,
+          "predicted_slope_hz_s": -4057.4317513332203,
+          "elevation_deg": 51.53819347097436,
+          "name": "STARLINK-11092 [DTC]    ",
+          "norad_id": 59710
+        },
+        {
+          "slope_error_hz_s": 2623.0066921069138,
+          "predicted_slope_hz_s": -3731.3130154560404,
+          "elevation_deg": 80.8704246696232,
+          "name": "STARLINK-31720          ",
+          "norad_id": 59497
+        },
+        {
+          "slope_error_hz_s": 2640.2313317482103,
+          "predicted_slope_hz_s": -3714.088375814744,
+          "elevation_deg": 65.86273633573414,
+          "name": "STARLINK-3200           ",
+          "norad_id": 49753
+        },
+        {
+          "slope_error_hz_s": 2721.2755801894086,
+          "predicted_slope_hz_s": -3633.0441273735455,
+          "elevation_deg": 56.86870373218062,
+          "name": "STARLINK-37175          ",
+          "norad_id": 68401
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00039-20260804T104232Z",
+      "track_id": "s011-t00114",
+      "mid": 1785840669.446707,
+      "start_utc": "2026-08-04T10:51:06.801175Z",
+      "duration_s": 5.291064023999979,
+      "measured_slope_hz_s": -4673.34885658085,
+      "confidence": 0.6727955224206642,
+      "carrier": 11549501802.884615,
+      "visible_starlinks": 189,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 1,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 919.9704565292609,
+          "predicted_slope_hz_s": -3753.3784000515893,
+          "elevation_deg": 80.83690157955677,
+          "name": "STARLINK-31519          ",
+          "norad_id": 59546
+        },
+        {
+          "slope_error_hz_s": 1035.83182525019,
+          "predicted_slope_hz_s": -3637.5170313306603,
+          "elevation_deg": 60.31035369632666,
+          "name": "STARLINK-4740           ",
+          "norad_id": 53871
+        },
+        {
+          "slope_error_hz_s": 1054.016613016022,
+          "predicted_slope_hz_s": -3619.3322435648283,
+          "elevation_deg": 70.14031019565246,
+          "name": "STARLINK-35583          ",
+          "norad_id": 66611
+        },
+        {
+          "slope_error_hz_s": 1189.0111637651485,
+          "predicted_slope_hz_s": -3484.3376928157018,
+          "elevation_deg": 37.51886394766336,
+          "name": "STARLINK-11674 [DTC]    ",
+          "norad_id": 64327
+        },
+        {
+          "slope_error_hz_s": 1214.119684662509,
+          "predicted_slope_hz_s": -3459.2291719183413,
+          "elevation_deg": 64.26177568756418,
+          "name": "STARLINK-37187          ",
+          "norad_id": 68399
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00039-20260804T104232Z",
+      "track_id": "s013-t00001",
+      "mid": 1785840741.652469,
+      "start_utc": "2026-08-04T10:52:20.008637Z",
+      "duration_s": 3.2876638019999973,
+      "measured_slope_hz_s": -3554.36536061212,
+      "confidence": 0.8395952817895301,
+      "carrier": 11549501802.884615,
+      "visible_starlinks": 201,
+      "matches_within_500_hz_s": 8,
+      "matches_within_1000_hz_s": 20,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5.840944701063563,
+          "predicted_slope_hz_s": -3548.5244159110566,
+          "elevation_deg": 65.4753115366315,
+          "name": "STARLINK-35366          ",
+          "norad_id": 66512
+        },
+        {
+          "slope_error_hz_s": 44.12037444480575,
+          "predicted_slope_hz_s": -3510.2449861673144,
+          "elevation_deg": 68.93435986020532,
+          "name": "STARLINK-35338          ",
+          "norad_id": 66250
+        },
+        {
+          "slope_error_hz_s": 70.35633298065159,
+          "predicted_slope_hz_s": -3624.7216935927718,
+          "elevation_deg": 60.31156357173589,
+          "name": "STARLINK-32621          ",
+          "norad_id": 62303
+        },
+        {
+          "slope_error_hz_s": 275.41045750085004,
+          "predicted_slope_hz_s": -3278.95490311127,
+          "elevation_deg": 70.07870773776055,
+          "name": "STARLINK-30895          ",
+          "norad_id": 58418
+        },
+        {
+          "slope_error_hz_s": 292.9064395531568,
+          "predicted_slope_hz_s": -3261.4589210589634,
+          "elevation_deg": 63.809638332884326,
+          "name": "STARLINK-30140          ",
+          "norad_id": 57458
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00039-20260804T104232Z",
+      "track_id": "s013-t00006",
+      "mid": 1785840741.3991418,
+      "start_utc": "2026-08-04T10:52:19.501983Z",
+      "duration_s": 3.79431832399996,
+      "measured_slope_hz_s": -7326.676189076553,
+      "confidence": 0.8819496831155687,
+      "carrier": 11549501802.884615,
+      "visible_starlinks": 201,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3178.7497234098846,
+          "predicted_slope_hz_s": -4147.926465666668,
+          "elevation_deg": 85.06181032486975,
+          "name": "STARLINK-36251          ",
+          "norad_id": 68093
+        },
+        {
+          "slope_error_hz_s": 3469.489786409983,
+          "predicted_slope_hz_s": -3857.18640266657,
+          "elevation_deg": 75.46433681289345,
+          "name": "STARLINK-30285          ",
+          "norad_id": 57840
+        },
+        {
+          "slope_error_hz_s": 3704.3464430545973,
+          "predicted_slope_hz_s": -3622.3297460219555,
+          "elevation_deg": 60.28792642029933,
+          "name": "STARLINK-32621          ",
+          "norad_id": 62303
+        },
+        {
+          "slope_error_hz_s": 3777.8260340480538,
+          "predicted_slope_hz_s": -3548.850155028499,
+          "elevation_deg": 65.4798834795427,
+          "name": "STARLINK-35366          ",
+          "norad_id": 66512
+        },
+        {
+          "slope_error_hz_s": 3805.784598065256,
+          "predicted_slope_hz_s": -3520.891591011297,
+          "elevation_deg": 69.09697529035208,
+          "name": "STARLINK-35338          ",
+          "norad_id": 66250
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00041-20260804T111516Z",
+      "track_id": "s001-t00025",
+      "mid": 1785842256.1142526,
+      "start_utc": "2026-08-04T11:17:34.347016Z",
+      "duration_s": 3.5344727009999986,
+      "measured_slope_hz_s": -3833.4721019204417,
+      "confidence": 0.8418037504265969,
+      "carrier": 11686117187.5,
+      "visible_starlinks": 176,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 14,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 22.25070895700992,
+          "predicted_slope_hz_s": -3855.7228108774516,
+          "elevation_deg": 65.77080140929077,
+          "name": "STARLINK-34776          ",
+          "norad_id": 65037
+        },
+        {
+          "slope_error_hz_s": 88.7607311140273,
+          "predicted_slope_hz_s": -3922.232833034469,
+          "elevation_deg": 87.9328909888408,
+          "name": "STARLINK-35597          ",
+          "norad_id": 66493
+        },
+        {
+          "slope_error_hz_s": 233.90950164731748,
+          "predicted_slope_hz_s": -4067.381603567759,
+          "elevation_deg": 74.24278563711762,
+          "name": "STARLINK-34596          ",
+          "norad_id": 64732
+        },
+        {
+          "slope_error_hz_s": 332.13253189927264,
+          "predicted_slope_hz_s": -3501.339570021169,
+          "elevation_deg": 60.27624520911144,
+          "name": "STARLINK-37021          ",
+          "norad_id": 68105
+        },
+        {
+          "slope_error_hz_s": 536.4760436348938,
+          "predicted_slope_hz_s": -3296.996058285548,
+          "elevation_deg": 57.07327263767904,
+          "name": "STARLINK-36967          ",
+          "norad_id": 68013
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00041-20260804T111516Z",
+      "track_id": "s001-t00049",
+      "mid": 1785842245.58103,
+      "start_utc": "2026-08-04T11:17:23.754165Z",
+      "duration_s": 3.653729949999999,
+      "measured_slope_hz_s": -7513.825915757019,
+      "confidence": 0.8124096643588724,
+      "carrier": 11686117187.5,
+      "visible_starlinks": 182,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 2383.279258185473,
+          "predicted_slope_hz_s": -5130.546657571546,
+          "elevation_deg": 67.83323898094909,
+          "name": "STARLINK-11369 [DTC]    ",
+          "norad_id": 62095
+        },
+        {
+          "slope_error_hz_s": 3521.0040775280036,
+          "predicted_slope_hz_s": -3992.8218382290156,
+          "elevation_deg": 65.66950022284011,
+          "name": "STARLINK-37021          ",
+          "norad_id": 68105
+        },
+        {
+          "slope_error_hz_s": 3567.83154200649,
+          "predicted_slope_hz_s": -3945.994373750529,
+          "elevation_deg": 72.21365143994308,
+          "name": "STARLINK-34596          ",
+          "norad_id": 64732
+        },
+        {
+          "slope_error_hz_s": 3734.416201901479,
+          "predicted_slope_hz_s": -3779.4097138555403,
+          "elevation_deg": 80.4981028040434,
+          "name": "STARLINK-35597          ",
+          "norad_id": 66493
+        },
+        {
+          "slope_error_hz_s": 3843.55972850612,
+          "predicted_slope_hz_s": -3670.2661872508993,
+          "elevation_deg": 71.26287725162946,
+          "name": "STARLINK-35450          ",
+          "norad_id": 65868
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00041-20260804T111516Z",
+      "track_id": "s002-t00019",
+      "mid": 1785842283.3945732,
+      "start_utc": "2026-08-04T11:18:01.314413Z",
+      "duration_s": 4.160319606000002,
+      "measured_slope_hz_s": -4054.3413521906223,
+      "confidence": 0.811301802770029,
+      "carrier": 11686117187.5,
+      "visible_starlinks": 178,
+      "matches_within_500_hz_s": 2,
+      "matches_within_1000_hz_s": 12,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 112.83414568137596,
+          "predicted_slope_hz_s": -3941.5072065092463,
+          "elevation_deg": 80.79854879019328,
+          "name": "STARLINK-4734           ",
+          "norad_id": 53790
+        },
+        {
+          "slope_error_hz_s": 419.91760279961454,
+          "predicted_slope_hz_s": -3634.4237493910077,
+          "elevation_deg": 67.47423320109732,
+          "name": "STARLINK-30925          ",
+          "norad_id": 58406
+        },
+        {
+          "slope_error_hz_s": 598.9033292481381,
+          "predicted_slope_hz_s": -3455.438022942484,
+          "elevation_deg": 54.27087768101403,
+          "name": "STARLINK-31358          ",
+          "norad_id": 58977
+        },
+        {
+          "slope_error_hz_s": 636.640188891593,
+          "predicted_slope_hz_s": -3417.7011632990293,
+          "elevation_deg": 60.85105773034534,
+          "name": "STARLINK-34776          ",
+          "norad_id": 65037
+        },
+        {
+          "slope_error_hz_s": 653.7508371406943,
+          "predicted_slope_hz_s": -3400.590515049928,
+          "elevation_deg": 37.11107561344531,
+          "name": "STARLINK-11700 [DTC]    ",
+          "norad_id": 64068
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00041-20260804T111516Z",
+      "track_id": "s002-t00049",
+      "mid": 1785842297.1347284,
+      "start_utc": "2026-08-04T11:18:14.800479Z",
+      "duration_s": 4.79403619499999,
+      "measured_slope_hz_s": -5406.441121831534,
+      "confidence": 0.7003851046826233,
+      "carrier": 11686117187.5,
+      "visible_starlinks": 185,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 1,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 76.04124839887663,
+          "predicted_slope_hz_s": -5330.399873432657,
+          "elevation_deg": 73.73407324762505,
+          "name": "STARLINK-11641 [DTC]    ",
+          "norad_id": 63268
+        },
+        {
+          "slope_error_hz_s": 1416.9965398120958,
+          "predicted_slope_hz_s": -3989.444582019438,
+          "elevation_deg": 82.60589840584,
+          "name": "STARLINK-4734           ",
+          "norad_id": 53790
+        },
+        {
+          "slope_error_hz_s": 1736.3848978171523,
+          "predicted_slope_hz_s": -3670.0562240143813,
+          "elevation_deg": 75.11695647009208,
+          "name": "STARLINK-36052          ",
+          "norad_id": 66605
+        },
+        {
+          "slope_error_hz_s": 2021.1951882094304,
+          "predicted_slope_hz_s": -3385.245933622103,
+          "elevation_deg": 64.2034392546525,
+          "name": "STARLINK-30925          ",
+          "norad_id": 58406
+        },
+        {
+          "slope_error_hz_s": 2055.0980321541974,
+          "predicted_slope_hz_s": -3351.343089677336,
+          "elevation_deg": 58.25752382132207,
+          "name": "STARLINK-31699          ",
+          "norad_id": 59551
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00041-20260804T111516Z",
+      "track_id": "s017-t00084",
+      "mid": 1785842860.9103394,
+      "start_utc": "2026-08-04T11:27:40.281561Z",
+      "duration_s": 3.528606001999947,
+      "measured_slope_hz_s": -9781.638277629321,
+      "confidence": 0.6955482182251047,
+      "carrier": 11686117187.5,
+      "visible_starlinks": 177,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5434.100218119603,
+          "predicted_slope_hz_s": -4347.538059509719,
+          "elevation_deg": 54.4726603554551,
+          "name": "STARLINK-11501 [DTC]    ",
+          "norad_id": 62268
+        },
+        {
+          "slope_error_hz_s": 5779.613600736391,
+          "predicted_slope_hz_s": -4002.0246768929296,
+          "elevation_deg": 72.99230885925087,
+          "name": "STARLINK-31369          ",
+          "norad_id": 58975
+        },
+        {
+          "slope_error_hz_s": 5931.072708274739,
+          "predicted_slope_hz_s": -3850.5655693545823,
+          "elevation_deg": 81.49747486079688,
+          "name": "STARLINK-5734           ",
+          "norad_id": 55612
+        },
+        {
+          "slope_error_hz_s": 5979.699264958781,
+          "predicted_slope_hz_s": -3801.93901267054,
+          "elevation_deg": 67.2134102652527,
+          "name": "STARLINK-34588          ",
+          "norad_id": 64729
+        },
+        {
+          "slope_error_hz_s": 6357.0651335132825,
+          "predicted_slope_hz_s": -3424.573144116039,
+          "elevation_deg": 61.593358436366216,
+          "name": "STARLINK-31340          ",
+          "norad_id": 59170
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00043-20260804T114742Z",
+      "track_id": "s004-t00010",
+      "mid": 1785844320.8841474,
+      "start_utc": "2026-08-04T11:51:59.184532Z",
+      "duration_s": 3.6510848030000034,
+      "measured_slope_hz_s": 5750.088839390355,
+      "confidence": 0.4920683778080431,
+      "carrier": 11350732572.115385,
+      "visible_starlinks": 196,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5840.70127973343,
+          "predicted_slope_hz_s": -90.6124403430751,
+          "elevation_deg": 10.452749339573009,
+          "name": "STARLINK-30169          ",
+          "norad_id": 57499
+        },
+        {
+          "slope_error_hz_s": 5856.990835362256,
+          "predicted_slope_hz_s": -106.90199597190097,
+          "elevation_deg": 10.727855979480337,
+          "name": "STARLINK-1193           ",
+          "norad_id": 45100
+        },
+        {
+          "slope_error_hz_s": 5875.549286190537,
+          "predicted_slope_hz_s": -125.46044680018188,
+          "elevation_deg": 13.116336677135266,
+          "name": "STARLINK-5944           ",
+          "norad_id": 56001
+        },
+        {
+          "slope_error_hz_s": 5897.839188221808,
+          "predicted_slope_hz_s": -147.75034883145315,
+          "elevation_deg": 10.812964969765849,
+          "name": "STARLINK-5819           ",
+          "norad_id": 55780
+        },
+        {
+          "slope_error_hz_s": 5902.050203225039,
+          "predicted_slope_hz_s": -151.9613638346838,
+          "elevation_deg": 12.09325863403289,
+          "name": "STARLINK-30511          ",
+          "norad_id": 57978
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00044-20260804T120346Z",
+      "track_id": "s017-t00005",
+      "mid": 1785845759.4289374,
+      "start_utc": "2026-08-04T12:15:57.653402Z",
+      "duration_s": 3.5510702279999578,
+      "measured_slope_hz_s": -3693.0130226697556,
+      "confidence": 0.8996030488982366,
+      "carrier": 11401963341.346153,
+      "visible_starlinks": 187,
+      "matches_within_500_hz_s": 5,
+      "matches_within_1000_hz_s": 14,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 35.41186575924439,
+          "predicted_slope_hz_s": -3657.6011569105112,
+          "elevation_deg": 71.45987774360604,
+          "name": "STARLINK-30574          ",
+          "norad_id": 58094
+        },
+        {
+          "slope_error_hz_s": 106.71486526811805,
+          "predicted_slope_hz_s": -3586.2981574016376,
+          "elevation_deg": 62.577522896595326,
+          "name": "STARLINK-2494           ",
+          "norad_id": 48487
+        },
+        {
+          "slope_error_hz_s": 129.7418668856576,
+          "predicted_slope_hz_s": -3822.7548895554132,
+          "elevation_deg": 87.41490586484251,
+          "name": "STARLINK-33717          ",
+          "norad_id": 63648
+        },
+        {
+          "slope_error_hz_s": 278.95357664936364,
+          "predicted_slope_hz_s": -3414.059446020392,
+          "elevation_deg": 62.57069728895492,
+          "name": "STARLINK-4019           ",
+          "norad_id": 52598
+        },
+        {
+          "slope_error_hz_s": 306.05163247369364,
+          "predicted_slope_hz_s": -3999.0646551434493,
+          "elevation_deg": 77.04283368977602,
+          "name": "STARLINK-31497          ",
+          "norad_id": 60592
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00044-20260804T120346Z",
+      "track_id": "s017-t00057",
+      "mid": 1785845774.1871586,
+      "start_utc": "2026-08-04T12:16:12.548098Z",
+      "duration_s": 3.278121027999987,
+      "measured_slope_hz_s": -4991.591734365824,
+      "confidence": 0.7088093165770767,
+      "carrier": 11401963341.346153,
+      "visible_starlinks": 187,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1108.6590642747542,
+          "predicted_slope_hz_s": -3882.9326700910697,
+          "elevation_deg": 58.67387620144281,
+          "name": "STARLINK-11185 [DTC]    ",
+          "norad_id": 62588
+        },
+        {
+          "slope_error_hz_s": 1179.4821511939604,
+          "predicted_slope_hz_s": -3812.1095831718635,
+          "elevation_deg": 67.51958697287579,
+          "name": "STARLINK-4019           ",
+          "norad_id": 52598
+        },
+        {
+          "slope_error_hz_s": 1310.6719617066633,
+          "predicted_slope_hz_s": -3680.9197726591606,
+          "elevation_deg": 71.12311760860825,
+          "name": "STARLINK-31497          ",
+          "norad_id": 60592
+        },
+        {
+          "slope_error_hz_s": 1484.041047740047,
+          "predicted_slope_hz_s": -3507.550686625777,
+          "elevation_deg": 75.55543452857914,
+          "name": "STARLINK-33717          ",
+          "norad_id": 63648
+        },
+        {
+          "slope_error_hz_s": 1538.9981769825308,
+          "predicted_slope_hz_s": -3452.593557383293,
+          "elevation_deg": 64.89164425210443,
+          "name": "STARLINK-30530          ",
+          "norad_id": 58005
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00045-20260804T122018Z",
+      "track_id": "s003-t00003",
+      "mid": 1785846212.5841537,
+      "start_utc": "2026-08-04T12:23:27.743277Z",
+      "duration_s": 9.681752424999985,
+      "measured_slope_hz_s": -4686.996341418438,
+      "confidence": 0.7192042289400132,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 193,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 1,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 252.45621482903698,
+          "predicted_slope_hz_s": -4434.540126589401,
+          "elevation_deg": 54.44561013805424,
+          "name": "STARLINK-11333 [DTC]    ",
+          "norad_id": 62273
+        },
+        {
+          "slope_error_hz_s": 1006.6539617595131,
+          "predicted_slope_hz_s": -3680.3423796589245,
+          "elevation_deg": 76.32465344505705,
+          "name": "STARLINK-30584          ",
+          "norad_id": 58089
+        },
+        {
+          "slope_error_hz_s": 1017.6866623152137,
+          "predicted_slope_hz_s": -3669.309679103224,
+          "elevation_deg": 76.42181634631339,
+          "name": "STARLINK-31374          ",
+          "norad_id": 59404
+        },
+        {
+          "slope_error_hz_s": 1092.6247874616706,
+          "predicted_slope_hz_s": -3594.371553956767,
+          "elevation_deg": 71.45397425995236,
+          "name": "STARLINK-32847          ",
+          "norad_id": 62811
+        },
+        {
+          "slope_error_hz_s": 1149.2330564129297,
+          "predicted_slope_hz_s": -3537.763285005508,
+          "elevation_deg": 66.54852523079882,
+          "name": "STARLINK-4179           ",
+          "norad_id": 53275
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00045-20260804T122018Z",
+      "track_id": "s009-t00000",
+      "mid": 1785846445.399961,
+      "start_utc": "2026-08-04T12:27:23.574934Z",
+      "duration_s": 3.901491238999995,
+      "measured_slope_hz_s": -9502.180815080126,
+      "confidence": 0.9050775644608899,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 203,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5430.192611692853,
+          "predicted_slope_hz_s": -4071.9882033872736,
+          "elevation_deg": 82.06853671464444,
+          "name": "STARLINK-4174           ",
+          "norad_id": 53276
+        },
+        {
+          "slope_error_hz_s": 5776.04962362271,
+          "predicted_slope_hz_s": -3726.1311914574158,
+          "elevation_deg": 79.37675265132633,
+          "name": "STARLINK-30613          ",
+          "norad_id": 58077
+        },
+        {
+          "slope_error_hz_s": 5803.796578493327,
+          "predicted_slope_hz_s": -3698.3842365867995,
+          "elevation_deg": 66.95739809138583,
+          "name": "STARLINK-2266           ",
+          "norad_id": 47997
+        },
+        {
+          "slope_error_hz_s": 5805.666880865258,
+          "predicted_slope_hz_s": -3696.5139342148686,
+          "elevation_deg": 74.48528256008149,
+          "name": "STARLINK-33789          ",
+          "norad_id": 63657
+        },
+        {
+          "slope_error_hz_s": 5981.288253493302,
+          "predicted_slope_hz_s": -3520.892561586824,
+          "elevation_deg": 59.88442282041377,
+          "name": "STARLINK-36831          ",
+          "norad_id": 67864
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00045-20260804T122018Z",
+      "track_id": "s009-t00043",
+      "mid": 1785846445.0860186,
+      "start_utc": "2026-08-04T12:27:22.947049Z",
+      "duration_s": 4.277939515000014,
+      "measured_slope_hz_s": -9270.942869183997,
+      "confidence": 0.7562302173609204,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 203,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5192.1229809121005,
+          "predicted_slope_hz_s": -4078.819888271896,
+          "elevation_deg": 82.3216577500927,
+          "name": "STARLINK-4174           ",
+          "norad_id": 53276
+        },
+        {
+          "slope_error_hz_s": 5552.15779686227,
+          "predicted_slope_hz_s": -3718.7850723217266,
+          "elevation_deg": 79.16123134024774,
+          "name": "STARLINK-30613          ",
+          "norad_id": 58077
+        },
+        {
+          "slope_error_hz_s": 5567.271416501862,
+          "predicted_slope_hz_s": -3703.6714526821347,
+          "elevation_deg": 67.02629093638284,
+          "name": "STARLINK-2266           ",
+          "norad_id": 47997
+        },
+        {
+          "slope_error_hz_s": 5579.809824900796,
+          "predicted_slope_hz_s": -3691.1330442832,
+          "elevation_deg": 74.37831942231753,
+          "name": "STARLINK-33789          ",
+          "norad_id": 63657
+        },
+        {
+          "slope_error_hz_s": 5743.401543223957,
+          "predicted_slope_hz_s": -3527.54132596004,
+          "elevation_deg": 59.95312434071919,
+          "name": "STARLINK-36831          ",
+          "norad_id": 67864
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00046-20260804T123637Z",
+      "track_id": "s017-t00072",
+      "mid": 1785847754.009825,
+      "start_utc": "2026-08-04T12:49:12.248092Z",
+      "duration_s": 3.523465666999982,
+      "measured_slope_hz_s": 7705.6734735674345,
+      "confidence": 0.7138885126251729,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 208,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 7794.381634702703,
+          "predicted_slope_hz_s": -88.70816113526885,
+          "elevation_deg": 10.626710583463655,
+          "name": "STARLINK-34885          ",
+          "norad_id": 65328
+        },
+        {
+          "slope_error_hz_s": 7799.726762407298,
+          "predicted_slope_hz_s": -94.05328883986414,
+          "elevation_deg": 11.199558980870798,
+          "name": "STARLINK-30138          ",
+          "norad_id": 57605
+        },
+        {
+          "slope_error_hz_s": 7812.398624452393,
+          "predicted_slope_hz_s": -106.72515088495862,
+          "elevation_deg": 11.108054564202986,
+          "name": "STARLINK-34054          ",
+          "norad_id": 64141
+        },
+        {
+          "slope_error_hz_s": 7816.265533715437,
+          "predicted_slope_hz_s": -110.59206014800279,
+          "elevation_deg": 11.692790093503241,
+          "name": "STARLINK-34895          ",
+          "norad_id": 65349
+        },
+        {
+          "slope_error_hz_s": 7832.593970168027,
+          "predicted_slope_hz_s": -126.92049660059257,
+          "elevation_deg": 12.600306803452083,
+          "name": "STARLINK-31233          ",
+          "norad_id": 58826
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00047-20260804T125250Z",
+      "track_id": "s009-t00003",
+      "mid": 1785848399.7498899,
+      "start_utc": "2026-08-04T12:59:58.110919Z",
+      "duration_s": 3.2779411619999905,
+      "measured_slope_hz_s": -3453.7387774799063,
+      "confidence": 0.8509858295284372,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 209,
+      "matches_within_500_hz_s": 8,
+      "matches_within_1000_hz_s": 13,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 0.5966312511518481,
+          "predicted_slope_hz_s": -3453.1421462287544,
+          "elevation_deg": 69.47593939185427,
+          "name": "STARLINK-32957          ",
+          "norad_id": 63124
+        },
+        {
+          "slope_error_hz_s": 84.84876169159952,
+          "predicted_slope_hz_s": -3538.587539171506,
+          "elevation_deg": 75.50104565434732,
+          "name": "STARLINK-31137          ",
+          "norad_id": 58686
+        },
+        {
+          "slope_error_hz_s": 97.93883884926481,
+          "predicted_slope_hz_s": -3551.677616329171,
+          "elevation_deg": 68.46456944767448,
+          "name": "STARLINK-34751          ",
+          "norad_id": 65338
+        },
+        {
+          "slope_error_hz_s": 119.91174207609447,
+          "predicted_slope_hz_s": -3333.827035403812,
+          "elevation_deg": 88.31783098024556,
+          "name": "STARLINK-34022          ",
+          "norad_id": 63866
+        },
+        {
+          "slope_error_hz_s": 251.73005347822664,
+          "predicted_slope_hz_s": -3202.0087240016796,
+          "elevation_deg": 55.687675955189256,
+          "name": "STARLINK-31167          ",
+          "norad_id": 58744
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00049-20260804T132450Z",
+      "track_id": "s016-t00001",
+      "mid": 1785850585.548792,
+      "start_utc": "2026-08-04T13:36:19.683723Z",
+      "duration_s": 11.73013743499996,
+      "measured_slope_hz_s": -3902.558852550995,
+      "confidence": 0.8484012313604175,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 207,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 8,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 210.79088513399074,
+          "predicted_slope_hz_s": -3691.7679674170045,
+          "elevation_deg": 73.2069621796406,
+          "name": "STARLINK-2196           ",
+          "norad_id": 47773
+        },
+        {
+          "slope_error_hz_s": 231.38198700026896,
+          "predicted_slope_hz_s": -3671.1768655507262,
+          "elevation_deg": 77.26194074043426,
+          "name": "STARLINK-5828           ",
+          "norad_id": 57070
+        },
+        {
+          "slope_error_hz_s": 314.452830876568,
+          "predicted_slope_hz_s": -3588.106021674427,
+          "elevation_deg": 75.01933102749948,
+          "name": "STARLINK-31225          ",
+          "norad_id": 59040
+        },
+        {
+          "slope_error_hz_s": 392.39949116858634,
+          "predicted_slope_hz_s": -3510.159361382409,
+          "elevation_deg": 70.53106157589322,
+          "name": "STARLINK-3826           ",
+          "norad_id": 52347
+        },
+        {
+          "slope_error_hz_s": 511.81054786608456,
+          "predicted_slope_hz_s": -3390.7483046849106,
+          "elevation_deg": 73.23133809647177,
+          "name": "STARLINK-30573          ",
+          "norad_id": 58058
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00049-20260804T132450Z",
+      "track_id": "s016-t00031",
+      "mid": 1785850583.027625,
+      "start_utc": "2026-08-04T13:36:19.683723Z",
+      "duration_s": 6.687803121000002,
+      "measured_slope_hz_s": -5245.359926252829,
+      "confidence": 0.7543843631819102,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 205,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1528.7885208124617,
+          "predicted_slope_hz_s": -3716.571405440367,
+          "elevation_deg": 78.42992486016124,
+          "name": "STARLINK-5828           ",
+          "norad_id": 57070
+        },
+        {
+          "slope_error_hz_s": 1598.0275881800017,
+          "predicted_slope_hz_s": -3647.332338072827,
+          "elevation_deg": 76.34925760802564,
+          "name": "STARLINK-31225          ",
+          "norad_id": 59040
+        },
+        {
+          "slope_error_hz_s": 1626.1874914405603,
+          "predicted_slope_hz_s": -3619.1724348122684,
+          "elevation_deg": 72.42154144801235,
+          "name": "STARLINK-3826           ",
+          "norad_id": 52347
+        },
+        {
+          "slope_error_hz_s": 1641.1702527097232,
+          "predicted_slope_hz_s": -3604.1896735431055,
+          "elevation_deg": 71.65241844915758,
+          "name": "STARLINK-2196           ",
+          "norad_id": 47773
+        },
+        {
+          "slope_error_hz_s": 1868.3014153609374,
+          "predicted_slope_hz_s": -3377.0585108918913,
+          "elevation_deg": 64.26887505980352,
+          "name": "STARLINK-5209           ",
+          "norad_id": 54061
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00049-20260804T132450Z",
+      "track_id": "s016-t00037",
+      "mid": 1785850584.354944,
+      "start_utc": "2026-08-04T13:36:22.715632Z",
+      "duration_s": 3.4044346710001037,
+      "measured_slope_hz_s": -3627.269040273188,
+      "confidence": 0.7522061054580655,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 206,
+      "matches_within_500_hz_s": 6,
+      "matches_within_1000_hz_s": 15,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 9.631097661012063,
+          "predicted_slope_hz_s": -3617.6379426121757,
+          "elevation_deg": 75.66902224492588,
+          "name": "STARLINK-31225          ",
+          "norad_id": 59040
+        },
+        {
+          "slope_error_hz_s": 24.376580361987635,
+          "predicted_slope_hz_s": -3651.6456206351754,
+          "elevation_deg": 72.4815583960882,
+          "name": "STARLINK-2196           ",
+          "norad_id": 47773
+        },
+        {
+          "slope_error_hz_s": 64.41358751088228,
+          "predicted_slope_hz_s": -3562.8554527623055,
+          "elevation_deg": 71.42654496660602,
+          "name": "STARLINK-3826           ",
+          "norad_id": 52347
+        },
+        {
+          "slope_error_hz_s": 67.04536637119827,
+          "predicted_slope_hz_s": -3694.314406644386,
+          "elevation_deg": 77.84493049899292,
+          "name": "STARLINK-5828           ",
+          "norad_id": 57070
+        },
+        {
+          "slope_error_hz_s": 282.72413792135103,
+          "predicted_slope_hz_s": -3344.5449023518368,
+          "elevation_deg": 72.32017442364472,
+          "name": "STARLINK-30573          ",
+          "norad_id": 58058
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00049-20260804T132450Z",
+      "track_id": "s016-t00039",
+      "mid": 1785850581.641305,
+      "start_utc": "2026-08-04T13:36:19.683723Z",
+      "duration_s": 3.9151635709999937,
+      "measured_slope_hz_s": -4446.094735270471,
+      "confidence": 0.8300473152214832,
+      "carrier": 11333655649.038462,
+      "visible_starlinks": 206,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 4,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 710.2941503956572,
+          "predicted_slope_hz_s": -3735.8005848748135,
+          "elevation_deg": 78.95711070655129,
+          "name": "STARLINK-5828           ",
+          "norad_id": 57070
+        },
+        {
+          "slope_error_hz_s": 770.9241153013609,
+          "predicted_slope_hz_s": -3675.17061996911,
+          "elevation_deg": 73.45710551422643,
+          "name": "STARLINK-3826           ",
+          "norad_id": 52347
+        },
+        {
+          "slope_error_hz_s": 771.4298185112289,
+          "predicted_slope_hz_s": -3674.664916759242,
+          "elevation_deg": 77.00317042494036,
+          "name": "STARLINK-31225          ",
+          "norad_id": 59040
+        },
+        {
+          "slope_error_hz_s": 894.4366935483613,
+          "predicted_slope_hz_s": -3551.6580417221094,
+          "elevation_deg": 70.7662885333068,
+          "name": "STARLINK-2196           ",
+          "norad_id": 47773
+        },
+        {
+          "slope_error_hz_s": 1008.7462433615824,
+          "predicted_slope_hz_s": -3437.3484919088883,
+          "elevation_deg": 65.04015804629236,
+          "name": "STARLINK-5209           ",
+          "norad_id": 54061
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00050-20260804T134103Z",
+      "track_id": "s008-t00011",
+      "mid": 1785851274.9329655,
+      "start_utc": "2026-08-04T13:47:53.042003Z",
+      "duration_s": 3.907733711999981,
+      "measured_slope_hz_s": -8636.131899098582,
+      "confidence": 0.5512079593177595,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 206,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3487.388268030625,
+          "predicted_slope_hz_s": -5148.743631067957,
+          "elevation_deg": 77.59972512078556,
+          "name": "STARLINK-11680 [DTC]    ",
+          "norad_id": 63554
+        },
+        {
+          "slope_error_hz_s": 4234.378140375803,
+          "predicted_slope_hz_s": -4401.753758722779,
+          "elevation_deg": 67.04040632202967,
+          "name": "STARLINK-3069           ",
+          "norad_id": 49176
+        },
+        {
+          "slope_error_hz_s": 4743.834241355709,
+          "predicted_slope_hz_s": -3892.297657742872,
+          "elevation_deg": 81.33275044130316,
+          "name": "STARLINK-33995          ",
+          "norad_id": 63706
+        },
+        {
+          "slope_error_hz_s": 4782.0602820650765,
+          "predicted_slope_hz_s": -3854.0716170335054,
+          "elevation_deg": 87.62146594175084,
+          "name": "STARLINK-5843           ",
+          "norad_id": 57072
+        },
+        {
+          "slope_error_hz_s": 4836.79157977276,
+          "predicted_slope_hz_s": -3799.340319325822,
+          "elevation_deg": 66.68644488205594,
+          "name": "STARLINK-34894          ",
+          "norad_id": 65753
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00050-20260804T134103Z",
+      "track_id": "s015-t00260",
+      "mid": 1785851518.616396,
+      "start_utc": "2026-08-04T13:51:58.426690Z",
+      "duration_s": 3.027294687000108,
+      "measured_slope_hz_s": 3417.004944122848,
+      "confidence": 0.7193628755872693,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 207,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 3506.481099206838,
+          "predicted_slope_hz_s": -89.47615508399004,
+          "elevation_deg": 10.22903209437201,
+          "name": "STARLINK-33919          ",
+          "norad_id": 63699
+        },
+        {
+          "slope_error_hz_s": 3515.421769059142,
+          "predicted_slope_hz_s": -98.41682493629439,
+          "elevation_deg": 11.250369244909956,
+          "name": "STARLINK-30532          ",
+          "norad_id": 58070
+        },
+        {
+          "slope_error_hz_s": 3521.780309372992,
+          "predicted_slope_hz_s": -104.77536525014408,
+          "elevation_deg": 12.417680626324588,
+          "name": "STARLINK-34476          ",
+          "norad_id": 64364
+        },
+        {
+          "slope_error_hz_s": 3525.3909008166256,
+          "predicted_slope_hz_s": -108.38595669377769,
+          "elevation_deg": 11.530776546336394,
+          "name": "STARLINK-6033           ",
+          "norad_id": 56322
+        },
+        {
+          "slope_error_hz_s": 3542.923029102786,
+          "predicted_slope_hz_s": -125.91808497993811,
+          "elevation_deg": 10.142470426800378,
+          "name": "STARLINK-32935          ",
+          "norad_id": 63202
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00051-20260804T135706Z",
+      "track_id": "s000-t00059",
+      "mid": 1785851919.4985836,
+      "start_utc": "2026-08-04T13:58:37.792078Z",
+      "duration_s": 3.4130104259999996,
+      "measured_slope_hz_s": -5770.976084077796,
+      "confidence": 0.7923882090034756,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 207,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1033.4914695924144,
+          "predicted_slope_hz_s": -4737.484614485382,
+          "elevation_deg": 60.450953237851834,
+          "name": "STARLINK-3620           ",
+          "norad_id": 51775
+        },
+        {
+          "slope_error_hz_s": 1668.267073237259,
+          "predicted_slope_hz_s": -4102.709010840537,
+          "elevation_deg": 82.61426503255001,
+          "name": "STARLINK-3098           ",
+          "norad_id": 49442
+        },
+        {
+          "slope_error_hz_s": 1901.414216560975,
+          "predicted_slope_hz_s": -3869.561867516821,
+          "elevation_deg": 84.90562083086103,
+          "name": "STARLINK-5548           ",
+          "norad_id": 56334
+        },
+        {
+          "slope_error_hz_s": 1928.5373011622646,
+          "predicted_slope_hz_s": -3842.4387829155316,
+          "elevation_deg": 85.00825139154426,
+          "name": "STARLINK-6330           ",
+          "norad_id": 57239
+        },
+        {
+          "slope_error_hz_s": 2045.1623318477482,
+          "predicted_slope_hz_s": -3725.813752230048,
+          "elevation_deg": 68.18834815140211,
+          "name": "STARLINK-30834          ",
+          "norad_id": 58151
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00051-20260804T135706Z",
+      "track_id": "s000-t00198",
+      "mid": 1785851919.9400382,
+      "start_utc": "2026-08-04T13:58:38.296307Z",
+      "duration_s": 3.287462418999997,
+      "measured_slope_hz_s": -6548.261541171552,
+      "confidence": 0.7856804401302933,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 207,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1845.7387321083397,
+          "predicted_slope_hz_s": -4702.522809063213,
+          "elevation_deg": 60.18730439891829,
+          "name": "STARLINK-3620           ",
+          "norad_id": 51775
+        },
+        {
+          "slope_error_hz_s": 2446.2729206272643,
+          "predicted_slope_hz_s": -4101.988620544288,
+          "elevation_deg": 82.58283919666452,
+          "name": "STARLINK-3098           ",
+          "norad_id": 49442
+        },
+        {
+          "slope_error_hz_s": 2681.4293531137623,
+          "predicted_slope_hz_s": -3866.83218805779,
+          "elevation_deg": 84.7374187699085,
+          "name": "STARLINK-5548           ",
+          "norad_id": 56334
+        },
+        {
+          "slope_error_hz_s": 2708.6472706382674,
+          "predicted_slope_hz_s": -3839.614270533285,
+          "elevation_deg": 84.83478270088636,
+          "name": "STARLINK-6330           ",
+          "norad_id": 57239
+        },
+        {
+          "slope_error_hz_s": 2816.5062569121137,
+          "predicted_slope_hz_s": -3731.7552842594387,
+          "elevation_deg": 68.26981161121303,
+          "name": "STARLINK-30834          ",
+          "norad_id": 58151
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00052-20260804T141317Z",
+      "track_id": "s009-t00066",
+      "mid": 1785853231.788941,
+      "start_utc": "2026-08-04T14:20:30.147154Z",
+      "duration_s": 3.4104104639999946,
+      "measured_slope_hz_s": -6081.794957845257,
+      "confidence": 0.6265651316791735,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 222,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1670.873699161989,
+          "predicted_slope_hz_s": -4410.921258683268,
+          "elevation_deg": 54.02145967600941,
+          "name": "STARLINK-11669 [DTC]    ",
+          "norad_id": 63548
+        },
+        {
+          "slope_error_hz_s": 2163.6386040022803,
+          "predicted_slope_hz_s": -3918.156353842977,
+          "elevation_deg": 70.19883303869848,
+          "name": "STARLINK-37435          ",
+          "norad_id": 69265
+        },
+        {
+          "slope_error_hz_s": 2169.967914438749,
+          "predicted_slope_hz_s": -3911.827043406508,
+          "elevation_deg": 36.44055399850569,
+          "name": "STARLINK-38085          ",
+          "norad_id": 69996
+        },
+        {
+          "slope_error_hz_s": 2242.8252229076825,
+          "predicted_slope_hz_s": -3838.9697349375747,
+          "elevation_deg": 75.07361904477482,
+          "name": "STARLINK-1807           ",
+          "norad_id": 46706
+        },
+        {
+          "slope_error_hz_s": 2285.3740574303774,
+          "predicted_slope_hz_s": -3796.4209004148797,
+          "elevation_deg": 81.54982058413351,
+          "name": "STARLINK-33652          ",
+          "norad_id": 63400
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00052-20260804T141317Z",
+      "track_id": "s009-t00089",
+      "mid": 1785853233.056431,
+      "start_utc": "2026-08-04T14:20:30.147154Z",
+      "duration_s": 5.818553602000009,
+      "measured_slope_hz_s": -3740.2591123123257,
+      "confidence": 0.7164891060061466,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 223,
+      "matches_within_500_hz_s": 8,
+      "matches_within_1000_hz_s": 19,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 5.7444853970318945,
+          "predicted_slope_hz_s": -3734.514626915294,
+          "elevation_deg": 75.9582731753549,
+          "name": "STARLINK-5520           ",
+          "norad_id": 57219
+        },
+        {
+          "slope_error_hz_s": 36.0167338955639,
+          "predicted_slope_hz_s": -3776.2758462078896,
+          "elevation_deg": 80.85040691356896,
+          "name": "STARLINK-33652          ",
+          "norad_id": 63400
+        },
+        {
+          "slope_error_hz_s": 45.12716415851992,
+          "predicted_slope_hz_s": -3695.1319481538058,
+          "elevation_deg": 42.607430116742876,
+          "name": "STARLINK-38035          ",
+          "norad_id": 69759
+        },
+        {
+          "slope_error_hz_s": 126.00139170789407,
+          "predicted_slope_hz_s": -3614.2577206044316,
+          "elevation_deg": 28.58060972469238,
+          "name": "STARLINK-1995           ",
+          "norad_id": 47590
+        },
+        {
+          "slope_error_hz_s": 142.61358858318226,
+          "predicted_slope_hz_s": -3882.872700895508,
+          "elevation_deg": 75.9735847710781,
+          "name": "STARLINK-1807           ",
+          "norad_id": 46706
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00053-20260804T142918Z",
+      "track_id": "s003-t00014",
+      "mid": 1785853979.5712845,
+      "start_utc": "2026-08-04T14:32:57.873424Z",
+      "duration_s": 3.395720049000005,
+      "measured_slope_hz_s": 7483.459172216251,
+      "confidence": 0.49798614237899336,
+      "carrier": 11669040264.423077,
+      "visible_starlinks": 227,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 7569.389933570242,
+          "predicted_slope_hz_s": -85.93076135399023,
+          "elevation_deg": 10.164672122818345,
+          "name": "STARLINK-35024          ",
+          "norad_id": 65410
+        },
+        {
+          "slope_error_hz_s": 7574.60192535354,
+          "predicted_slope_hz_s": -91.14275313728814,
+          "elevation_deg": 10.57746477852509,
+          "name": "STARLINK-30928          ",
+          "norad_id": 58452
+        },
+        {
+          "slope_error_hz_s": 7586.750015370335,
+          "predicted_slope_hz_s": -103.29084315408349,
+          "elevation_deg": 11.510889735998779,
+          "name": "STARLINK-31338          ",
+          "norad_id": 59156
+        },
+        {
+          "slope_error_hz_s": 7590.573436617395,
+          "predicted_slope_hz_s": -107.1142644011432,
+          "elevation_deg": 10.104549147520551,
+          "name": "STARLINK-36098          ",
+          "norad_id": 66816
+        },
+        {
+          "slope_error_hz_s": 7604.600630448486,
+          "predicted_slope_hz_s": -121.14145823223475,
+          "elevation_deg": 12.470158269140738,
+          "name": "STARLINK-35022          ",
+          "norad_id": 65409
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00053-20260804T142918Z",
+      "track_id": "s007-t00085",
+      "mid": 1785854117.1133676,
+      "start_utc": "2026-08-04T14:35:15.285501Z",
+      "duration_s": 4.160882569999956,
+      "measured_slope_hz_s": -4153.974870090515,
+      "confidence": 0.5867436813757982,
+      "carrier": 11669040264.423077,
+      "visible_starlinks": 211,
+      "matches_within_500_hz_s": 4,
+      "matches_within_1000_hz_s": 8,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 170.88324853426593,
+          "predicted_slope_hz_s": -3983.091621556249,
+          "elevation_deg": 71.98453719157679,
+          "name": "STARLINK-37177          ",
+          "norad_id": 68611
+        },
+        {
+          "slope_error_hz_s": 252.90111010515966,
+          "predicted_slope_hz_s": -3901.073759985355,
+          "elevation_deg": 59.3628068561931,
+          "name": "STARLINK-37639          ",
+          "norad_id": 69146
+        },
+        {
+          "slope_error_hz_s": 347.9496276734749,
+          "predicted_slope_hz_s": -3806.02524241704,
+          "elevation_deg": 81.26972373532178,
+          "name": "STARLINK-30976          ",
+          "norad_id": 58447
+        },
+        {
+          "slope_error_hz_s": 356.43529352045334,
+          "predicted_slope_hz_s": -3797.5395765700614,
+          "elevation_deg": 53.95282818250668,
+          "name": "STARLINK-11339 [DTC]    ",
+          "norad_id": 61691
+        },
+        {
+          "slope_error_hz_s": 534.0436940300242,
+          "predicted_slope_hz_s": -3619.9311760604905,
+          "elevation_deg": 60.38015599680552,
+          "name": "STARLINK-35189          ",
+          "norad_id": 65676
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00053-20260804T142918Z",
+      "track_id": "s018-t00005",
+      "mid": 1785854527.1097226,
+      "start_utc": "2026-08-04T14:42:04.530059Z",
+      "duration_s": 5.159327005000023,
+      "measured_slope_hz_s": -3324.4050353290886,
+      "confidence": 0.8861419857802689,
+      "carrier": 11669040264.423077,
+      "visible_starlinks": 229,
+      "matches_within_500_hz_s": 16,
+      "matches_within_1000_hz_s": 28,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 26.73419950412972,
+          "predicted_slope_hz_s": -3297.670835824959,
+          "elevation_deg": 58.45333334150313,
+          "name": "STARLINK-2589           ",
+          "norad_id": 48371
+        },
+        {
+          "slope_error_hz_s": 81.68185902331106,
+          "predicted_slope_hz_s": -3242.7231763057775,
+          "elevation_deg": 49.92120459464721,
+          "name": "STARLINK-34482          ",
+          "norad_id": 64782
+        },
+        {
+          "slope_error_hz_s": 84.98286615438747,
+          "predicted_slope_hz_s": -3409.387901483476,
+          "elevation_deg": 62.97530530919692,
+          "name": "STARLINK-37478          ",
+          "norad_id": 69260
+        },
+        {
+          "slope_error_hz_s": 151.75540184384408,
+          "predicted_slope_hz_s": -3476.1604371729327,
+          "elevation_deg": 69.1768612966476,
+          "name": "STARLINK-30084          ",
+          "norad_id": 56825
+        },
+        {
+          "slope_error_hz_s": 188.48695236097637,
+          "predicted_slope_hz_s": -3512.891987690065,
+          "elevation_deg": 65.43983559297101,
+          "name": "STARLINK-36709          ",
+          "norad_id": 67969
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00053-20260804T142918Z",
+      "track_id": "s018-t00012",
+      "mid": 1785854528.4947748,
+      "start_utc": "2026-08-04T14:42:06.922531Z",
+      "duration_s": 3.1444882400001006,
+      "measured_slope_hz_s": -6729.920771513011,
+      "confidence": 0.8176652755307203,
+      "carrier": 11669040264.423077,
+      "visible_starlinks": 228,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 1680.8876735778167,
+          "predicted_slope_hz_s": -5049.033097935194,
+          "elevation_deg": 78.49776687252997,
+          "name": "STARLINK-38048          ",
+          "norad_id": 69754
+        },
+        {
+          "slope_error_hz_s": 2846.96186719979,
+          "predicted_slope_hz_s": -3882.9589043132205,
+          "elevation_deg": 71.10690539586308,
+          "name": "STARLINK-35221          ",
+          "norad_id": 65695
+        },
+        {
+          "slope_error_hz_s": 2988.4716855492597,
+          "predicted_slope_hz_s": -3741.449085963751,
+          "elevation_deg": 79.28396497012841,
+          "name": "STARLINK-31341          ",
+          "norad_id": 59155
+        },
+        {
+          "slope_error_hz_s": 3132.1633007887117,
+          "predicted_slope_hz_s": -3597.757470724299,
+          "elevation_deg": 66.54566343496707,
+          "name": "STARLINK-36709          ",
+          "norad_id": 67969
+        },
+        {
+          "slope_error_hz_s": 3224.047169433709,
+          "predicted_slope_hz_s": -3505.8736020793017,
+          "elevation_deg": 65.20916705355121,
+          "name": "STARLINK-36956          ",
+          "norad_id": 68009
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00053-20260804T142918Z",
+      "track_id": "s018-t00029",
+      "mid": 1785854527.9279804,
+      "start_utc": "2026-08-04T14:42:05.538100Z",
+      "duration_s": 5.536710421999942,
+      "measured_slope_hz_s": -4902.350200307999,
+      "confidence": 0.789923572626328,
+      "carrier": 11669040264.423077,
+      "visible_starlinks": 228,
+      "matches_within_500_hz_s": 1,
+      "matches_within_1000_hz_s": 1,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 149.99761540110285,
+          "predicted_slope_hz_s": -5052.347815709102,
+          "elevation_deg": 78.55841407629501,
+          "name": "STARLINK-38048          ",
+          "norad_id": 69754
+        },
+        {
+          "slope_error_hz_s": 1029.2705447187845,
+          "predicted_slope_hz_s": -3873.079655589215,
+          "elevation_deg": 70.95195769592256,
+          "name": "STARLINK-35221          ",
+          "norad_id": 65695
+        },
+        {
+          "slope_error_hz_s": 1177.3260426803286,
+          "predicted_slope_hz_s": -3725.024157627671,
+          "elevation_deg": 78.81396214725083,
+          "name": "STARLINK-31341          ",
+          "norad_id": 59155
+        },
+        {
+          "slope_error_hz_s": 1339.2025462194906,
+          "predicted_slope_hz_s": -3563.1476540885087,
+          "elevation_deg": 66.0911021111664,
+          "name": "STARLINK-36709          ",
+          "norad_id": 67969
+        },
+        {
+          "slope_error_hz_s": 1386.0353409550034,
+          "predicted_slope_hz_s": -3516.314859352996,
+          "elevation_deg": 65.34447179840417,
+          "name": "STARLINK-36956          ",
+          "norad_id": 68009
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00053-20260804T142918Z",
+      "track_id": "s019-t00031",
+      "mid": 1785854588.70983,
+      "start_utc": "2026-08-04T14:43:07.135395Z",
+      "duration_s": 4.407053753000014,
+      "measured_slope_hz_s": -3577.1078365552653,
+      "confidence": 0.8444107944926555,
+      "carrier": 11669040264.423077,
+      "visible_starlinks": 225,
+      "matches_within_500_hz_s": 10,
+      "matches_within_1000_hz_s": 19,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 9.429359014910005,
+          "predicted_slope_hz_s": -3586.5371955701753,
+          "elevation_deg": 74.90873366405222,
+          "name": "STARLINK-30969          ",
+          "norad_id": 58438
+        },
+        {
+          "slope_error_hz_s": 15.417228213412272,
+          "predicted_slope_hz_s": -3561.690608341853,
+          "elevation_deg": 73.07912323980935,
+          "name": "STARLINK-5786           ",
+          "norad_id": 56032
+        },
+        {
+          "slope_error_hz_s": 30.565620787631815,
+          "predicted_slope_hz_s": -3607.673457342897,
+          "elevation_deg": 70.55021786690075,
+          "name": "STARLINK-35046          ",
+          "norad_id": 65701
+        },
+        {
+          "slope_error_hz_s": 64.24834186810949,
+          "predicted_slope_hz_s": -3512.859494687156,
+          "elevation_deg": 61.050875295735246,
+          "name": "STARLINK-37226          ",
+          "norad_id": 68619
+        },
+        {
+          "slope_error_hz_s": 68.67630608582385,
+          "predicted_slope_hz_s": -3508.4315304694414,
+          "elevation_deg": 70.11650073484184,
+          "name": "STARLINK-35984          ",
+          "norad_id": 66814
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00054-20260804T144526Z",
+      "track_id": "s006-t00018",
+      "mid": 1785855062.0149865,
+      "start_utc": "2026-08-04T14:51:00.505077Z",
+      "duration_s": 3.397586820000015,
+      "measured_slope_hz_s": -9620.87199905382,
+      "confidence": 0.6103056237121512,
+      "carrier": 11600732572.115385,
+      "visible_starlinks": 220,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 4916.999311987483,
+          "predicted_slope_hz_s": -4703.872687066336,
+          "elevation_deg": 50.681450190942364,
+          "name": "STARLINK-38084          ",
+          "norad_id": 69995
+        },
+        {
+          "slope_error_hz_s": 5843.352167372463,
+          "predicted_slope_hz_s": -3777.519831681357,
+          "elevation_deg": 81.28554891908006,
+          "name": "STARLINK-5912           ",
+          "norad_id": 56020
+        },
+        {
+          "slope_error_hz_s": 6026.213699053993,
+          "predicted_slope_hz_s": -3594.658299999827,
+          "elevation_deg": 67.21949927490203,
+          "name": "STARLINK-30348          ",
+          "norad_id": 57712
+        },
+        {
+          "slope_error_hz_s": 6223.364935716709,
+          "predicted_slope_hz_s": -3397.507063337111,
+          "elevation_deg": 71.53968419524836,
+          "name": "STARLINK-5830           ",
+          "norad_id": 57065
+        },
+        {
+          "slope_error_hz_s": 6519.969158106192,
+          "predicted_slope_hz_s": -3100.9028409476277,
+          "elevation_deg": 54.109375336118084,
+          "name": "STARLINK-35146          ",
+          "norad_id": 65421
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00054-20260804T144526Z",
+      "track_id": "s016-t00010",
+      "mid": 1785855429.1352406,
+      "start_utc": "2026-08-04T14:57:07.307757Z",
+      "duration_s": 4.033436525999946,
+      "measured_slope_hz_s": 324.4182212799959,
+      "confidence": 0.7907051771643312,
+      "carrier": 11600732572.115385,
+      "visible_starlinks": 216,
+      "matches_within_500_hz_s": 18,
+      "matches_within_1000_hz_s": 73,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 408.38168789148324,
+          "predicted_slope_hz_s": -83.96346661148729,
+          "elevation_deg": 10.24590812384236,
+          "name": "STARLINK-33933          ",
+          "norad_id": 63784
+        },
+        {
+          "slope_error_hz_s": 409.64945738129035,
+          "predicted_slope_hz_s": -85.23123610129444,
+          "elevation_deg": 10.0237591349805,
+          "name": "STARLINK-31977          ",
+          "norad_id": 59892
+        },
+        {
+          "slope_error_hz_s": 416.5558678215818,
+          "predicted_slope_hz_s": -92.13764654158587,
+          "elevation_deg": 10.830670268288161,
+          "name": "STARLINK-31615          ",
+          "norad_id": 59413
+        },
+        {
+          "slope_error_hz_s": 434.1616359844663,
+          "predicted_slope_hz_s": -109.74341470447035,
+          "elevation_deg": 11.6653795304351,
+          "name": "STARLINK-36592          ",
+          "norad_id": 68007
+        },
+        {
+          "slope_error_hz_s": 434.73299327747475,
+          "predicted_slope_hz_s": -110.31477199747886,
+          "elevation_deg": 10.882009838350879,
+          "name": "STARLINK-33707          ",
+          "norad_id": 63401
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00058-20260804T153016Z",
+      "track_id": "s007-t00024",
+      "mid": 1785857769.936579,
+      "start_utc": "2026-08-04T15:36:08.103822Z",
+      "duration_s": 3.665514121000001,
+      "measured_slope_hz_s": -7799.351941974427,
+      "confidence": 0.7396730591399377,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 220,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 2787.140517444379,
+          "predicted_slope_hz_s": -5012.211424530048,
+          "elevation_deg": 75.4605239308788,
+          "name": "STARLINK-11437 [DTC]    ",
+          "norad_id": 62884
+        },
+        {
+          "slope_error_hz_s": 3367.037423131055,
+          "predicted_slope_hz_s": -4432.314518843372,
+          "elevation_deg": 79.30522171998561,
+          "name": "STARLINK-37842          ",
+          "norad_id": 69487
+        },
+        {
+          "slope_error_hz_s": 3836.8573049354036,
+          "predicted_slope_hz_s": -3962.4946370390235,
+          "elevation_deg": 75.92969387330596,
+          "name": "STARLINK-3614           ",
+          "norad_id": 51771
+        },
+        {
+          "slope_error_hz_s": 3880.687558338503,
+          "predicted_slope_hz_s": -3918.664383635924,
+          "elevation_deg": 71.46990816544988,
+          "name": "STARLINK-37576          ",
+          "norad_id": 69047
+        },
+        {
+          "slope_error_hz_s": 4006.806597460404,
+          "predicted_slope_hz_s": -3792.545344514023,
+          "elevation_deg": 65.59849607867184,
+          "name": "STARLINK-37146          ",
+          "norad_id": 68555
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00058-20260804T153016Z",
+      "track_id": "s008-t00069",
+      "mid": 1785857804.6717815,
+      "start_utc": "2026-08-04T15:36:43.343025Z",
+      "duration_s": 3.0369411249999985,
+      "measured_slope_hz_s": 7305.827809118225,
+      "confidence": 0.6038243100971631,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 229,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 7388.287137876027,
+          "predicted_slope_hz_s": -82.45932875780287,
+          "elevation_deg": 10.017724530544383,
+          "name": "STARLINK-2591           ",
+          "norad_id": 48361
+        },
+        {
+          "slope_error_hz_s": 7400.6016190738055,
+          "predicted_slope_hz_s": -94.77380995558102,
+          "elevation_deg": 11.254702479733787,
+          "name": "STARLINK-5213           ",
+          "norad_id": 54093
+        },
+        {
+          "slope_error_hz_s": 7411.864903216651,
+          "predicted_slope_hz_s": -106.03709409842676,
+          "elevation_deg": 10.843294360097005,
+          "name": "STARLINK-30986          ",
+          "norad_id": 58492
+        },
+        {
+          "slope_error_hz_s": 7413.335914038783,
+          "predicted_slope_hz_s": -107.50810492055791,
+          "elevation_deg": 10.946554502377396,
+          "name": "STARLINK-2361           ",
+          "norad_id": 47901
+        },
+        {
+          "slope_error_hz_s": 7424.966267971272,
+          "predicted_slope_hz_s": -119.13845885304704,
+          "elevation_deg": 12.453395895362332,
+          "name": "STARLINK-2622           ",
+          "norad_id": 48360
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00058-20260804T153016Z",
+      "track_id": "s009-t00032",
+      "mid": 1785857840.3847046,
+      "start_utc": "2026-08-04T15:37:18.678155Z",
+      "duration_s": 3.917970727000011,
+      "measured_slope_hz_s": 8823.996134257892,
+      "confidence": 0.7252873808052965,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 234,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 8937.03802727841,
+          "predicted_slope_hz_s": -113.04189302051802,
+          "elevation_deg": 11.065633664837346,
+          "name": "STARLINK-34920          ",
+          "norad_id": 65447
+        },
+        {
+          "slope_error_hz_s": 8941.313998131658,
+          "predicted_slope_hz_s": -117.31786387376596,
+          "elevation_deg": 11.11150420963352,
+          "name": "STARLINK-36313          ",
+          "norad_id": 68156
+        },
+        {
+          "slope_error_hz_s": 8950.619698270013,
+          "predicted_slope_hz_s": -126.62356401212121,
+          "elevation_deg": 12.781530583908445,
+          "name": "STARLINK-30078          ",
+          "norad_id": 56841
+        },
+        {
+          "slope_error_hz_s": 8954.46245972927,
+          "predicted_slope_hz_s": -130.46632547137733,
+          "elevation_deg": 12.621892237305419,
+          "name": "STARLINK-33947          ",
+          "norad_id": 63787
+        },
+        {
+          "slope_error_hz_s": 8959.83332779209,
+          "predicted_slope_hz_s": -135.83719353419747,
+          "elevation_deg": 11.230365811004862,
+          "name": "STARLINK-31008          ",
+          "norad_id": 58636
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00058-20260804T153016Z",
+      "track_id": "s012-t00092",
+      "mid": 1785857963.3309116,
+      "start_utc": "2026-08-04T15:39:19.602995Z",
+      "duration_s": 7.455832509999993,
+      "measured_slope_hz_s": -6246.959961729428,
+      "confidence": 0.7762930741473811,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 223,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 2261.074949465521,
+          "predicted_slope_hz_s": -3985.885012263907,
+          "elevation_deg": 73.50518615634405,
+          "name": "STARLINK-30938          ",
+          "norad_id": 58389
+        },
+        {
+          "slope_error_hz_s": 2362.3982468395793,
+          "predicted_slope_hz_s": -3884.5617148898486,
+          "elevation_deg": 76.209922631885,
+          "name": "STARLINK-3608           ",
+          "norad_id": 51776
+        },
+        {
+          "slope_error_hz_s": 2379.7919889728773,
+          "predicted_slope_hz_s": -3867.1679727565506,
+          "elevation_deg": 70.62590248374185,
+          "name": "STARLINK-37596          ",
+          "norad_id": 69032
+        },
+        {
+          "slope_error_hz_s": 2438.7117907957395,
+          "predicted_slope_hz_s": -3808.2481709336885,
+          "elevation_deg": 82.70590432300364,
+          "name": "STARLINK-36063          ",
+          "norad_id": 66606
+        },
+        {
+          "slope_error_hz_s": 2792.8461988459235,
+          "predicted_slope_hz_s": -3454.1137628835045,
+          "elevation_deg": 53.15343769672623,
+          "name": "STARLINK-1133           ",
+          "norad_id": 45064
+        }
+      ]
+    },
+    {
+      "capture": "dwell-00058-20260804T153016Z",
+      "track_id": "s019-t00114",
+      "mid": 1785858248.138281,
+      "start_utc": "2026-08-04T15:44:05.423365Z",
+      "duration_s": 5.429831956000044,
+      "measured_slope_hz_s": 6416.068898070907,
+      "confidence": 0.6761277627490285,
+      "carrier": 11481194110.576923,
+      "visible_starlinks": 220,
+      "matches_within_500_hz_s": 0,
+      "matches_within_1000_hz_s": 0,
+      "best_matches": [
+        {
+          "slope_error_hz_s": 6512.235543668485,
+          "predicted_slope_hz_s": -96.16664559757763,
+          "elevation_deg": 10.047751592382717,
+          "name": "STARLINK-30986          ",
+          "norad_id": 58492
+        },
+        {
+          "slope_error_hz_s": 6517.959752475335,
+          "predicted_slope_hz_s": -101.89085440442767,
+          "elevation_deg": 10.044128725779526,
+          "name": "STARLINK-35279          ",
+          "norad_id": 66069
+        },
+        {
+          "slope_error_hz_s": 6522.32759089297,
+          "predicted_slope_hz_s": -106.25869282206288,
+          "elevation_deg": 12.048162448917894,
+          "name": "STARLINK-31308          ",
+          "norad_id": 59153
+        },
+        {
+          "slope_error_hz_s": 6538.972710206594,
+          "predicted_slope_hz_s": -122.90381213568624,
+          "elevation_deg": 12.050159958173806,
+          "name": "STARLINK-33947          ",
+          "norad_id": 63787
+        },
+        {
+          "slope_error_hz_s": 6542.764866805671,
+          "predicted_slope_hz_s": -126.6959687347638,
+          "elevation_deg": 13.671756759246357,
+          "name": "STARLINK-5213           ",
+          "norad_id": 54093
+        }
+      ]
+    }
+  ]
+}

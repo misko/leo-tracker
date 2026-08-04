@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh current Starlink pass predictions every six hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:30:00
+Persistent=true
+Unit=leo-tracker-pass-refresh.service
+
+[Install]
+WantedBy=timers.target

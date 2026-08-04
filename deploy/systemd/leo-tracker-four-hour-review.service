@@ -1,0 +1,8 @@
+[Unit]
+Description=Summarize the latest four hours of LEO radio observations
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
+ExecStart=/home/satpi01/.local/bin/uv run --active --no-sync python -m leo_tracker.radio.periodic_review artifacts/starlink_measurement_watch_radio2_v3_20260802 artifacts/starlink_measurement_watch_radio2_v3_20260802/reviews --hours 4

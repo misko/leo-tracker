@@ -1,0 +1,23 @@
+{
+  "samples_per_channel": 524288,
+  "cycles": 10,
+  "radios": [
+    {
+      "serial": "1040005e0b100007100010000bf33a5d4d",
+      "bus": 1,
+      "address": 14,
+      "port_path": [
+        1
+      ],
+      "first_stream_id": 56174229788,
+      "last_stream_id": 59578083452,
+      "channel_rms_last": [
+        529.9948344270522,
+        538.4455187434203
+      ]
+    }
+  ],
+  "rss_initial_kib": 43808,
+  "rss_final_kib": 64304,
+  "rss_growth_kib": 20496
+}

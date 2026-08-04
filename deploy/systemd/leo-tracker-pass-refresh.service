@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh current Starlink pass predictions from archived TLEs
+After=network-online.target leo-tracker-tle-archive.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
+Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
+ExecStart=/bin/bash scripts/refresh_starlink_passes.sh

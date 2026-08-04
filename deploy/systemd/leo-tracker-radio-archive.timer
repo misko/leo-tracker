@@ -1,0 +1,10 @@
+[Unit]
+Description=Archive completed LEO radio artifacts every two hours
+
+[Timer]
+OnCalendar=*-*-* 00/2:50:00
+Persistent=true
+Unit=leo-tracker-radio-archive.service
+
+[Install]
+WantedBy=timers.target

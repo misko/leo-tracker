@@ -1,0 +1,15 @@
+[Unit]
+Description=LEO tracker read-only dashboard
+After=network.target
+
+[Service]
+Type=exec
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
+Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
+ExecStart=/home/satpi01/.local/bin/uv run --active --no-sync leo-radio starlink-dashboard artifacts/starlink_hybrid_watch --host 0.0.0.0 --port 8765
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

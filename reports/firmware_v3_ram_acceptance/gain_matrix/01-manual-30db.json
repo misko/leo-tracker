@@ -1,0 +1,47 @@
+{
+  "artifact": "reports/firmware_v3_ram_acceptance/gain_matrix/01-manual-30db.npz",
+  "capture": {
+    "configured_gain_db": 30.0,
+    "duty_fraction": 0.08469928710438028,
+    "first_utc_ns": 1785694834155461935,
+    "gain_mode": "manual",
+    "identity": {
+      "configured_gain_db": 30.0,
+      "enabled_channels": [
+        0,
+        1
+      ],
+      "gain_mode": "manual",
+      "implementation": "pyadi.ad9361",
+      "kind": "plutoplus-paired",
+      "serial": null,
+      "transport": "iio",
+      "uri": "ip:192.168.2.1"
+    },
+    "last_utc_ns": 1785694834549922942,
+    "median_snapshot_interval_s": 0.131384424,
+    "observation_span_s": 0.4029943403333333,
+    "path": "reports/firmware_v3_ram_acceptance/gain_matrix/01-manual-30db.npz",
+    "receiver_count": 2,
+    "retained_sample_time_s": 0.034133333333333335,
+    "samples_per_snapshot": 262144,
+    "schema": "leo-tracker.measurement-waterfall/v2",
+    "snapshots": 4
+  },
+  "configured_gain_db": 30.0,
+  "gain_mode": "manual",
+  "maximum_clip_fraction": null,
+  "median_hardware_gain_db": [
+    30.0,
+    30.0
+  ],
+  "median_peak_raw": [
+    7.930992126464844,
+    6.697811603546143
+  ],
+  "median_rms_raw": [
+    1.920057773590088,
+    1.7743117809295654
+  ],
+  "profile": "01-manual-30db"
+}

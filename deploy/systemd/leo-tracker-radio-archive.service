@@ -1,0 +1,8 @@
+[Unit]
+Description=Archive completed LEO radio artifacts to low-priority NFS storage
+After=network-online.target remote-fs.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/satpi01/leo-tracker
+ExecStart=/bin/bash scripts/archive_radio_artifacts.sh

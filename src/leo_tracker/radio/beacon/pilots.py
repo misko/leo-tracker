@@ -5,6 +5,7 @@ Elements of the Starlink Ku-Band Downlink*, arXiv:2602.02627, Appendix A.
 """
 from __future__ import annotations
 
+from functools import lru_cache
 import numpy as np
 from scipy.signal import fftconvolve
 
@@ -54,8 +55,10 @@ def edge_pilot_symbols(edge: str = "lower") -> np.ndarray:
     return output
 
 
-def edge_pilot_frame(sample_rate_hz: float, edge: str = "lower", *, symbol_roll: int = 0) -> np.ndarray:
-    """Synthesize one pilot-only frame at an SDR tuned to the pilot-band center."""
+@lru_cache(maxsize=32)
+def _edge_pilot_frame_cached(sample_rate_hz: float, edge: str,
+                             symbol_roll: int) -> np.ndarray:
+    """Cached immutable-by-convention pilot waveform used by hot acquisition loops."""
     if sample_rate_hz <= 0:
         raise ValueError("sample rate must be positive")
     count = round(sample_rate_hz * STARLINK_FRAME_DURATION_S)
@@ -76,13 +79,19 @@ def edge_pilot_frame(sample_rate_hz: float, edge: str = "lower", *, symbol_roll:
             values += codes[index - 2, column] * np.exp(
                 2j * np.pi * frequency * (local_time - CYCLIC_PREFIX_DURATION_S))
         output[selected] = values / np.sqrt(len(indexes))
+    output.flags.writeable = False
     return output
+
+
+def edge_pilot_frame(sample_rate_hz: float, edge: str = "lower", *, symbol_roll: int = 0) -> np.ndarray:
+    """Synthesize one pilot-only frame at an SDR tuned to the pilot-band center."""
+    return _edge_pilot_frame_cached(float(sample_rate_hz), edge, int(symbol_roll)).copy()
 
 
 def _symbol_correlations(values: np.ndarray, sample_rate_hz: float, epoch_sample: int,
                          frequency_offset_hz: float, edge: str, symbol_roll: int = 0
                          ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    template = edge_pilot_frame(sample_rate_hz, edge, symbol_roll=symbol_roll)
+    template = _edge_pilot_frame_cached(float(sample_rate_hz), edge, int(symbol_roll))
     period = sample_rate_hz * STARLINK_FRAME_DURATION_S
     symbol_period = sample_rate_hz * OFDM_SYMBOL_DURATION_S
     correlations, powers, times = [], [], []
@@ -162,12 +171,13 @@ def track_edge_pilots(samples: np.ndarray, sample_rate_hz: float, epoch_sample: 
 
 
 def matched_pilot_score(samples: np.ndarray, sample_rate_hz: float, *, edge: str = "lower",
-                        frequency_offsets_hz: tuple[float, ...] = (0.0,)) -> dict:
+                        frequency_offsets_hz: tuple[float, ...] = (0.0,),
+                        symbol_roll: int = 0) -> dict:
     """Search frame epoch and CFO using a normalized exact-pilot matched filter."""
     values = np.asarray(samples, np.complex64)
     if values.ndim != 1:
         raise ValueError("samples must be one dimensional")
-    template = edge_pilot_frame(sample_rate_hz, edge)
+    template = _edge_pilot_frame_cached(float(sample_rate_hz), edge, int(symbol_roll))
     if values.size < template.size:
         raise ValueError("at least one frame is required")
     template_energy = float(np.vdot(template, template).real)
@@ -184,4 +194,5 @@ def matched_pilot_score(samples: np.ndarray, sample_rate_hz: float, *, edge: str
             best = {"score": score, "frequency_offset_hz": float(offset_hz),
                     "sample_index": index, "epoch_s": index / sample_rate_hz}
     return {"schema": "leo-tracker.starlink-edge-pilot-match/v1", "edge": edge,
+            "symbol_roll": int(symbol_roll),
             "searched_frequency_offsets_hz": list(frequency_offsets_hz), **best}

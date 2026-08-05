@@ -687,7 +687,7 @@ class DashboardModel:
     def beacon(self, limit: int = 12) -> dict:
         if self.beacon_root is None:
             return {"enabled": False, "captures": [], "candidate_count": 0,
-                    "qualified_count": 0, "active": None}
+                    "qualified_count": 0, "active": None, "calibration": {}}
         captures_root, reports_root = self.beacon_root / "captures", self.beacon_root / "reports"
         active = None
         manifest_paths = sorted(captures_root.glob("*/manifest.json"),
@@ -706,12 +706,24 @@ class DashboardModel:
                           "rf_center_hz": manifest.get("rf_center_hz")}
                 break
         rows = []
-        for report_path in sorted(reports_root.glob("*.json"), reverse=True)[:max(1, min(limit, 100))]:
+        report_paths = sorted(reports_root.glob("*.json"),
+                              key=lambda path: path.stat().st_mtime_ns, reverse=True)
+        for report_path in report_paths[:max(1, min(limit, 100))]:
             report = self._json(report_path, {})
             if report.get("schema") != "leo-tracker.starlink-beacon-analysis/v1":
                 continue
             manifest, summary = report.get("capture_manifest", {}), report.get("summary", {})
+            analysis = report.get("analysis", {})
             exact = report.get("exact_checks", [])
+            followup_path = reports_root / "followups" / report_path.name
+            followup = self._json(followup_path, {})
+            confirmation = followup.get("confirmation", {})
+            confirmation_links = confirmation.get("cross_receiver_links", []) + [
+                link for receiver in confirmation.get("receivers", [])
+                for link in receiver.get("links", [])]
+            strongest_link = max(confirmation_links,
+                key=lambda item: abs(float(item.get("drift_hz_s", 0))), default=None)
+            overlapping_passes = followup.get("overlapping_passes", [])
             rows.append({"name": report_path.stem,
                 "plot_url": (f"/beacon-plots/{report_path.stem}.png"
                              if (reports_root / "plots" / f"{report_path.stem}.png").is_file()
@@ -726,9 +738,29 @@ class DashboardModel:
                 "gain_mode": manifest.get("gain_mode"),
                 "configured_gain_db": manifest.get("configured_gain_db"),
                 "duration_s": manifest.get("requested_duration_s"),
+                "acquisition_span_hz": analysis.get("acquisition_span_hz", 0),
+                "acquisition_step_hz": analysis.get("acquisition_step_hz"),
                 "stream_timing": manifest.get("stream_timing", {}),
                 "candidate_count": summary.get("exact_candidate_count", 0),
                 "qualified_count": summary.get("exact_qualified_count", 0),
+                "single_receiver_candidate_count": summary.get("single_receiver_candidate_count", 0),
+                "single_receiver_qualified_count": summary.get("single_receiver_qualified_count", 0),
+                "followup_trigger_count": summary.get("followup_trigger_count", 0),
+                "followup_check_count": len(followup.get("checks", [])),
+                "followup_url": (f"/beacon-followups/{report_path.name}"
+                                 if followup_path.is_file() else None),
+                "followup_confirmed": confirmation.get("confirmed", False),
+                "same_receiver_confirmed": confirmation.get("same_receiver_confirmed", False),
+                "cross_receiver_confirmed": confirmation.get("cross_receiver_confirmed", False),
+                "confirmed_link_count": len(confirmation_links),
+                "strongest_confirmed_link": strongest_link,
+                "overlapping_pass_count": len(overlapping_passes),
+                "overlapping_passes": [{
+                    "name": item.get("name"), "norad_id": item.get("norad_id"),
+                    "observation_utc": item.get("observation_utc"),
+                    "culmination_elevation_deg": item.get("culmination_elevation_deg"),
+                    "nearest_prediction": item.get("nearest_prediction")}
+                    for item in overlapping_passes[:5]],
                 "structural_qualified_fraction": summary.get("qualified_fraction", 0),
                 "exact_checks": [{"candidate": item.get("candidate"),
                     "qualified": item.get("qualified"),
@@ -737,9 +769,16 @@ class DashboardModel:
                     "pss_ratios": [receiver.get("pss", {}).get("peak_to_median")
                                    for receiver in item.get("receivers", [])],
                     "pilot_margins": [receiver.get("pilot", {}).get("score_margin")
-                                      for receiver in item.get("receivers", [])]}
+                                      for receiver in item.get("receivers", [])],
+                    "matched_margins": [receiver.get("acquisition", {}).get("match_score_margin")
+                                        for receiver in item.get("receivers", [])],
+                    "selected_subband_offsets_hz": [
+                        receiver.get("acquisition", {}).get("selected_center_offset_hz")
+                        for receiver in item.get("receivers", [])]}
                     for item in exact]})
+        calibration = self._json(reports_root / "calibration" / "calibration.json", {})
         return {"enabled": True, "root": str(self.beacon_root), "active": active,
+                "calibration": calibration,
                 "captures": rows, "candidate_count": sum(row["candidate_count"] for row in rows),
                 "qualified_count": sum(row["qualified_count"] for row in rows)}
 
@@ -778,7 +817,7 @@ let waterfallSignature='';
 async function refresh(){try{const d=await fetch('/api/snapshot',{cache:'no-store'}).then(r=>r.json()),s=d.status;
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString();document.querySelector('#state').innerHTML='<span class="live">'+s.state.toUpperCase()+'</span>';document.querySelector('#age').textContent=f(s.update_age_s,0)+' s since completed chunk';
 document.querySelector('#progress').textContent=f(100*s.progress_fraction,1)+'%';document.querySelector('#progressbar').style.width=(100*s.progress_fraction)+'%';document.querySelector('#coverage').textContent=f(s.retained_sample_hours*60,1)+' min';document.querySelector('#coveragebar').style.width=(100*s.retained_sample_fraction)+'%';document.querySelector('#count').textContent=s.detection_count;document.querySelector('#chunks').textContent=s.completed_chunks+' chunks · '+f(s.analyzed_span_hours,2)+' h wall span · '+f(s.frequency_bin_width_hz/1000,2)+' kHz/bin · baseline '+(s.resolution_baseline_ready?'ready':'warming')+(s.pending_wide_analysis_chunks?' · '+s.pending_wide_analysis_chunks+' pending wide':'');
-const bcn=d.beacon||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},label=x.qualified_count?'QUALIFIED':x.candidate_count?'CANDIDATE':'control rejected';return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(t.host_read_duty_fraction)?' · host-read duty '+f(100*t.host_read_duty_fraction,1)+'%':''}<br>PSS RX0/RX1 ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · pilot margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}</div>`}).join('');
+const bcn=d.beacon||{},cal=bcn.calibration||{},cn=(cal.modes||{}).narrow||{},cw=(cal.modes||{}).wide||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · empirical null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[];return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${wide?'wide acquisition':'narrow lock'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}</div>`}).join('');
 document.querySelector('#dither').innerHTML=(d.dither.comparisons||[]).slice(0,6).map(x=>`<div class="log"><strong>Chunk ${x.chunk}</strong> · ${x.classification} · ${f(x.tuning_dither_hz/1e6,3)} MHz dither · receivers ${x.receivers_agree?'agree':'disagree'}<br>${x.receivers.map(r=>'RX'+r.receiver+' sky/baseband '+f(r.sky_fixed_correlation,3)+' / '+f(r.baseband_fixed_correlation,3)).join(' · ')}</div>`).join('')||'<span class="muted">Waiting for the first nominal/dither pair.</span>';
 const nextWaterfallSignature=d.waterfalls.waterfalls.map(x=>x.plot_url+':'+x.qualified_event_count+':'+x.tle_guided_candidate_count+':'+x.blind_comb_candidate_count+':'+x.blind_carrier_candidate_count+':'+x.wide_feature_candidate_count).join('|');
 if(nextWaterfallSignature!==waterfallSignature){waterfallSignature=nextWaterfallSignature;document.querySelector('#waterfalls').innerHTML=d.waterfalls.waterfalls.map(x=>{
@@ -843,6 +882,11 @@ def make_handler(model: DashboardModel):
                 if name.endswith(".png") and target.is_file():
                     return self._send(target.read_bytes(), "image/png",
                                       cache_control="public, max-age=300")
+            if path.startswith("/beacon-followups/") and model.beacon_root is not None:
+                name = Path(path).name
+                target = model.beacon_root / "reports" / "followups" / name
+                if name.endswith(".json") and target.is_file():
+                    return self._send(target.read_bytes(), "application/json")
             self._send(b'{"error":"not found"}', "application/json", HTTPStatus.NOT_FOUND)
 
         def log_message(self, format, *args):

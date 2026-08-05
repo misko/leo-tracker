@@ -267,3 +267,26 @@ class BeaconCapture:
                             shape=(record.sample_count, 2, 2))
             values = raw[..., 0].astype(np.float32) + 1j * raw[..., 1].astype(np.float32)
             yield record, values.astype(np.complex64)
+
+    def read_window(self, first_sample: int, sample_count: int) -> np.ndarray:
+        """Read a paired window without materializing complete large chunks."""
+        total = int(self.manifest.get("captured_samples_per_receiver", 0))
+        if first_sample < 0 or sample_count <= 0 or first_sample + sample_count > total:
+            raise ValueError("requested window lies outside the capture")
+        pieces, stop = [], first_sample + sample_count
+        for item in self.manifest["chunks"]:
+            chunk_start = item["first_sample_index"]
+            chunk_stop = chunk_start + item["sample_count"]
+            if chunk_stop <= first_sample or chunk_start >= stop:
+                continue
+            local_start = max(first_sample, chunk_start) - chunk_start
+            local_stop = min(stop, chunk_stop) - chunk_start
+            raw = np.memmap(self.root / item["path"], mode="r", dtype="<i2",
+                            shape=(item["sample_count"], 2, 2))
+            selected = raw[local_start:local_stop]
+            values = selected[..., 0].astype(np.float32) + 1j * selected[..., 1].astype(np.float32)
+            pieces.append(values.astype(np.complex64))
+        result = np.concatenate(pieces, axis=0) if pieces else np.empty((0, 2), np.complex64)
+        if result.shape != (sample_count, 2):
+            raise ValueError("capture window is incomplete")
+        return result

@@ -36,7 +36,10 @@ def apply_retention(root: Path, *, keep_negative: int = 12, dry_run: bool = Fals
         except (FileNotFoundError, json.JSONDecodeError):
             protected.append(str(capture)); continue
         summary = report.get("summary", {})
-        if summary.get("exact_candidate_count", 0) or summary.get("exact_qualified_count", 0):
+        if (summary.get("exact_candidate_count", 0) or summary.get("exact_qualified_count", 0)
+                or summary.get("single_receiver_candidate_count", 0)
+                or summary.get("single_receiver_qualified_count", 0)
+                or summary.get("followup_trigger_count", 0)):
             protected.append(str(capture))
         else:
             negatives.append((int(manifest.get("created_utc_ns", 0)), capture))

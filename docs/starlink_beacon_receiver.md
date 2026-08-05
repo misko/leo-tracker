@@ -34,10 +34,58 @@ center. The four currently monitored IFs are therefore:
 | 4 | lower edge | 1.709687500 GHz | 11.459687500 GHz | 1.875 MHz |
 | 4 | upper edge | 1.940312500 GHz | 11.690312500 GHz | 1.875 MHz |
 
-Each dwell synchronously records both Pluto+ receivers as little-endian CI16 at
-2.5 MS/s and 2.3 MHz RF bandwidth. This is 20 MB/s, or 2.4 GB per two-minute
-dwell. The 1.875 MHz pilot band leaves approximately 312.5 kHz of analog-filter
-margin on either side for Doppler and modest LNB frequency error.
+The lock mode synchronously records both Pluto+ receivers as little-endian CI16
+at 2.5 MS/s and 2.3 MHz RF bandwidth. This is 20 MB/s, or 2.4 GB per two-minute
+dwell. Its approximately 312.5 kHz filter margin is sufficient for Doppler but
+not for the unknown, independent frequency errors of two inexpensive LNBs.
+
+Every second four-band lock cycle is therefore followed by a wide acquisition
+cycle. Each wide dwell captures ten seconds at 10 MS/s and 9 MHz bandwidth,
+then searches digital 2.5 MHz subbands from -3.5 through +3.5 MHz in 500 kHz
+steps. Every bank receives a joint frame-epoch/CFO matched search against both
+the exact waveform and a 17-symbol-rolled control. The winning exact-minus-
+control bank seeds detailed symbolwise tracking. PSS remains independent
+supporting evidence rather than an authoritative timing seed. Once a stable LNB
+offset is acquired, the continuous narrow mode supplies the denser Doppler record.
+
+Narrow captures are joint-matched every two seconds using 10 ms windows. The
+expensive symbolwise tracker runs only when the joint exact-minus-control margin
+exceeds 0.008. This provides roughly ten times the earlier temporal coverage at
+similar compute cost. Dual-RX agreement remains the promotion gate, while strong
+single-RX evidence is explicitly labeled and retained for dense replay because
+the two independent LNBs need not have equal sensitivity.
+
+Every elevated single-RX margin, plus any near-dual event with a common frame
+epoch, triggers an automatic ±0.5 s replay at 100 ms spacing. Temporal
+confirmation requires consecutive exact/control candidates with frame epochs
+within 20 samples and a CFO change compatible with at most 15 kHz/s plus a
+25 kHz tolerance. A separate cross-receiver rule accepts candidates that switch
+between LNBs within 400 ms only when both RF chains select the same frame epoch
+at each observation and the candidate CFO remains continuous. Confirmed events
+trigger an immediate repeat dwell on the same pilot band. Isolated excursions
+remain follow-ups; they are not promoted.
+
+Confirmed follow-ups are retrospectively joined to the archived pass catalog.
+The report records every Starlink pass overlapping the RF event, its NORAD ID,
+nearest predicted elevation/Doppler, and culmination elevation. With many
+simultaneous visible spacecraft this is compatibility evidence, not unique
+identification; unique TLE matching still requires a longer Doppler trajectory.
+
+After every four-band narrow cycle, `starlink-beacon-calibrate` rebuilds an
+empirical null report from all non-confirmed observations. Narrow and wide modes
+are kept separate because frequency-bank maximization changes the null. The
+dashboard publishes receiver/check counts, match-margin percentiles, single-RX
+exceedances, and complete dual-gate exceedances alongside the fixed gates.
+
+The 10 MS/s path is intentionally described as periodic, not continuous. A
+hardware trial needed 121.4 seconds of wall time to return 30 seconds of dual-RX
+IQ, while the 2.5 MS/s path runs approximately in real time. The NVMe is not the
+bottleneck; this is the observed Pluto transport ceiling.
+
+Before each dwell, the service applies a host thermal guard: capture pauses at
+75 °C and resumes below 70 °C. This protects continuity and artifact integrity
+without conflating thermal throttling with RF absence. Both host and Pluto
+temperatures remain recorded in each capture manifest.
 
 A bounded reader thread continuously refills the Pluto while a consumer thread
 converts, hashes, and writes CI16 chunks. Manifests include host-side read
@@ -49,16 +97,23 @@ report.
 ## Operations
 
 The production service is `leo-tracker-beacon-watch.service`. It cycles through
-the four pilot bands, captures two continuous minutes per tuning, analyzes the
-capture, and then applies retention. All candidate captures are preserved.
+the four pilot bands, captures two continuous minutes per narrow tuning, adds a
+periodic wide LNB-offset acquisition cycle, analyzes every capture, and then
+applies retention. All candidate captures are preserved.
 Only the newest twelve negative captures are kept. Interrupted captures are
 moved to `quarantine` rather than deleted.
+At startup, the service idempotently analyzes every complete artifact lacking a
+report before beginning new captures. Thus a reboot between atomic capture
+completion and analysis cannot strand or silently discard an observation.
 
 Data live under `/mnt/leo-nvme/leo-tracker`:
 
 - `captures/<session>/manifest.json`: versioned parameters, timing, chunk hashes, and state.
 - `captures/<session>/chunk-*.ci16`: atomic five-second, dual-RX IQ chunks.
 - `reports/<session>.json`: structural, PSS, exact-pilot, control, CFO, and confidence evidence.
+- `reports/plots/<session>.png`: PSS, pilot/control margin, and CFO evidence.
+- `reports/followups/<session>.json`: dense replay and temporal-confirmation evidence.
+- `reports/calibration/calibration.json`: cumulative empirical null distributions.
 - `quarantine/`: recoverable interrupted sessions.
 
 Useful commands:

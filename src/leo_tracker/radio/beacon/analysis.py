@@ -8,11 +8,65 @@ from pathlib import Path
 import numpy as np
 
 from .artifact import BeaconCapture
+from .acquisition import acquire_exact_receiver
 from .structure import analyze_frame_period
-from .pilots import track_edge_pilots
-from .templates import acquire_pss_epoch
 
 ANALYSIS_SCHEMA = "leo-tracker.starlink-beacon-analysis/v1"
+DUAL_MATCH_MARGIN = .01
+DUAL_SYMBOL_MARGIN = .005
+DUAL_EPOCH_DELTA_SAMPLES = 20
+SINGLE_MATCH_MARGIN = .015
+SINGLE_SYMBOL_MARGIN = .01
+
+
+def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str,
+                         start_sample: int = 0, acquisition_span_hz: float = 0,
+                         acquisition_step_hz: float = 500_000,
+                         exact_subband_rate_hz: float = 2_500_000) -> dict:
+    """Apply all exact/control gates to one paired-IQ window."""
+    paired = np.asarray(values, np.complex64)
+    if paired.ndim != 2 or paired.shape[1] != 2:
+        raise ValueError("exact window must have shape (samples, 2 receivers)")
+    receivers = []
+    for receiver in range(2):
+        exact = acquire_exact_receiver(paired[:, receiver], source_rate_hz,
+            edge=edge, acquisition_span_hz=acquisition_span_hz,
+            acquisition_step_hz=acquisition_step_hz,
+            subband_rate_hz=exact_subband_rate_hz)
+        receivers.append({"receiver": receiver, **exact})
+    exact_rate = receivers[0]["acquisition"]["subband_rate_hz"]
+    period = exact_rate / 750
+    epoch_difference = abs(receivers[0]["acquisition"]["selected_epoch_sample"] -
+                           receivers[1]["acquisition"]["selected_epoch_sample"])
+    epoch_difference = min(epoch_difference, period - epoch_difference)
+    pss_epoch_difference = abs(receivers[0]["pss"]["epoch_sample"] -
+                               receivers[1]["pss"]["epoch_sample"])
+    pss_epoch_difference = min(pss_epoch_difference, period - pss_epoch_difference)
+    cfo_difference = abs(receivers[0]["pilot"]["frequency_offset_hz"] -
+                         receivers[1]["pilot"]["frequency_offset_hz"])
+    margins = [item["pilot"]["score_margin"] for item in receivers]
+    coherences = [item["pilot"]["coherence"] for item in receivers]
+    match_margins = [item["acquisition"]["match_score_margin"] for item in receivers]
+    receiver_candidates = [match_margins[index] >= SINGLE_MATCH_MARGIN and
+                           margins[index] >= SINGLE_SYMBOL_MARGIN
+                           for index in range(2)]
+    receiver_qualified = [match_margins[index] >= .03 and margins[index] >= .02
+                          and coherences[index] >= .05 for index in range(2)]
+    candidate = (min(match_margins) >= DUAL_MATCH_MARGIN and
+                 min(margins) >= DUAL_SYMBOL_MARGIN and
+                 epoch_difference <= DUAL_EPOCH_DELTA_SAMPLES)
+    qualified = (min(match_margins) >= .03 and min(margins) >= .02 and
+                 min(coherences) >= .05 and epoch_difference <= 8)
+    followup_trigger = bool(any(receiver_candidates) or
+                            (epoch_difference <= DUAL_EPOCH_DELTA_SAMPLES and
+                             max(match_margins) >= DUAL_MATCH_MARGIN))
+    return {"start_sample": int(start_sample), "start_s": start_sample / source_rate_hz,
+            "duration_s": paired.shape[0] / source_rate_hz, "receivers": receivers,
+            "epoch_difference_samples": epoch_difference,
+            "pss_epoch_difference_samples": pss_epoch_difference,
+            "cfo_difference_hz": cfo_difference, "candidate": bool(candidate),
+            "qualified": bool(qualified), "receiver_candidates": receiver_candidates,
+            "receiver_qualified": receiver_qualified, "followup_trigger": followup_trigger}
 
 
 def summarize_doppler_track(exact_checks: list[dict]) -> dict:
@@ -39,10 +93,20 @@ def summarize_doppler_track(exact_checks: list[dict]) -> dict:
 
 def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                     maximum_analysis_rate_hz: float = 250_000,
-                    exact_interval_s: float = 60.0, exact_window_s: float = .1) -> dict:
+                    exact_interval_s: float = 60.0, exact_window_s: float = .1,
+                    acquisition_span_hz: float = 0,
+                    acquisition_step_hz: float = 500_000,
+                    exact_subband_rate_hz: float = 2_500_000,
+                    exact_start_s: float = 0,
+                    exact_stop_s: float | None = None) -> dict:
     """Analyze independent windows without loading a complete long capture into RAM."""
-    if min(window_s, maximum_analysis_rate_hz, exact_interval_s, exact_window_s) <= 0:
+    if min(window_s, maximum_analysis_rate_hz, exact_interval_s, exact_window_s,
+           acquisition_step_hz, exact_subband_rate_hz) <= 0:
         raise ValueError("window lengths, intervals, and analysis rate must be positive")
+    if acquisition_span_hz < 0:
+        raise ValueError("acquisition span must be nonnegative")
+    if exact_start_s < 0 or (exact_stop_s is not None and exact_stop_s <= exact_start_s):
+        raise ValueError("exact replay interval must have 0 <= start < stop")
     capture = BeaconCapture.open(capture_path, verify=True)
     source_rate = float(capture.manifest["sample_rate_hz"])
     decimation = max(1, int(np.floor(source_rate / maximum_analysis_rate_hz)))
@@ -50,7 +114,9 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
     window_samples = max(1, round(window_s * analysis_rate))
     windows: list[dict] = []
     exact_checks: list[dict] = []
-    next_exact_sample = 0
+    next_exact_sample = round(exact_start_s * source_rate)
+    exact_stop_sample = (capture.manifest["captured_samples_per_receiver"]
+                         if exact_stop_s is None else round(exact_stop_s * source_rate))
     exact_pending: list[np.ndarray] = []
     analysis_index = 0
     carry = np.empty((0, 2), np.complex64)
@@ -58,7 +124,7 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
     edge = region.removesuffix("-edge") if region in ("lower-edge", "upper-edge") else None
     for record, values in capture.chunks():
         chunk_stop = record.first_sample_index + record.sample_count
-        while edge and next_exact_sample < chunk_stop:
+        while edge and next_exact_sample < chunk_stop and next_exact_sample < exact_stop_sample:
             if next_exact_sample < record.first_sample_index and not exact_pending:
                 next_exact_sample = record.first_sample_index
             count = round(exact_window_s * source_rate)
@@ -72,33 +138,10 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                 break
             exact_values = np.concatenate(exact_pending, axis=0)
             exact_pending = []
-            receivers = []
-            for receiver in range(2):
-                pss = acquire_pss_epoch(exact_values[:, receiver], source_rate, edge=edge)
-                pilot = track_edge_pilots(exact_values[:, receiver], source_rate,
-                                           pss["epoch_sample"], edge=edge)
-                receivers.append({"receiver": receiver, "pss": pss, "pilot": pilot})
-            period = source_rate / 750
-            epoch_difference = abs(receivers[0]["pss"]["epoch_sample"] -
-                                   receivers[1]["pss"]["epoch_sample"])
-            epoch_difference = min(epoch_difference, period - epoch_difference)
-            cfo_difference = abs(receivers[0]["pilot"]["frequency_offset_hz"] -
-                                 receivers[1]["pilot"]["frequency_offset_hz"])
-            pss_ratios = [item["pss"]["peak_to_median"] for item in receivers]
-            margins = [item["pilot"]["score_margin"] for item in receivers]
-            coherences = [item["pilot"]["coherence"] for item in receivers]
-            # Independent LNB local oscillators may have a large static CFO
-            # difference. Identity comes from the exact codes and common frame
-            # epoch; Doppler is compared from the CFO *change* over time.
-            candidate = (min(pss_ratios) >= 1.8 and min(margins) >= .005 and
-                         epoch_difference <= 20)
-            qualified = (min(pss_ratios) >= 2.5 and min(margins) >= .02 and
-                         min(coherences) >= .05 and epoch_difference <= 8)
-            exact_checks.append({"start_sample": next_exact_sample,
-                "start_s": next_exact_sample / source_rate, "duration_s": exact_window_s,
-                "receivers": receivers, "epoch_difference_samples": epoch_difference,
-                "cfo_difference_hz": cfo_difference, "candidate": bool(candidate),
-                "qualified": bool(qualified)})
+            exact_checks.append(analyze_exact_window(exact_values, source_rate, edge=edge,
+                start_sample=next_exact_sample, acquisition_span_hz=acquisition_span_hz,
+                acquisition_step_hz=acquisition_step_hz,
+                exact_subband_rate_hz=exact_subband_rate_hz))
             next_exact_sample += round(exact_interval_s * source_rate)
         selected = values[::decimation]
         combined = np.concatenate((carry, selected), axis=0)
@@ -121,7 +164,11 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
         "capture_manifest": capture.manifest,
         "analysis": {"window_s": window_s, "decimation": decimation,
                      "analysis_rate_hz": analysis_rate, "exact_interval_s": exact_interval_s,
-                     "exact_window_s": exact_window_s, "exact_edge": edge},
+                     "exact_window_s": exact_window_s, "exact_edge": edge,
+                     "acquisition_span_hz": acquisition_span_hz,
+                     "acquisition_step_hz": acquisition_step_hz,
+                     "exact_subband_rate_hz": min(source_rate, exact_subband_rate_hz),
+                     "exact_start_s": exact_start_s, "exact_stop_s": exact_stop_s},
         "windows": windows,
         "exact_checks": exact_checks,
         "doppler_track": doppler_track,
@@ -130,6 +177,11 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                     "exact_check_count": len(exact_checks),
                     "exact_candidate_count": sum(item["candidate"] for item in exact_checks),
                     "exact_qualified_count": sum(item["qualified"] for item in exact_checks),
+                    "single_receiver_candidate_count": sum(
+                        sum(item["receiver_candidates"]) for item in exact_checks),
+                    "single_receiver_qualified_count": sum(
+                        sum(item["receiver_qualified"]) for item in exact_checks),
+                    "followup_trigger_count": sum(item["followup_trigger"] for item in exact_checks),
                     "doppler_track_qualified": doppler_track["qualified"]},
     }
     output = Path(output)

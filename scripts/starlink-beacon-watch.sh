@@ -5,29 +5,41 @@ repo_dir="${LEO_TRACKER_REPO:-/home/satpi01/leo-tracker}"
 storage_root="${LEO_BEACON_STORAGE:-/mnt/leo-nvme/leo-tracker}"
 duration_s="${LEO_BEACON_DWELL_S:-120}"
 wide_duration_s="${LEO_BEACON_WIDE_DWELL_S:-10}"
-wide_every_cycles="${LEO_BEACON_WIDE_EVERY_CYCLES:-2}"
+# Once narrow lock has demonstrated the LNB offset is inside the 2.3 MHz
+# passband, a wide reacquisition every ~30 minutes is enough to detect LO drift
+# without repeatedly sacrificing near-continuous beacon coverage.
+wide_every_cycles="${LEO_BEACON_WIDE_EVERY_CYCLES:-15}"
 keep_negative="${LEO_BEACON_KEEP_NEGATIVE:-12}"
 uv_cache="${UV_CACHE_DIR:-${repo_dir}/.uv-cache}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
 maximum_pi_temp_millic="${LEO_BEACON_MAX_PI_TEMP_MILLIC:-75000}"
 resume_pi_temp_millic="${LEO_BEACON_RESUME_PI_TEMP_MILLIC:-70000}"
+target_spec="${LEO_BEACON_TARGETS:-4:lower-edge}"
+maximum_cycles="${LEO_BEACON_MAX_CYCLES:-0}"
+fake_source="${LEO_BEACON_FAKE:-0}"
+read -r -a targets <<< "${target_spec}"
+if (( ${#targets[@]} == 0 )); then
+  echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2
+  exit 2
+fi
+source_args=()
+if [[ "${fake_source}" == "1" ]]; then
+  source_args+=(--fake)
+fi
 
 mkdir -p "${storage_root}/captures" "${storage_root}/reports" "${storage_root}/staging"
 mkdir -p "${storage_root}/reports/plots"
 cd "${repo_dir}"
 
 capture_target() {
-    target="$1"
-    mode="$2"
+    local target="$1" mode="$2" channel region stamp name capture
+    local pi_temp_millic pi_temp radio_temp_millic radio_temp
+    local -a temperature_args capture_args
     channel="${target%%:*}"
     region="${target##*:}"
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     name="ch${channel}-${region}-${mode}-${stamp}"
     capture="${storage_root}/captures/${name}"
-    report="${storage_root}/reports/${name}.json"
-    plot="${storage_root}/reports/plots/${name}.png"
-    followup="${storage_root}/reports/followups/${name}.json"
-    confirmation_marker="${storage_root}/staging/${name}.confirmed"
     while read -r pi_temp_millic < /sys/class/thermal/thermal_zone0/temp &&
           (( pi_temp_millic >= maximum_pi_temp_millic )); do
       printf '{"thermal_backoff":true,"pi_temperature_c":%.3f,"resume_below_c":%.3f}\n' \
@@ -40,7 +52,10 @@ capture_target() {
       fi
     done
     pi_temp="$(awk '{printf "%.3f", $1/1000}' /sys/class/thermal/thermal_zone0/temp)"
-    radio_temp_millic="$(iio_attr -u ip:192.168.2.1 -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
+    radio_temp_millic=""
+    if [[ "${fake_source}" != "1" ]]; then
+      radio_temp_millic="$(iio_attr -u ip:192.168.2.1 -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
+    fi
     temperature_args=(--host-temperature-c "${pi_temp}")
     if [[ -n "${radio_temp_millic}" ]]; then
       radio_temp="$(awk -v value="${radio_temp_millic}" 'BEGIN {printf "%.3f", value/1000}')"
@@ -49,19 +64,34 @@ capture_target() {
     if [[ "${mode}" == "wide" ]]; then
       capture_args=(--duration-s "${wide_duration_s}" --sample-rate-hz 10000000
         --bandwidth-hz 9000000 --block-size 1048576)
-      analysis_args=(--exact-interval-s 5 --exact-window-s .01
-        --acquisition-span-hz 3500000 --acquisition-step-hz 500000
-        --exact-subband-rate-hz 2500000)
     else
       capture_args=(--duration-s "${duration_s}" --sample-rate-hz 2500000
         --bandwidth-hz 2300000 --block-size 262144)
-      analysis_args=(--exact-interval-s 2 --exact-window-s .01)
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \
       --channel-number "${channel}" --region "${region}" \
       --gain-mode manual --gain-db 50 --chunk-s 5 --queue-blocks 16 \
-      "${temperature_args[@]}"
+      "${temperature_args[@]}" "${source_args[@]}"
+    pending_name="${name}"
+    pending_capture="${capture}"
+    pending_mode="${mode}"
+}
+
+process_capture() {
+    local name="$1" capture="$2" mode="$3"
+    local report="${storage_root}/reports/${name}.json"
+    local plot="${storage_root}/reports/plots/${name}.png"
+    local followup="${storage_root}/reports/followups/${name}.json"
+    local confirmation_marker="${storage_root}/staging/${name}.confirmed"
+    local analysis_args
+    if [[ "${mode}" == "wide" ]]; then
+      analysis_args=(--exact-interval-s 5 --exact-window-s .01
+        --acquisition-span-hz 3500000 --acquisition-step-hz 500000
+        --exact-subband-rate-hz 2500000)
+    else
+      analysis_args=(--exact-interval-s 2 --exact-window-s .01)
+    fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-analyze "${capture}" "${report}" \
       --window-s 1 --maximum-analysis-rate-hz 50000 "${analysis_args[@]}" --plot "${plot}"
@@ -70,9 +100,44 @@ capture_target() {
       --radius-s .5 --interval-s .1 --window-s .01 \
       --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json" \
       --confirmation-marker "${confirmation_marker}"
-    last_confirmation_marker="${confirmation_marker}"
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
+    env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-calibrate "${storage_root}/reports" \
+      "${storage_root}/reports/calibration/calibration.json"
+}
+
+analysis_pid=""
+analysis_name=""
+wait_for_analysis() {
+  if [[ -n "${analysis_pid}" ]]; then
+    wait "${analysis_pid}"
+    analysis_pid=""
+    analysis_name=""
+  fi
+}
+
+stop_analysis() {
+  if [[ -n "${analysis_pid}" ]]; then
+    kill "${analysis_pid}" 2>/dev/null || true
+    wait "${analysis_pid}" 2>/dev/null || true
+  fi
+}
+handle_signal() {
+  trap - EXIT INT TERM
+  stop_analysis
+  exit 130
+}
+trap stop_analysis EXIT
+trap handle_signal INT TERM
+
+start_pending_analysis() {
+  # Exactly one analyzer is allowed. Capture N+1 overlaps analysis N, but a
+  # backlog can never grow without bound or consume the NVMe silently.
+  wait_for_analysis
+  process_capture "${pending_name}" "${pending_capture}" "${pending_mode}" &
+  analysis_pid=$!
+  analysis_name="${pending_name}"
 }
 
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
@@ -83,19 +148,19 @@ env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
 
 cycle=0
 while true; do
-  for target in 3:lower-edge 3:upper-edge 4:lower-edge 4:upper-edge; do
+  for target in "${targets[@]}"; do
     capture_target "${target}" narrow
-    if [[ -f "${last_confirmation_marker}" ]]; then
-      capture_target "${target}" confirm
-    fi
+    start_pending_analysis
   done
-  env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-    starlink-beacon-calibrate "${storage_root}/reports" \
-    "${storage_root}/reports/calibration/calibration.json"
   cycle=$((cycle + 1))
   if (( wide_every_cycles > 0 && cycle % wide_every_cycles == 0 )); then
-    for target in 3:lower-edge 3:upper-edge 4:lower-edge 4:upper-edge; do
+    for target in "${targets[@]}"; do
       capture_target "${target}" wide
+      start_pending_analysis
     done
+  fi
+  if (( maximum_cycles > 0 && cycle >= maximum_cycles )); then
+    wait_for_analysis
+    break
   fi
 done

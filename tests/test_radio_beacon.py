@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -484,6 +486,11 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     script = (Path(__file__).parents[1] / "scripts" / "starlink-beacon-watch.sh").read_text()
     assert 'capture_target "${target}" narrow' in script
     assert 'capture_target "${target}" wide' in script
+    assert 'LEO_BEACON_TARGETS:-4:lower-edge' in script
+    assert 'LEO_BEACON_WIDE_EVERY_CYCLES:-15' in script
+    assert "Exactly one analyzer is allowed" in script
+    assert "start_pending_analysis" in script
+    assert 'LEO_BEACON_MAX_CYCLES:-0' in script
     assert "--sample-rate-hz 10000000" in script
     assert "--acquisition-span-hz 3500000" in script
     assert "--exact-interval-s 2 --exact-window-s .01" in script
@@ -492,6 +499,34 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "starlink-beacon-followup" in script
     assert "starlink-beacon-calibrate" in script
     assert "LEO_BEACON_MAX_PI_TEMP_MILLIC" in script
+
+
+def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
+    repo = Path(__file__).parents[1]
+    storage = tmp_path / "beacon-store"
+    environment = os.environ | {
+        "LEO_TRACKER_REPO": str(repo), "LEO_BEACON_STORAGE": str(storage),
+        "LEO_BEACON_DWELL_S": ".04", "LEO_BEACON_WIDE_DWELL_S": ".04",
+        "LEO_BEACON_WIDE_EVERY_CYCLES": "1",
+        "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
+        "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
+        "UV_CACHE_DIR": str(repo / ".uv-cache"), "UV_BIN": shutil.which("uv") or "uv"}
+    result = subprocess.run(["bash", str(repo / "scripts/starlink-beacon-watch.sh")],
+        cwd=repo, env=environment, text=True, capture_output=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    reports = list((storage / "reports").glob("*.json"))
+    assert len(reports) == 2
+    assert {"narrow", "wide"} == {
+        "wide" if report.stem.split("-")[-2] == "wide" else "narrow"
+        for report in reports}
+    for report_path in reports:
+        report = json.loads(report_path.read_text())
+        assert report["capture_manifest"]["state"] == "complete"
+        assert report["capture_manifest"]["metadata"] == {
+            "channel_number": 4, "region": "lower-edge",
+            "tuning_basis": "published Starlink channel and edge-pilot geometry"}
+        assert (storage / "reports" / "followups" / report_path.name).is_file()
+    assert (storage / "reports" / "calibration" / "calibration.json").is_file()
 
 
 def test_doppler_summary_uses_lnb_slopes_not_absolute_cfo_agreement():

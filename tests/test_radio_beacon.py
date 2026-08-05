@@ -780,6 +780,7 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "starlink-beacon-recover" in script
     assert "starlink-beacon-followup" in script
     assert "starlink-beacon-decode" in script
+    assert "starlink-beacon-fingerprint" in script
     assert '[[ "${mode}" != "wide" && -f "${confirmation_marker}" ]]' in script
     assert "starlink-beacon-calibrate" in script
     assert "LEO_BEACON_MAX_PI_TEMP_MILLIC" in script
@@ -813,6 +814,8 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
             "tuning_basis": "published Starlink channel and edge-pilot geometry"}
         assert (storage / "reports" / "followups" / report_path.name).is_file()
     assert (storage / "reports" / "calibration" / "calibration.json").is_file()
+    fingerprint_index = storage / "reports" / "fingerprints" / "index.json"
+    assert json.loads(fingerprint_index.read_text())["fingerprint_count"] == 0
 
 
 def test_doppler_summary_uses_lnb_slopes_not_absolute_cfo_agreement():

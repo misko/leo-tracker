@@ -442,6 +442,7 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
     reports = beacon_root / "reports"
     (reports / "followups").mkdir(parents=True)
     (reports / "decoded").mkdir()
+    (reports / "fingerprints").mkdir()
     capture.mkdir(parents=True)
     manifest = {"state": "complete", "created_utc_ns": 1_700_000_000_000_000_000,
         "sample_rate_hz": 2_500_000, "bandwidth_hz": 2_300_000,
@@ -461,12 +462,23 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         "minimum_frame_count": 7}}
     (reports / "decoded" / f"{name}.json").write_text(json.dumps(decode))
     (reports / "decoded" / f"{name}.png").write_bytes(b"decode-png")
+    fingerprint = {"schema": "leo-tracker.starlink-waveform-fingerprint/v1",
+        "capture_name": name, "interpretation": {"satellite_identity_claim": False}}
+    (reports / "fingerprints" / f"{name}.json").write_text(json.dumps(fingerprint))
+    (reports / "fingerprints" / "index.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-waveform-fingerprint-index/v1",
+        "fingerprint_count": 1, "membership": {name: "wf-test"},
+        "clusters": [{"cluster_id": "wf-test", "member_count": 1}],
+        "nearest_matches": {name: []}}))
 
     model = DashboardModel(observation_root, beacon_root=beacon_root)
     row = model.beacon()["captures"][0]
     assert row["decode"] == decode["combined"]
     assert row["decode_url"] == f"/beacon-decodes/{name}.json"
     assert row["decode_plot_url"] == f"/beacon-decode-plots/{name}.png"
+    assert row["fingerprint_url"] == f"/beacon-fingerprints/{name}.json"
+    assert row["fingerprint_cluster_id"] == "wf-test"
+    assert row["fingerprint_cluster_size"] == 1
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(model))
     thread = Thread(target=server.serve_forever, daemon=True); thread.start()
@@ -475,5 +487,8 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         served = json.loads(urlopen(base + row["decode_url"], timeout=2).read())
         assert served["combined"]["minimum_frame_count"] == 7
         assert urlopen(base + row["decode_plot_url"], timeout=2).read() == b"decode-png"
+        served_fingerprint = json.loads(urlopen(
+            base + row["fingerprint_url"], timeout=2).read())
+        assert not served_fingerprint["interpretation"]["satellite_identity_claim"]
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)

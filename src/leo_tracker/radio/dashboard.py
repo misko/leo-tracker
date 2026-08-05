@@ -703,9 +703,12 @@ class DashboardModel:
                                 key=lambda path: path.stat().st_mtime_ns, reverse=True)
         followup_paths = list((reports_root / "followups").glob("*.json"))
         decode_paths = list((reports_root / "decoded").glob("*.json"))
+        fingerprint_paths = list((reports_root / "fingerprints").glob("*.json"))
+        fingerprint_index_path = reports_root / "fingerprints" / "index.json"
         calibration_path = reports_root / "calibration" / "calibration.json"
         signature_paths = (manifest_paths[:2] +
-            report_paths[:max(1, min(limit, 100))] + followup_paths + decode_paths)
+            report_paths[:max(1, min(limit, 100))] + followup_paths + decode_paths +
+            fingerprint_paths)
         if calibration_path.is_file():
             signature_paths.append(calibration_path)
         try:
@@ -716,6 +719,10 @@ class DashboardModel:
         with self._beacon_cache_lock:
             if signature and signature == self._beacon_cache_signature:
                 return self._beacon_cache
+        fingerprint_index = self._json(fingerprint_index_path, {})
+        fingerprint_membership = fingerprint_index.get("membership", {})
+        fingerprint_cluster_sizes = {cluster.get("cluster_id"): cluster.get("member_count", 0)
+            for cluster in fingerprint_index.get("clusters", [])}
         active = None
         for manifest_path in manifest_paths:
             manifest = self._json(manifest_path, {})
@@ -761,6 +768,11 @@ class DashboardModel:
             decode_path = reports_root / "decoded" / report_path.name
             decode = self._json(decode_path, {})
             decode_plot = reports_root / "decoded" / f"{report_path.stem}.png"
+            fingerprint_path = reports_root / "fingerprints" / report_path.name
+            fingerprint = self._json(fingerprint_path, {})
+            fingerprint_cluster = fingerprint_membership.get(report_path.stem)
+            fingerprint_matches = fingerprint_index.get("nearest_matches", {}).get(
+                report_path.stem, [])
             confirmation = followup.get("confirmation", {})
             confirmation_links = (confirmation.get("cross_receiver_links", []) +
                 confirmation.get("dual_receiver_links", []) + [
@@ -807,6 +819,13 @@ class DashboardModel:
                 "decode_plot_url": (f"/beacon-decode-plots/{report_path.stem}.png"
                                     if decode_plot.is_file() else None),
                 "decode": decode.get("combined"),
+                "fingerprint_url": (f"/beacon-fingerprints/{report_path.name}"
+                    if fingerprint.get("schema") ==
+                    "leo-tracker.starlink-waveform-fingerprint/v1" else None),
+                "fingerprint_cluster_id": fingerprint_cluster,
+                "fingerprint_cluster_size": fingerprint_cluster_sizes.get(
+                    fingerprint_cluster, 0),
+                "fingerprint_nearest_matches": fingerprint_matches,
                 "followup_confirmed": confirmation.get("confirmed", False),
                 "same_receiver_confirmed": confirmation.get("same_receiver_confirmed", False),
                 "cross_receiver_confirmed": confirmation.get("cross_receiver_confirmed", False),
@@ -838,6 +857,15 @@ class DashboardModel:
         calibration = self._json(calibration_path, {})
         result = {"enabled": True, "root": str(self.beacon_root), "active": active,
                 "calibration": calibration,
+                "fingerprints": {"count": fingerprint_index.get("fingerprint_count", 0),
+                    "cluster_count": len(fingerprint_index.get("clusters", [])),
+                    "linked_count": fingerprint_index.get("linked_fingerprint_count", 0),
+                    "unresolved_count": fingerprint_index.get(
+                        "unresolved_singleton_count", 0),
+                    "largest_cluster_size": fingerprint_index.get(
+                        "largest_cluster_size", 0),
+                    "index_url": ("/beacon-fingerprints/index.json"
+                                  if fingerprint_index_path.is_file() else None)},
                 "active_acquisition_method": (rows[0]["exact_acquisition_method"]
                                                if rows else None),
                 "captures": rows, "candidate_count": sum(row["candidate_count"] for row in rows),
@@ -898,7 +926,7 @@ let waterfallSignature='',refreshing=false;
 async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/snapshot',{cache:'no-store'}).then(r=>r.json()),s=d.status;
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString();document.querySelector('#state').innerHTML='<span class="live">'+s.state.toUpperCase()+'</span>';document.querySelector('#age').textContent=f(s.update_age_s,0)+' s since completed chunk';
 document.querySelector('#progress').textContent=f(100*s.progress_fraction,1)+'%';document.querySelector('#progressbar').style.width=(100*s.progress_fraction)+'%';document.querySelector('#coverage').textContent=f(s.retained_sample_hours*60,1)+' min';document.querySelector('#coveragebar').style.width=(100*s.retained_sample_fraction)+'%';document.querySelector('#count').textContent=s.detection_count;document.querySelector('#chunks').textContent=s.completed_chunks+' chunks · '+f(s.analyzed_span_hours,2)+' h wall span · '+f(s.frequency_bin_width_hz/1000,2)+' kHz/bin · baseline '+(s.resolution_baseline_ready?'ready':'warming')+(s.pending_wide_analysis_chunks?' · '+s.pending_wide_analysis_chunks+' pending wide':'');
-const bcn=d.beacon||{},cal=bcn.calibration||{},cm=bcn.active_acquisition_method||'coherent_grid_v1',cms=(cal.acquisition_methods||{})[cm]||cal.modes||{},cn=cms.narrow||{},cw=cms.wide||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Detector ${cm} · recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · method-specific null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[],dec=x.decode||{},soft=((dec.soft_dual_rx||{}).pilot||{}),mode=x.observation_mode||'narrow';return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${mode==='oversample'?'5 MS/s oversample':wide?'wide acquisition':'narrow lock'} · detector ${x.exact_acquisition_method||'coherent_grid_v1'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${Number.isFinite(x.exact_temporal_coverage_fraction)?' · exact replay '+f(100*x.exact_temporal_coverage_fraction,2)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.dual_receiver_confirmed?'dual-RX Doppler':x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${x.decode_url?`<br><span class="yes">DECODED</span> · held-out pilots ${f(100*dec.minimum_pilot_accuracy,1)}%${Number.isFinite(soft.hard_symbol_accuracy)?' · soft dual-RX '+f(100*soft.hard_symbol_accuracy,1)+'% / confidence '+f(100*soft.soft_mean_confidence,1)+'%':''} · narrow SSS ${f(100*dec.minimum_sss_accuracy,1)}% · ${dec.minimum_frame_count} frames · <a href="${x.decode_url}" target="_blank">decode JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}${x.decode_plot_url?`<a href="${x.decode_plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.decode_plot_url}"></a>`:''}</div>`}).join('');
+const bcn=d.beacon||{},cal=bcn.calibration||{},cm=bcn.active_acquisition_method||'coherent_grid_v1',cms=(cal.acquisition_methods||{})[cm]||cal.modes||{},cn=cms.narrow||{},cw=cms.wide||{},fps=bcn.fingerprints||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Detector ${cm} · recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · method-specific null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''} · waveform fingerprints ${fps.count||0} · linked ${fps.linked_count||0} · largest family ${fps.largest_cluster_size||0} · unresolved low-confidence ${fps.unresolved_count||0}${fps.index_url?' · <a href="'+fps.index_url+'" target="_blank">index JSON</a>':''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[],dec=x.decode||{},soft=((dec.soft_dual_rx||{}).pilot||{}),mode=x.observation_mode||'narrow',match=(x.fingerprint_nearest_matches||[])[0]||{};return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${mode==='oversample'?'5 MS/s oversample':wide?'wide acquisition':'narrow lock'} · detector ${x.exact_acquisition_method||'coherent_grid_v1'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${Number.isFinite(x.exact_temporal_coverage_fraction)?' · exact replay '+f(100*x.exact_temporal_coverage_fraction,2)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.dual_receiver_confirmed?'dual-RX Doppler':x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${x.decode_url?`<br><span class="yes">DECODED</span> · held-out pilots ${f(100*dec.minimum_pilot_accuracy,1)}%${Number.isFinite(soft.hard_symbol_accuracy)?' · soft dual-RX '+f(100*soft.hard_symbol_accuracy,1)+'% / confidence '+f(100*soft.soft_mean_confidence,1)+'%':''} · narrow SSS ${f(100*dec.minimum_sss_accuracy,1)}% · ${dec.minimum_frame_count} frames · <a href="${x.decode_url}" target="_blank">decode JSON</a>`:''}${x.fingerprint_url?`<br><span class="live">FINGERPRINT</span> · family ${x.fingerprint_cluster_id} (${x.fingerprint_cluster_size})${match.capture_name?' · nearest '+match.capture_name+' · waveform '+f(100*match.waveform_family_similarity,1)+'% · conditional channel '+f(100*match.conditional_channel_similarity,1)+'%':''} · <a href="${x.fingerprint_url}" target="_blank">signature JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}${x.decode_plot_url?`<a href="${x.decode_plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.decode_plot_url}"></a>`:''}</div>`}).join('');
 document.querySelector('#dither').innerHTML=(d.dither.comparisons||[]).slice(0,6).map(x=>`<div class="log"><strong>Chunk ${x.chunk}</strong> · ${x.classification} · ${f(x.tuning_dither_hz/1e6,3)} MHz dither · receivers ${x.receivers_agree?'agree':'disagree'}<br>${x.receivers.map(r=>'RX'+r.receiver+' sky/baseband '+f(r.sky_fixed_correlation,3)+' / '+f(r.baseband_fixed_correlation,3)).join(' · ')}</div>`).join('')||'<span class="muted">Waiting for the first nominal/dither pair.</span>';
 const nextWaterfallSignature=d.waterfalls.waterfalls.map(x=>x.plot_url+':'+x.qualified_event_count+':'+x.tle_guided_candidate_count+':'+x.blind_comb_candidate_count+':'+x.blind_carrier_candidate_count+':'+x.wide_feature_candidate_count).join('|');
 if(nextWaterfallSignature!==waterfallSignature){waterfallSignature=nextWaterfallSignature;document.querySelector('#waterfalls').innerHTML=d.waterfalls.waterfalls.map(x=>{
@@ -979,6 +1007,11 @@ def make_handler(model: DashboardModel):
                 if name.endswith(".png") and target.is_file():
                     return self._send(target.read_bytes(), "image/png",
                                       cache_control="public, max-age=300")
+            if path.startswith("/beacon-fingerprints/") and model.beacon_root is not None:
+                name = Path(path).name
+                target = model.beacon_root / "reports" / "fingerprints" / name
+                if name.endswith(".json") and target.is_file():
+                    return self._send(target.read_bytes(), "application/json")
             self._send(b'{"error":"not found"}', "application/json", HTTPStatus.NOT_FOUND)
 
         def log_message(self, format, *args):

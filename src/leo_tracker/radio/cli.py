@@ -66,6 +66,7 @@ from .beacon.calibration import build_calibration as build_beacon_calibration
 from .beacon.null_replay import replay_null_calibration as replay_beacon_null_calibration
 from .beacon.decode import decode_followup as decode_beacon_followup
 from .beacon.decode import plot_decode_report as plot_beacon_decode
+from .beacon.fingerprint import update_fingerprint_store
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -380,6 +381,12 @@ def command_starlink_beacon_decode(args: argparse.Namespace) -> int:
         "plot": str(args.plot) if args.plot else None,
         "symbols": str(args.symbols) if args.symbols else None}, sort_keys=True))
     return 0
+
+
+def command_starlink_beacon_fingerprint(args: argparse.Namespace) -> int:
+    report = update_fingerprint_store(args.root, capture_name=args.capture_name)
+    print(json.dumps(report, sort_keys=True))
+    return 1 if report["errors"] else 0
 
 
 def command_analyze(args: argparse.Namespace) -> int:
@@ -1472,6 +1479,13 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_decode.add_argument("--symbols", type=Path,
         help="write equalized complex symbols and channel estimates as NPZ")
     beacon_decode.set_defaults(handler=command_starlink_beacon_decode)
+    beacon_fingerprint = commands.add_parser("starlink-beacon-fingerprint",
+        help="compare decoded PSS/SSS/pilot signatures across beacon observations")
+    beacon_fingerprint.add_argument("root", type=Path,
+        help="beacon storage root containing reports/decoded")
+    beacon_fingerprint.add_argument("--capture-name",
+        help="update one decoded capture before rebuilding the comparison index")
+    beacon_fingerprint.set_defaults(handler=command_starlink_beacon_fingerprint)
     analyze = commands.add_parser("analyze", help="create blind ridge data and waterfall")
     analyze.add_argument("capture"); analyze.add_argument("output_dir")
     analyze.add_argument("--fft-size", type=int, default=4096); analyze.add_argument("--hop-size", type=int)

@@ -203,6 +203,10 @@ Data live under `/mnt/leo-nvme/leo-tracker`:
 - `reports/decoded/<session>.npz`: equalized symbols, decisions, and channel estimates.
 - `reports/decoded/<session>.png`: dual-RX constellations and held-out decision maps.
 - `reports/calibration/calibration.json`: cumulative empirical null distributions.
+- `reports/fingerprints/*.json`: normalized cross-capture pilot/SSS and
+  conditional receiver/channel signatures.
+- `reports/fingerprints/index.json`: nearest matches and waveform-family
+  clusters. These clusters are explicitly not satellite identity claims.
 - `quarantine/`: recoverable interrupted sessions.
 
 Useful commands:
@@ -227,7 +231,19 @@ env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
   /mnt/leo-nvme/leo-tracker/reports/decoded/test.json \
   --plot /mnt/leo-nvme/leo-tracker/reports/decoded/test.png \
   --symbols /mnt/leo-nvme/leo-tracker/reports/decoded/test.npz
+
+env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
+  starlink-beacon-fingerprint /mnt/leo-nvme/leo-tracker
 ```
+
+The fingerprint stage packs the 2,400 combined edge-pilot decisions into a
+compact two-bit codeword, records the eight-subcarrier SSS consensus, and keeps
+confidence, entropy, PSS, CFO, Doppler-link, and overlapping-pass context. Its
+waveform score is chance-normalized symbol agreement. A separate conditional
+channel score compares normalized amplitude and detrended phase through each
+fixed LNB/RX path. The latter includes receiver and propagation effects and is
+therefore not an emitter identifier. Satellite attribution still requires a
+compatible Doppler trajectory/TLE or a future decoded identity field.
 
 ## Verification strategy
 
@@ -250,6 +266,9 @@ reject noise at chance-level accuracy, reject sample rates below the complete
 validate normalized soft probabilities, compare native 5 MS/s decoding against
 the same IQ downsampled to 2.5 MS/s, and run JSON/NPZ/PNG generation through the public CLI.
 Dashboard E2E coverage verifies both decoder artifact routes.
+Fingerprint tests cover packed-state round trips, chance-level rejection,
+invariance to gain and linear channel phase, legacy hard-symbol archives,
+family clustering, CLI backfill, and dashboard artifact routes.
 
 Hardware acceptance requires a complete capture with contiguous sample indexes,
 monotonic timestamps, valid checksums, both receivers present, and a report.

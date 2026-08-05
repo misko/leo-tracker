@@ -39,6 +39,7 @@ fi
 
 mkdir -p "${storage_root}/captures" "${storage_root}/reports" "${storage_root}/staging"
 mkdir -p "${storage_root}/reports/plots" "${storage_root}/reports/decoded"
+mkdir -p "${storage_root}/reports/fingerprints"
 cd "${repo_dir}"
 
 capture_target() {
@@ -128,6 +129,10 @@ process_capture() {
       env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
         starlink-beacon-decode "${capture}" "${followup}" "${decode}" \
         --plot "${decode_plot}" --symbols "${decode_symbols}"
+      if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-fingerprint "${storage_root}" --capture-name "${name}"; then
+        printf '{"fingerprint_error":true,"capture":"%s"}\n' "${name}" >&2
+      fi
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
@@ -175,6 +180,10 @@ env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   --narrow-exact-interval-s "${narrow_exact_interval_s}" \
   --wide-exact-interval-s "${wide_exact_interval_s}" \
   --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json"
+if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+  starlink-beacon-fingerprint "${storage_root}"; then
+  printf '{"fingerprint_backfill_error":true}\n' >&2
+fi
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
 

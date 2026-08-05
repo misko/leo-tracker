@@ -445,6 +445,40 @@ def test_recovery_analyzes_complete_unreported_capture_and_is_idempotent(tmp_pat
     assert second["skipped_count"] == 1
 
 
+def test_recovery_backfills_decode_for_existing_confirmed_narrow_capture(
+        tmp_path, monkeypatch):
+    root = tmp_path / "store"
+    capture = root / "captures" / "confirmed"
+    reports = root / "reports"
+    followups = reports / "followups"
+    capture.mkdir(parents=True); followups.mkdir(parents=True)
+    (capture / "manifest.json").write_text(json.dumps({
+        "sample_rate_hz": 2_500_000}) + "\n")
+    (reports / "confirmed.json").write_text("{}\n")
+    (followups / "confirmed.json").write_text(json.dumps({
+        "confirmation": {"confirmed": True}}) + "\n")
+
+    def fake_decode(_capture, _followup, output, *, symbols_output):
+        report = {"combined": {"minimum_pilot_accuracy": .7,
+                               "minimum_sss_accuracy": .4}}
+        output.write_text(json.dumps(report) + "\n")
+        symbols_output.write_bytes(b"symbols")
+        return report, {}
+
+    monkeypatch.setattr("leo_tracker.radio.beacon.recovery.decode_followup", fake_decode)
+    monkeypatch.setattr("leo_tracker.radio.beacon.recovery.plot_decode_report",
+                        lambda _report, _arrays, output: output.write_bytes(b"png"))
+
+    result = recover_unanalyzed(root)
+
+    assert result["errors"] == []
+    assert result["recovered_decodes"] == [{"capture": "confirmed",
+        "minimum_pilot_accuracy": .7, "minimum_sss_accuracy": .4}]
+    assert (reports / "decoded" / "confirmed.json").is_file()
+    assert (reports / "decoded" / "confirmed.npz").read_bytes() == b"symbols"
+    assert (reports / "decoded" / "confirmed.png").read_bytes() == b"png"
+
+
 def test_recovery_cli_accepts_pass_archive_for_retrospective_annotation(tmp_path):
     root = tmp_path / "store"; (root / "captures").mkdir(parents=True)
     passes = tmp_path / "passes.json"

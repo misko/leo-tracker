@@ -708,7 +708,23 @@ class DashboardModel:
         rows = []
         report_paths = sorted(reports_root.glob("*.json"),
                               key=lambda path: path.stat().st_mtime_ns, reverse=True)
-        for report_path in report_paths[:max(1, min(limit, 100))]:
+        recent_paths = report_paths[:max(1, min(limit, 100))]
+        confirmed_names = set()
+        for followup_path in (reports_root / "followups").glob("*.json"):
+            followup = self._json(followup_path, {})
+            if followup.get("confirmation", {}).get("confirmed"):
+                confirmed_names.add(followup_path.name)
+        selected_paths = list(recent_paths)
+        selected_names = {path.name for path in selected_paths}
+        for name in confirmed_names - selected_names:
+            path = reports_root / name
+            if path.is_file():
+                selected_paths.append(path)
+        # Confirmed events are durable evidence, not ephemeral recent status.
+        # Pin them first so a high capture cadence cannot hide them from the UI.
+        selected_paths.sort(key=lambda path: (
+            path.name in confirmed_names, path.stat().st_mtime_ns), reverse=True)
+        for report_path in selected_paths:
             report = self._json(report_path, {})
             if report.get("schema") != "leo-tracker.starlink-beacon-analysis/v1":
                 continue

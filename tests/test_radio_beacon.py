@@ -482,6 +482,29 @@ def test_dashboard_orders_beacon_reports_by_recency_not_filename(tmp_path):
     assert [row["name"] for row in rows] == ["a-newer", "z-older"]
 
 
+def test_dashboard_never_ages_confirmed_beacon_out_of_recent_window(tmp_path):
+    observation = tmp_path / "watch"; observation.mkdir()
+    beacon = tmp_path / "beacon"; reports = beacon / "reports"
+    reports.mkdir(parents=True); (beacon / "captures").mkdir()
+    (reports / "followups").mkdir()
+    payload = {"schema": "leo-tracker.starlink-beacon-analysis/v1",
+               "capture_manifest": {}, "summary": {}, "exact_checks": []}
+    confirmed = reports / "confirmed-old.json"; confirmed.write_text(json.dumps(payload))
+    (reports / "followups" / confirmed.name).write_text(json.dumps({
+        "confirmation": {"confirmed": True, "receivers": [],
+                         "cross_receiver_links": []}}))
+    os.utime(confirmed, ns=(1_000_000_000, 1_000_000_000))
+    for index in range(13):
+        path = reports / f"recent-{index:02d}.json"; path.write_text(json.dumps(payload))
+        os.utime(path, ns=(2_000_000_000 + index, 2_000_000_000 + index))
+
+    rows = DashboardModel(observation, beacon_root=beacon).beacon(limit=12)["captures"]
+
+    assert len(rows) == 13
+    assert rows[0]["name"] == "confirmed-old"
+    assert rows[0]["followup_confirmed"]
+
+
 def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisition():
     script = (Path(__file__).parents[1] / "scripts" / "starlink-beacon-watch.sh").read_text()
     assert 'capture_target "${target}" narrow' in script

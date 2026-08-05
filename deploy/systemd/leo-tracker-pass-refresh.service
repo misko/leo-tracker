@@ -4,6 +4,8 @@ After=network-online.target leo-tracker-tle-archive.service
 
 [Service]
 Type=oneshot
+User=satpi01
+Group=users
 WorkingDirectory=/home/satpi01/leo-tracker
 Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
 Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache

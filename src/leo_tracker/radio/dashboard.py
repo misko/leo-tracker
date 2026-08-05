@@ -52,11 +52,13 @@ class DashboardModel:
     """Build small JSON snapshots from append-only watcher artifacts."""
 
     def __init__(self, observation_dir: Path, passes_path: Path | None = None, *,
+                 beacon_root: Path | None = None,
                  samples_per_snapshot: int = 262_144,
                  sample_rate_hz: float = 30_720_000,
                  snapshots_per_chunk: int = 4096):
         self.root = Path(observation_dir).resolve()
         self.passes_path = (Path(passes_path).resolve() if passes_path else self.root / "passes.json")
+        self.beacon_root = None if beacon_root is None else Path(beacon_root).resolve()
         self.samples_per_snapshot = int(samples_per_snapshot)
         self.sample_rate_hz = float(sample_rate_hz)
         self.snapshots_per_chunk = int(snapshots_per_chunk)
@@ -682,10 +684,70 @@ class DashboardModel:
                 "first": report.get("first"), "second": report.get("second")})
         return {"comparisons": rows}
 
+    def beacon(self, limit: int = 12) -> dict:
+        if self.beacon_root is None:
+            return {"enabled": False, "captures": [], "candidate_count": 0,
+                    "qualified_count": 0, "active": None}
+        captures_root, reports_root = self.beacon_root / "captures", self.beacon_root / "reports"
+        active = None
+        manifest_paths = sorted(captures_root.glob("*/manifest.json"),
+                                key=lambda path: path.stat().st_mtime_ns, reverse=True)
+        for manifest_path in manifest_paths:
+            manifest = self._json(manifest_path, {})
+            report_exists = (reports_root / f"{manifest_path.parent.name}.json").is_file()
+            if manifest.get("state") == "capturing" or (
+                    manifest.get("state") == "complete" and not report_exists):
+                active = {"name": manifest_path.parent.name,
+                          "stage": "capturing" if manifest.get("state") == "capturing" else "analyzing",
+                          "created_utc": _iso_from_ns(manifest.get("created_utc_ns", 0)),
+                          "channel_number": manifest.get("metadata", {}).get("channel_number"),
+                          "region": manifest.get("metadata", {}).get("region"),
+                          "if_center_hz": manifest.get("center_frequency_hz"),
+                          "rf_center_hz": manifest.get("rf_center_hz")}
+                break
+        rows = []
+        for report_path in sorted(reports_root.glob("*.json"), reverse=True)[:max(1, min(limit, 100))]:
+            report = self._json(report_path, {})
+            if report.get("schema") != "leo-tracker.starlink-beacon-analysis/v1":
+                continue
+            manifest, summary = report.get("capture_manifest", {}), report.get("summary", {})
+            exact = report.get("exact_checks", [])
+            rows.append({"name": report_path.stem,
+                "plot_url": (f"/beacon-plots/{report_path.stem}.png"
+                             if (reports_root / "plots" / f"{report_path.stem}.png").is_file()
+                             else None),
+                "created_utc": _iso_from_ns(manifest.get("created_utc_ns", 0)),
+                "channel_number": manifest.get("metadata", {}).get("channel_number"),
+                "region": manifest.get("metadata", {}).get("region"),
+                "if_center_hz": manifest.get("center_frequency_hz"),
+                "rf_center_hz": manifest.get("rf_center_hz"),
+                "sample_rate_hz": manifest.get("sample_rate_hz"),
+                "bandwidth_hz": manifest.get("bandwidth_hz"),
+                "gain_mode": manifest.get("gain_mode"),
+                "configured_gain_db": manifest.get("configured_gain_db"),
+                "duration_s": manifest.get("requested_duration_s"),
+                "stream_timing": manifest.get("stream_timing", {}),
+                "candidate_count": summary.get("exact_candidate_count", 0),
+                "qualified_count": summary.get("exact_qualified_count", 0),
+                "structural_qualified_fraction": summary.get("qualified_fraction", 0),
+                "exact_checks": [{"candidate": item.get("candidate"),
+                    "qualified": item.get("qualified"),
+                    "epoch_difference_samples": item.get("epoch_difference_samples"),
+                    "cfo_difference_hz": item.get("cfo_difference_hz"),
+                    "pss_ratios": [receiver.get("pss", {}).get("peak_to_median")
+                                   for receiver in item.get("receivers", [])],
+                    "pilot_margins": [receiver.get("pilot", {}).get("score_margin")
+                                      for receiver in item.get("receivers", [])]}
+                    for item in exact]})
+        return {"enabled": True, "root": str(self.beacon_root), "active": active,
+                "captures": rows, "candidate_count": sum(row["candidate_count"] for row in rows),
+                "qualified_count": sum(row["qualified_count"] for row in rows)}
+
     def snapshot(self, now: datetime | None = None) -> dict:
         return {"status": self.status(now), "expected": self.expected_passes(now),
                 "detected": self.detections(), "logs": self.logs(),
-                "waterfalls": self.waterfalls(), "dither": self.dither_comparisons()}
+                "waterfalls": self.waterfalls(), "dither": self.dither_comparisons(),
+                "beacon": self.beacon()}
 
 
 HTML = r'''<!doctype html>
@@ -705,6 +767,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;p
 <div class="card"><div class="muted">WALL WINDOW</div><div id="progress" class="metric">—</div><div class="bar"><i id="progressbar"></i></div></div>
 <div class="card"><div class="muted">RETAINED IQ</div><div id="coverage" class="metric">—</div><div class="bar"><i id="coveragebar"></i></div></div>
 <div class="card"><div class="muted">CANDIDATES</div><div id="count" class="metric">—</div><div id="chunks" class="muted"></div></div></section>
+<section class="panel" style="margin-bottom:12px"><h2>Exact Starlink beacon receiver</h2><div class="muted">Published PSS + 2026 edge-pilot codes · dual-RX controls · TLE-blind acquisition</div><div id="beacon"></div></section>
 <section class="panel" style="margin-bottom:12px"><h2>Tuning-dither validation</h2><div class="muted">Sky-fixed features move in baseband when the Pluto tuning center changes; receiver spurs do not.</div><div id="dither"></div></section>
 <section class="panel" style="margin-bottom:12px"><h2>Recent time waterfalls</h2><div class="muted">All completed chunks, newest first. Time is vertical; frequency is horizontal.</div><div id="waterfalls" class="waterfalls"></div></section>
 <div class="columns"><section class="panel"><h2>Detected Doppler candidates</h2><div class="muted" id="speednote"></div><div id="detections" class="detections"></div></section>
@@ -715,6 +778,7 @@ let waterfallSignature='';
 async function refresh(){try{const d=await fetch('/api/snapshot',{cache:'no-store'}).then(r=>r.json()),s=d.status;
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString();document.querySelector('#state').innerHTML='<span class="live">'+s.state.toUpperCase()+'</span>';document.querySelector('#age').textContent=f(s.update_age_s,0)+' s since completed chunk';
 document.querySelector('#progress').textContent=f(100*s.progress_fraction,1)+'%';document.querySelector('#progressbar').style.width=(100*s.progress_fraction)+'%';document.querySelector('#coverage').textContent=f(s.retained_sample_hours*60,1)+' min';document.querySelector('#coveragebar').style.width=(100*s.retained_sample_fraction)+'%';document.querySelector('#count').textContent=s.detection_count;document.querySelector('#chunks').textContent=s.completed_chunks+' chunks · '+f(s.analyzed_span_hours,2)+' h wall span · '+f(s.frequency_bin_width_hz/1000,2)+' kHz/bin · baseline '+(s.resolution_baseline_ready?'ready':'warming')+(s.pending_wide_analysis_chunks?' · '+s.pending_wide_analysis_chunks+' pending wide':'');
+const bcn=d.beacon||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},label=x.qualified_count?'QUALIFIED':x.candidate_count?'CANDIDATE':'control rejected';return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(t.host_read_duty_fraction)?' · host-read duty '+f(100*t.host_read_duty_fraction,1)+'%':''}<br>PSS RX0/RX1 ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · pilot margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}</div>`}).join('');
 document.querySelector('#dither').innerHTML=(d.dither.comparisons||[]).slice(0,6).map(x=>`<div class="log"><strong>Chunk ${x.chunk}</strong> · ${x.classification} · ${f(x.tuning_dither_hz/1e6,3)} MHz dither · receivers ${x.receivers_agree?'agree':'disagree'}<br>${x.receivers.map(r=>'RX'+r.receiver+' sky/baseband '+f(r.sky_fixed_correlation,3)+' / '+f(r.baseband_fixed_correlation,3)).join(' · ')}</div>`).join('')||'<span class="muted">Waiting for the first nominal/dither pair.</span>';
 const nextWaterfallSignature=d.waterfalls.waterfalls.map(x=>x.plot_url+':'+x.qualified_event_count+':'+x.tle_guided_candidate_count+':'+x.blind_comb_candidate_count+':'+x.blind_carrier_candidate_count+':'+x.wide_feature_candidate_count).join('|');
 if(nextWaterfallSignature!==waterfallSignature){waterfallSignature=nextWaterfallSignature;document.querySelector('#waterfalls').innerHTML=d.waterfalls.waterfalls.map(x=>{
@@ -757,7 +821,8 @@ def make_handler(model: DashboardModel):
             endpoints = {"/api/snapshot": model.snapshot, "/api/status": model.status,
                          "/api/passes": model.expected_passes, "/api/detections": model.detections,
                          "/api/logs": model.logs, "/api/waterfalls": model.waterfalls,
-                         "/api/dither": model.dither_comparisons}
+                         "/api/dither": model.dither_comparisons,
+                         "/api/beacon": model.beacon}
             if path in endpoints:
                 return self._send(json.dumps(endpoints[path](), allow_nan=False).encode(),
                                   "application/json")
@@ -772,6 +837,12 @@ def make_handler(model: DashboardModel):
                 target = model.root / "observations" / name
                 if name.endswith(".json") and target.is_file():
                     return self._send(target.read_bytes(), "application/json")
+            if path.startswith("/beacon-plots/") and model.beacon_root is not None:
+                name = Path(path).name
+                target = model.beacon_root / "reports" / "plots" / name
+                if name.endswith(".png") and target.is_file():
+                    return self._send(target.read_bytes(), "image/png",
+                                      cache_control="public, max-age=300")
             self._send(b'{"error":"not found"}', "application/json", HTTPStatus.NOT_FOUND)
 
         def log_message(self, format, *args):
@@ -781,10 +852,11 @@ def make_handler(model: DashboardModel):
 
 def serve_dashboard(observation_dir: Path, *, host: str = "127.0.0.1", port: int = 8765,
                     passes_path: Path | None = None,
+                    beacon_root: Path | None = None,
                     samples_per_snapshot: int = 262_144,
                     sample_rate_hz: float = 30_720_000,
                     snapshots_per_chunk: int = 4096):
-    model = DashboardModel(observation_dir, passes_path,
+    model = DashboardModel(observation_dir, passes_path, beacon_root=beacon_root,
         samples_per_snapshot=samples_per_snapshot, sample_rate_hz=sample_rate_hz,
         snapshots_per_chunk=snapshots_per_chunk)
     server = ThreadingHTTPServer((host, port), make_handler(model))

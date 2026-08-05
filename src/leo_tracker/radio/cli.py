@@ -54,6 +54,11 @@ from .tracking.coherent import (write_coherent_iq_analysis,
                                 write_cross_ambiguity_analysis)
 from .tracking.benchmark import write_tracker_summary
 from .tracking.tle_match import rematch_tracker_report
+from .beacon.analysis import analyze_capture as analyze_beacon_capture
+from .beacon.artifact import capture_beacon_iq, queued_paired_blocks
+from .beacon.channels import starlink_edge_pilot_if_hz, starlink_if_hz
+from .beacon.retention import apply_retention as apply_beacon_retention
+from .beacon.plot import plot_beacon_report
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -207,6 +212,71 @@ def command_paired_capture(args: argparse.Namespace) -> int:
         "pair_session_id": rx0.manifest["metadata"]["pair_session_id"],
         "rx0_capture_id": rx0.manifest["capture_id"], "rx1_capture_id": rx1.manifest["capture_id"],
         "samples_per_channel": count, "first_buffer_utc_ns": rx0.manifest["start_utc_ns"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
+    center_hz = args.center_frequency_hz
+    if center_hz is None:
+        center_hz = (starlink_if_hz(args.channel_number, args.lnb_lo_hz)
+                     if args.region == "center" else
+                     starlink_edge_pilot_if_hz(args.channel_number, args.region.removesuffix("-edge"),
+                                               args.lnb_lo_hz))
+    configured_gain_db = args.gain_db if args.gain_mode == "manual" else None
+    config = RadioConfig(center_hz, args.sample_rate_hz, args.bandwidth_hz,
+                         configured_gain_db, gain_mode=args.gain_mode)
+    if args.fake:
+        count = round(args.duration_s * args.sample_rate_hz)
+        period = max(1, round(args.sample_rate_hz / 750))
+        rng = np.random.default_rng(args.seed)
+        template = (rng.normal(size=period) + 1j * rng.normal(size=period)) * 500
+        rx0 = np.tile(template, int(np.ceil(count / period)))[:count]
+        rx1 = np.roll(rx0, 2) * .8
+        noise = lambda: (rng.normal(size=count) + 1j * rng.normal(size=count)) * args.fake_noise_std
+        source = FakePairedSource(rx0 + noise(), rx1 + noise(), config,
+                                  block_size=args.block_size, start_utc_ns=args.fake_start_utc_ns)
+    else:
+        source = PairedPlutoSource(config, uri=args.uri, block_size=args.block_size,
+                                   transport="iio", serial=args.serial)
+    identity = dict(source.identity)
+    if args.host_temperature_c is not None:
+        identity["host_temperature_c"] = args.host_temperature_c
+    if args.radio_temperature_c is not None:
+        identity["radio_temperature_c"] = args.radio_temperature_c
+    try:
+        queued = queued_paired_blocks(source, queue_blocks=args.queue_blocks)
+        manifest = capture_beacon_iq(queued, args.output,
+            sample_rate_hz=args.sample_rate_hz, center_frequency_hz=center_hz,
+            bandwidth_hz=args.bandwidth_hz, duration_s=args.duration_s,
+            lnb_lo_hz=args.lnb_lo_hz, chunk_s=args.chunk_s,
+            identity=identity, gain_mode=args.gain_mode,
+            configured_gain_db=configured_gain_db,
+            metadata={"channel_number": args.channel_number, "region": args.region,
+                      "tuning_basis": "published Starlink channel and edge-pilot geometry"})
+    finally:
+        if "queued" in locals():
+            queued.close()
+        source.close()
+    print(json.dumps({"capture": str(args.output), "state": manifest["state"],
+        "samples_per_receiver": manifest["captured_samples_per_receiver"],
+        "stored_bytes": manifest["stored_bytes"], "rf_center_hz": manifest["rf_center_hz"]},
+        sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
+    report = analyze_beacon_capture(args.capture, args.output, window_s=args.window_s,
+        maximum_analysis_rate_hz=args.maximum_analysis_rate_hz,
+        exact_interval_s=args.exact_interval_s, exact_window_s=args.exact_window_s)
+    if args.plot:
+        plot_beacon_report(report, args.plot)
+    print(json.dumps({"analysis": str(args.output), **report["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_retain(args: argparse.Namespace) -> int:
+    print(json.dumps(apply_beacon_retention(args.root, keep_negative=args.keep_negative,
+                                            dry_run=args.dry_run), sort_keys=True))
     return 0
 
 
@@ -643,6 +713,7 @@ def command_starlink_waterfall_analyze(args: argparse.Namespace) -> int:
 def command_starlink_dashboard(args: argparse.Namespace) -> int:
     serve_dashboard(args.observation_dir, host=args.host, port=args.port,
                     passes_path=args.passes,
+                    beacon_root=args.beacon_root,
                     samples_per_snapshot=args.samples_per_snapshot,
                     sample_rate_hz=args.sample_rate_hz,
                     snapshots_per_chunk=args.snapshots_per_chunk)
@@ -1182,6 +1253,50 @@ def build_parser() -> argparse.ArgumentParser:
     paired.add_argument("--fake-stop-hz", type=float, default=2000); paired.add_argument("--fake-noise-std", type=float, default=.02)
     paired.add_argument("--fake-start-utc-ns", type=int, default=1_700_000_000_000_000_000)
     paired.add_argument("--seed", type=int, default=0); paired.set_defaults(handler=command_paired_capture)
+    beacon_capture = commands.add_parser("starlink-beacon-capture",
+        help="continuously record crash-safe dual-RX IQ for Starlink beacon acquisition")
+    beacon_capture.add_argument("output", type=Path)
+    beacon_capture.add_argument("--duration-s", type=float, required=True)
+    beacon_capture.add_argument("--channel-number", type=int, choices=range(1, 9), default=3)
+    beacon_capture.add_argument("--region", choices=("lower-edge", "upper-edge", "center"),
+        default="lower-edge", help="published pilot band to capture; center is the pilot-free gutter control")
+    beacon_capture.add_argument("--center-frequency-hz", type=float,
+        help="explicit L-band IF; defaults to the published channel center minus the LNB LO")
+    beacon_capture.add_argument("--lnb-lo-hz", type=float, default=9_750_000_000)
+    beacon_capture.add_argument("--sample-rate-hz", type=float, default=2_500_000)
+    beacon_capture.add_argument("--bandwidth-hz", type=float, default=2_300_000)
+    beacon_capture.add_argument("--gain-mode", choices=("manual", "slow_attack", "fast_attack"), default="manual")
+    beacon_capture.add_argument("--gain-db", type=float, default=50)
+    beacon_capture.add_argument("--block-size", type=int, default=262_144)
+    beacon_capture.add_argument("--chunk-s", type=float, default=5)
+    beacon_capture.add_argument("--queue-blocks", type=int, default=16,
+        help="bounded lossless reader queue overlapping Pluto refills with NVMe writes")
+    beacon_capture.add_argument("--uri", default="pluto://ip:192.168.2.1")
+    beacon_capture.add_argument("--serial")
+    beacon_capture.add_argument("--host-temperature-c", type=float)
+    beacon_capture.add_argument("--radio-temperature-c", type=float)
+    beacon_capture.add_argument("--fake", action="store_true")
+    beacon_capture.add_argument("--fake-noise-std", type=float, default=50)
+    beacon_capture.add_argument("--fake-start-utc-ns", type=int, default=1_700_000_000_000_000_000)
+    beacon_capture.add_argument("--seed", type=int, default=0)
+    beacon_capture.set_defaults(handler=command_starlink_beacon_capture)
+    beacon_analyze = commands.add_parser("starlink-beacon-analyze",
+        help="verify and score a beacon IQ artifact for the published 750 Hz frame cadence")
+    beacon_analyze.add_argument("capture", type=Path)
+    beacon_analyze.add_argument("output", type=Path)
+    beacon_analyze.add_argument("--window-s", type=float, default=1)
+    beacon_analyze.add_argument("--maximum-analysis-rate-hz", type=float, default=250_000)
+    beacon_analyze.add_argument("--exact-interval-s", type=float, default=60)
+    beacon_analyze.add_argument("--exact-window-s", type=float, default=.1)
+    beacon_analyze.add_argument("--plot", type=Path,
+        help="write an exact-PSS, pilot-control, and CFO evidence PNG")
+    beacon_analyze.set_defaults(handler=command_starlink_beacon_analyze)
+    beacon_retain = commands.add_parser("starlink-beacon-retain",
+        help="retain all candidates and only the newest non-candidate IQ captures")
+    beacon_retain.add_argument("root", type=Path)
+    beacon_retain.add_argument("--keep-negative", type=int, default=12)
+    beacon_retain.add_argument("--dry-run", action="store_true")
+    beacon_retain.set_defaults(handler=command_starlink_beacon_retain)
     analyze = commands.add_parser("analyze", help="create blind ridge data and waterfall")
     analyze.add_argument("capture"); analyze.add_argument("output_dir")
     analyze.add_argument("--fft-size", type=int, default=4096); analyze.add_argument("--hop-size", type=int)
@@ -1425,6 +1540,8 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("observation_dir", type=Path)
     dashboard.add_argument("--passes", type=Path,
                            help="expected-pass catalog; defaults to OBSERVATION_DIR/passes.json")
+    dashboard.add_argument("--beacon-root", type=Path,
+                           help="continuous exact-beacon storage root")
     dashboard.add_argument("--host", default="127.0.0.1")
     dashboard.add_argument("--port", type=int, default=8765)
     dashboard.add_argument("--samples-per-snapshot", type=int, default=262_144)

@@ -1,0 +1,20 @@
+[Unit]
+Description=Continuous Starlink edge-pilot dual-RX capture and analysis
+After=network-online.target mnt-leo\x2dnvme.mount
+Wants=network-online.target
+Requires=mnt-leo\x2dnvme.mount
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
+ExecStart=/home/satpi01/leo-tracker/scripts/starlink-beacon-watch.sh
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

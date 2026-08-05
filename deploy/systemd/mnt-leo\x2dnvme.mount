@@ -1,0 +1,12 @@
+[Unit]
+Description=LEO tracker NVMe capture volume
+Before=leo-tracker-beacon-watch.service
+
+[Mount]
+What=/dev/disk/by-uuid/e37789c6-fcf4-4b27-9785-3f44132aee5b
+Where=/mnt/leo-nvme
+Type=ext4
+Options=noatime
+
+[Install]
+WantedBy=local-fs.target

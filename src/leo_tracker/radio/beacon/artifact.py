@@ -1,0 +1,269 @@
+"""Crash-safe, chunked, dual-receiver complex-IQ capture artifacts."""
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+import hashlib
+import json
+import os
+from pathlib import Path
+import queue
+import threading
+import time
+from typing import Iterable, Iterator
+
+import numpy as np
+
+from ..paired import PairedSampleBlock
+
+SCHEMA = "leo-tracker.beacon-iq/v1"
+LAYOUT = "sample,receiver,component; receivers=rx0,rx1; components=i,q"
+
+
+def queued_paired_blocks(source, *, queue_blocks: int = 16) -> Iterator[PairedSampleBlock]:
+    """Overlap blocking radio refills with conversion, hashing, and NVMe writes."""
+    if queue_blocks < 1:
+        raise ValueError("queue-blocks must be at least one")
+    pending: queue.Queue = queue.Queue(maxsize=queue_blocks)
+    sentinel = object(); stop = threading.Event(); failure: list[BaseException] = []
+
+    def produce() -> None:
+        try:
+            for block in source.blocks():
+                if stop.is_set():
+                    break
+                while not stop.is_set():
+                    try:
+                        pending.put(block, timeout=.1); break
+                    except queue.Full:
+                        pass
+        except BaseException as exc:
+            failure.append(exc)
+        finally:
+            while not stop.is_set():
+                try:
+                    pending.put(sentinel, timeout=.1); break
+                except queue.Full:
+                    pass
+
+    worker = threading.Thread(target=produce, name="beacon-radio-reader", daemon=True)
+    worker.start()
+    try:
+        while True:
+            item = pending.get()
+            if item is sentinel:
+                if failure:
+                    raise failure[0]
+                return
+            yield item
+    finally:
+        stop.set()
+        worker.join(timeout=2)
+
+
+@dataclass(frozen=True)
+class BeaconChunk:
+    path: str
+    first_sample_index: int
+    sample_count: int
+    first_utc_ns: int
+    last_utc_ns: int
+    read_count: int
+    sha256: str
+    bytes: int
+
+
+def _atomic_json(path: Path, value: dict) -> None:
+    temporary = path.with_suffix(path.suffix + ".next")
+    with temporary.open("w") as stream:
+        stream.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _complex_to_ci16(rx0: np.ndarray, rx1: np.ndarray) -> np.ndarray:
+    first, second = np.asarray(rx0), np.asarray(rx1)
+    if first.ndim != 1 or first.shape != second.shape:
+        raise ValueError("dual receiver blocks must be equal one-dimensional arrays")
+    output = np.empty((first.size, 2, 2), dtype="<i2")
+    for receiver, values in enumerate((first, second)):
+        output[:, receiver, 0] = np.clip(np.rint(values.real), -32768, 32767).astype("<i2")
+        output[:, receiver, 1] = np.clip(np.rint(values.imag), -32768, 32767).astype("<i2")
+    return output
+
+
+def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
+                      sample_rate_hz: float, center_frequency_hz: float,
+                      bandwidth_hz: float, duration_s: float,
+                      lnb_lo_hz: float | None = None, chunk_s: float = 5.0,
+                      identity: dict | None = None, gain_mode: str = "manual",
+                      configured_gain_db: float | None = None,
+                      metadata: dict | None = None) -> dict:
+    """Write raw ci16 chunks, committing each chunk atomically with a checksum."""
+    if min(sample_rate_hz, center_frequency_hz, bandwidth_hz, duration_s, chunk_s) <= 0:
+        raise ValueError("capture frequencies, rates, duration, and chunk length must be positive")
+    if bandwidth_hz > sample_rate_hz:
+        raise ValueError("bandwidth cannot exceed sample rate")
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=False)
+    manifest_path = destination / "manifest.json"
+    started_ns = time.time_ns()
+    requested_samples = round(duration_s * sample_rate_hz)
+    chunk_samples = max(1, round(chunk_s * sample_rate_hz))
+    manifest = {"schema": SCHEMA, "state": "capturing", "dtype": "ci16_le",
+        "layout": LAYOUT, "sample_rate_hz": sample_rate_hz,
+        "bandwidth_hz": bandwidth_hz, "center_frequency_hz": center_frequency_hz,
+        "lnb_lo_hz": lnb_lo_hz, "rf_center_hz": center_frequency_hz + (lnb_lo_hz or 0),
+        "receiver_count": 2, "requested_duration_s": duration_s,
+        "requested_samples_per_receiver": requested_samples,
+        "chunk_samples": chunk_samples, "gain_mode": gain_mode,
+        "configured_gain_db": configured_gain_db, "identity": identity or {},
+        "metadata": metadata or {},
+        "created_utc_ns": started_ns, "chunks": []}
+    _atomic_json(manifest_path, manifest)
+    pending: list[np.ndarray] = []
+    pending_count = total = 0
+    pending_reads: list[PairedSampleBlock] = []
+    chunk_index = committed_samples = 0
+    expected_source_index: int | None = None
+    read_count = total_read_duration_ns = maximum_read_duration_ns = 0
+    total_host_gap_ns = maximum_host_gap_ns = 0
+    first_read_start_ns: int | None = None
+    previous_read_stop_ns: int | None = None
+
+    def stream_timing() -> dict:
+        span_ns = (0 if first_read_start_ns is None or previous_read_stop_ns is None else
+                   previous_read_stop_ns - first_read_start_ns)
+        return {"read_count": read_count, "first_read_start_utc_ns": first_read_start_ns,
+            "last_read_stop_utc_ns": previous_read_stop_ns, "wall_span_s": span_ns / 1e9,
+            "sample_time_s": total / sample_rate_hz,
+            "total_read_duration_s": total_read_duration_ns / 1e9,
+            "maximum_read_duration_s": maximum_read_duration_ns / 1e9,
+            "total_positive_host_gap_s": total_host_gap_ns / 1e9,
+            "maximum_positive_host_gap_s": maximum_host_gap_ns / 1e9,
+            "host_read_duty_fraction": (total_read_duration_ns / span_ns if span_ns > 0 else None),
+            "note": "host syscall timing diagnoses writer stalls but is not an RF hardware timestamp"}
+
+    def commit(count: int) -> None:
+        nonlocal pending, pending_count, pending_reads, chunk_index, committed_samples
+        values = np.concatenate(pending, axis=0)
+        written, remainder = values[:count], values[count:]
+        filename = f"chunk-{chunk_index:06d}.ci16"
+        partial, final = destination / (filename + ".partial"), destination / filename
+        digest = hashlib.sha256()
+        with partial.open("wb", buffering=0) as stream:
+            payload = memoryview(written).cast("B")
+            stream.write(payload); digest.update(payload); os.fsync(stream.fileno())
+        os.replace(partial, final)
+        relative = str(final.relative_to(destination))
+        first, last = pending_reads[0], pending_reads[-1]
+        record = BeaconChunk(relative, int(committed_samples), int(count),
+            int(first.utc_ns), int(last.utc_ns), len(pending_reads), digest.hexdigest(),
+            final.stat().st_size)
+        manifest["chunks"].append(asdict(record)); _atomic_json(manifest_path, manifest)
+        pending = ([] if not remainder.size else [remainder.copy()])
+        pending_count = int(remainder.shape[0])
+        pending_reads = ([] if not remainder.size else [last])
+        committed_samples += count
+        chunk_index += 1
+
+    try:
+        for block in blocks:
+            if total >= requested_samples:
+                break
+            if expected_source_index is None:
+                expected_source_index = block.sample_index
+            if block.sample_index != expected_source_index or block.dropped_samples:
+                raise RuntimeError(
+                    f"non-contiguous radio stream: expected sample {expected_source_index}, "
+                    f"received {block.sample_index}, dropped={block.dropped_samples}"
+                )
+            expected_source_index += block.rx0.size
+            read_count += 1
+            if block.read_duration_ns is not None:
+                duration_ns = int(block.read_duration_ns)
+                read_start_ns = int(block.utc_ns - duration_ns // 2)
+                read_stop_ns = int(block.utc_ns + duration_ns // 2)
+                if first_read_start_ns is None:
+                    first_read_start_ns = read_start_ns
+                if previous_read_stop_ns is not None:
+                    gap_ns = max(0, read_start_ns - previous_read_stop_ns)
+                    total_host_gap_ns += gap_ns
+                    maximum_host_gap_ns = max(maximum_host_gap_ns, gap_ns)
+                previous_read_stop_ns = read_stop_ns
+                total_read_duration_ns += duration_ns
+                maximum_read_duration_ns = max(maximum_read_duration_ns, duration_ns)
+            available = min(block.rx0.size, requested_samples - total)
+            if available <= 0:
+                break
+            pending.append(_complex_to_ci16(block.rx0[:available], block.rx1[:available]))
+            pending_reads.append(block); pending_count += available; total += available
+            while pending_count >= chunk_samples:
+                commit(chunk_samples)
+        if pending_count:
+            commit(pending_count)
+        if total != requested_samples:
+            raise RuntimeError(f"radio ended after {total} of {requested_samples} samples")
+    except BaseException:
+        manifest["state"] = "interrupted"; manifest["captured_samples_per_receiver"] = total
+        manifest["stream_timing"] = stream_timing()
+        _atomic_json(manifest_path, manifest)
+        raise
+    manifest["state"] = "complete"; manifest["captured_samples_per_receiver"] = total
+    manifest["stream_timing"] = stream_timing()
+    manifest["completed_utc_ns"] = time.time_ns()
+    manifest["stored_bytes"] = sum(item["bytes"] for item in manifest["chunks"])
+    _atomic_json(manifest_path, manifest)
+    return manifest
+
+
+class BeaconCapture:
+    def __init__(self, root: Path, manifest: dict): self.root, self.manifest = root, manifest
+
+    @classmethod
+    def open(cls, root: Path, *, verify: bool = False) -> "BeaconCapture":
+        root = Path(root); manifest = json.loads((root / "manifest.json").read_text())
+        if manifest.get("schema") != SCHEMA:
+            raise ValueError("unsupported beacon capture schema")
+        capture = cls(root, manifest)
+        if verify: capture.verify()
+        return capture
+
+    def verify(self) -> None:
+        total = expected_index = 0
+        previous_utc_ns: int | None = None
+        for item in self.manifest["chunks"]:
+            path = self.root / item["path"]
+            if path.stat().st_size != item["bytes"]:
+                raise ValueError(f"size mismatch for {path}")
+            digest_builder = hashlib.sha256()
+            with path.open("rb") as stream:
+                for block in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+                    digest_builder.update(block)
+            digest = digest_builder.hexdigest()
+            if digest != item["sha256"]:
+                raise ValueError(f"checksum mismatch for {path}")
+            if item["bytes"] != item["sample_count"] * 2 * 2 * 2:
+                raise ValueError(f"layout size mismatch for {path}")
+            if item["first_sample_index"] != expected_index:
+                raise ValueError("chunk sample indexes are not contiguous")
+            if previous_utc_ns is not None and item["first_utc_ns"] < previous_utc_ns:
+                raise ValueError("chunk timestamps are not monotonic")
+            total += item["sample_count"]
+            expected_index = total
+            previous_utc_ns = item["last_utc_ns"]
+        if total != self.manifest.get("captured_samples_per_receiver"):
+            raise ValueError("manifest sample total is inconsistent")
+
+    def chunks(self) -> Iterator[tuple[BeaconChunk, np.ndarray]]:
+        for item in self.manifest["chunks"]:
+            record = BeaconChunk(**item)
+            raw = np.memmap(self.root / record.path, mode="r", dtype="<i2",
+                            shape=(record.sample_count, 2, 2))
+            values = raw[..., 0].astype(np.float32) + 1j * raw[..., 1].astype(np.float32)
+            yield record, values.astype(np.complex64)

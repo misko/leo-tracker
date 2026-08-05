@@ -759,13 +759,18 @@ def test_dashboard_never_ages_confirmed_beacon_out_of_recent_window(tmp_path):
 def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisition():
     script = (Path(__file__).parents[1] / "scripts" / "starlink-beacon-watch.sh").read_text()
     assert 'capture_target "${target}" narrow' in script
+    assert 'capture_target "${target}" oversample' in script
     assert 'capture_target "${target}" wide' in script
     assert 'LEO_BEACON_TARGETS:-4:lower-edge' in script
     assert 'LEO_BEACON_WIDE_EVERY_CYCLES:-15' in script
+    assert 'LEO_BEACON_OVERSAMPLE_EVERY_CYCLES:-10' in script
+    assert 'LEO_BEACON_OVERSAMPLE_ON_STARTUP:-1' in script
     assert "Exactly one analyzer is allowed" in script
     assert "start_pending_analysis" in script
     assert 'LEO_BEACON_MAX_CYCLES:-0' in script
     assert "--sample-rate-hz 10000000" in script
+    assert "--sample-rate-hz 5000000" in script
+    assert "--bandwidth-hz 3000000" in script
     assert "--acquisition-span-hz 3500000" in script
     assert 'LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3' in script
     assert 'LEO_BEACON_NARROW_EXACT_INTERVAL_S:-3' in script
@@ -775,7 +780,7 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "starlink-beacon-recover" in script
     assert "starlink-beacon-followup" in script
     assert "starlink-beacon-decode" in script
-    assert '[[ "${mode}" == "narrow" && -f "${confirmation_marker}" ]]' in script
+    assert '[[ "${mode}" != "wide" && -f "${confirmation_marker}" ]]' in script
     assert "starlink-beacon-calibrate" in script
     assert "LEO_BEACON_MAX_PI_TEMP_MILLIC" in script
 
@@ -786,6 +791,7 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
     environment = os.environ | {
         "LEO_TRACKER_REPO": str(repo), "LEO_BEACON_STORAGE": str(storage),
         "LEO_BEACON_DWELL_S": ".04", "LEO_BEACON_WIDE_DWELL_S": ".04",
+        "LEO_BEACON_OVERSAMPLE_ON_STARTUP": "0",
         "LEO_BEACON_WIDE_EVERY_CYCLES": "1",
         "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
         "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
@@ -803,6 +809,7 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
         assert report["capture_manifest"]["state"] == "complete"
         assert report["capture_manifest"]["metadata"] == {
             "channel_number": 4, "region": "lower-edge",
+            "observation_mode": ("wide" if "-wide-" in report_path.stem else "narrow"),
             "tuning_basis": "published Starlink channel and edge-pilot geometry"}
         assert (storage / "reports" / "followups" / report_path.name).is_file()
     assert (storage / "reports" / "calibration" / "calibration.json").is_file()

@@ -259,6 +259,7 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
             identity=identity, gain_mode=args.gain_mode,
             configured_gain_db=configured_gain_db,
             metadata={"channel_number": args.channel_number, "region": args.region,
+                      "observation_mode": args.observation_mode,
                       "tuning_basis": "published Starlink channel and edge-pilot geometry"})
     finally:
         if "queued" in locals():
@@ -372,6 +373,10 @@ def command_starlink_beacon_decode(args: argparse.Namespace) -> int:
         "frame_count": report["combined"]["minimum_frame_count"],
         "minimum_pilot_accuracy": report["combined"]["minimum_pilot_accuracy"],
         "minimum_sss_accuracy": report["combined"]["minimum_sss_accuracy"],
+        "soft_dual_rx_pilot_accuracy": report["combined"]["soft_dual_rx"][
+            "pilot"]["hard_symbol_accuracy"],
+        "soft_dual_rx_mean_confidence": report["combined"]["soft_dual_rx"][
+            "pilot"]["soft_mean_confidence"],
         "plot": str(args.plot) if args.plot else None,
         "symbols": str(args.symbols) if args.symbols else None}, sort_keys=True))
     return 0
@@ -1362,6 +1367,8 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_capture.add_argument("--lnb-lo-hz", type=float, default=9_750_000_000)
     beacon_capture.add_argument("--sample-rate-hz", type=float, default=2_500_000)
     beacon_capture.add_argument("--bandwidth-hz", type=float, default=2_300_000)
+    beacon_capture.add_argument("--observation-mode",
+        choices=("narrow", "oversample", "wide"), default="narrow")
     beacon_capture.add_argument("--gain-mode", choices=("manual", "slow_attack", "fast_attack"), default="manual")
     beacon_capture.add_argument("--gain-db", type=float, default=50)
     beacon_capture.add_argument("--block-size", type=int, default=262_144)

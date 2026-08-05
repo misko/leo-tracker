@@ -30,7 +30,9 @@ def recover_unanalyzed(root: Path, *, passes_path: Path | None = None,
         if not followup.get("confirmation", {}).get("confirmed"):
             return
         manifest = json.loads((capture / "manifest.json").read_text())
-        if float(manifest.get("sample_rate_hz", 0)) >= 5_000_000:
+        mode = manifest.get("metadata", {}).get("observation_mode")
+        if mode == "wide" or (mode is None and
+                              float(manifest.get("sample_rate_hz", 0)) >= 5_000_000):
             return
         output = decoded / f"{capture.name}.json"
         if output.is_file():
@@ -72,13 +74,18 @@ def recover_unanalyzed(root: Path, *, passes_path: Path | None = None,
         if manifest.get("schema") != SCHEMA or manifest.get("state") != "complete":
             skipped.append(capture.name)
             continue
-        wide = float(manifest.get("sample_rate_hz", 0)) >= 5_000_000
+        mode = manifest.get("metadata", {}).get("observation_mode")
+        wide = (mode == "wide" or (mode is None and
+                float(manifest.get("sample_rate_hz", 0)) >= 5_000_000))
+        oversample = mode == "oversample"
         settings = ({"exact_interval_s": wide_exact_interval_s, "exact_window_s": .01,
                      "acquisition_span_hz": 3_500_000,
                      "acquisition_step_hz": 500_000,
                      "exact_subband_rate_hz": 2_500_000}
                     if wide else {"exact_interval_s": narrow_exact_interval_s,
-                                  "exact_window_s": .01})
+                                  "exact_window_s": .01,
+                                  "exact_subband_rate_hz": (5_000_000 if oversample
+                                                             else 2_500_000)})
         try:
             report = analyze_capture(capture, report_path, window_s=1,
                                      maximum_analysis_rate_hz=50_000,
@@ -89,7 +96,9 @@ def recover_unanalyzed(root: Path, *, passes_path: Path | None = None,
             followup = followup_capture(capture, report_path, followup_path,
                                         passes_path=passes_path)
             decode_confirmed(capture, followup_path, followup)
-            recovered.append({"capture": capture.name, "mode": "wide" if wide else "narrow",
+            recovered.append({"capture": capture.name,
+                              "mode": "wide" if wide else (
+                                  "oversample" if oversample else "narrow"),
                               "candidate_count": report["summary"]["exact_candidate_count"],
                               "qualified_count": report["summary"]["exact_qualified_count"],
                               "single_receiver_candidate_count": report["summary"].get(

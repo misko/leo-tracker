@@ -5,10 +5,13 @@ repo_dir="${LEO_TRACKER_REPO:-/home/satpi01/leo-tracker}"
 storage_root="${LEO_BEACON_STORAGE:-/mnt/leo-nvme/leo-tracker}"
 duration_s="${LEO_BEACON_DWELL_S:-120}"
 wide_duration_s="${LEO_BEACON_WIDE_DWELL_S:-10}"
+oversample_duration_s="${LEO_BEACON_OVERSAMPLE_DWELL_S:-15}"
 # Once narrow lock has demonstrated the LNB offset is inside the 2.3 MHz
 # passband, a wide reacquisition every ~30 minutes is enough to detect LO drift
 # without repeatedly sacrificing near-continuous beacon coverage.
 wide_every_cycles="${LEO_BEACON_WIDE_EVERY_CYCLES:-15}"
+oversample_every_cycles="${LEO_BEACON_OVERSAMPLE_EVERY_CYCLES:-10}"
+oversample_on_startup="${LEO_BEACON_OVERSAMPLE_ON_STARTUP:-1}"
 keep_negative="${LEO_BEACON_KEEP_NEGATIVE:-12}"
 uv_cache="${UV_CACHE_DIR:-${repo_dir}/.uv-cache}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
@@ -71,6 +74,9 @@ capture_target() {
     if [[ "${mode}" == "wide" ]]; then
       capture_args=(--duration-s "${wide_duration_s}" --sample-rate-hz 10000000
         --bandwidth-hz 9000000 --block-size 1048576)
+    elif [[ "${mode}" == "oversample" ]]; then
+      capture_args=(--duration-s "${oversample_duration_s}" --sample-rate-hz 5000000
+        --bandwidth-hz 3000000 --block-size 524288)
     else
       capture_args=(--duration-s "${duration_s}" --sample-rate-hz 2500000
         --bandwidth-hz 2300000 --block-size 262144)
@@ -78,6 +84,7 @@ capture_target() {
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \
       --channel-number "${channel}" --region "${region}" \
+      --observation-mode "${mode}" \
       --gain-mode manual --gain-db 50 --chunk-s 5 --queue-blocks 16 \
       "${temperature_args[@]}" "${source_args[@]}"
     pending_name="${name}"
@@ -99,6 +106,9 @@ process_capture() {
       analysis_args=(--exact-interval-s "${wide_exact_interval_s}" --exact-window-s .01
         --acquisition-span-hz 3500000 --acquisition-step-hz 500000
         --exact-subband-rate-hz 2500000)
+    elif [[ "${mode}" == "oversample" ]]; then
+      analysis_args=(--exact-interval-s "${narrow_exact_interval_s}" --exact-window-s .01
+        --exact-subband-rate-hz 5000000)
     else
       analysis_args=(--exact-interval-s "${narrow_exact_interval_s}" --exact-window-s .01)
     fi
@@ -112,9 +122,9 @@ process_capture() {
       --radius-s .5 --interval-s .1 --window-s .01 \
       --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json" \
       --confirmation-marker "${confirmation_marker}"
-    # Demodulation is intentionally limited to confirmed narrow captures. Wide
-    # reacquisitions can place the selected pilot bank away from baseband zero.
-    if [[ "${mode}" == "narrow" && -f "${confirmation_marker}" ]]; then
+    # Wide reacquisitions can place the selected pilot bank away from baseband
+    # zero; fixed-center narrow and oversampled captures are directly decodable.
+    if [[ "${mode}" != "wide" && -f "${confirmation_marker}" ]]; then
       env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
         starlink-beacon-decode "${capture}" "${followup}" "${decode}" \
         --plot "${decode_plot}" --symbols "${decode_symbols}"
@@ -175,6 +185,13 @@ while true; do
     start_pending_analysis
   done
   cycle=$((cycle + 1))
+  if (( (oversample_on_startup == 1 && cycle == 1) ||
+        (oversample_every_cycles > 0 && cycle % oversample_every_cycles == 0) )); then
+    for target in "${targets[@]}"; do
+      capture_target "${target}" oversample
+      start_pending_analysis
+    done
+  fi
   if (( wide_every_cycles > 0 && cycle % wide_every_cycles == 0 )); then
     for target in "${targets[@]}"; do
       capture_target "${target}" wide

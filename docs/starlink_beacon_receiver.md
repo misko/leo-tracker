@@ -47,7 +47,12 @@ legacy carrier grid has since been shown to have large off-grid blind spots and
 its confirmations must survive the newer detector before being called beacons.
 The target list is
 configurable with `LEO_BEACON_TARGETS`; the other three edge bands remain
-available for controlled comparison. Every fifteenth narrow lock cycle (roughly
+available for controlled comparison. Every tenth cycle, production inserts a
+15-second 5 MS/s, 3 MHz RF-bandwidth oversampled dwell. It demodulates natively
+and also digitally downsamples the same IQ to 2.5 MS/s, yielding a controlled
+same-signal comparison without confusing sky variability for a rate benefit.
+The cadence is configurable with `LEO_BEACON_OVERSAMPLE_EVERY_CYCLES`.
+Every fifteenth narrow lock cycle (roughly
 30 minutes) is followed by a wide acquisition on the same target. The cadence is
 configurable with `LEO_BEACON_WIDE_EVERY_CYCLES`. Each wide dwell captures ten seconds
 at 10 MS/s and 9 MHz bandwidth,
@@ -135,6 +140,16 @@ and the eight visible SSS subcarriers. Pilot channel estimates are cross-fitted:
 each held-out symbol parity is equalized using the opposite parity, so a symbol
 is not credited for fitting its own channel. The pilot and SSS sequences are
 known synchronization structure; they are not decoded user payload.
+
+Decoder revision 2 estimates and removes residual within-frame carrier slope,
+weights repeated frames by coherent quality, and publishes normalized QPSK
+state probabilities for every symbol. Independently equalized RX0/RX1 symbols
+are inverse-noise combined, preserving per-receiver results alongside the soft
+dual-RX result. On preserved event `20260805T203100Z`, this changed the separate
+receiver decisions from 87.5%/86.5% to 88.0%/86.9%, while dual-RX combining
+reached 95.3% pilot accuracy and 68.8% on the narrow SSS slice. A previously
+weak receiver in event `20260805T200557Z` improved from 32.7% to 82.5% after a
+-584 Hz residual-CFO correction; the combined pilot result reached 92.1%.
 
 The preserved `20260805T171900Z` field event contains seven complete frames in
 the selected 10 ms replay. Its held-out pilot decisions are 73.8% correct on
@@ -231,7 +246,9 @@ rejection, AGC/manual-gain semantics, and evidence-aware retention.
 Decoder tests pin the published SSS base-4 sequence and edge slices, recover
 held-out pilots and SSS from a synthetic channel with CFO/frame phase/noise,
 reject noise at chance-level accuracy, reject sample rates below the complete
-1.875 MHz pilot span, and run JSON/NPZ/PNG generation through the public CLI.
+1.875 MHz pilot span, recover a deliberately omitted 600 Hz carrier correction,
+validate normalized soft probabilities, compare native 5 MS/s decoding against
+the same IQ downsampled to 2.5 MS/s, and run JSON/NPZ/PNG generation through the public CLI.
 Dashboard E2E coverage verifies both decoder artifact routes.
 
 Hardware acceptance requires a complete capture with contiguous sample indexes,

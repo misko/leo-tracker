@@ -27,8 +27,8 @@ def _tone_design(rate, frame_start, symbol, frequencies):
     return start, stop, design
 
 
-def _decoded_fixture(*, seed=91, noise_std=.04):
-    rate, duration, epoch, cfo = 2_500_000.0, .01, 347, 83_700.0
+def _decoded_fixture(*, seed=91, noise_std=.04, rate=2_500_000.0):
+    duration, epoch, cfo = .01, round(347 * rate / 2_500_000), 83_700.0
     count = round(rate * duration)
     indexes = STARLINK_EDGE_PILOT_SUBCARRIERS["lower"]
     frequencies = np.asarray([subcarrier_offset_hz(index) -
@@ -78,6 +78,20 @@ def test_narrow_decoder_recovers_held_out_pilots_and_sss():
     assert arrays["pilot_equalized"].shape == (300, 8)
     assert arrays["sss_equalized"].shape == (7, 8)
     assert arrays["pilot_correct"].dtype == np.bool_
+    assert arrays["pilot_probabilities"].shape == (300, 8, 4)
+    np.testing.assert_allclose(arrays["pilot_probabilities"].sum(axis=-1), 1,
+                               atol=1e-6)
+    assert report["pilot"]["effective_frame_count"] <= frames
+    assert report["pilot"]["soft_mean_expected_probability"] > .9
+
+
+def test_narrow_decoder_refines_residual_carrier_slope():
+    signal, rate, epoch, cfo, _ = _decoded_fixture(noise_std=.02)
+    report, _ = demodulate_edge_window(
+        signal, rate, epoch_sample=epoch, carrier_offset_hz=cfo - 600,
+        edge="lower")
+    assert report["residual_cfo_refinement_hz"] == pytest.approx(600, abs=35)
+    assert report["pilot"]["hard_symbol_accuracy"] > .98
 
 
 def test_narrow_decoder_does_not_hard_decode_noise_as_known_code():
@@ -125,8 +139,43 @@ def test_decode_followup_writes_json_symbols_and_plot(tmp_path):
     saved = json.loads(output.read_text())
     assert saved["schema"] == "leo-tracker.starlink-edge-decode/v1"
     assert saved["combined"]["minimum_pilot_accuracy"] > .98
+    assert saved["decoder_revision"] == 2
+    assert saved["combined"]["soft_dual_rx"]["pilot"][
+        "hard_symbol_accuracy"] > .98
     assert saved["waveform"]["decoded_sss_subcarriers_per_frame"] == 8
     assert saved["symbol_archive_bytes"] == symbols.stat().st_size
     assert len(saved["symbol_archive_sha256"]) == 64
     assert symbols.read_bytes().startswith(b"PK")
     assert plot.read_bytes().startswith(b"\x89PNG")
+
+
+def test_oversampled_decode_reports_same_window_downsample_control(tmp_path):
+    signal, rate, epoch, cfo, _ = _decoded_fixture(noise_std=.02, rate=5_000_000)
+    capture_path = tmp_path / "oversample"
+    block = PairedSampleBlock(signal, signal * (.8 + .1j), 0,
+                              1_700_000_000_000_000_000)
+    capture_beacon_iq([block], capture_path, sample_rate_hz=rate,
+        center_frequency_hz=1_709_687_500, bandwidth_hz=3_000_000,
+        duration_s=.01, lnb_lo_hz=9_750_000_000, chunk_s=.01,
+        metadata={"channel_number": 4, "region": "lower-edge",
+                  "observation_mode": "oversample"})
+    receivers = [{"receiver": receiver,
+        "acquisition": {"selected_epoch_sample": epoch,
+                        "subband_rate_hz": rate, "match_score_margin": .2},
+        "pilot": {"edge": "lower", "frequency_offset_hz": cfo,
+                  "score_margin": .08}, "pss": {"peak_to_median": 2.4}}
+        for receiver in range(2)]
+    followup = tmp_path / "followup.json"
+    followup.write_text(json.dumps({"checks": [{"start_s": 0,
+        "duration_s": .01, "candidate": True, "qualified": True,
+        "epoch_difference_samples": 0, "receivers": receivers}]}) + "\n")
+    output = tmp_path / "decode.json"
+
+    assert main(["starlink-beacon-decode", str(capture_path), str(followup),
+                 str(output)]) == 0
+    saved = json.loads(output.read_text())
+    assert saved["capture_parameters"]["sample_rate_hz"] == 5_000_000
+    for receiver in saved["receivers"]:
+        assert receiver["pilot"]["hard_symbol_accuracy"] > .98
+        assert receiver["downsampled_comparison"]["sample_rate_hz"] == 2_500_000
+        assert receiver["downsampled_comparison"]["pilot_hard_symbol_accuracy"] > .95

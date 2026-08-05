@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from .artifact import BeaconCapture
+from .acquisition import extract_complex_subband
 from .channels import (STARLINK_EDGE_PILOT_SUBCARRIERS,
                        STARLINK_SUBCARRIER_SPACING_HZ,
                        starlink_edge_pilot_offset_hz, subcarrier_offset_hz)
@@ -92,19 +93,43 @@ def _demodulate_symbol(values: np.ndarray, sample_rate_hz: float,
                       np.complex64)
 
 
+def _soft_probabilities(equalized: np.ndarray, *, rotation_quarters: float,
+                        noise_variance: float) -> np.ndarray:
+    constellation = np.exp(1j * np.pi / 2 *
+                           (np.arange(4, dtype=float) + rotation_quarters))
+    distance = np.abs(np.asarray(equalized)[..., None] - constellation) ** 2
+    logits = -distance / max(float(noise_variance), 1e-6)
+    logits -= np.max(logits, axis=-1, keepdims=True)
+    likelihood = np.exp(logits)
+    return np.asarray(likelihood / np.sum(likelihood, axis=-1, keepdims=True),
+                      np.float32)
+
+
 def _metric_summary(equalized: np.ndarray, expected: np.ndarray, *,
-                    rotation_quarters: float) -> tuple[dict, np.ndarray]:
+                    rotation_quarters: float
+                    ) -> tuple[dict, np.ndarray, np.ndarray]:
     expected_values = np.broadcast_to(expected, equalized.shape)
     decoded = _constellation_states(equalized, rotation_quarters=rotation_quarters)
     known = _constellation_states(expected_values, rotation_quarters=rotation_quarters)
     correct = decoded == known
     error = equalized - expected_values
+    noise_variance = max(float(np.mean(np.abs(error) ** 2)), 1e-6)
+    probabilities = _soft_probabilities(
+        equalized, rotation_quarters=rotation_quarters,
+        noise_variance=noise_variance)
+    expected_probability = np.take_along_axis(
+        probabilities, known[..., None], axis=-1)[..., 0]
+    entropy = -np.sum(probabilities * np.log2(
+        np.maximum(probabilities, 1e-12)), axis=-1)
     return ({"observation_count": int(equalized.size),
              "hard_symbol_accuracy": float(np.mean(correct)),
              "random_chance_accuracy": .25,
              "rms_evm": float(np.sqrt(np.mean(np.abs(error) ** 2))),
-             "median_equalized_magnitude": float(np.median(np.abs(equalized)))},
-            correct)
+             "median_equalized_magnitude": float(np.median(np.abs(equalized))),
+             "soft_mean_confidence": float(np.mean(np.max(probabilities, axis=-1))),
+             "soft_mean_expected_probability": float(np.mean(expected_probability)),
+             "soft_mean_entropy_bits": float(np.mean(entropy)),
+             "soft_noise_variance": noise_variance}, correct, probabilities)
 
 
 def _sss_decode(coefficients: np.ndarray, frame_phase: np.ndarray,
@@ -126,12 +151,32 @@ def _sss_decode(coefficients: np.ndarray, frame_phase: np.ndarray,
             scale = np.mean(normalized[training] * np.conj(expected)[None, :])
             equalized[testing] = normalized[testing] / (
                 scale if abs(scale) > 1e-20 else np.complex64(1))
-    metrics, correct = _metric_summary(
+    metrics, correct, probabilities = _metric_summary(
         equalized, expected[None, :], rotation_quarters=0)
     metrics.update({"frame_count": int(frame_phase.size),
                     "per_subcarrier_accuracy": np.mean(correct, axis=0).tolist()})
     return metrics, {"expected": expected, "equalized": equalized,
-                     "correct": correct}
+                     "correct": correct, "probabilities": probabilities}
+
+
+def _estimate_residual_cfo(pilots: np.ndarray, expected: np.ndarray) -> float:
+    """Estimate within-frame phase slope after removing known pilot states."""
+    frame_match = np.sum(pilots * np.conj(expected)[None, :, :], axis=(1, 2))
+    aligned = pilots * np.exp(-1j * np.angle(frame_match))[:, None, None]
+    channel = np.mean(aligned * np.conj(expected)[None, :, :], axis=(0, 1))
+    symbol_match = np.sum(pilots * np.conj(expected)[None, :, :] *
+                          np.conj(channel)[None, None, :], axis=2)
+    phase = np.unwrap(np.angle(symbol_match), axis=1)
+    time_s = (np.arange(300, dtype=float) + 2.5) * OFDM_SYMBOL_DURATION_S
+    time_s -= np.mean(time_s)
+    slopes = []
+    for frame in range(pilots.shape[0]):
+        weight = np.abs(symbol_match[frame])
+        usable = weight > np.median(weight) * .25
+        if np.count_nonzero(usable) >= 20:
+            slopes.append(np.polyfit(time_s[usable], phase[frame, usable], 1,
+                                     w=np.sqrt(weight[usable]))[0] / (2 * np.pi))
+    return float(np.clip(np.median(slopes) if slopes else 0.0, -2_000, 2_000))
 
 
 def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
@@ -171,13 +216,29 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
     if not pilot_frames:
         raise ValueError("window contains no complete Starlink frame")
     pilots = np.asarray(pilot_frames, np.complex64)
+    sss_coefficients = np.asarray(sss_frames, np.complex64)
     # The phase-code matrix differs between lower and upper pilot bands.
     expected_pilots = edge_pilot_symbols(edge)
+    residual_cfo_hz = _estimate_residual_cfo(pilots, expected_pilots)
+    pilot_times_s = (np.arange(300, dtype=float) + 2.5) * OFDM_SYMBOL_DURATION_S
+    reference_time_s = float(np.mean(pilot_times_s))
+    pilots *= np.exp(-2j * np.pi * residual_cfo_hz *
+                     (pilot_times_s - reference_time_s))[None, :, None]
+    sss_time_s = 1.5 * OFDM_SYMBOL_DURATION_S
+    sss_coefficients *= np.exp(-2j * np.pi * residual_cfo_hz *
+                               (sss_time_s - reference_time_s))
     # _pilot_decode's channel estimator needs the selected edge's matrix.
     frame_match = np.sum(pilots * np.conj(expected_pilots)[None, :, :], axis=(1, 2))
     frame_phase = np.angle(frame_match)
     aligned = pilots * np.exp(-1j * frame_phase)[:, None, None]
-    stacked = np.mean(aligned, axis=0)
+    frame_energy = np.sum(np.abs(pilots) ** 2, axis=(1, 2))
+    frame_quality = np.abs(frame_match) ** 2 / np.maximum(frame_energy, 1e-20)
+    positive = frame_quality[frame_quality > 0]
+    if positive.size:
+        frame_quality = np.minimum(frame_quality, 4 * np.median(positive))
+    frame_weights = (frame_quality / np.sum(frame_quality) if np.sum(frame_quality) > 0
+                     else np.full(len(pilot_frames), 1 / len(pilot_frames)))
+    stacked = np.sum(aligned * frame_weights[:, None, None], axis=0)
     equalized = np.empty_like(stacked)
     symbol_indexes = np.arange(300)
     for parity in range(2):
@@ -191,10 +252,12 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
     modeled = (np.exp(1j * frame_phase)[:, None, None] *
                full_channel[None, None, :] * expected_pilots[None, :, :])
     residual = pilots - modeled
-    pilot_metrics, pilot_correct = _metric_summary(
+    pilot_metrics, pilot_correct, pilot_probabilities = _metric_summary(
         equalized, expected_pilots, rotation_quarters=.5)
     pilot_metrics.update({"frame_count": len(pilot_frames),
-        "stacking_gain_db": float(10 * np.log10(len(pilot_frames))),
+        "effective_frame_count": float(1 / np.sum(frame_weights ** 2)),
+        "stacking_gain_db": float(10 * np.log10(1 / np.sum(frame_weights ** 2))),
+        "frame_weights": frame_weights.tolist(),
         "model_snr_db": float(10 * np.log10(
             max(float(np.mean(np.abs(modeled) ** 2)), 1e-30) /
             max(float(np.mean(np.abs(residual) ** 2)), 1e-30))),
@@ -204,14 +267,16 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
         "frame_phase_deg": np.rad2deg(frame_phase).tolist()})
     sss_expected = sss_edge_symbols(edge)
     sss_metrics, sss_arrays = _sss_decode(
-        np.asarray(sss_frames), frame_phase, full_channel, sss_expected)
+        sss_coefficients, frame_phase, full_channel, sss_expected)
     arrays = {"pilot_expected": expected_pilots,
               "pilot_equalized": equalized,
               "pilot_stacked": stacked,
               "pilot_correct": pilot_correct,
+              "pilot_probabilities": pilot_probabilities,
               "sss_expected": sss_arrays["expected"],
               "sss_equalized": sss_arrays["equalized"],
               "sss_correct": sss_arrays["correct"],
+              "sss_probabilities": sss_arrays["probabilities"],
               "channel": full_channel,
               "frame_phase": frame_phase,
               "frame_starts": np.asarray(starts, dtype=np.int64),
@@ -221,6 +286,7 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
               "sample_rate_hz": float(sample_rate_hz),
               "epoch_sample": int(epoch_sample),
               "carrier_offset_hz": float(carrier_offset_hz),
+              "residual_cfo_refinement_hz": residual_cfo_hz,
               "pilot": pilot_metrics, "sss": sss_metrics}
     return report, arrays
 
@@ -252,6 +318,47 @@ def _json_ready(value):
     return value
 
 
+def _combine_receiver_symbols(receivers: list[dict],
+                              arrays: dict[str, np.ndarray]) -> tuple[dict, dict]:
+    """Inverse-noise combine independently equalized RX0/RX1 symbols."""
+    pilot_noise = np.asarray([max(item["pilot"]["soft_noise_variance"], 1e-6)
+                              for item in receivers], dtype=float)
+    pilot_weights = (1 / pilot_noise) / np.sum(1 / pilot_noise)
+    pilot_equalized = sum(pilot_weights[receiver] *
+        arrays[f"rx{receiver}_pilot_equalized"] for receiver in range(2))
+    pilot_expected = arrays["rx0_pilot_expected"]
+    pilot_metrics, pilot_correct, pilot_probabilities = _metric_summary(
+        pilot_equalized, pilot_expected, rotation_quarters=.5)
+    pilot_metrics["receiver_weights"] = pilot_weights.tolist()
+
+    sss_noise = np.asarray([max(item["sss"]["soft_noise_variance"], 1e-6)
+                            for item in receivers], dtype=float)
+    sss_weights = (1 / sss_noise) / np.sum(1 / sss_noise)
+    sss_frame_count = min(arrays[f"rx{receiver}_sss_equalized"].shape[0]
+                          for receiver in range(2))
+    sss_equalized = sum(sss_weights[receiver] *
+        arrays[f"rx{receiver}_sss_equalized"][:sss_frame_count]
+        for receiver in range(2))
+    sss_expected = arrays["rx0_sss_expected"]
+    sss_metrics, sss_correct, sss_probabilities = _metric_summary(
+        sss_equalized, sss_expected[None, :], rotation_quarters=0)
+    sss_metrics.update({"receiver_weights": sss_weights.tolist(),
+                        "frame_count": int(sss_equalized.shape[0]),
+                        "per_subcarrier_accuracy": np.mean(
+                            sss_correct, axis=0).tolist()})
+    metrics = {"method": "inverse-noise equalized dual-RX combining",
+               "pilot": pilot_metrics, "sss": sss_metrics}
+    combined_arrays = {"combined_pilot_expected": pilot_expected,
+        "combined_pilot_equalized": pilot_equalized,
+        "combined_pilot_correct": pilot_correct,
+        "combined_pilot_probabilities": pilot_probabilities,
+        "combined_sss_expected": sss_expected,
+        "combined_sss_equalized": sss_equalized,
+        "combined_sss_correct": sss_correct,
+        "combined_sss_probabilities": sss_probabilities}
+    return metrics, combined_arrays
+
+
 def decode_followup(capture_path: Path, followup_path: Path, output: Path, *,
                     time_s: float | None = None,
                     symbols_output: Path | None = None) -> tuple[dict, dict[str, np.ndarray]]:
@@ -273,6 +380,23 @@ def decode_followup(capture_path: Path, followup_path: Path, output: Path, *,
             epoch_sample=int(evidence["acquisition"]["selected_epoch_sample"]),
             carrier_offset_hz=float(evidence["pilot"]["frequency_offset_hz"]),
             edge=edge)
+        if rate > 2_500_000:
+            comparison_rate = 2_500_000.0
+            comparison_samples = extract_complex_subband(
+                paired[:, receiver], rate, 0, comparison_rate)
+            comparison, _ = demodulate_edge_window(
+                comparison_samples, comparison_rate,
+                epoch_sample=round(int(evidence["acquisition"][
+                    "selected_epoch_sample"]) * comparison_rate / rate),
+                carrier_offset_hz=float(evidence["pilot"]["frequency_offset_hz"]),
+                edge=edge)
+            decoded["downsampled_comparison"] = {
+                "sample_rate_hz": comparison_rate,
+                "pilot_hard_symbol_accuracy": comparison["pilot"][
+                    "hard_symbol_accuracy"],
+                "pilot_rms_evm": comparison["pilot"]["rms_evm"],
+                "sss_hard_symbol_accuracy": comparison["sss"][
+                    "hard_symbol_accuracy"]}
         decoded.update({"receiver": receiver,
                         "pss": evidence.get("pss", {}),
                         "exact_control_match_margin": evidence.get(
@@ -282,8 +406,10 @@ def decode_followup(capture_path: Path, followup_path: Path, output: Path, *,
         receivers.append(decoded)
         arrays.update({f"rx{receiver}_{key}": value
                        for key, value in receiver_arrays.items()})
+    combined_decode, combined_arrays = _combine_receiver_symbols(receivers, arrays)
+    arrays.update(combined_arrays)
     indexes, frequencies = _edge_frequencies(edge)
-    report = {"schema": DECODE_SCHEMA,
+    report = {"schema": DECODE_SCHEMA, "decoder_revision": 2,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "capture": str(capture_path.resolve()),
         "source_followup": str(followup_path.resolve()),
@@ -311,12 +437,15 @@ def decode_followup(capture_path: Path, followup_path: Path, output: Path, *,
             "minimum_sss_accuracy": min(
                 item["sss"]["hard_symbol_accuracy"] for item in receivers),
             "minimum_frame_count": min(item["pilot"]["frame_count"]
-                                       for item in receivers)},
+                                       for item in receivers),
+            "soft_dual_rx": combined_decode},
         "limitations": [
-            "2.5 MS/s contains one 1.875 MHz edge-pilot band, not the full 240 MHz channel",
+            f"{rate/1e6:g} MS/s contains one edge-pilot neighborhood, not the full 240 MHz channel",
             "pilot channel estimates are cross-fitted on opposite symbol parities",
             "SSS is only the eight-subcarrier narrowband slice and is lower SNR",
             "no Starlink header or user payload is decoded"]}
+    report["capture_parameters"]["observation_mode"] = capture.manifest.get(
+        "metadata", {}).get("observation_mode", "narrow")
     if symbols_output is not None:
         symbols_output = Path(symbols_output)
         symbols_output.parent.mkdir(parents=True, exist_ok=True)
@@ -336,7 +465,7 @@ def plot_decode_report(report: dict, arrays: dict[str, np.ndarray], output: Path
     """Render constellations, held-out decisions, and channel measurements."""
     import matplotlib.pyplot as plt
 
-    figure, axes = plt.subplots(3, 2, figsize=(14, 15), constrained_layout=True)
+    figure, axes = plt.subplots(4, 2, figsize=(14, 19), constrained_layout=True)
     pilot_ideal = np.exp(1j * np.pi / 2 * (np.arange(4) + .5))
     sss_ideal = np.exp(1j * np.pi / 2 * np.arange(4))
     colors = plt.get_cmap("tab10")
@@ -356,7 +485,6 @@ def plot_decode_report(report: dict, arrays: dict[str, np.ndarray], output: Path
                         f"accuracy {metric['hard_symbol_accuracy']:.1%}"),
                  xlabel="I", ylabel="Q", aspect="equal")
         axis.grid(alpha=.25); axis.legend(ncol=2, fontsize=8)
-
         correct = arrays[f"rx{receiver}_pilot_correct"].T
         axis = axes[1, receiver]
         axis.imshow(correct, origin="lower", aspect="auto", interpolation="nearest",
@@ -380,6 +508,29 @@ def plot_decode_report(report: dict, arrays: dict[str, np.ndarray], output: Path
                         f"accuracy {metric['hard_symbol_accuracy']:.1%}"),
                  xlabel="I", ylabel="Q", aspect="equal")
         axis.grid(alpha=.25); axis.legend(ncol=2, fontsize=8)
+    combined = arrays["combined_pilot_equalized"]
+    expected = arrays["combined_pilot_expected"]
+    states = _constellation_states(expected, rotation_quarters=.5).ravel()
+    axis = axes[3, 0]
+    for state in range(4):
+        selected = combined.ravel()[states == state]
+        axis.scatter(selected.real, selected.imag, s=7, alpha=.28,
+                     color=colors(state), label=f"state {state}")
+    axis.scatter(pilot_ideal.real, pilot_ideal.imag, marker="x", s=90,
+                 linewidth=2, color="black", label="ideal")
+    combined_metric = report["combined"]["soft_dual_rx"]["pilot"]
+    axis.set(title=("Soft dual-RX combined pilot constellation · "
+                    f"accuracy {combined_metric['hard_symbol_accuracy']:.1%}"),
+             xlabel="I", ylabel="Q", aspect="equal")
+    axis.grid(alpha=.25); axis.legend(ncol=2, fontsize=8)
+    confidence = np.max(arrays["combined_pilot_probabilities"], axis=-1).T
+    axis = axes[3, 1]
+    image = axis.imshow(confidence, origin="lower", aspect="auto",
+        interpolation="nearest", cmap="viridis", vmin=.25, vmax=1,
+        extent=(2, 302, -.5, 7.5))
+    axis.set(title="Soft dual-RX symbol confidence",
+             xlabel="OFDM symbol index", ylabel="edge subcarrier position")
+    figure.colorbar(image, ax=axis, label="maximum QPSK probability")
     observation = report["selected_observation"]
     capture = report["capture_parameters"]
     figure.suptitle(

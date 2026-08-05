@@ -50,7 +50,7 @@ def recover_unanalyzed(root: Path, *, passes_path: Path | None = None) -> dict:
                      "acquisition_span_hz": 3_500_000,
                      "acquisition_step_hz": 500_000,
                      "exact_subband_rate_hz": 2_500_000}
-                    if wide else {"exact_interval_s": 2, "exact_window_s": .01})
+                    if wide else {"exact_interval_s": 1, "exact_window_s": .01})
         try:
             report = analyze_capture(capture, report_path, window_s=1,
                                      maximum_analysis_rate_hz=50_000, **settings)

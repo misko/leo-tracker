@@ -337,6 +337,8 @@ def test_recovery_analyzes_complete_unreported_capture_and_is_idempotent(tmp_pat
     assert first["errors"] == []
     assert first["recovered"][0]["capture"] == "orphan"
     assert (root / "reports" / "orphan.json").is_file()
+    recovered_report = json.loads((root / "reports" / "orphan.json").read_text())
+    assert recovered_report["analysis"]["exact_interval_s"] == 1
     assert (root / "reports" / "plots" / "orphan.png").read_bytes().startswith(b"\x89PNG")
     second = recover_unanalyzed(root)
     assert second["recovered"] == []

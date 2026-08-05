@@ -125,6 +125,24 @@ event without retrospective targeting. Its dense replay again showed identical
 dual-receiver timing and parallel CFO slopes near -4 kHz/s, demonstrating that
 the production path can repeat the detection autonomously.
 
+## Narrowband waveform decoding
+
+Every confirmed narrow capture is now demodulated rather than stopping at a
+correlation score. The decoder removes the measured carrier offset, solves the
+eight edge-subcarrier coefficients for each OFDM symbol, aligns repeated 750 Hz
+frames, and stacks them. It decodes the 300 published pilot symbols per frame
+and the eight visible SSS subcarriers. Pilot channel estimates are cross-fitted:
+each held-out symbol parity is equalized using the opposite parity, so a symbol
+is not credited for fitting its own channel. The pilot and SSS sequences are
+known synchronization structure; they are not decoded user payload.
+
+The preserved `20260805T171900Z` field event contains seven complete frames in
+the selected 10 ms replay. Its held-out pilot decisions are 73.8% correct on
+RX0 and 71.9% on RX1, compared with 25% random chance. The narrow SSS slice is
+weaker at 44.6% and 37.5%, so it is supporting rather than conclusive evidence.
+At 2.5 MS/s the receiver fully contains the 1.875 MHz pilot band, but it cannot
+capture or decode the full 240 MHz Starlink channel, header, or user payload.
+
 The 10 MS/s path is intentionally described as periodic, not continuous. A
 hardware trial needed 121.4 seconds of wall time to return 30 seconds of dual-RX
 IQ, while the 2.5 MS/s path runs approximately in real time. The NVMe is not the
@@ -166,6 +184,9 @@ Data live under `/mnt/leo-nvme/leo-tracker`:
 - `reports/<session>.json`: structural, PSS, exact-pilot, control, CFO, and confidence evidence.
 - `reports/plots/<session>.png`: PSS, pilot/control margin, and CFO evidence.
 - `reports/followups/<session>.json`: dense replay and temporal-confirmation evidence.
+- `reports/decoded/<session>.json`: decoder parameters and pilot/SSS confidence metrics.
+- `reports/decoded/<session>.npz`: equalized symbols, decisions, and channel estimates.
+- `reports/decoded/<session>.png`: dual-RX constellations and held-out decision maps.
 - `reports/calibration/calibration.json`: cumulative empirical null distributions.
 - `quarantine/`: recoverable interrupted sessions.
 
@@ -184,6 +205,13 @@ env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
 env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
   starlink-beacon-null-replay /mnt/leo-nvme/leo-tracker \
   /mnt/leo-nvme/leo-tracker/reports/calibration/pilot_symbolwise_v3-null
+
+env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
+  starlink-beacon-decode /mnt/leo-nvme/leo-tracker/captures/test \
+  /mnt/leo-nvme/leo-tracker/reports/followups/test.json \
+  /mnt/leo-nvme/leo-tracker/reports/decoded/test.json \
+  --plot /mnt/leo-nvme/leo-tracker/reports/decoded/test.png \
+  --symbols /mnt/leo-nvme/leo-tracker/reports/decoded/test.npz
 ```
 
 ## Verification strategy
@@ -200,6 +228,11 @@ follow-up, retention, calibration, and clean pipeline drain through the same
 bash entry point used by the service. Storage tests cover
 chunk rollover, SHA-256 verification, interrupted manifests, discontinuity
 rejection, AGC/manual-gain semantics, and evidence-aware retention.
+Decoder tests pin the published SSS base-4 sequence and edge slices, recover
+held-out pilots and SSS from a synthetic channel with CFO/frame phase/noise,
+reject noise at chance-level accuracy, reject sample rates below the complete
+1.875 MHz pilot span, and run JSON/NPZ/PNG generation through the public CLI.
+Dashboard E2E coverage verifies both decoder artifact routes.
 
 Hardware acceptance requires a complete capture with contiguous sample indexes,
 monotonic timestamps, valid checksums, both receivers present, and a report.

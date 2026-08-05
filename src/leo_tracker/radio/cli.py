@@ -64,6 +64,8 @@ from .beacon.followup import (followup_capture as followup_beacon_capture,
                               rescore_followup as rescore_beacon_followup)
 from .beacon.calibration import build_calibration as build_beacon_calibration
 from .beacon.null_replay import replay_null_calibration as replay_beacon_null_calibration
+from .beacon.decode import decode_followup as decode_beacon_followup
+from .beacon.decode import plot_decode_report as plot_beacon_decode
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -356,6 +358,22 @@ def command_starlink_beacon_null_replay(args: argparse.Namespace) -> int:
                       "selected_capture_count": report["selected_capture_count"],
                       "completed_report_count": len(report["completed_reports"]),
                       "reused_report_count": len(report["reused_reports"])}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_decode(args: argparse.Namespace) -> int:
+    report, arrays = decode_beacon_followup(
+        args.capture, args.followup, args.output, time_s=args.time_s,
+        symbols_output=args.symbols)
+    if args.plot:
+        plot_beacon_decode(report, arrays, args.plot)
+    print(json.dumps({"decode": str(args.output),
+        "selected_time_s": report["selected_observation"]["start_s"],
+        "frame_count": report["combined"]["minimum_frame_count"],
+        "minimum_pilot_accuracy": report["combined"]["minimum_pilot_accuracy"],
+        "minimum_sss_accuracy": report["combined"]["minimum_sss_accuracy"],
+        "plot": str(args.plot) if args.plot else None,
+        "symbols": str(args.symbols) if args.symbols else None}, sort_keys=True))
     return 0
 
 
@@ -1435,6 +1453,18 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_null.add_argument("--maximum-host-temperature-c", type=float, default=75)
     beacon_null.add_argument("--resume-host-temperature-c", type=float, default=70)
     beacon_null.set_defaults(handler=command_starlink_beacon_null_replay)
+    beacon_decode = commands.add_parser("starlink-beacon-decode",
+        help="demodulate and render edge-pilot and narrow SSS constellations")
+    beacon_decode.add_argument("capture", type=Path)
+    beacon_decode.add_argument("followup", type=Path)
+    beacon_decode.add_argument("output", type=Path)
+    beacon_decode.add_argument("--time-s", type=float,
+        help="decode the dense follow-up check nearest this capture time")
+    beacon_decode.add_argument("--plot", type=Path,
+        help="write pilot/SSS constellations and held-out decision maps")
+    beacon_decode.add_argument("--symbols", type=Path,
+        help="write equalized complex symbols and channel estimates as NPZ")
+    beacon_decode.set_defaults(handler=command_starlink_beacon_decode)
     analyze = commands.add_parser("analyze", help="create blind ridge data and waterfall")
     analyze.add_argument("capture"); analyze.add_argument("output_dir")
     analyze.add_argument("--fft-size", type=int, default=4096); analyze.add_argument("--hop-size", type=int)

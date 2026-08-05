@@ -431,3 +431,49 @@ def test_dashboard_cache_invalidates_when_late_tracker_sidecar_arrives(tmp_path)
         "schema": "leo-tracker.tracker-ensemble/v1", "joint_tracks": [],
         "metrics": {}}))
     assert model.waterfalls()["waterfalls"][0]["tracker_ensemble_available"]
+
+
+def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
+    observation_root = tmp_path / "watch"
+    observation_root.mkdir()
+    beacon_root = tmp_path / "beacons"
+    name = "ch4-lower-edge-narrow-20260805T171900Z"
+    capture = beacon_root / "captures" / name
+    reports = beacon_root / "reports"
+    (reports / "followups").mkdir(parents=True)
+    (reports / "decoded").mkdir()
+    capture.mkdir(parents=True)
+    manifest = {"state": "complete", "created_utc_ns": 1_700_000_000_000_000_000,
+        "sample_rate_hz": 2_500_000, "bandwidth_hz": 2_300_000,
+        "center_frequency_hz": 1_709_687_500, "rf_center_hz": 11_459_687_500,
+        "gain_mode": "manual", "configured_gain_db": 50,
+        "metadata": {"channel_number": 4, "region": "lower-edge"}}
+    (capture / "manifest.json").write_text(json.dumps(manifest))
+    report = {"schema": "leo-tracker.starlink-beacon-analysis/v1",
+        "capture_manifest": manifest, "summary": {"exact_candidate_count": 1},
+        "analysis": {"exact_acquisition_method": "pilot_symbolwise_v3"},
+        "exact_checks": []}
+    (reports / f"{name}.json").write_text(json.dumps(report))
+    (reports / "followups" / f"{name}.json").write_text(json.dumps({
+        "confirmation": {"confirmed": True}}))
+    decode = {"schema": "leo-tracker.starlink-edge-decode/v1", "combined": {
+        "minimum_pilot_accuracy": .719, "minimum_sss_accuracy": .375,
+        "minimum_frame_count": 7}}
+    (reports / "decoded" / f"{name}.json").write_text(json.dumps(decode))
+    (reports / "decoded" / f"{name}.png").write_bytes(b"decode-png")
+
+    model = DashboardModel(observation_root, beacon_root=beacon_root)
+    row = model.beacon()["captures"][0]
+    assert row["decode"] == decode["combined"]
+    assert row["decode_url"] == f"/beacon-decodes/{name}.json"
+    assert row["decode_plot_url"] == f"/beacon-decode-plots/{name}.png"
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(model))
+    thread = Thread(target=server.serve_forever, daemon=True); thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        served = json.loads(urlopen(base + row["decode_url"], timeout=2).read())
+        assert served["combined"]["minimum_frame_count"] == 7
+        assert urlopen(base + row["decode_plot_url"], timeout=2).read() == b"decode-png"
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=2)

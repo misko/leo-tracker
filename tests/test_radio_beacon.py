@@ -740,6 +740,8 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "--plot \"${plot}\"" in script
     assert "starlink-beacon-recover" in script
     assert "starlink-beacon-followup" in script
+    assert "starlink-beacon-decode" in script
+    assert '[[ "${mode}" == "narrow" && -f "${confirmation_marker}" ]]' in script
     assert "starlink-beacon-calibrate" in script
     assert "LEO_BEACON_MAX_PI_TEMP_MILLIC" in script
 

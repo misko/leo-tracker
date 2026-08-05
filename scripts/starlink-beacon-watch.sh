@@ -35,7 +35,7 @@ if [[ "${fake_source}" == "1" ]]; then
 fi
 
 mkdir -p "${storage_root}/captures" "${storage_root}/reports" "${storage_root}/staging"
-mkdir -p "${storage_root}/reports/plots"
+mkdir -p "${storage_root}/reports/plots" "${storage_root}/reports/decoded"
 cd "${repo_dir}"
 
 capture_target() {
@@ -91,6 +91,9 @@ process_capture() {
     local plot="${storage_root}/reports/plots/${name}.png"
     local followup="${storage_root}/reports/followups/${name}.json"
     local confirmation_marker="${storage_root}/staging/${name}.confirmed"
+    local decode="${storage_root}/reports/decoded/${name}.json"
+    local decode_plot="${storage_root}/reports/decoded/${name}.png"
+    local decode_symbols="${storage_root}/reports/decoded/${name}.npz"
     local analysis_args
     if [[ "${mode}" == "wide" ]]; then
       analysis_args=(--exact-interval-s "${wide_exact_interval_s}" --exact-window-s .01
@@ -109,6 +112,13 @@ process_capture() {
       --radius-s .5 --interval-s .1 --window-s .01 \
       --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json" \
       --confirmation-marker "${confirmation_marker}"
+    # Demodulation is intentionally limited to confirmed narrow captures. Wide
+    # reacquisitions can place the selected pilot bank away from baseband zero.
+    if [[ "${mode}" == "narrow" && -f "${confirmation_marker}" ]]; then
+      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-decode "${capture}" "${followup}" "${decode}" \
+        --plot "${decode_plot}" --symbols "${decode_symbols}"
+    fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \

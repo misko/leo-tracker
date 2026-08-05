@@ -6,9 +6,25 @@ from fractions import Fraction
 import numpy as np
 from scipy.signal import resample_poly
 
-from .pilots import matched_pilot_control_scores, track_edge_pilots
+from .pilots import (acquire_pilot_epoch, conditioned_pilot_frequency_search,
+                     conditioned_pilot_score, matched_pilot_control_scores,
+                     track_edge_pilots)
 from .structure import STARLINK_FRAME_DURATION_S
 from .templates import acquire_pss_epoch
+
+
+def _conditioned_cfo_refinement(samples: np.ndarray, sample_rate_hz: float,
+                                epoch_sample: int, initial_cfo_hz: float, *,
+                                edge: str) -> tuple[dict, dict]:
+    """Refine CFO after timing is fixed, then evaluate control at that same point."""
+    offsets = initial_cfo_hz + np.arange(-2_000.0, 2_000.1, 100.0)
+    exact = conditioned_pilot_frequency_search(
+        samples, sample_rate_hz, epoch_sample, offsets, edge=edge)
+    exact["initial_frequency_offset_hz"] = float(initial_cfo_hz)
+    control = conditioned_pilot_score(samples, sample_rate_hz, epoch_sample,
+        exact["frequency_offset_hz"], edge=edge, symbol_roll=17)
+    control["conditioned_on_exact_hypothesis"] = True
+    return exact, control
 
 
 def acquisition_centers(span_hz: float, step_hz: float) -> tuple[float, ...]:
@@ -43,7 +59,8 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
                            acquisition_span_hz: float = 0,
                            acquisition_step_hz: float = 500_000,
                            subband_rate_hz: float = 2_500_000,
-                           symbolwise_prefilter_margin: float = .008) -> dict:
+                           symbolwise_prefilter_margin: float = .008,
+                           method: str = "coherent_grid_v1") -> dict:
     """Search LNB frequency uncertainty, then evaluate exact pilot codes.
 
     Every digital subband receives joint frame-epoch/CFO matching against both
@@ -53,22 +70,77 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
     """
     if symbolwise_prefilter_margin < 0:
         raise ValueError("symbolwise prefilter must be nonnegative")
+    if method not in ("coherent_grid_v1", "pss_symbolwise_v2",
+                      "pilot_symbolwise_v3"):
+        raise ValueError("unknown exact acquisition method")
     output_rate = min(float(source_rate_hz), float(subband_rate_hz))
     centers = acquisition_centers(acquisition_span_hz, acquisition_step_hz)
     frequency_offsets = tuple(np.arange(-350_000, 350_001, 25_000, dtype=float))
     banks = []
     for center in centers:
         subband = extract_complex_subband(samples, source_rate_hz, center, output_rate)
+        if method in ("pss_symbolwise_v2", "pilot_symbolwise_v3"):
+            pss_search = acquire_pss_epoch(subband, output_rate, edge=edge,
+                maximum_candidates=4,
+                frequency_offsets_hz=(-300_000.0, -150_000.0, 0.0,
+                                      150_000.0, 300_000.0))
+            timing_search = (pss_search if method == "pss_symbolwise_v2" else
+                             acquire_pilot_epoch(subband, output_rate, edge=edge,
+                                                 maximum_candidates=4))
+            hypotheses = []
+            for rank, candidate in enumerate(timing_search["candidate_epochs"]):
+                initial_cfo = candidate["frequency_offset_hz"]
+                coarse_offsets = tuple(sorted({float(np.clip(initial_cfo + delta,
+                    -350_000.0, 350_000.0)) for delta in (-100_000.0, 0.0, 100_000.0)}))
+                pilot = track_edge_pilots(subband, output_rate,
+                    candidate["epoch_sample"], edge=edge,
+                    coarse_frequency_offsets_hz=coarse_offsets)
+                exact_match, control_match = _conditioned_cfo_refinement(
+                    subband, output_rate, candidate["epoch_sample"],
+                    pilot["frequency_offset_hz"], edge=edge)
+                pilot["symbolwise_frequency_offset_hz"] = pilot["frequency_offset_hz"]
+                pilot["frequency_offset_hz"] = exact_match["frequency_offset_hz"]
+                margin = exact_match["score"] - control_match["score"]
+                selection = max(margin, 0.0) * max(pilot["score_margin"], 0.0)
+                hypotheses.append({"candidate_rank": rank, "pss": candidate,
+                    "pilot": pilot, "exact_match": exact_match,
+                    "control_match": control_match, "match_score_margin": margin,
+                    "selection_score": selection})
+            selected = max(hypotheses, key=lambda item: (
+                item["selection_score"], item["match_score_margin"],
+                item["pilot"]["score_margin"]))
+            selected_timing = {**timing_search, **selected["pss"],
+                               "selected_candidate_rank": selected["candidate_rank"]}
+            selected_pss = (selected_timing if method == "pss_symbolwise_v2"
+                            else pss_search)
+            banks.append({"center_offset_hz": center, "samples": subband,
+                "pss": selected_pss, "timing": selected_timing,
+                "pilot": selected["pilot"],
+                "exact_match": selected["exact_match"],
+                "control_match": selected["control_match"],
+                "match_score_margin": selected["match_score_margin"],
+                "selection_score": selected["selection_score"],
+                "hypotheses": hypotheses})
+            continue
         exact_match, control_match = matched_pilot_control_scores(
             subband, output_rate, edge=edge, frequency_offsets_hz=frequency_offsets)
         banks.append({"center_offset_hz": center, "samples": subband,
                       "exact_match": exact_match, "control_match": control_match,
                       "match_score_margin": exact_match["score"] - control_match["score"]})
-    best = max(banks, key=lambda item: item["match_score_margin"])
-    pss = acquire_pss_epoch(best["samples"], output_rate, edge=edge)
+    best = max(banks, key=lambda item: (item.get("selection_score", 0.0),
+                                       item["match_score_margin"]))
+    pss = (best["pss"] if method in ("pss_symbolwise_v2", "pilot_symbolwise_v3") else
+           acquire_pss_epoch(best["samples"], output_rate, edge=edge))
     period = output_rate * STARLINK_FRAME_DURATION_S
-    matched_epoch = int(round(best["exact_match"]["sample_index"] % period))
-    if best["match_score_margin"] >= symbolwise_prefilter_margin:
+    matched_epoch = (int(best["timing"]["epoch_sample"])
+                     if method in ("pss_symbolwise_v2", "pilot_symbolwise_v3") else
+                     int(round(best["exact_match"]["sample_index"] % period)))
+    if method in ("pss_symbolwise_v2", "pilot_symbolwise_v3"):
+        pilot = dict(best["pilot"])
+        pilot["local_frequency_offset_hz"] = pilot["frequency_offset_hz"]
+        pilot["frequency_offset_hz"] += best["center_offset_hz"]
+        pilot["evaluated"] = True
+    elif best["match_score_margin"] >= symbolwise_prefilter_margin:
         pilot = track_edge_pilots(best["samples"], output_rate, matched_epoch, edge=edge)
         pilot["local_frequency_offset_hz"] = pilot["frequency_offset_hz"]
         pilot["frequency_offset_hz"] += best["center_offset_hz"]
@@ -81,12 +153,15 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
                  "score_margin": 0.0, "coherence": 0.0, "control_coherence": 0.0,
                  "symbol_matches": 0, "evaluated": False,
                  "skip_reason": "joint exact-minus-control margin below symbolwise prefilter"}
-    pilot["epoch_source"] = "joint_exact_pilot_match"
-    return {
+    pilot["epoch_source"] = ({"pss_symbolwise_v2": "pss_candidate_symbolwise_code_match",
+                              "pilot_symbolwise_v3": "pilot_symbol_epoch_search"}.get(
+                                  method, "joint_exact_pilot_match"))
+    result = {
         "pss": pss,
         "pilot": pilot,
         "acquisition": {
             "source_rate_hz": float(source_rate_hz),
+            "method": method,
             "subband_rate_hz": output_rate,
             "span_hz": float(acquisition_span_hz),
             "step_hz": float(acquisition_step_hz),
@@ -97,8 +172,9 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
             "match_score_margin": best["match_score_margin"],
             "symbolwise_prefilter_margin": symbolwise_prefilter_margin,
             "searched_bank_count": len(banks),
-            "pilot_evaluated_bank_count": int(
-                best["match_score_margin"] >= symbolwise_prefilter_margin),
+            "pilot_evaluated_bank_count": (len(banks) if method in (
+                "pss_symbolwise_v2", "pilot_symbolwise_v3") else
+                int(best["match_score_margin"] >= symbolwise_prefilter_margin)),
             "banks": [{"center_offset_hz": item["center_offset_hz"],
                        "exact_match_score": item["exact_match"]["score"],
                        "control_match_score": item["control_match"]["score"],
@@ -106,3 +182,6 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
                       for item in banks],
         },
     }
+    if method == "pilot_symbolwise_v3":
+        result["pilot_epoch"] = best["timing"]
+    return result

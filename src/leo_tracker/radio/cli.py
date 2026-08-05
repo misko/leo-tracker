@@ -58,10 +58,12 @@ from .beacon.analysis import analyze_capture as analyze_beacon_capture
 from .beacon.artifact import capture_beacon_iq, queued_paired_blocks
 from .beacon.channels import starlink_edge_pilot_if_hz, starlink_if_hz
 from .beacon.retention import apply_retention as apply_beacon_retention
-from .beacon.plot import plot_beacon_report
+from .beacon.plot import plot_beacon_followup, plot_beacon_report
 from .beacon.recovery import recover_unanalyzed as recover_unanalyzed_beacons
-from .beacon.followup import followup_capture as followup_beacon_capture
+from .beacon.followup import (followup_capture as followup_beacon_capture,
+                              rescore_followup as rescore_beacon_followup)
 from .beacon.calibration import build_calibration as build_beacon_calibration
+from .beacon.null_replay import replay_null_calibration as replay_beacon_null_calibration
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -274,6 +276,7 @@ def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
         acquisition_span_hz=args.acquisition_span_hz,
         acquisition_step_hz=args.acquisition_step_hz,
         exact_subband_rate_hz=args.exact_subband_rate_hz,
+        exact_acquisition_method=args.exact_acquisition_method,
         exact_start_s=args.exact_start_s, exact_stop_s=args.exact_stop_s)
     if args.plot:
         plot_beacon_report(report, args.plot)
@@ -288,7 +291,10 @@ def command_starlink_beacon_retain(args: argparse.Namespace) -> int:
 
 
 def command_starlink_beacon_recover(args: argparse.Namespace) -> int:
-    print(json.dumps(recover_unanalyzed_beacons(args.root, passes_path=args.passes),
+    print(json.dumps(recover_unanalyzed_beacons(args.root, passes_path=args.passes,
+        exact_acquisition_method=args.exact_acquisition_method,
+        narrow_exact_interval_s=args.narrow_exact_interval_s,
+        wide_exact_interval_s=args.wide_exact_interval_s),
                      sort_keys=True))
     return 0
 
@@ -309,11 +315,47 @@ def command_starlink_beacon_followup(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_beacon_followup_rescore(args: argparse.Namespace) -> int:
+    report = rescore_beacon_followup(args.followup, passes_path=args.passes)
+    if args.plot:
+        plot_beacon_followup(report, args.plot, start_s=args.plot_start_s,
+                             stop_s=args.plot_stop_s)
+    print(json.dumps({"followup": str(args.followup),
+                      "confirmed": report["confirmation"]["confirmed"],
+                      "dual_receiver_confirmed": report["confirmation"].get(
+                          "dual_receiver_confirmed", False),
+                      "overlapping_pass_count": len(report["overlapping_passes"])},
+                     sort_keys=True))
+    return 0
+
+
 def command_starlink_beacon_calibrate(args: argparse.Namespace) -> int:
     report = build_beacon_calibration(args.reports, args.output)
     print(json.dumps({"calibration": str(args.output),
                       "narrow_checks": report["modes"]["narrow"]["check_count"],
-                      "wide_checks": report["modes"]["wide"]["check_count"]}, sort_keys=True))
+                      "wide_checks": report["modes"]["wide"]["check_count"],
+                      "acquisition_methods": {method: {
+                          "narrow_checks": modes["narrow"]["check_count"],
+                          "wide_checks": modes["wide"]["check_count"]}
+                          for method, modes in report.get(
+                              "acquisition_methods", {}).items()}}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_null_replay(args: argparse.Namespace) -> int:
+    def progress(item: dict) -> None:
+        print(json.dumps({"null_replay_progress": item}, sort_keys=True), flush=True)
+    report = replay_beacon_null_calibration(args.root, args.output,
+        acquisition_method=args.exact_acquisition_method,
+        capture_limit=args.capture_limit, checks_per_capture=args.checks_per_capture,
+        window_s=args.exact_window_s,
+        maximum_host_temperature_c=args.maximum_host_temperature_c,
+        resume_host_temperature_c=args.resume_host_temperature_c,
+        progress=progress)
+    print(json.dumps({"null_replay": str(args.output / "replay-summary.json"),
+                      "selected_capture_count": report["selected_capture_count"],
+                      "completed_report_count": len(report["completed_reports"]),
+                      "reused_report_count": len(report["reused_reports"])}, sort_keys=True))
     return 0
 
 
@@ -1329,6 +1371,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="search this much independent-LNB frequency error on either side")
     beacon_analyze.add_argument("--acquisition-step-hz", type=float, default=500_000)
     beacon_analyze.add_argument("--exact-subband-rate-hz", type=float, default=2_500_000)
+    beacon_analyze.add_argument("--exact-acquisition-method",
+        choices=("coherent_grid_v1", "pss_symbolwise_v2", "pilot_symbolwise_v3"),
+        default="coherent_grid_v1")
     beacon_analyze.add_argument("--exact-start-s", type=float, default=0,
         help="begin exact-code replay at this capture offset")
     beacon_analyze.add_argument("--exact-stop-s", type=float,
@@ -1347,6 +1392,11 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_recover.add_argument("root", type=Path)
     beacon_recover.add_argument("--passes", type=Path,
         help="archived pass predictions used to annotate recovered confirmations")
+    beacon_recover.add_argument("--exact-acquisition-method",
+        choices=("coherent_grid_v1", "pss_symbolwise_v2", "pilot_symbolwise_v3"),
+        default="coherent_grid_v1")
+    beacon_recover.add_argument("--narrow-exact-interval-s", type=float, default=1)
+    beacon_recover.add_argument("--wide-exact-interval-s", type=float, default=5)
     beacon_recover.set_defaults(handler=command_starlink_beacon_recover)
     beacon_followup = commands.add_parser("starlink-beacon-followup",
         help="densely replay neighborhoods around exact-code triggers")
@@ -1359,11 +1409,32 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_followup.add_argument("--passes", type=Path)
     beacon_followup.add_argument("--confirmation-marker", type=Path)
     beacon_followup.set_defaults(handler=command_starlink_beacon_followup)
+    beacon_rescore = commands.add_parser("starlink-beacon-followup-rescore",
+        help="reapply current confirmation and TLE annotation to saved replay checks")
+    beacon_rescore.add_argument("followup", type=Path)
+    beacon_rescore.add_argument("--passes", type=Path)
+    beacon_rescore.add_argument("--plot", type=Path)
+    beacon_rescore.add_argument("--plot-start-s", type=float)
+    beacon_rescore.add_argument("--plot-stop-s", type=float)
+    beacon_rescore.set_defaults(handler=command_starlink_beacon_followup_rescore)
     beacon_calibrate = commands.add_parser("starlink-beacon-calibrate",
         help="publish empirical exact/control null distributions and gate exceedances")
     beacon_calibrate.add_argument("reports", type=Path)
     beacon_calibrate.add_argument("output", type=Path)
     beacon_calibrate.set_defaults(handler=command_starlink_beacon_calibrate)
+    beacon_null = commands.add_parser("starlink-beacon-null-replay",
+        help="replay stratified retained field negatives for a detector-specific null")
+    beacon_null.add_argument("root", type=Path)
+    beacon_null.add_argument("output", type=Path)
+    beacon_null.add_argument("--exact-acquisition-method",
+        choices=("coherent_grid_v1", "pss_symbolwise_v2", "pilot_symbolwise_v3"),
+        default="pilot_symbolwise_v3")
+    beacon_null.add_argument("--capture-limit", type=int, default=6)
+    beacon_null.add_argument("--checks-per-capture", type=int, default=12)
+    beacon_null.add_argument("--exact-window-s", type=float, default=.01)
+    beacon_null.add_argument("--maximum-host-temperature-c", type=float, default=75)
+    beacon_null.add_argument("--resume-host-temperature-c", type=float, default=70)
+    beacon_null.set_defaults(handler=command_starlink_beacon_null_replay)
     analyze = commands.add_parser("analyze", help="create blind ridge data and waterfall")
     analyze.add_argument("capture"); analyze.add_argument("output_dir")
     analyze.add_argument("--fft-size", type=int, default=4096); analyze.add_argument("--hop-size", type=int)

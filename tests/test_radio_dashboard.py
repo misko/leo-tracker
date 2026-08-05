@@ -58,6 +58,31 @@ def test_dashboard_snapshot_reports_progress_pass_match_and_physics(tmp_path):
     assert doppler_radial_acceleration_m_s2(-1000, 10e9) == pytest.approx(29.9792458)
 
 
+def test_dashboard_coalesces_repeated_live_snapshots(tmp_path):
+    root = tmp_path / "watch"; _write_fixture(root)
+    model = DashboardModel(root)
+    calls = {"status": 0}
+    def status():
+        calls["status"] += 1
+        return {"state": "running"}
+    model.status = status
+    model.expected_passes = lambda: {}
+    model.detections = lambda: {}
+    model.logs = lambda: {}
+    model.waterfalls = lambda: {}
+    model.dither_comparisons = lambda: {}
+    model.beacon = lambda: {}
+
+    first = model.snapshot()
+    second = model.snapshot()
+
+    assert second is first
+    assert calls["status"] == 1
+    model._snapshot_cache_created -= 5
+    assert model.snapshot() is not first
+    assert calls["status"] == 2
+
+
 def test_dashboard_http_e2e_serves_html_json_and_plot(tmp_path):
     root = tmp_path / "watch"; _write_fixture(root)
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(DashboardModel(root)))

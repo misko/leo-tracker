@@ -13,7 +13,8 @@ import pytest
 from scipy.signal import resample_poly
 
 from leo_tracker.radio.cli import main
-from leo_tracker.radio.beacon.analysis import analyze_capture, summarize_doppler_track
+from leo_tracker.radio.beacon.analysis import (analyze_capture, detection_gates,
+                                               summarize_doppler_track)
 from leo_tracker.radio.beacon.acquisition import (acquire_exact_receiver,
     acquisition_centers, extract_complex_subband)
 from leo_tracker.radio.beacon.artifact import (BeaconCapture, capture_beacon_iq,
@@ -24,15 +25,17 @@ from leo_tracker.radio.beacon.structure import analyze_frame_period, frame_perio
 from leo_tracker.radio.beacon.templates import (acquire_pss_epoch, pss_subband_samples,
     pss_subsequence_phase_states, pss_time_samples)
 from leo_tracker.radio.beacon.pilots import (EDGE_PILOT_HEX, edge_pilot_frame,
-    edge_pilot_symbols, matched_pilot_control_scores, matched_pilot_score,
+    edge_pilot_symbols, acquire_pilot_epoch, conditioned_pilot_frequency_search,
+    conditioned_pilot_score, matched_pilot_control_scores, matched_pilot_score,
     track_edge_pilots)
 from leo_tracker.radio.beacon.retention import apply_retention
 from leo_tracker.radio.beacon.recovery import recover_unanalyzed
 from leo_tracker.radio.beacon.followup import (followup_capture,
                                                summarize_temporal_confirmation)
 from leo_tracker.radio.beacon.calibration import build_calibration
+from leo_tracker.radio.beacon.null_replay import replay_null_calibration
 from leo_tracker.radio.dashboard import DashboardModel, make_handler
-from leo_tracker.radio.beacon.plot import plot_beacon_report
+from leo_tracker.radio.beacon.plot import plot_beacon_followup, plot_beacon_report
 from leo_tracker.radio.paired import PairedSampleBlock
 from leo_tracker.radio.paired import FakePairedSource
 from leo_tracker.radio.source import RadioConfig
@@ -153,6 +156,81 @@ def test_wide_acquisition_recovers_large_lnb_offset_and_exact_pilots():
     assert abs(found["pss"]["epoch_sample"] - epoch) <= 1
 
 
+@pytest.mark.parametrize("cfo_hz", [2_500, 12_500, 77_777, 187_500, 337_500])
+def test_pss_symbolwise_v2_acquires_published_pilot_across_off_grid_cfo(cfo_hz):
+    rate, size, epoch = 2_500_000.0, 25_000, 500
+    frame = edge_pilot_frame(rate, "lower")
+    pss = pss_subband_samples(rate, "lower")
+    frame[:pss.size] += np.sqrt(pss.size) * pss
+    signal = np.zeros(size, np.complex64)
+    frame_index = 0
+    while True:
+        start = epoch + round(frame_index * rate / 750)
+        if start + frame.size > size:
+            break
+        signal[start:start + frame.size] += frame
+        frame_index += 1
+    time_s = np.arange(size) / rate
+    signal *= np.exp(2j * np.pi * cfo_hz * time_s)
+    rng = np.random.default_rng(600 + int(cfo_hz))
+    signal += .3 * (rng.normal(size=size) + 1j * rng.normal(size=size))
+
+    found = acquire_exact_receiver(signal, rate, edge="lower", method="pss_symbolwise_v2")
+
+    assert abs(found["pss"]["epoch_sample"] - epoch) <= 1
+    assert found["pilot"]["frequency_offset_hz"] == pytest.approx(cfo_hz, abs=150)
+    assert found["acquisition"]["match_score_margin"] > .5
+    assert found["pilot"]["score_margin"] > .5
+
+
+def test_coherent_grid_v1_documents_off_grid_cfo_blind_spot():
+    rate, size, epoch, cfo_hz = 2_500_000.0, 25_000, 500, 12_500.0
+    frame = edge_pilot_frame(rate, "lower")
+    pss = pss_subband_samples(rate, "lower")
+    frame[:pss.size] += np.sqrt(pss.size) * pss
+    signal = np.zeros(size, np.complex64)
+    for frame_index in range(7):
+        start = epoch + round(frame_index * rate / 750)
+        signal[start:start + frame.size] += frame
+    signal *= np.exp(2j * np.pi * cfo_hz * np.arange(size) / rate)
+
+    legacy = acquire_exact_receiver(signal, rate, edge="lower", method="coherent_grid_v1")
+    replacement = acquire_exact_receiver(signal, rate, edge="lower", method="pss_symbolwise_v2")
+
+    assert legacy["acquisition"]["match_score_margin"] < .008
+    assert replacement["acquisition"]["match_score_margin"] > .5
+
+
+def test_pilot_symbolwise_v3_recovers_weak_timing_when_narrow_pss_is_insufficient():
+    rate, size, epoch, cfo_hz = 2_500_000.0, 25_000, 500, 177_777.0
+    frame = edge_pilot_frame(rate, "lower")
+    pss = pss_subband_samples(rate, "lower")
+    frame[:pss.size] += np.sqrt(pss.size) * pss
+    model = np.zeros(size, np.complex64)
+    for frame_index in range(8):
+        start = epoch + round(frame_index * rate / 750)
+        if start + frame.size <= size:
+            model[start:start + frame.size] += frame
+    model /= np.sqrt(np.mean(np.abs(model) ** 2))
+    rng = np.random.default_rng(992)
+    noise = (rng.normal(size=size) + 1j * rng.normal(size=size)).astype(np.complex64)
+    time_s = np.arange(size) / rate
+    signal = noise + .3 * np.sqrt(np.mean(np.abs(noise) ** 2)) * model * np.exp(
+        2j * np.pi * cfo_hz * time_s)
+
+    timing = acquire_pilot_epoch(signal, rate, edge="lower")
+    found = acquire_exact_receiver(signal, rate, edge="lower",
+                                   method="pilot_symbolwise_v3")
+
+    assert abs(timing["epoch_sample"] - epoch) <= 1
+    assert timing["frequency_offset_hz"] == 200_000
+    assert found["acquisition"]["selected_epoch_sample"] == epoch
+    assert found["pilot_epoch"]["epoch_sample"] == epoch
+    assert found["pilot"]["frequency_offset_hz"] == pytest.approx(cfo_hz, abs=5_000)
+    assert found["acquisition"]["match_score_margin"] > .015
+    assert found["pilot"]["score_margin"] > .03
+
+
 def test_symbolwise_tracker_is_skipped_below_configurable_joint_prefilter():
     rng = np.random.default_rng(44)
     noise = (rng.normal(size=25_000) + 1j * rng.normal(size=25_000)).astype(np.complex64)
@@ -180,6 +258,24 @@ def test_batched_exact_and_control_match_is_equivalent_to_independent_searches()
         assert batched["score"] == pytest.approx(independent["score"], rel=1e-6)
         assert batched["frequency_offset_hz"] == independent["frequency_offset_hz"]
         assert batched["sample_index"] == independent["sample_index"]
+
+
+def test_batched_conditioned_cfo_search_matches_independent_scores():
+    rate, epoch = 2_500_000.0, 313
+    rng = np.random.default_rng(814)
+    samples = (rng.normal(size=25_000) + 1j * rng.normal(size=25_000)).astype(np.complex64)
+    offsets = np.array((-12_500.0, 0.0, 7_300.0, 25_000.0))
+    expected = [conditioned_pilot_score(samples, rate, epoch, offset, edge="lower")
+                for offset in offsets]
+
+    actual = conditioned_pilot_frequency_search(
+        samples, rate, epoch, offsets, edge="lower")
+    best = max(expected, key=lambda item: item["score"])
+
+    assert actual["frequency_offset_hz"] == best["frequency_offset_hz"]
+    assert actual["score"] == pytest.approx(best["score"], rel=1e-6, abs=1e-8)
+    assert actual["maximum_score"] == pytest.approx(best["maximum_score"], rel=1e-6)
+    assert actual["frame_support"] == best["frame_support"]
 
 
 def test_symbolwise_pilot_tracker_refines_cfo_and_beats_scrambled_control():
@@ -301,10 +397,12 @@ def test_exact_replay_can_be_restricted_to_a_targeted_time_interval(tmp_path):
     assert main(["starlink-beacon-analyze", str(capture), str(analysis),
                  "--window-s", ".1", "--maximum-analysis-rate-hz", "100000",
                  "--exact-interval-s", ".02", "--exact-window-s", ".01",
-                 "--exact-start-s", ".05", "--exact-stop-s", ".11"]) == 0
+                 "--exact-start-s", ".05", "--exact-stop-s", ".11",
+                 "--exact-acquisition-method", "pss_symbolwise_v2"]) == 0
     report = json.loads(analysis.read_text())
     assert [item["start_s"] for item in report["exact_checks"]] == pytest.approx([.05, .07, .09])
     assert report["summary"]["exact_temporal_coverage_fraction"] == pytest.approx(.15)
+    assert report["analysis"]["exact_acquisition_method"] == "pss_symbolwise_v2"
 
 
 def test_retention_preserves_candidates_and_bounds_negative_ring(tmp_path):
@@ -333,12 +431,14 @@ def test_recovery_analyzes_complete_unreported_capture_and_is_idempotent(tmp_pat
     assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".04",
                  "--sample-rate-hz", "100000", "--bandwidth-hz", "90000",
                  "--block-size", "1000", "--chunk-s", ".02", "--fake"]) == 0
-    first = recover_unanalyzed(root)
+    first = recover_unanalyzed(root, exact_acquisition_method="pss_symbolwise_v2",
+                               narrow_exact_interval_s=.02)
     assert first["errors"] == []
     assert first["recovered"][0]["capture"] == "orphan"
     assert (root / "reports" / "orphan.json").is_file()
     recovered_report = json.loads((root / "reports" / "orphan.json").read_text())
-    assert recovered_report["analysis"]["exact_interval_s"] == 1
+    assert recovered_report["analysis"]["exact_interval_s"] == .02
+    assert recovered_report["analysis"]["exact_acquisition_method"] == "pss_symbolwise_v2"
     assert (root / "reports" / "plots" / "orphan.png").read_bytes().startswith(b"\x89PNG")
     second = recover_unanalyzed(root)
     assert second["recovered"] == []
@@ -379,6 +479,27 @@ def test_temporal_followup_requires_consecutive_stable_epoch_and_cfo():
     assert switched["cross_receiver_confirmed"]
     assert switched["cross_receiver_links"][0]["candidate_receivers"] == [[0], [1]]
 
+    def dual_point(time_s, epoch, frequencies):
+        return {"start_s": time_s, "candidate": True,
+                "receiver_candidates": [True, True],
+                "epoch_difference_samples": 0,
+                "receivers": [{
+                    "acquisition": {"selected_epoch_sample": epoch,
+                                    "subband_rate_hz": 2.5e6},
+                    "pilot": {"frequency_offset_hz": frequencies[receiver]}}
+                    for receiver in range(2)]}
+    aliased = summarize_temporal_confirmation([
+        dual_point(2.0, 100, (-100_000, -97_000)),
+        dual_point(2.1, 2_000, (-100_400, -97_450))], interval_s=.1)
+    assert aliased["confirmed"]
+    assert aliased["dual_receiver_confirmed"]
+    assert not aliased["same_receiver_confirmed"]
+    assert aliased["dual_receiver_links"][0]["slope_difference_hz_s"] == pytest.approx(500)
+    divergent = summarize_temporal_confirmation([
+        dual_point(2.0, 100, (-100_000, -97_000)),
+        dual_point(2.1, 2_000, (-100_400, -95_000))], interval_s=.1)
+    assert not divergent["confirmed"]
+
 
 def test_followup_without_triggers_is_fast_idempotent_cli_artifact(tmp_path):
     source = tmp_path / "base.json"
@@ -388,18 +509,25 @@ def test_followup_without_triggers_is_fast_idempotent_cli_artifact(tmp_path):
     assert report["trigger_count"] == 0
     assert report["checks"] == []
     assert json.loads(output.read_text())["schema"] == "leo-tracker.starlink-beacon-followup/v1"
+    assert main(["starlink-beacon-followup-rescore", str(output)]) == 0
+    assert json.loads(output.read_text())["confirmation"]["confirmed"] is False
 
 
-def test_empirical_calibration_separates_modes_and_excludes_confirmed_events(tmp_path):
+def test_empirical_calibration_separates_methods_modes_and_confirmed_events(tmp_path):
     reports = tmp_path / "reports"; reports.mkdir(); (reports / "followups").mkdir()
-    def write(name, span, margins):
+    def write(name, span, margins, method="coherent_grid_v1"):
         receivers = [{"acquisition": {"match_score_margin": margin},
                       "pilot": {"score_margin": margin * 2}} for margin in margins]
         (reports / f"{name}.json").write_text(json.dumps({
             "schema": "leo-tracker.starlink-beacon-analysis/v1",
-            "analysis": {"acquisition_span_hz": span},
+            "analysis": {"acquisition_span_hz": span,
+                         "exact_acquisition_method": method},
             "exact_checks": [{"epoch_difference_samples": 2, "receivers": receivers}]}) + "\n")
     write("narrow", 0, [.001, .002]); write("wide", 3.5e6, [.004, .006])
+    write("v2-narrow", 0, [.04, .06], "pss_symbolwise_v2")
+    supplementary = reports / "calibration" / "pss_symbolwise_v2-null"
+    supplementary.mkdir(parents=True)
+    (supplementary / "v2-extra.json").write_text((reports / "v2-narrow.json").read_text())
     write("confirmed", 0, [.1, .1])
     (reports / "followups" / "confirmed.json").write_text(json.dumps({
         "confirmation": {"confirmed": True}}) + "\n")
@@ -409,7 +537,59 @@ def test_empirical_calibration_separates_modes_and_excludes_confirmed_events(tmp
     assert result["modes"]["narrow"]["check_count"] == 1
     assert result["modes"]["wide"]["receiver_check_count"] == 2
     assert result["modes"]["narrow"]["match_margin_quantiles"]["maximum"] == .002
+    assert result["acquisition_methods"]["coherent_grid_v1"]["narrow"][
+        "receiver_check_count"] == 2
+    assert result["acquisition_methods"]["pss_symbolwise_v2"]["narrow"][
+        "receiver_check_count"] == 4
+    assert result["acquisition_methods"]["pss_symbolwise_v2"]["narrow"][
+        "match_margin_quantiles"]["maximum"] == .06
+    assert result["acquisition_methods"]["pss_symbolwise_v2"]["wide"][
+        "check_count"] == 0
+    assert result["gates_by_acquisition_method"]["pss_symbolwise_v2"] == detection_gates(
+        "pss_symbolwise_v2")
+    assert result["gates_by_acquisition_method"]["pss_symbolwise_v2"][
+        "dual_match_margin"] > result["gates"]["dual_match_margin"]
+    assert json.loads(output.read_text())["schema"].endswith("/v2")
     assert json.loads(output.read_text())["gates"]["dual_epoch_delta_samples"] == 20
+
+
+def test_detector_specific_null_replay_is_resumable_and_exposed_by_cli(tmp_path):
+    root = tmp_path / "store"; reports = root / "reports"
+    captures = root / "captures"; reports.mkdir(parents=True); captures.mkdir()
+    (reports / "followups").mkdir()
+    rate, size = 100_000.0, 4_000
+    rng = np.random.default_rng(881)
+    rx0 = (rng.normal(size=size) + 1j * rng.normal(size=size)).astype(np.complex64)
+    rx1 = (rng.normal(size=size) + 1j * rng.normal(size=size)).astype(np.complex64)
+    capture = captures / "negative"
+    capture_beacon_iq(_blocks(rx0, rx1), capture, sample_rate_hz=rate,
+        center_frequency_hz=1.7e9, bandwidth_hz=90_000, duration_s=.04,
+        metadata={"channel_number": 4, "region": "lower-edge"}, chunk_s=.02)
+    (reports / "negative.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-analysis/v1",
+        "capture": str(capture), "summary": {}}) + "\n")
+    output = tmp_path / "null"
+
+    first = replay_null_calibration(root, output,
+        acquisition_method="coherent_grid_v1", capture_limit=1,
+        checks_per_capture=2, window_s=.01,
+        maximum_host_temperature_c=999, resume_host_temperature_c=998)
+
+    assert len(first["completed_reports"]) == 1
+    replay = json.loads((output / "negative.json").read_text())
+    assert replay["null_replay"]["source_selection"] == "strict_no-trigger_negative"
+    assert replay["summary"]["exact_check_count"] == 2
+    assert first["method_calibration"]["narrow"]["check_count"] == 2
+    assert main(["starlink-beacon-null-replay", str(root), str(output),
+                 "--exact-acquisition-method", "coherent_grid_v1",
+                 "--capture-limit", "1", "--checks-per-capture", "2",
+                 "--exact-window-s", ".01", "--maximum-host-temperature-c", "999",
+                 "--resume-host-temperature-c", "998"]) == 0
+    summary = json.loads((output / "replay-summary.json").read_text())
+    assert len(summary["reused_reports"]) == 1
+    with pytest.raises(ValueError, match="resume temperature"):
+        replay_null_calibration(root, output, maximum_host_temperature_c=70,
+                                resume_host_temperature_c=70)
 
 
 def test_beacon_agc_does_not_silently_apply_manual_gain(tmp_path):
@@ -433,8 +613,10 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
     (beacon / "reports" / "calibration").mkdir()
     (beacon / "reports" / "followups").mkdir()
     (beacon / "reports" / "calibration" / "calibration.json").write_text(json.dumps({
-        "schema": "leo-tracker.starlink-beacon-calibration/v1",
-        "modes": {"narrow": {"check_count": 123}}}) + "\n")
+        "schema": "leo-tracker.starlink-beacon-calibration/v2",
+        "modes": {"narrow": {"check_count": 123}},
+        "acquisition_methods": {"pss_symbolwise_v2": {
+            "narrow": {"check_count": 7}, "wide": {"check_count": 0}}}}) + "\n")
     (beacon / "reports" / "one.json").write_text(json.dumps({
         "schema": "leo-tracker.starlink-beacon-analysis/v1",
         "capture_manifest": {"created_utc_ns": 1_700_000_000_000_000_000,
@@ -446,7 +628,8 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
                     "single_receiver_candidate_count": 2,
                     "exact_sampled_time_s": 1.2,
                     "exact_temporal_coverage_fraction": .01},
-        "analysis": {"acquisition_span_hz": 3.5e6, "acquisition_step_hz": .5e6},
+        "analysis": {"acquisition_span_hz": 3.5e6, "acquisition_step_hz": .5e6,
+                     "exact_acquisition_method": "pss_symbolwise_v2"},
         "exact_checks": [{"candidate": True, "qualified": False,
             "epoch_difference_samples": 2, "cfo_difference_hz": 100,
             "receivers": [{"pss": {"peak_to_median": 3}, "pilot": {"score_margin": .1},
@@ -466,9 +649,13 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
             "observation_utc": "2026-08-05T15:15:34Z",
             "culmination_elevation_deg": 87.6,
             "nearest_prediction": {"expected_doppler_hz": 139181}}]}) + "\n")
-    report = DashboardModel(observation, beacon_root=beacon).beacon()
+    model = DashboardModel(observation, beacon_root=beacon)
+    report = model.beacon()
     assert report["candidate_count"] == 1
     assert report["calibration"]["modes"]["narrow"]["check_count"] == 123
+    assert report["active_acquisition_method"] == "pss_symbolwise_v2"
+    assert report["calibration"]["acquisition_methods"]["pss_symbolwise_v2"][
+        "narrow"]["check_count"] == 7
     assert report["captures"][0]["single_receiver_candidate_count"] == 2
     assert report["captures"][0]["acquisition_span_hz"] == 3.5e6
     assert report["captures"][0]["exact_temporal_coverage_fraction"] == .01
@@ -476,6 +663,7 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
     assert report["captures"][0]["exact_checks"][0]["matched_margins"] == [.08, .07]
     assert report["captures"][0]["exact_checks"][0]["selected_subband_offsets_hz"] == [1.5e6, -1e6]
     capture = report["captures"][0]
+    assert capture["exact_acquisition_method"] == "pss_symbolwise_v2"
     assert capture["followup_confirmed"]
     assert capture["cross_receiver_confirmed"]
     assert capture["confirmed_link_count"] == 1
@@ -483,6 +671,7 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
     assert capture["overlapping_pass_count"] == 1
     assert capture["overlapping_passes"][0]["norad_id"] == 123
     assert capture["followup_url"] == "/beacon-followups/one.json"
+    assert model.beacon() is report
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(
         DashboardModel(observation, beacon_root=beacon)))
     thread = Thread(target=server.serve_forever, daemon=True); thread.start()
@@ -544,7 +733,10 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert 'LEO_BEACON_MAX_CYCLES:-0' in script
     assert "--sample-rate-hz 10000000" in script
     assert "--acquisition-span-hz 3500000" in script
-    assert "--exact-interval-s 1 --exact-window-s .01" in script
+    assert 'LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3' in script
+    assert 'LEO_BEACON_NARROW_EXACT_INTERVAL_S:-3' in script
+    assert 'LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10' in script
+    assert '--exact-acquisition-method "${exact_acquisition_method}"' in script
     assert "--plot \"${plot}\"" in script
     assert "starlink-beacon-recover" in script
     assert "starlink-beacon-followup" in script
@@ -604,3 +796,8 @@ def test_beacon_evidence_plot_is_published(tmp_path):
     output = tmp_path / "evidence.png"
     plot_beacon_report(report, output)
     assert output.read_bytes().startswith(b"\x89PNG")
+    source = tmp_path / "source.json"; source.write_text(json.dumps(report))
+    followup_plot = tmp_path / "followup.png"
+    plot_beacon_followup({"source_analysis": str(source),
+                          "checks": report["exact_checks"]}, followup_plot)
+    assert followup_plot.read_bytes().startswith(b"\x89PNG")

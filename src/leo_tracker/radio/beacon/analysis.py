@@ -18,21 +18,69 @@ DUAL_EPOCH_DELTA_SAMPLES = 20
 SINGLE_MATCH_MARGIN = .015
 SINGLE_SYMBOL_MARGIN = .01
 
+DETECTION_GATES = {
+    "coherent_grid_v1": {
+        "dual_match_margin": DUAL_MATCH_MARGIN,
+        "dual_symbol_margin": DUAL_SYMBOL_MARGIN,
+        "dual_epoch_delta_samples": DUAL_EPOCH_DELTA_SAMPLES,
+        "single_match_margin": SINGLE_MATCH_MARGIN,
+        "single_symbol_margin": SINGLE_SYMBOL_MARGIN,
+        "qualified_match_margin": .03,
+        "qualified_symbol_margin": .02,
+        "qualified_coherence": .05,
+        "qualified_epoch_delta_samples": 8,
+    },
+    # These conservative provisional gates sit above the first detector-
+    # specific field null. They are versioned separately so later calibration
+    # can never change the meaning of a historical report.
+    "pss_symbolwise_v2": {
+        "dual_match_margin": .02,
+        "dual_symbol_margin": .02,
+        "dual_epoch_delta_samples": 20,
+        "single_match_margin": .025,
+        "single_symbol_margin": .03,
+        "qualified_match_margin": .05,
+        "qualified_symbol_margin": .05,
+        "qualified_coherence": .05,
+        "qualified_epoch_delta_samples": 8,
+    },
+    "pilot_symbolwise_v3": {
+        "dual_match_margin": .02,
+        "dual_symbol_margin": .02,
+        "dual_epoch_delta_samples": 20,
+        "single_match_margin": .025,
+        "single_symbol_margin": .03,
+        "qualified_match_margin": .05,
+        "qualified_symbol_margin": .05,
+        "qualified_coherence": .05,
+        "qualified_epoch_delta_samples": 8,
+    },
+}
+
+
+def detection_gates(method: str) -> dict:
+    try:
+        return dict(DETECTION_GATES[method])
+    except KeyError as exc:
+        raise ValueError(f"unknown exact acquisition method: {method}") from exc
+
 
 def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str,
                          start_sample: int = 0, acquisition_span_hz: float = 0,
                          acquisition_step_hz: float = 500_000,
-                         exact_subband_rate_hz: float = 2_500_000) -> dict:
+                         exact_subband_rate_hz: float = 2_500_000,
+                         acquisition_method: str = "coherent_grid_v1") -> dict:
     """Apply all exact/control gates to one paired-IQ window."""
     paired = np.asarray(values, np.complex64)
     if paired.ndim != 2 or paired.shape[1] != 2:
         raise ValueError("exact window must have shape (samples, 2 receivers)")
+    gates = detection_gates(acquisition_method)
     receivers = []
     for receiver in range(2):
         exact = acquire_exact_receiver(paired[:, receiver], source_rate_hz,
             edge=edge, acquisition_span_hz=acquisition_span_hz,
             acquisition_step_hz=acquisition_step_hz,
-            subband_rate_hz=exact_subband_rate_hz)
+            subband_rate_hz=exact_subband_rate_hz, method=acquisition_method)
         receivers.append({"receiver": receiver, **exact})
     exact_rate = receivers[0]["acquisition"]["subband_rate_hz"]
     period = exact_rate / 750
@@ -47,26 +95,31 @@ def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str
     margins = [item["pilot"]["score_margin"] for item in receivers]
     coherences = [item["pilot"]["coherence"] for item in receivers]
     match_margins = [item["acquisition"]["match_score_margin"] for item in receivers]
-    receiver_candidates = [match_margins[index] >= SINGLE_MATCH_MARGIN and
-                           margins[index] >= SINGLE_SYMBOL_MARGIN
+    receiver_candidates = [match_margins[index] >= gates["single_match_margin"] and
+                           margins[index] >= gates["single_symbol_margin"]
                            for index in range(2)]
-    receiver_qualified = [match_margins[index] >= .03 and margins[index] >= .02
-                          and coherences[index] >= .05 for index in range(2)]
-    candidate = (min(match_margins) >= DUAL_MATCH_MARGIN and
-                 min(margins) >= DUAL_SYMBOL_MARGIN and
-                 epoch_difference <= DUAL_EPOCH_DELTA_SAMPLES)
-    qualified = (min(match_margins) >= .03 and min(margins) >= .02 and
-                 min(coherences) >= .05 and epoch_difference <= 8)
+    receiver_qualified = [match_margins[index] >= gates["qualified_match_margin"] and
+                          margins[index] >= gates["qualified_symbol_margin"] and
+                          coherences[index] >= gates["qualified_coherence"]
+                          for index in range(2)]
+    candidate = (min(match_margins) >= gates["dual_match_margin"] and
+                 min(margins) >= gates["dual_symbol_margin"] and
+                 epoch_difference <= gates["dual_epoch_delta_samples"])
+    qualified = (min(match_margins) >= gates["qualified_match_margin"] and
+                 min(margins) >= gates["qualified_symbol_margin"] and
+                 min(coherences) >= gates["qualified_coherence"] and
+                 epoch_difference <= gates["qualified_epoch_delta_samples"])
     followup_trigger = bool(any(receiver_candidates) or
-                            (epoch_difference <= DUAL_EPOCH_DELTA_SAMPLES and
-                             max(match_margins) >= DUAL_MATCH_MARGIN))
+                            (epoch_difference <= gates["dual_epoch_delta_samples"] and
+                             max(match_margins) >= gates["dual_match_margin"]))
     return {"start_sample": int(start_sample), "start_s": start_sample / source_rate_hz,
             "duration_s": paired.shape[0] / source_rate_hz, "receivers": receivers,
             "epoch_difference_samples": epoch_difference,
             "pss_epoch_difference_samples": pss_epoch_difference,
             "cfo_difference_hz": cfo_difference, "candidate": bool(candidate),
             "qualified": bool(qualified), "receiver_candidates": receiver_candidates,
-            "receiver_qualified": receiver_qualified, "followup_trigger": followup_trigger}
+            "receiver_qualified": receiver_qualified, "followup_trigger": followup_trigger,
+            "detection_gates": gates, "exact_acquisition_method": acquisition_method}
 
 
 def summarize_doppler_track(exact_checks: list[dict]) -> dict:
@@ -97,6 +150,7 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                     acquisition_span_hz: float = 0,
                     acquisition_step_hz: float = 500_000,
                     exact_subband_rate_hz: float = 2_500_000,
+                    exact_acquisition_method: str = "coherent_grid_v1",
                     exact_start_s: float = 0,
                     exact_stop_s: float | None = None) -> dict:
     """Analyze independent windows without loading a complete long capture into RAM."""
@@ -141,7 +195,8 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
             exact_checks.append(analyze_exact_window(exact_values, source_rate, edge=edge,
                 start_sample=next_exact_sample, acquisition_span_hz=acquisition_span_hz,
                 acquisition_step_hz=acquisition_step_hz,
-                exact_subband_rate_hz=exact_subband_rate_hz))
+                exact_subband_rate_hz=exact_subband_rate_hz,
+                acquisition_method=exact_acquisition_method))
             next_exact_sample += round(exact_interval_s * source_rate)
         selected = values[::decimation]
         combined = np.concatenate((carry, selected), axis=0)
@@ -170,6 +225,8 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                      "acquisition_span_hz": acquisition_span_hz,
                      "acquisition_step_hz": acquisition_step_hz,
                      "exact_subband_rate_hz": min(source_rate, exact_subband_rate_hz),
+                     "exact_acquisition_method": exact_acquisition_method,
+                     "detection_gates": detection_gates(exact_acquisition_method),
                      "exact_start_s": exact_start_s, "exact_stop_s": exact_stop_s},
         "windows": windows,
         "exact_checks": exact_checks,

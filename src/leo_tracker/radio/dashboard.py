@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 import re
 import threading
+import time
 from urllib.parse import urlparse
 
 import numpy as np
@@ -69,9 +70,16 @@ class DashboardModel:
         self._measurement_cache_lock = threading.RLock()
         self._catalog_cache_signature: tuple[int, int] | None = None
         self._catalog_cache: tuple[dict, list[dict]] = ({}, [])
-        # Roughly three hours at the live cadence. Longer-term statistics are
-        # produced by the four-hour review job, not rebuilt in HTTP requests.
-        self._dashboard_history_limit = 64
+        self._beacon_cache_signature: tuple | None = None
+        self._beacon_cache: dict | None = None
+        self._beacon_cache_lock = threading.RLock()
+        self._snapshot_cache_lock = threading.Lock()
+        self._snapshot_cache_created = 0.0
+        self._snapshot_cache: dict | None = None
+        # The web page renders at most twelve waterfalls. Keep a small margin
+        # for summary calculations; longer-term statistics belong to the
+        # periodic review artifacts rather than a cold HTTP request.
+        self._dashboard_history_limit = 16
         if self.samples_per_snapshot <= 0 or self.sample_rate_hz <= 0 or self.snapshots_per_chunk <= 0:
             raise ValueError("dashboard sampling parameters must be positive")
 
@@ -689,9 +697,24 @@ class DashboardModel:
             return {"enabled": False, "captures": [], "candidate_count": 0,
                     "qualified_count": 0, "active": None, "calibration": {}}
         captures_root, reports_root = self.beacon_root / "captures", self.beacon_root / "reports"
-        active = None
+        report_paths = sorted(reports_root.glob("*.json"),
+                              key=lambda path: path.stat().st_mtime_ns, reverse=True)
         manifest_paths = sorted(captures_root.glob("*/manifest.json"),
                                 key=lambda path: path.stat().st_mtime_ns, reverse=True)
+        followup_paths = list((reports_root / "followups").glob("*.json"))
+        calibration_path = reports_root / "calibration" / "calibration.json"
+        signature_paths = manifest_paths[:2] + report_paths[:max(1, min(limit, 100))] + followup_paths
+        if calibration_path.is_file():
+            signature_paths.append(calibration_path)
+        try:
+            signature = tuple(sorted((str(path), path.stat().st_mtime_ns, path.stat().st_size)
+                                     for path in signature_paths))
+        except OSError:
+            signature = ()
+        with self._beacon_cache_lock:
+            if signature and signature == self._beacon_cache_signature:
+                return self._beacon_cache
+        active = None
         for manifest_path in manifest_paths:
             manifest = self._json(manifest_path, {})
             report_exists = (reports_root / f"{manifest_path.parent.name}.json").is_file()
@@ -706,11 +729,9 @@ class DashboardModel:
                           "rf_center_hz": manifest.get("rf_center_hz")}
                 break
         rows = []
-        report_paths = sorted(reports_root.glob("*.json"),
-                              key=lambda path: path.stat().st_mtime_ns, reverse=True)
         recent_paths = report_paths[:max(1, min(limit, 100))]
         confirmed_names = set()
-        for followup_path in (reports_root / "followups").glob("*.json"):
+        for followup_path in followup_paths:
             followup = self._json(followup_path, {})
             if followup.get("confirmation", {}).get("confirmed"):
                 confirmed_names.add(followup_path.name)
@@ -734,9 +755,10 @@ class DashboardModel:
             followup_path = reports_root / "followups" / report_path.name
             followup = self._json(followup_path, {})
             confirmation = followup.get("confirmation", {})
-            confirmation_links = confirmation.get("cross_receiver_links", []) + [
+            confirmation_links = (confirmation.get("cross_receiver_links", []) +
+                confirmation.get("dual_receiver_links", []) + [
                 link for receiver in confirmation.get("receivers", [])
-                for link in receiver.get("links", [])]
+                for link in receiver.get("links", [])])
             strongest_link = max(confirmation_links,
                 key=lambda item: abs(float(item.get("drift_hz_s", 0))), default=None)
             overlapping_passes = followup.get("overlapping_passes", [])
@@ -754,6 +776,8 @@ class DashboardModel:
                 "gain_mode": manifest.get("gain_mode"),
                 "configured_gain_db": manifest.get("configured_gain_db"),
                 "duration_s": manifest.get("requested_duration_s"),
+                "exact_acquisition_method": analysis.get(
+                    "exact_acquisition_method", "coherent_grid_v1"),
                 "acquisition_span_hz": analysis.get("acquisition_span_hz", 0),
                 "acquisition_step_hz": analysis.get("acquisition_step_hz"),
                 "stream_timing": manifest.get("stream_timing", {}),
@@ -771,6 +795,7 @@ class DashboardModel:
                 "followup_confirmed": confirmation.get("confirmed", False),
                 "same_receiver_confirmed": confirmation.get("same_receiver_confirmed", False),
                 "cross_receiver_confirmed": confirmation.get("cross_receiver_confirmed", False),
+                "dual_receiver_confirmed": confirmation.get("dual_receiver_confirmed", False),
                 "confirmed_link_count": len(confirmation_links),
                 "strongest_confirmed_link": strongest_link,
                 "overlapping_pass_count": len(overlapping_passes),
@@ -795,17 +820,39 @@ class DashboardModel:
                         receiver.get("acquisition", {}).get("selected_center_offset_hz")
                         for receiver in item.get("receivers", [])]}
                     for item in exact]})
-        calibration = self._json(reports_root / "calibration" / "calibration.json", {})
-        return {"enabled": True, "root": str(self.beacon_root), "active": active,
+        calibration = self._json(calibration_path, {})
+        result = {"enabled": True, "root": str(self.beacon_root), "active": active,
                 "calibration": calibration,
+                "active_acquisition_method": (rows[0]["exact_acquisition_method"]
+                                               if rows else None),
                 "captures": rows, "candidate_count": sum(row["candidate_count"] for row in rows),
                 "qualified_count": sum(row["qualified_count"] for row in rows)}
+        with self._beacon_cache_lock:
+            self._beacon_cache_signature = signature
+            self._beacon_cache = result
+        return result
 
     def snapshot(self, now: datetime | None = None) -> dict:
-        return {"status": self.status(now), "expected": self.expected_passes(now),
-                "detected": self.detections(), "logs": self.logs(),
-                "waterfalls": self.waterfalls(), "dither": self.dither_comparisons(),
-                "beacon": self.beacon()}
+        # A browser tab can issue another refresh before a cold snapshot has
+        # finished. Coalesce those requests so they cannot start parallel scans
+        # of the same on-disk history and consume a CPU core indefinitely.
+        if now is not None:
+            return {"status": self.status(now), "expected": self.expected_passes(now),
+                    "detected": self.detections(), "logs": self.logs(),
+                    "waterfalls": self.waterfalls(), "dither": self.dither_comparisons(),
+                    "beacon": self.beacon()}
+        with self._snapshot_cache_lock:
+            monotonic = time.monotonic()
+            if (self._snapshot_cache is not None and
+                    monotonic - self._snapshot_cache_created < 4.0):
+                return self._snapshot_cache
+            result = {"status": self.status(), "expected": self.expected_passes(),
+                      "detected": self.detections(), "logs": self.logs(),
+                      "waterfalls": self.waterfalls(), "dither": self.dither_comparisons(),
+                      "beacon": self.beacon()}
+            self._snapshot_cache = result
+            self._snapshot_cache_created = time.monotonic()
+            return result
 
 
 HTML = r'''<!doctype html>
@@ -832,11 +879,11 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;p
 <aside><section class="panel"><h2>Expected passes</h2><div id="passes"></div></section><section class="panel" style="margin-top:12px"><h2>Recent analysis log</h2><div id="logs"></div></section></aside></div>
 </main><script>
 const f=(x,n=2)=>Number.isFinite(x)?x.toFixed(n):'—'; const when=s=>s?new Date(s).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
-let waterfallSignature='';
-async function refresh(){try{const d=await fetch('/api/snapshot',{cache:'no-store'}).then(r=>r.json()),s=d.status;
+let waterfallSignature='',refreshing=false;
+async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/snapshot',{cache:'no-store'}).then(r=>r.json()),s=d.status;
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString();document.querySelector('#state').innerHTML='<span class="live">'+s.state.toUpperCase()+'</span>';document.querySelector('#age').textContent=f(s.update_age_s,0)+' s since completed chunk';
 document.querySelector('#progress').textContent=f(100*s.progress_fraction,1)+'%';document.querySelector('#progressbar').style.width=(100*s.progress_fraction)+'%';document.querySelector('#coverage').textContent=f(s.retained_sample_hours*60,1)+' min';document.querySelector('#coveragebar').style.width=(100*s.retained_sample_fraction)+'%';document.querySelector('#count').textContent=s.detection_count;document.querySelector('#chunks').textContent=s.completed_chunks+' chunks · '+f(s.analyzed_span_hours,2)+' h wall span · '+f(s.frequency_bin_width_hz/1000,2)+' kHz/bin · baseline '+(s.resolution_baseline_ready?'ready':'warming')+(s.pending_wide_analysis_chunks?' · '+s.pending_wide_analysis_chunks+' pending wide':'');
-const bcn=d.beacon||{},cal=bcn.calibration||{},cn=(cal.modes||{}).narrow||{},cw=(cal.modes||{}).wide||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · empirical null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[];return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${wide?'wide acquisition':'narrow lock'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${Number.isFinite(x.exact_temporal_coverage_fraction)?' · exact replay '+f(100*x.exact_temporal_coverage_fraction,2)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}</div>`}).join('');
+const bcn=d.beacon||{},cal=bcn.calibration||{},cm=bcn.active_acquisition_method||'coherent_grid_v1',cms=(cal.acquisition_methods||{})[cm]||cal.modes||{},cn=cms.narrow||{},cw=cms.wide||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Detector ${cm} · recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · method-specific null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[];return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${wide?'wide acquisition':'narrow lock'} · detector ${x.exact_acquisition_method||'coherent_grid_v1'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${Number.isFinite(x.exact_temporal_coverage_fraction)?' · exact replay '+f(100*x.exact_temporal_coverage_fraction,2)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.dual_receiver_confirmed?'dual-RX Doppler':x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}</div>`}).join('');
 document.querySelector('#dither').innerHTML=(d.dither.comparisons||[]).slice(0,6).map(x=>`<div class="log"><strong>Chunk ${x.chunk}</strong> · ${x.classification} · ${f(x.tuning_dither_hz/1e6,3)} MHz dither · receivers ${x.receivers_agree?'agree':'disagree'}<br>${x.receivers.map(r=>'RX'+r.receiver+' sky/baseband '+f(r.sky_fixed_correlation,3)+' / '+f(r.baseband_fixed_correlation,3)).join(' · ')}</div>`).join('')||'<span class="muted">Waiting for the first nominal/dither pair.</span>';
 const nextWaterfallSignature=d.waterfalls.waterfalls.map(x=>x.plot_url+':'+x.qualified_event_count+':'+x.tle_guided_candidate_count+':'+x.blind_comb_candidate_count+':'+x.blind_carrier_candidate_count+':'+x.wide_feature_candidate_count).join('|');
 if(nextWaterfallSignature!==waterfallSignature){waterfallSignature=nextWaterfallSignature;document.querySelector('#waterfalls').innerHTML=d.waterfalls.waterfalls.map(x=>{
@@ -854,7 +901,7 @@ return `<article class="card waterfall"><strong>${x.capture_id||('Chunk '+x.chun
 document.querySelector('#speednote').textContent=d.detected.speed_note;document.querySelector('#detections').innerHTML=d.detected.detections.slice(0,12).map(x=>{const p=x.tle_guided_candidate;const measurement=x.mean_drift_hz_s===null?(p?`<span class="muted">TLE path</span> ${p.name} · ${p.signal_model||'single-tone'} · <span class="muted">predicted span</span> ${f(p.predicted_doppler_span_hz/1000,1)} kHz<br><span class="muted">score / stationary gain</span> ${f(p.joint_score_db,3)} / ${f(p.stationary_improvement_db,3)} dB`:'measured drift unavailable'):`<span class="muted">drift</span> ${f(x.mean_drift_hz_s/1000,2)} kHz/s · <span class="muted">radial a</span> ${f(x.radial_acceleration_m_s2,1)} m/s²<br><span class="muted">Δ radial v</span> ${f(x.equivalent_radial_velocity_change_m_s/1000,2)} km/s`;return `<article class="card candidate"><strong>Chunk ${x.chunk}</strong> · ${when(x.start_utc)}<br>${measurement} · ${x.overlapping_expected_passes} TLE overlaps<br>${x.best_tle_match?'<span class="muted">matched pass</span> '+x.best_tle_match.name+' ('+f(x.best_tle_match.max_elevation_deg,1)+'°)':''}<a href="${x.plot_url}" target="_blank"><img loading="lazy" src="${x.plot_url}"></a></article>`}).join('')||'<p class="muted">No promoted candidates yet.</p>';
 document.querySelector('#passes').innerHTML='<table><tr><th>Satellite</th><th>Rise</th><th>El.</th><th>LOS speed</th></tr>'+d.expected.passes.slice(0,12).map(p=>`<tr><td>${p.name}</td><td>${when(p.rise_utc)}</td><td>${f(p.max_elevation_deg,0)}°</td><td>${f(Math.max(Math.abs(p.rise_range_rate_km_s),Math.abs(p.set_range_rate_km_s)),2)} km/s</td></tr>`).join('')+'</table>';
 document.querySelector('#logs').innerHTML=d.logs.events.slice(0,18).map(e=>`<div class="log"><span class="muted">${when(e.time_utc)}</span> chunk ${e.chunk} <span class="${e.detected?'yes':''}">${e.detected?'candidate':'rejected'}</span><br>${e.drift_hz_s.map(x=>f(x/1000,2)).join(' / ')} kHz/s</div>`).join('');
-}catch(e){document.querySelector('#state').textContent='OFFLINE';console.error(e)}}refresh();setInterval(refresh,5000);
+}catch(e){document.querySelector('#state').textContent='OFFLINE';console.error(e)}finally{refreshing=false}}refresh();setInterval(refresh,5000);
 </script></body></html>'''
 
 

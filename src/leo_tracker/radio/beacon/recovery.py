@@ -10,7 +10,10 @@ from .plot import plot_beacon_report
 from .followup import followup_capture
 
 
-def recover_unanalyzed(root: Path, *, passes_path: Path | None = None) -> dict:
+def recover_unanalyzed(root: Path, *, passes_path: Path | None = None,
+                       exact_acquisition_method: str = "coherent_grid_v1",
+                       narrow_exact_interval_s: float = 1,
+                       wide_exact_interval_s: float = 5) -> dict:
     """Analyze complete artifacts that lack reports; never discard failures."""
     root = Path(root).resolve()
     captures = root / "captures"
@@ -46,14 +49,17 @@ def recover_unanalyzed(root: Path, *, passes_path: Path | None = None) -> dict:
             skipped.append(capture.name)
             continue
         wide = float(manifest.get("sample_rate_hz", 0)) >= 5_000_000
-        settings = ({"exact_interval_s": 5, "exact_window_s": .01,
+        settings = ({"exact_interval_s": wide_exact_interval_s, "exact_window_s": .01,
                      "acquisition_span_hz": 3_500_000,
                      "acquisition_step_hz": 500_000,
                      "exact_subband_rate_hz": 2_500_000}
-                    if wide else {"exact_interval_s": 1, "exact_window_s": .01})
+                    if wide else {"exact_interval_s": narrow_exact_interval_s,
+                                  "exact_window_s": .01})
         try:
             report = analyze_capture(capture, report_path, window_s=1,
-                                     maximum_analysis_rate_hz=50_000, **settings)
+                                     maximum_analysis_rate_hz=50_000,
+                                     exact_acquisition_method=exact_acquisition_method,
+                                     **settings)
             plot_beacon_report(report, plots / f"{capture.name}.png")
             followup_capture(capture, report_path,
                              reports / "followups" / f"{capture.name}.json",

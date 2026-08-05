@@ -13,6 +13,43 @@ from .artifact import BeaconCapture
 FOLLOWUP_SCHEMA = "leo-tracker.starlink-beacon-followup/v1"
 
 
+def _pass_overlaps(capture_path: Path, confirmation: dict,
+                   passes_path: Path | None) -> list[dict]:
+    if passes_path is None or not Path(passes_path).is_file():
+        return []
+    capture = BeaconCapture.open(capture_path, verify=True)
+    first_utc_ns = capture.manifest.get("chunks", [{}])[0].get("first_utc_ns")
+    confirmed_times = [
+        (item["start_s"] + item["stop_s"]) / 2
+        for key in ("cross_receiver_links", "dual_receiver_links")
+        for item in confirmation.get(key, [])]
+    for receiver in confirmation.get("receivers", []):
+        confirmed_times.extend((item["start_s"] + item["stop_s"]) / 2
+                               for item in receiver.get("links", []))
+    if not first_utc_ns or not confirmed_times:
+        return []
+    observation = datetime.fromtimestamp(
+        (first_utc_ns / 1e9) + min(confirmed_times), tz=timezone.utc)
+    predictions = json.loads(Path(passes_path).read_text())
+    overlaps = []
+    for satellite in predictions.get("satellites", []):
+        for predicted in satellite.get("passes", []):
+            rise = datetime.fromisoformat(predicted["rise"]["time"].replace("Z", "+00:00"))
+            setting = datetime.fromisoformat(predicted["set"]["time"].replace("Z", "+00:00"))
+            if rise <= observation <= setting:
+                track = predicted.get("track") or []
+                if not track:
+                    continue
+                nearest = min(track, key=lambda point: abs(
+                    datetime.fromisoformat(point["time"].replace("Z", "+00:00")) - observation))
+                overlaps.append({"name": satellite.get("name", "").strip(),
+                    "norad_id": satellite.get("norad_id"),
+                    "observation_utc": observation.isoformat(),
+                    "nearest_prediction": nearest,
+                    "culmination_elevation_deg": predicted["culmination"]["elevation_deg"]})
+    return sorted(overlaps, key=lambda item: item["culmination_elevation_deg"], reverse=True)
+
+
 def summarize_temporal_confirmation(checks: list[dict], *, interval_s: float) -> dict:
     """Require repeated exact/control evidence with stable frame epoch and CFO."""
     receivers = []
@@ -71,18 +108,50 @@ def summarize_temporal_confirmation(checks: list[dict], *, interval_s: float) ->
                                      if value],
                                     [index for index, value in enumerate(second["receiver_candidates"])
                                      if value]]})
+    # The pilot-code likelihood has cyclic timing aliases at low SNR. A real
+    # common RF signal can therefore move between local epoch aliases over time
+    # while both synchronous receivers still choose exactly the same alias at
+    # each instant. Confirm that case from dual-RX code evidence and matched
+    # Doppler slopes instead of requiring one alias to remain globally stable.
+    dual_links = []
+    dual_points = [item for item in checks if item.get("candidate") and
+                   item.get("epoch_difference_samples", np.inf) <= 20]
+    for first, second in zip(dual_points, dual_points[1:]):
+        elapsed = second["start_s"] - first["start_s"]
+        if elapsed <= 0 or elapsed > 1.6 * interval_s:
+            continue
+        slopes = []
+        for receiver in range(2):
+            before = first["receivers"][receiver]["pilot"]["frequency_offset_hz"]
+            after = second["receivers"][receiver]["pilot"]["frequency_offset_hz"]
+            slopes.append((after - before) / elapsed)
+        slope_difference = abs(slopes[0] - slopes[1])
+        if max(map(abs, slopes)) <= 15_000 and slope_difference <= 2_500:
+            dual_links.append({"start_s": first["start_s"],
+                               "stop_s": second["start_s"],
+                               "receiver_slopes_hz_s": list(map(float, slopes)),
+                               "slope_difference_hz_s": float(slope_difference),
+                               "first_epoch_difference_samples": float(
+                                   first["epoch_difference_samples"]),
+                               "second_epoch_difference_samples": float(
+                                   second["epoch_difference_samples"])})
     same_receiver_confirmed = any(item["confirmed"] for item in receivers)
     cross_receiver_confirmed = bool(cross_links)
+    dual_receiver_confirmed = bool(dual_links)
     dual_count = sum(item.get("candidate", False) for item in checks)
-    return {"confirmed": same_receiver_confirmed or cross_receiver_confirmed,
+    return {"confirmed": (same_receiver_confirmed or cross_receiver_confirmed or
+                           dual_receiver_confirmed),
             "same_receiver_confirmed": same_receiver_confirmed,
             "cross_receiver_confirmed": cross_receiver_confirmed,
+            "dual_receiver_confirmed": dual_receiver_confirmed,
             "cross_receiver_links": cross_links,
+            "dual_receiver_links": dual_links,
             "dual_candidate_point_count": dual_count, "receivers": receivers,
             "requirements": {"consecutive_max_gap_intervals": 1.6,
                              "cross_receiver_max_gap_intervals": 4.1,
                              "maximum_epoch_delta_samples": 20,
                              "maximum_drift_hz_s": 15_000,
+                             "maximum_dual_slope_difference_hz_s": 2_500,
                              "cfo_slack_hz": 25_000}}
 
 
@@ -121,41 +190,33 @@ def followup_capture(capture_path: Path, analysis_path: Path, output: Path, *,
                 start_sample=first_sample,
                 acquisition_span_hz=float(config.get("acquisition_span_hz", 0)),
                 acquisition_step_hz=float(config.get("acquisition_step_hz", 500_000)),
-                exact_subband_rate_hz=float(config.get("exact_subband_rate_hz", 2_500_000))))
+                exact_subband_rate_hz=float(config.get("exact_subband_rate_hz", 2_500_000)),
+                acquisition_method=str(config.get(
+                    "exact_acquisition_method", "coherent_grid_v1"))))
         report["confirmation"] = summarize_temporal_confirmation(
             report["checks"], interval_s=interval_s)
-        if passes_path is not None and Path(passes_path).is_file():
-            predictions = json.loads(Path(passes_path).read_text())
-            first_utc_ns = capture.manifest.get("chunks", [{}])[0].get("first_utc_ns")
-            confirmed_times = [
-                (item["start_s"] + item["stop_s"]) / 2
-                for item in report["confirmation"].get("cross_receiver_links", [])]
-            for receiver in report["confirmation"].get("receivers", []):
-                confirmed_times.extend((item["start_s"] + item["stop_s"]) / 2
-                                       for item in receiver.get("links", []))
-            if first_utc_ns and confirmed_times:
-                observation = datetime.fromtimestamp(
-                    (first_utc_ns / 1e9) + min(confirmed_times), tz=timezone.utc)
-                overlaps = []
-                for satellite in predictions.get("satellites", []):
-                    for predicted in satellite.get("passes", []):
-                        rise = datetime.fromisoformat(predicted["rise"]["time"].replace("Z", "+00:00"))
-                        setting = datetime.fromisoformat(predicted["set"]["time"].replace("Z", "+00:00"))
-                        if rise <= observation <= setting:
-                            track = predicted.get("track") or []
-                            if not track:
-                                continue
-                            nearest = min(track, key=lambda point: abs(
-                                datetime.fromisoformat(point["time"].replace("Z", "+00:00")) - observation))
-                            overlaps.append({"name": satellite.get("name", "").strip(),
-                                "norad_id": satellite.get("norad_id"),
-                                "observation_utc": observation.isoformat(),
-                                "nearest_prediction": nearest,
-                                "culmination_elevation_deg": predicted["culmination"]["elevation_deg"]})
-                report["overlapping_passes"] = sorted(
-                    overlaps, key=lambda item: item["culmination_elevation_deg"], reverse=True)
+        report["overlapping_passes"] = _pass_overlaps(
+            capture_path, report["confirmation"], passes_path)
     output = Path(output); output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(output.suffix + ".next")
     temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     temporary.replace(output)
+    return report
+
+
+def rescore_followup(path: Path, *, passes_path: Path | None = None) -> dict:
+    """Reapply current confirmation logic to saved expensive replay checks."""
+    path = Path(path)
+    report = json.loads(path.read_text())
+    if report.get("schema") != FOLLOWUP_SCHEMA:
+        raise ValueError("not a Starlink beacon follow-up report")
+    interval_s = float(report.get("settings", {}).get("interval_s", .1))
+    report["confirmation"] = summarize_temporal_confirmation(
+        report.get("checks", []), interval_s=interval_s)
+    report["overlapping_passes"] = _pass_overlaps(
+        Path(report["capture"]), report["confirmation"], passes_path)
+    report["rescored_utc"] = datetime.now(timezone.utc).isoformat()
+    temporary = path.with_suffix(path.suffix + ".next")
+    temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
     return report

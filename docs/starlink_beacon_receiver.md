@@ -36,11 +36,16 @@ center. The four supported IFs are therefore:
 
 The lock mode synchronously records both Pluto+ receivers as little-endian CI16
 at 2.5 MS/s and 2.3 MHz RF bandwidth. This is 20 MB/s, or 2.4 GB per two-minute
-dwell. Its approximately 312.5 kHz filter margin is sufficient for Doppler but
-not for the unknown, independent frequency errors of two inexpensive LNBs.
+dwell. The Nyquist interval leaves 312.5 kHz per side around the 1.875 MHz pilot,
+but the configured analog RF filter leaves only about 212.5 kHz per side. That
+can attenuate the largest LEO Doppler plus the unknown, independent frequency
+errors of two inexpensive LNBs.
 
 Production currently focuses on the channel-4 lower edge because that tuning
-produced the first temporally confirmed exact-code event. The target list is
+produced the strongest legacy candidates. Those events remain hypotheses: the
+legacy carrier grid has since been shown to have large off-grid blind spots and
+its confirmations must survive the newer detector before being called beacons.
+The target list is
 configurable with `LEO_BEACON_TARGETS`; the other three edge bands remain
 available for controlled comparison. Every fifteenth narrow lock cycle (roughly
 30 minutes) is followed by a wide acquisition on the same target. The cadence is
@@ -53,15 +58,33 @@ control bank seeds detailed symbolwise tracking. PSS remains independent
 supporting evidence rather than an authoritative timing seed. Once a stable LNB
 offset is acquired, the continuous narrow mode supplies the denser Doppler record.
 
-Narrow captures are joint-matched every second using 10 ms windows. Exact and
-rolled-control delay/CFO searches share a vectorized FFT bank, preserving the
-same frequency grid and score while halving their measured compute cost. The
-expensive symbolwise tracker runs only when the joint exact-minus-control margin
-exceeds 0.008. The one-second cadence is twice the preceding production cadence
-and sixty times the original once-per-minute replay at similar compute cost.
+The `coherent_grid_v1` detector joint-matches narrow captures every second using
+10 ms windows. Its exact and rolled-control delay/CFO searches share a vectorized
+FFT bank. Controlled tests found that its 25 kHz carrier grid can miss a perfect
+pilot only 2.5--12.5 kHz off a grid point, so v1 is retained for retrospective
+comparison rather than treated as the final detector.
+
+`pss_symbolwise_v2` searches a coarse CFO bank with the published PSS, retains
+multiple separated timing hypotheses, tracks the exact pilot code
+noncoherently symbol by symbol, and then refines CFO on a 100 Hz grid. The
+17-symbol-rolled control is evaluated at the *same* selected epoch and CFO; it
+is not allowed to choose an easier unrelated hypothesis. Silent-window energy
+masking prevents FFT roundoff from manufacturing PSS peaks. Detector generation
+is written to every report and follow-up so their score populations cannot be
+silently combined.
 Dual-RX agreement remains the promotion gate, while strong single-RX evidence
 is explicitly labeled and retained for dense replay because
 the two independent LNBs need not have equal sensitivity.
+
+`pilot_symbolwise_v3` is the production detector. At 2.5 MS/s the narrow PSS
+contains only about eleven samples per frame, which made weak-signal timing
+acquisition fragile even though v2 removed the carrier-grid blind spots. V3
+instead searches every possible frame epoch by noncoherently combining 24
+spread pilot-symbol anchors across the capture window and a coarse CFO bank.
+It then applies the same conditioned exact-code versus rolled-control test and
+fine CFO refinement as v2. The all-epoch search costs more CPU, so production
+checks narrow captures every three seconds and wide captures every ten seconds;
+a hit still launches the 100 ms dense follow-up.
 
 Every elevated single-RX margin, plus any near-dual event with a common frame
 epoch, triggers an automatic ±0.5 s replay at 100 ms spacing. Temporal
@@ -80,10 +103,27 @@ simultaneous visible spacecraft this is compatibility evidence, not unique
 identification; unique TLE matching still requires a longer Doppler trajectory.
 
 After every analyzed capture, `starlink-beacon-calibrate` rebuilds an
-empirical null report from all non-confirmed observations. Narrow and wide modes
-are kept separate because frequency-bank maximization changes the null. The
+empirical null report from all non-confirmed observations. Acquisition methods
+and narrow/wide modes are kept separate because detector and frequency-bank
+maximization change the null. The
 dashboard publishes receiver/check counts, match-margin percentiles, single-RX
 exceedances, and complete dual-gate exceedances alongside the fixed gates.
+`starlink-beacon-null-replay` creates a resumable, thermally guarded null for a
+new detector by replaying stratified windows from retained strict negatives.
+
+On 2026-08-05 v3 recovered two independent channel-4 lower-edge events. The
+first produced consecutive dual-receiver links near capture time 76 s. The
+second produced 21/21 dual-receiver candidate points over a dense two-second
+replay: both receivers selected the same frame epoch to within one sample and
+tracked parallel CFO curves from approximately -96 to -104 kHz. After those
+captures were preserved and excluded, the initial v3 field null contained 48
+checks with zero single- or dual-receiver gate crossings. These establish a
+repeatable Starlink-specific code detection, but not a unique spacecraft ID;
+many visible Starlinks overlap each event and the inexpensive LNB offsets hide
+absolute Doppler. After deployment, the first live v3 observation found a third
+event without retrospective targeting. Its dense replay again showed identical
+dual-receiver timing and parallel CFO slopes near -4 kHz/s, demonstrating that
+the production path can repeat the detection autonomously.
 
 The 10 MS/s path is intentionally described as periodic, not continuous. A
 hardware trial needed 121.4 seconds of wall time to return 30 seconds of dual-RX
@@ -138,7 +178,12 @@ env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
 
 env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
   starlink-beacon-analyze /mnt/leo-nvme/leo-tracker/captures/test \
-  /mnt/leo-nvme/leo-tracker/reports/test.json
+  /mnt/leo-nvme/leo-tracker/reports/test.json \
+  --exact-acquisition-method pilot_symbolwise_v3
+
+env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
+  starlink-beacon-null-replay /mnt/leo-nvme/leo-tracker \
+  /mnt/leo-nvme/leo-tracker/reports/calibration/pilot_symbolwise_v3-null
 ```
 
 ## Verification strategy
@@ -146,7 +191,8 @@ env UV_CACHE_DIR=.uv-cache uv run --active --no-sync leo-radio \
 Unit tests pin published channel centers, pilot offsets, the PSS hexadecimal
 sequence, its inversion/repetition pattern, all 16 pilot-code lengths, and the
 4QAM code mapping. Synthetic tests exercise frame-period recovery, exact-PSS
-epoch folding, pilot timing, carrier offset refinement, dual-channel artifact
+epoch folding, pilot timing, off-grid carrier offsets from 2.5 through 337.5 kHz,
+conditioned exact/control scoring, carrier offset refinement, dual-channel artifact
 round trips, noise rejection, and the time-shifted pilot control. CLI E2E tests
 run capture through analysis using the fake paired radio. A finite fake-radio
 watcher test also exercises capture, bounded asynchronous analysis, dense
@@ -157,10 +203,11 @@ rejection, AGC/manual-gain semantics, and evidence-aware retention.
 
 Hardware acceptance requires a complete capture with contiguous sample indexes,
 monotonic timestamps, valid checksums, both receivers present, and a report.
-A field detection additionally requires both receivers to pass the exact PSS
-and pilot/control gates with consistent epoch and CFO. Longer-term false-alarm
-thresholds will be calibrated from retained negative sky captures rather than
-chosen from a desired result.
+A field detection additionally requires both receivers to pass the exact
+pilot/control gates with consistent frame epoch and physically continuous CFO;
+PSS is independent supporting evidence. Longer-term false-alarm thresholds are
+calibrated from retained negative sky captures rather than chosen from a desired
+result.
 
 ## Primary references
 

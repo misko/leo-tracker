@@ -17,6 +17,13 @@ resume_pi_temp_millic="${LEO_BEACON_RESUME_PI_TEMP_MILLIC:-70000}"
 target_spec="${LEO_BEACON_TARGETS:-4:lower-edge}"
 maximum_cycles="${LEO_BEACON_MAX_CYCLES:-0}"
 fake_source="${LEO_BEACON_FAKE:-0}"
+exact_acquisition_method="${LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3}"
+# The all-epoch v3 search is deliberately more expensive than the legacy
+# coherent grid.  These cadences keep analysis inside the following 120 s
+# capture on the Pi while retaining enough temporal samples to trigger the
+# dense 100 ms follow-up around a beacon hit.
+narrow_exact_interval_s="${LEO_BEACON_NARROW_EXACT_INTERVAL_S:-3}"
+wide_exact_interval_s="${LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10}"
 read -r -a targets <<< "${target_spec}"
 if (( ${#targets[@]} == 0 )); then
   echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2
@@ -86,15 +93,17 @@ process_capture() {
     local confirmation_marker="${storage_root}/staging/${name}.confirmed"
     local analysis_args
     if [[ "${mode}" == "wide" ]]; then
-      analysis_args=(--exact-interval-s 5 --exact-window-s .01
+      analysis_args=(--exact-interval-s "${wide_exact_interval_s}" --exact-window-s .01
         --acquisition-span-hz 3500000 --acquisition-step-hz 500000
         --exact-subband-rate-hz 2500000)
     else
-      analysis_args=(--exact-interval-s 1 --exact-window-s .01)
+      analysis_args=(--exact-interval-s "${narrow_exact_interval_s}" --exact-window-s .01)
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-analyze "${capture}" "${report}" \
-      --window-s 1 --maximum-analysis-rate-hz 50000 "${analysis_args[@]}" --plot "${plot}"
+      --window-s 1 --maximum-analysis-rate-hz 50000 \
+      --exact-acquisition-method "${exact_acquisition_method}" \
+      "${analysis_args[@]}" --plot "${plot}"
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-followup "${capture}" "${report}" "${followup}" \
       --radius-s .5 --interval-s .1 --window-s .01 \
@@ -142,6 +151,9 @@ start_pending_analysis() {
 
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   starlink-beacon-recover "${storage_root}" \
+  --exact-acquisition-method "${exact_acquisition_method}" \
+  --narrow-exact-interval-s "${narrow_exact_interval_s}" \
+  --wide-exact-interval-s "${wide_exact_interval_s}" \
   --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json"
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"

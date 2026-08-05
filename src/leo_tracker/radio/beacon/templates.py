@@ -48,30 +48,76 @@ def pss_subband_samples(sample_rate_hz: float, edge: str = "lower") -> np.ndarra
     return result if norm == 0 else result / norm
 
 
-def acquire_pss_epoch(samples: np.ndarray, sample_rate_hz: float, *, edge: str = "lower") -> dict:
+def acquire_pss_epoch(samples: np.ndarray, sample_rate_hz: float, *, edge: str = "lower",
+                      maximum_candidates: int = 4,
+                      minimum_separation_samples: int | None = None,
+                      frequency_offsets_hz: tuple[float, ...] = (0.0,)) -> dict:
     """Noncoherently fold exact-PSS match power at the 750 Hz frame cadence."""
+    if maximum_candidates <= 0:
+        raise ValueError("maximum PSS candidates must be positive")
     values = np.asarray(samples, np.complex64)
+    offsets = np.asarray(frequency_offsets_hz, dtype=float)
+    if offsets.ndim != 1 or offsets.size == 0:
+        raise ValueError("at least one PSS frequency offset is required")
     template = pss_subband_samples(sample_rate_hz, edge)
     period = sample_rate_hz * STARLINK_FRAME_DURATION_S
     if values.ndim != 1 or values.size < round(4 * period):
         raise ValueError("at least four frames of one-dimensional samples are required")
-    correlation = fftconvolve(values, np.conj(template[::-1]), mode="valid")
+    time_s = np.arange(values.size) / sample_rate_hz
+    corrected = values[None, :] * np.exp(
+        -2j * np.pi * offsets[:, None] * time_s[None, :])
+    correlation = fftconvolve(
+        corrected, np.conj(template[None, ::-1]), mode="valid", axes=-1)
     energy = fftconvolve(np.abs(values) ** 2, np.ones(template.size), mode="valid")
-    match_power = np.abs(correlation) ** 2 / np.maximum(energy, 1e-20)
+    # FFT roundoff leaves tiny nonzero correlations and occasionally tiny
+    # negative energies in genuinely empty windows.  Dividing those two
+    # residues can manufacture enormous PSS scores.  Mask windows with no
+    # measurable input energy; real captures have a noise floor, while this is
+    # important for deterministic zero-padded fixtures and drop-out handling.
+    energy_floor = max(float(np.max(energy)), 0.0) * 1e-12
+    usable = energy > max(energy_floor, np.finfo(float).tiny)
+    match_power = np.zeros(correlation.shape, dtype=float)
+    np.divide(np.abs(correlation) ** 2, energy[None, :], out=match_power,
+              where=usable[None, :])
     epoch_count = round(period)
-    folded = np.zeros(epoch_count)
+    folded_bank = np.zeros((offsets.size, epoch_count))
     support = np.zeros(epoch_count, int)
     for epoch in range(epoch_count):
-        indexes = np.rint(epoch + np.arange(np.ceil((match_power.size-epoch)/period)) * period).astype(int)
-        indexes = indexes[indexes < match_power.size]
+        indexes = np.rint(epoch + np.arange(
+            np.ceil((match_power.shape[1] - epoch) / period)) * period).astype(int)
+        indexes = indexes[indexes < match_power.shape[1]]
         if indexes.size:
-            folded[epoch] = float(np.mean(match_power[indexes]))
+            folded_bank[:, epoch] = np.mean(match_power[:, indexes], axis=1)
             support[epoch] = indexes.size
+    selected_offset_indexes = np.argmax(folded_bank, axis=0)
+    folded = folded_bank[selected_offset_indexes, np.arange(epoch_count)]
     best = int(np.argmax(folded))
     median = float(np.median(folded))
+    separation = (max(4, 2 * template.size) if minimum_separation_samples is None
+                  else int(minimum_separation_samples))
+    if separation <= 0:
+        raise ValueError("PSS candidate separation must be positive")
+    candidates = []
+    for epoch in np.argsort(folded)[::-1]:
+        epoch = int(epoch)
+        if any(min(abs(epoch - item["epoch_sample"]),
+                   epoch_count - abs(epoch - item["epoch_sample"])) < separation
+               for item in candidates):
+            continue
+        candidates.append({"epoch_sample": epoch, "epoch_s": epoch / sample_rate_hz,
+            "frequency_offset_hz": float(offsets[selected_offset_indexes[epoch]]),
+            "folded_score": float(folded[epoch]),
+            "peak_to_median": float(folded[epoch] / max(median, 1e-20)),
+            "frame_support": int(support[epoch])})
+        if len(candidates) >= maximum_candidates:
+            break
     return {"schema": "leo-tracker.starlink-pss-epoch/v1", "edge": edge,
             "epoch_sample": best, "epoch_s": best / sample_rate_hz,
             "frame_period_samples": period, "folded_score": float(folded[best]),
             "folded_median": median,
             "peak_to_median": float(folded[best] / max(median, 1e-20)),
-            "frame_support": int(support[best]), "template_samples": int(template.size)}
+            "frame_support": int(support[best]), "template_samples": int(template.size),
+            "frequency_offset_hz": float(offsets[selected_offset_indexes[best]]),
+            "searched_frequency_offsets_hz": offsets.tolist(),
+            "candidate_epochs": candidates,
+            "candidate_minimum_separation_samples": separation}

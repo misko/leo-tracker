@@ -157,6 +157,8 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
         carry = combined[start:].copy()
     qualified = [item for item in windows if item["qualified"]]
     doppler_track = summarize_doppler_track(exact_checks)
+    exact_sampled_time_s = float(sum(item["duration_s"] for item in exact_checks))
+    capture_duration_s = (capture.manifest["captured_samples_per_receiver"] / source_rate)
     report = {
         "schema": ANALYSIS_SCHEMA,
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -175,6 +177,10 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
         "summary": {"window_count": len(windows), "qualified_window_count": len(qualified),
                     "qualified_fraction": len(qualified) / len(windows) if windows else 0.0,
                     "exact_check_count": len(exact_checks),
+                    "exact_sampled_time_s": exact_sampled_time_s,
+                    "exact_temporal_coverage_fraction": (
+                        exact_sampled_time_s / capture_duration_s
+                        if capture_duration_s > 0 else 0.0),
                     "exact_candidate_count": sum(item["candidate"] for item in exact_checks),
                     "exact_qualified_count": sum(item["qualified"] for item in exact_checks),
                     "single_receiver_candidate_count": sum(

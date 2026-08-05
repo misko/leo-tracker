@@ -196,3 +196,51 @@ def matched_pilot_score(samples: np.ndarray, sample_rate_hz: float, *, edge: str
     return {"schema": "leo-tracker.starlink-edge-pilot-match/v1", "edge": edge,
             "symbol_roll": int(symbol_roll),
             "searched_frequency_offsets_hz": list(frequency_offsets_hz), **best}
+
+
+def matched_pilot_control_scores(samples: np.ndarray, sample_rate_hz: float, *,
+                                 edge: str = "lower",
+                                 frequency_offsets_hz: tuple[float, ...] = (0.0,),
+                                 control_symbol_roll: int = 17) -> tuple[dict, dict]:
+    """Batch the exact and time-scrambled delay/CFO searches.
+
+    This is mathematically identical to two :func:`matched_pilot_score` calls,
+    but shares the CFO correction bank, rolling energy, and batched FFT plan.
+    The speedup permits denser temporal replay without weakening acquisition or
+    using a signal-dependent prefilter.
+    """
+    values = np.asarray(samples, np.complex64)
+    offsets = np.asarray(frequency_offsets_hz, dtype=float)
+    if values.ndim != 1:
+        raise ValueError("samples must be one dimensional")
+    if offsets.ndim != 1 or offsets.size == 0:
+        raise ValueError("at least one frequency offset is required")
+    templates = np.stack([
+        _edge_pilot_frame_cached(float(sample_rate_hz), edge, symbol_roll)
+        for symbol_roll in (0, int(control_symbol_roll))])
+    if values.size < templates.shape[1]:
+        raise ValueError("at least one frame is required")
+    time_s = np.arange(values.size, dtype=float) / sample_rate_hz
+    corrected = values[None, :] * np.exp(
+        -2j * np.pi * offsets[:, None] * time_s[None, :])
+    correlations = fftconvolve(corrected[None, :, :],
+        np.conj(templates[:, None, ::-1]), mode="valid", axes=-1)
+    rolling_energy = fftconvolve(
+        np.abs(values) ** 2, np.ones(templates.shape[1]), mode="valid")
+    template_energy = np.sum(np.abs(templates) ** 2, axis=1)
+    normalized = np.abs(correlations) / np.sqrt(np.maximum(
+        rolling_energy[None, None, :] * template_energy[:, None, None], 1e-20))
+    reports = []
+    shape = normalized.shape[1:]
+    for template_index, symbol_roll in enumerate((0, int(control_symbol_roll))):
+        offset_index, sample_index = np.unravel_index(
+            int(np.argmax(normalized[template_index])), shape)
+        reports.append({
+            "schema": "leo-tracker.starlink-edge-pilot-match/v1", "edge": edge,
+            "symbol_roll": symbol_roll,
+            "searched_frequency_offsets_hz": offsets.tolist(),
+            "score": float(normalized[template_index, offset_index, sample_index]),
+            "frequency_offset_hz": float(offsets[offset_index]),
+            "sample_index": int(sample_index),
+            "epoch_s": int(sample_index) / sample_rate_hz})
+    return reports[0], reports[1]

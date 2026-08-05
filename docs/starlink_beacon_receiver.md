@@ -53,11 +53,14 @@ control bank seeds detailed symbolwise tracking. PSS remains independent
 supporting evidence rather than an authoritative timing seed. Once a stable LNB
 offset is acquired, the continuous narrow mode supplies the denser Doppler record.
 
-Narrow captures are joint-matched every two seconds using 10 ms windows. The
+Narrow captures are joint-matched every second using 10 ms windows. Exact and
+rolled-control delay/CFO searches share a vectorized FFT bank, preserving the
+same frequency grid and score while halving their measured compute cost. The
 expensive symbolwise tracker runs only when the joint exact-minus-control margin
-exceeds 0.008. This provides roughly ten times the earlier temporal coverage at
-similar compute cost. Dual-RX agreement remains the promotion gate, while strong
-single-RX evidence is explicitly labeled and retained for dense replay because
+exceeds 0.008. The one-second cadence is twice the preceding production cadence
+and sixty times the original once-per-minute replay at similar compute cost.
+Dual-RX agreement remains the promotion gate, while strong single-RX evidence
+is explicitly labeled and retained for dense replay because
 the two independent LNBs need not have equal sensitivity.
 
 Every elevated single-RX margin, plus any near-dual event with a common frame

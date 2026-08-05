@@ -90,7 +90,7 @@ process_capture() {
         --acquisition-span-hz 3500000 --acquisition-step-hz 500000
         --exact-subband-rate-hz 2500000)
     else
-      analysis_args=(--exact-interval-s 2 --exact-window-s .01)
+      analysis_args=(--exact-interval-s 1 --exact-window-s .01)
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-analyze "${capture}" "${report}" \

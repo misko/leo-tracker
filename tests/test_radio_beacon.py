@@ -24,7 +24,8 @@ from leo_tracker.radio.beacon.structure import analyze_frame_period, frame_perio
 from leo_tracker.radio.beacon.templates import (acquire_pss_epoch, pss_subband_samples,
     pss_subsequence_phase_states, pss_time_samples)
 from leo_tracker.radio.beacon.pilots import (EDGE_PILOT_HEX, edge_pilot_frame,
-    edge_pilot_symbols, matched_pilot_score, track_edge_pilots)
+    edge_pilot_symbols, matched_pilot_control_scores, matched_pilot_score,
+    track_edge_pilots)
 from leo_tracker.radio.beacon.retention import apply_retention
 from leo_tracker.radio.beacon.recovery import recover_unanalyzed
 from leo_tracker.radio.beacon.followup import (followup_capture,
@@ -162,6 +163,25 @@ def test_symbolwise_tracker_is_skipped_below_configurable_joint_prefilter():
     assert found["acquisition"]["pilot_evaluated_bank_count"] == 0
 
 
+def test_batched_exact_and_control_match_is_equivalent_to_independent_searches():
+    rng = np.random.default_rng(512)
+    samples = (rng.normal(size=25_000) + 1j * rng.normal(size=25_000)).astype(np.complex64)
+    offsets = (-100_000.0, 0.0, 75_000.0)
+    exact, control = matched_pilot_control_scores(
+        samples, 2_500_000, edge="lower", frequency_offsets_hz=offsets)
+
+    independent_exact = matched_pilot_score(
+        samples, 2_500_000, edge="lower", frequency_offsets_hz=offsets)
+    independent_control = matched_pilot_score(
+        samples, 2_500_000, edge="lower", frequency_offsets_hz=offsets, symbol_roll=17)
+
+    for batched, independent in ((exact, independent_exact),
+                                 (control, independent_control)):
+        assert batched["score"] == pytest.approx(independent["score"], rel=1e-6)
+        assert batched["frequency_offset_hz"] == independent["frequency_offset_hz"]
+        assert batched["sample_index"] == independent["sample_index"]
+
+
 def test_symbolwise_pilot_tracker_refines_cfo_and_beats_scrambled_control():
     rate, epoch, frames, cfo = 250_000.0, 83, 8, 73_000.0
     template = edge_pilot_frame(rate)
@@ -266,6 +286,8 @@ def test_beacon_capture_and_analysis_cli_end_to_end(tmp_path, capsys):
     assert report["summary"]["window_count"] == 2
     assert report["summary"]["qualified_window_count"] == 2
     assert report["summary"]["exact_check_count"] == 1
+    assert report["summary"]["exact_sampled_time_s"] == pytest.approx(.1)
+    assert report["summary"]["exact_temporal_coverage_fraction"] == pytest.approx(.5)
     assert report["summary"]["exact_qualified_count"] == 0
     assert '"stored_bytes": 160000' in capsys.readouterr().out
 
@@ -282,6 +304,7 @@ def test_exact_replay_can_be_restricted_to_a_targeted_time_interval(tmp_path):
                  "--exact-start-s", ".05", "--exact-stop-s", ".11"]) == 0
     report = json.loads(analysis.read_text())
     assert [item["start_s"] for item in report["exact_checks"]] == pytest.approx([.05, .07, .09])
+    assert report["summary"]["exact_temporal_coverage_fraction"] == pytest.approx(.15)
 
 
 def test_retention_preserves_candidates_and_bounds_negative_ring(tmp_path):
@@ -418,7 +441,9 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
             "sample_rate_hz": 2.5e6, "bandwidth_hz": 2.3e6,
             "gain_mode": "manual", "configured_gain_db": 50},
         "summary": {"exact_candidate_count": 1, "exact_qualified_count": 0,
-                    "single_receiver_candidate_count": 2},
+                    "single_receiver_candidate_count": 2,
+                    "exact_sampled_time_s": 1.2,
+                    "exact_temporal_coverage_fraction": .01},
         "analysis": {"acquisition_span_hz": 3.5e6, "acquisition_step_hz": .5e6},
         "exact_checks": [{"candidate": True, "qualified": False,
             "epoch_difference_samples": 2, "cfo_difference_hz": 100,
@@ -444,6 +469,7 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
     assert report["calibration"]["modes"]["narrow"]["check_count"] == 123
     assert report["captures"][0]["single_receiver_candidate_count"] == 2
     assert report["captures"][0]["acquisition_span_hz"] == 3.5e6
+    assert report["captures"][0]["exact_temporal_coverage_fraction"] == .01
     assert report["captures"][0]["exact_checks"][0]["pss_ratios"] == [3, 3.1]
     assert report["captures"][0]["exact_checks"][0]["matched_margins"] == [.08, .07]
     assert report["captures"][0]["exact_checks"][0]["selected_subband_offsets_hz"] == [1.5e6, -1e6]
@@ -516,7 +542,7 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert 'LEO_BEACON_MAX_CYCLES:-0' in script
     assert "--sample-rate-hz 10000000" in script
     assert "--acquisition-span-hz 3500000" in script
-    assert "--exact-interval-s 2 --exact-window-s .01" in script
+    assert "--exact-interval-s 1 --exact-window-s .01" in script
     assert "--plot \"${plot}\"" in script
     assert "starlink-beacon-recover" in script
     assert "starlink-beacon-followup" in script

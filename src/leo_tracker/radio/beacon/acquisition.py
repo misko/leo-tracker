@@ -6,7 +6,7 @@ from fractions import Fraction
 import numpy as np
 from scipy.signal import resample_poly
 
-from .pilots import matched_pilot_score, track_edge_pilots
+from .pilots import matched_pilot_control_scores, track_edge_pilots
 from .structure import STARLINK_FRAME_DURATION_S
 from .templates import acquire_pss_epoch
 
@@ -59,11 +59,8 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
     banks = []
     for center in centers:
         subband = extract_complex_subband(samples, source_rate_hz, center, output_rate)
-        exact_match = matched_pilot_score(subband, output_rate, edge=edge,
-                                           frequency_offsets_hz=frequency_offsets)
-        control_match = matched_pilot_score(subband, output_rate, edge=edge,
-                                             frequency_offsets_hz=frequency_offsets,
-                                             symbol_roll=17)
+        exact_match, control_match = matched_pilot_control_scores(
+            subband, output_rate, edge=edge, frequency_offsets_hz=frequency_offsets)
         banks.append({"center_offset_hz": center, "samples": subband,
                       "exact_match": exact_match, "control_match": control_match,
                       "match_score_margin": exact_match["score"] - control_match["score"]})

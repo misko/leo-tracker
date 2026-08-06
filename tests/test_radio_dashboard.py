@@ -506,11 +506,20 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         assert b'id="recordings"' in dashboard_html
         assert b"<img" not in dashboard_html
         recordings = json.loads(urlopen(base + "/api/recordings", timeout=2).read())
+        assert recordings["summary"]["analyzed_capture_count"] == 1
+        assert recordings["summary"]["temporally_confirmed_capture_count"] == 1
+        assert recordings["summary"]["decoded_capture_count"] == 1
+        assert recordings["summary"]["fingerprint_count"] == 1
         index_row = next(item for item in recordings["recordings"]
                          if item["recording_id"] == name)
         assert index_row["confirmed"]
         assert index_row["decoded"]
+        assert index_row["dual_candidate_count"] == 1
+        assert index_row["single_receiver_candidate_count"] == 0
+        assert index_row["decode_frame_count"] == 7
         assert index_row["pilot_accuracy"] == .719
+        assert index_row["fingerprint_family"] == "wf-test"
+        assert index_row["fingerprint_family_size"] == 1
         detail_page = urlopen(base + index_row["detail_url"], timeout=2).read()
         assert b"Diagnostic plot" in detail_page
         detail = json.loads(urlopen(

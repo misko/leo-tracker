@@ -41,11 +41,13 @@ R_ARM    = 105.0     # centre to bore axis, in the flush plane
 WEB_W    = 24.0      # cross width = half the clamp's 48.7 mm width
 WEB_T    = 12.0      # cross thickness below the flush face
 PED_D    = 50.0      # pedestal outside diameter
-PED_WALL = 6.0       # pedestal wall
-FOOT_D   = 90.0      # flared foot diameter
-FOOT_CLR = 25.0      # LNBF tail to ground. The flare occupies all of it, so
-                     # this and FOOT_D are linked by the 45 deg overhang limit:
-                     # FOOT_D <= PED_D + 2*FOOT_CLR
+PED_WALL = 5.0       # pedestal wall
+FOOT_CLR = 90.0      # LNBF tail to ground: room for an F connector and boot
+                     # (~40 mm) plus a drip loop (~50 mm)
+FLARE_H  = 60.0      # flare height. Kept separate from FOOT_CLR so the column
+                     # can be tall without the cone growing with it.
+FOOT_D   = 160.0     # foot diameter. The 45 deg overhang limit caps this at
+                     # FOOT_D <= PED_D + 2*FLARE_H, and FLARE_H <= FOOT_CLR
 EMBED    = 0.8       # how far the web buries into the clamp wall (wall >= 6)
 
 PHI_TIP  = PHI_CON + CHAM_DEG
@@ -99,7 +101,7 @@ r_aft = R_ARM - H * math.tan(tr)                   # bore axis at the clamp aft
 r_tail = r_aft - BODY_L * ST                       # ... and at the LNBF tail
 z_tail = -BODY_L * CT
 Z_BASE = z_tail - FOOT_CLR                         # foot sits below the tails
-FLARE = math.degrees(math.atan2((FOOT_D - PED_D) / 2, FOOT_CLR))
+FLARE = math.degrees(math.atan2((FOOT_D - PED_D) / 2, FLARE_H))
 
 gap_adj = r_tail * math.sqrt(2) - BODY_D
 gap_ped = r_tail - BODY_D / 2 - PED_D / 2
@@ -110,10 +112,13 @@ print(f"  clearance LNBF to LNBF (adjacent) {gap_adj:+.1f} mm")
 print(f"  clearance LNBF to pedestal       {gap_ped:+.1f} mm")
 if min(gap_adj, gap_ped) < 5.0:
     print("  *** TIGHT - raise R_ARM or shrink PED_D ***")
+cg = (LEN_MAX + 34 - BODY_L) / 2 * CT - Z_BASE     # loaded CG above the foot
 print(f"pedestal {H - Z_BASE:.0f} mm tall, foot Ø{FOOT_D:.0f} at z={Z_BASE:.1f}, "
       f"{FOOT_CLR:.0f} mm under the tails")
-print(f"  foot flare {FLARE:.1f}° from vertical"
-      + ("  *** OVER 45° - needs supports ***" if FLARE > 45 else "  (supportless)"))
+print(f"  foot flare {FLARE:.1f}° from vertical over {FLARE_H:.0f} mm"
+      + ("  *** OVER 45° - NEEDS SUPPORTS ***" if FLARE > 45 else "  (supportless)"))
+print(f"  tip angle {math.degrees(math.atan2(FOOT_D/2, cg)):.1f}° "
+      f"(CG {cg:.0f} mm above the foot, LNBFs only - the mount sits lower)")
 
 
 def q(a, b, c, d):
@@ -231,8 +236,8 @@ def revolve(rz_pairs, n=72, flip=False):
 
 ri_ped, ri_foot = PED_D / 2 - PED_WALL, FOOT_D / 2 - PED_WALL
 pedestal = (
-    revolve([(PED_D/2, H), (PED_D/2, Z_BASE + FOOT_CLR), (FOOT_D/2, Z_BASE)]) +
-    revolve([(ri_foot, Z_BASE), (ri_ped, Z_BASE + FOOT_CLR),
+    revolve([(PED_D/2, H), (PED_D/2, Z_BASE + FLARE_H), (FOOT_D/2, Z_BASE)]) +
+    revolve([(ri_foot, Z_BASE), (ri_ped, Z_BASE + FLARE_H),
              (ri_ped, H - WEB_T)], flip=True) +
     revolve([(ri_foot, Z_BASE), (FOOT_D/2, Z_BASE)], flip=True) +
     revolve([(0.0, H), (PED_D/2, H)], flip=True) +
@@ -243,9 +248,12 @@ arms = [web_arm(a, M, o) for a, (M, o) in zip(AZ, XF)]
 allf = [f for c in clamps for f in c] + [x for a in arms for x in a] + pedestal
 
 ap = np.vstack(allf)
+R45 = rz(45)
+a45 = np.vstack([f @ R45.T for f in allf])
 print(f"envelope {ap[:,0].max()-ap[:,0].min():.0f} x {ap[:,1].max()-ap[:,1].min():.0f}"
       f" x {ap[:,2].max()-ap[:,2].min():.0f} mm  "
-      f"({(ap[:,0].max()-ap[:,0].min())/math.sqrt(2)+FOOT_D/2:.0f} mm bed if rotated 45°)")
+      f"({max(a45[:,0].max()-a45[:,0].min(), a45[:,1].max()-a45[:,1].min()):.0f} mm "
+      f"bed if rotated 45°)")
 
 FLIP = np.diag([1.0, -1.0, -1.0])
 printo = [f @ FLIP.T for f in allf]

@@ -18,11 +18,12 @@ needs support.
 | Arm radius | 105 mm, centre to bore axis in the flush plane |
 | Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
 | Cross web | 24 mm wide × 12 mm thick |
-| Pedestal | Ø50 × 6 mm wall, 115 mm tall, flaring to a Ø90 foot |
+| Pedestal | Ø50 × 5 mm wall, 180 mm tall, flaring to a Ø160 foot |
 | Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
-| Envelope | 237 × 237 × 115 mm (213 mm bed rotated 45°) |
-| Ground clearance | 25 mm under the LNBF tails |
-| Print | 115 mm tall, ~160–210 g, 14–20 h |
+| Envelope | 237 × 237 × 180 mm (197 mm bed rotated 45°) |
+| Ground clearance | 90 mm under the LNBF tails |
+| Tip angle | 27.6° |
+| Print | 180 mm tall, ~180–240 g, 18–24 h |
 
 `quad-clamp-print.stl` is oriented on its flush face — slice as-is.
 `quad-clamp-installed.stl` is the same solid at its service attitude.
@@ -79,8 +80,8 @@ printing, because they move `R_ARM` directly.
 
 ## Standing on the pedestal
 
-The centre drops 115 mm to a hollow Ø50 column with a Ø90 flared foot, reaching
-25 mm below the lowest LNBF. Three details make it work:
+The centre drops 180 mm to a hollow Ø50 column with a Ø160 flared foot,
+reaching 90 mm below the lowest LNBF. Three details make it work:
 
 - **The top face stays flat all the way across.** The cross does not slope down
   to the centre — it keeps a flush top and gets *deeper*. Sloping arms would put
@@ -93,13 +94,26 @@ The centre drops 115 mm to a hollow Ø50 column with a Ø90 flared foot, reachin
   vertical. Below the tails there is nothing to hit, so the foot can spread;
   above them it could not.
 
-**Foot width and ground clearance are the same knob.** The flare starts at the
-LNBF tails and ends at the ground, so its angle is fixed by the two:
-`atan((FOOT_D − PED_D)/2 / FOOT_CLR)`. Holding that under 45° for supportless
-printing caps the foot at **`FOOT_D ≤ PED_D + 2 × FOOT_CLR`** — every extra
-millimetre of ground clearance buys at most two millimetres of foot diameter.
-Ø90 on 25 mm of clearance lands at 38.7°, with margin. `assembly.py` computes
-the angle and flags it if it goes over.
+**Height and width fight each other, so size them together.** Ground clearance
+raises the centre of gravity one-for-one, while foot diameter only helps as a
+ratio, so going taller costs stability faster than going wider buys it back:
+
+| Clearance | Foot | Flare | Tip angle |
+| --- | --- | --- | --- |
+| 25 mm | Ø90 | 38.7° | 27.1° |
+| 90 mm | Ø90 | 24.0° | 16.4° |
+| 90 mm | Ø130 | 41.6° | 23.0° |
+| **90 mm** | **Ø160** | **42.5°** | **27.6°** |
+
+Ø160 is what holds the original stability at the taller height. `assembly.py`
+reports the tip angle every run using the LNBFs as the CG, which is conservative
+— the mount's own mass sits lower.
+
+`FLARE_H` is deliberately separate from `FOOT_CLR`. If the flare had to span the
+whole 90 mm drop the cone would be enormous; confining it to the bottom 60 mm
+keeps the column straight for the rest and holds the flare at 42.5°, inside the
+45° overhang limit. The cap is **`FOOT_D ≤ PED_D + 2 × FLARE_H`**, with
+`FLARE_H ≤ FOOT_CLR` so the cone stays below the LNBF tails.
 
 ## The wall went back to 6 mm
 

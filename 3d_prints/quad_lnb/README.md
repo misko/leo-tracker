@@ -53,10 +53,11 @@ mass so you can see immediately whether the change broke something.
 | Clamp bore | Ø40.4, 37 mm mouth, 241° wrap |
 | Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
 | Cross web | 24 mm wide × 12 mm thick, 105 mm arms |
-| Pedestal | Ø50 × 115 mm tall, flaring to a Ø90 foot |
-| Envelope | 237 × 237 × 115 mm (213 mm bed rotated 45°) |
-| Ground clearance | 25 mm under the LNBF tails |
-| Print | 115 mm tall, ~160–210 g, 14–20 h |
+| Pedestal | Ø50 × 180 mm tall, flaring to a Ø160 foot |
+| Envelope | 237 × 237 × 180 mm (197 mm bed rotated 45°) |
+| Ground clearance | 90 mm under the LNBF tails |
+| Tip angle | 27.6° |
+| Print | 180 mm tall, ~180–240 g, 18–24 h |
 
 ## What shapes the design
 
@@ -91,9 +92,12 @@ middle prints as a slab with a column rising out of it. The column is open at
 the bottom so it drains, and the foot flares only below the LNBF tails, where
 there is nothing left to hit.
 
-Foot width and ground clearance are the same knob: the flare runs from the tails
-to the ground, so keeping it under 45° for supportless printing caps the foot at
-`FOOT_D ≤ PED_D + 2 × FOOT_CLR`. Ø90 on 25 mm of clearance lands at 38.7°.
+Ground clearance is set by the coax, not by looks: an F connector and boot need
+~40 mm and turning a drip loop needs ~50 more, so the foot sits 90 mm below the
+LNBF tails. That raises the CG one-for-one, and foot diameter only helps as a
+ratio — Ø160 is what restores the tip angle the shorter version had. The flare is
+confined to the bottom 60 mm so the cone does not grow with the column; the cap
+is `FOOT_D ≤ PED_D + 2 × FLARE_H` at the 45° overhang limit.
 
 **One horizontal cut makes it printable.** All four clamps' forward ends and the
 web's top face lie in a single plane. Flipped onto that plane, every surface is

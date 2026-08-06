@@ -9,8 +9,18 @@ import numpy as np
 
 from .analysis import analyze_exact_window
 from .artifact import BeaconCapture
+from .template_learning import load_learned_beacon
 
 FOLLOWUP_SCHEMA = "leo-tracker.starlink-beacon-followup/v1"
+
+
+def _measurement_frequency(check: dict, receiver: int) -> float:
+    full = check.get("full_frame_evidence", {})
+    if full.get("candidate"):
+        receivers = full.get("receivers", [])
+        if len(receivers) == 2:
+            return float(receivers[receiver]["frequency_offset_hz"])
+    return float(check["receivers"][receiver]["pilot"]["frequency_offset_hz"])
 
 
 def _pass_overlaps(capture_path: Path, confirmation: dict,
@@ -66,14 +76,14 @@ def summarize_temporal_confirmation(checks: list[dict], *, interval_s: float) ->
             epoch_delta = abs(a["acquisition"]["selected_epoch_sample"] -
                               b["acquisition"]["selected_epoch_sample"])
             epoch_delta = min(epoch_delta, period - epoch_delta)
-            cfo_delta = abs(a["pilot"]["frequency_offset_hz"] -
-                            b["pilot"]["frequency_offset_hz"])
+            first_cfo = _measurement_frequency(first, receiver)
+            second_cfo = _measurement_frequency(second, receiver)
+            cfo_delta = abs(first_cfo - second_cfo)
             if epoch_delta <= 20 and cfo_delta <= 25_000 + 15_000 * elapsed:
                 links.append({"start_s": first["start_s"], "stop_s": second["start_s"],
                               "epoch_delta_samples": epoch_delta,
                               "cfo_delta_hz": cfo_delta,
-                              "drift_hz_s": (b["pilot"]["frequency_offset_hz"] -
-                                             a["pilot"]["frequency_offset_hz"]) / elapsed})
+                              "drift_hz_s": (second_cfo - first_cfo) / elapsed})
         receivers.append({"receiver": receiver, "candidate_point_count": len(points),
                           "confirmed_link_count": len(links), "confirmed": bool(links),
                           "links": links})
@@ -122,8 +132,8 @@ def summarize_temporal_confirmation(checks: list[dict], *, interval_s: float) ->
             continue
         slopes = []
         for receiver in range(2):
-            before = first["receivers"][receiver]["pilot"]["frequency_offset_hz"]
-            after = second["receivers"][receiver]["pilot"]["frequency_offset_hz"]
+            before = _measurement_frequency(first, receiver)
+            after = _measurement_frequency(second, receiver)
             slopes.append((after - before) / elapsed)
         slope_difference = abs(slopes[0] - slopes[1])
         if max(map(abs, slopes)) <= 15_000 and slope_difference <= 2_500:
@@ -175,6 +185,18 @@ def followup_capture(capture_path: Path, analysis_path: Path, output: Path, *,
         source_rate = float(capture.manifest["sample_rate_hz"])
         duration_s = capture.manifest["captured_samples_per_receiver"] / source_rate
         config = analysis.get("analysis", {})
+        learned_templates = None
+        learned_template_source = config.get("learned_beacon")
+        if learned_template_source:
+            learned_report, learned_arrays = load_learned_beacon(
+                Path(learned_template_source))
+            if (not learned_report.get("summary", {}).get("qualified", False) or
+                    abs(float(learned_report["sample_rate_hz"]) - source_rate) > 1e-6 or
+                    learned_report["region"] != capture.manifest.get(
+                        "metadata", {}).get("region")):
+                raise ValueError("analysis learned beacon does not match follow-up capture")
+            learned_templates = tuple(learned_arrays[f"template_rx{receiver}"]
+                                      for receiver in range(2))
         starts = set()
         for trigger in triggers:
             first = max(0.0, trigger["start_s"] - radius_s)
@@ -192,7 +214,9 @@ def followup_capture(capture_path: Path, analysis_path: Path, output: Path, *,
                 acquisition_step_hz=float(config.get("acquisition_step_hz", 500_000)),
                 exact_subband_rate_hz=float(config.get("exact_subband_rate_hz", 2_500_000)),
                 acquisition_method=str(config.get(
-                    "exact_acquisition_method", "coherent_grid_v1"))))
+                    "exact_acquisition_method", "coherent_grid_v1")),
+                learned_templates=learned_templates,
+                learned_template_source=learned_template_source))
         report["confirmation"] = summarize_temporal_confirmation(
             report["checks"], interval_s=interval_s)
         report["overlapping_passes"] = _pass_overlaps(

@@ -163,7 +163,7 @@ Observe one receiver for two minutes:
 ```bash
 /home/satpi01/.local/bin/uv run --active --no-sync leo-radio starlink-observe \
   artifacts/starlink_ch3 --channel-number 3 --channels 0 \
-  --duration-s 120 --sample-rate-hz 2500000 --bandwidth-hz 2300000 \
+  --duration-s 120 --sample-rate-hz 2500000 --bandwidth-hz 2500000 \
   --block-size 262144 --gain-db 40 --uri pluto://ip:192.168.2.1
 ```
 

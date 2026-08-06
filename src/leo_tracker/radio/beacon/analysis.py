@@ -9,7 +9,9 @@ import numpy as np
 
 from .artifact import BeaconCapture
 from .acquisition import acquire_exact_receiver
+from .frame_tracking import conditioned_frame_observations
 from .structure import analyze_frame_period
+from .template_learning import load_learned_beacon
 
 ANALYSIS_SCHEMA = "leo-tracker.starlink-beacon-analysis/v1"
 DUAL_MATCH_MARGIN = .01
@@ -17,6 +19,8 @@ DUAL_SYMBOL_MARGIN = .005
 DUAL_EPOCH_DELTA_SAMPLES = 20
 SINGLE_MATCH_MARGIN = .015
 SINGLE_SYMBOL_MARGIN = .01
+LEARNED_DUAL_FRAME_MARGIN = .05
+LEARNED_MAXIMUM_CFO_DIFFERENCE_HZ = 15_000
 
 DETECTION_GATES = {
     "coherent_grid_v1": {
@@ -69,7 +73,9 @@ def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str
                          start_sample: int = 0, acquisition_span_hz: float = 0,
                          acquisition_step_hz: float = 500_000,
                          exact_subband_rate_hz: float = 2_500_000,
-                         acquisition_method: str = "coherent_grid_v1") -> dict:
+                         acquisition_method: str = "coherent_grid_v1",
+                         learned_templates: tuple[np.ndarray, np.ndarray] | None = None,
+                         learned_template_source: str | None = None) -> dict:
     """Apply all exact/control gates to one paired-IQ window."""
     paired = np.asarray(values, np.complex64)
     if paired.ndim != 2 or paired.shape[1] != 2:
@@ -102,21 +108,74 @@ def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str
                           margins[index] >= gates["qualified_symbol_margin"] and
                           coherences[index] >= gates["qualified_coherence"]
                           for index in range(2)]
-    candidate = (min(match_margins) >= gates["dual_match_margin"] and
-                 min(margins) >= gates["dual_symbol_margin"] and
-                 epoch_difference <= gates["dual_epoch_delta_samples"])
+    pilot_candidate = (min(match_margins) >= gates["dual_match_margin"] and
+                       min(margins) >= gates["dual_symbol_margin"] and
+                       epoch_difference <= gates["dual_epoch_delta_samples"])
+    full_frame_evidence = {"available": False, "candidate": False,
+                           "template_source": learned_template_source,
+                           "receivers": []}
+    if learned_templates is not None:
+        if len(learned_templates) != 2:
+            raise ValueError("learned templates must contain exactly two receivers")
+        learned_receivers = []
+        for receiver, template in enumerate(learned_templates):
+            source = receivers[receiver]
+            observation = conditioned_frame_observations(
+                paired[:, receiver], source_rate_hz,
+                epoch_sample=int(source["acquisition"]["selected_epoch_sample"]),
+                coarse_cfo_hz=float(source["pilot"]["frequency_offset_hz"]),
+                absolute_start_sample=start_sample, edge=edge,
+                minimum_margin=0, template=template)
+            best = int(np.argmax(observation["score_margin"]))
+            learned_receivers.append({
+                "receiver": receiver,
+                "best_frame_index": best,
+                "best_frame_start_sample": int(observation["frame_start_sample"][best]),
+                "frequency_offset_hz": float(observation["frequency_offset_hz"][best]),
+                "formal_sigma_hz": float(observation["formal_sigma_hz"][best]),
+                "exact_score": float(observation["exact_score"][best]),
+                "control_score": float(observation["control_score"][best]),
+                "score_margin": float(observation["score_margin"][best]),
+                "median_score_margin": float(np.median(observation["score_margin"])),
+            })
+        learned_cfo_difference = abs(
+            learned_receivers[0]["frequency_offset_hz"] -
+            learned_receivers[1]["frequency_offset_hz"])
+        learned_candidate = bool(
+            min(item["score_margin"] for item in learned_receivers) >=
+                LEARNED_DUAL_FRAME_MARGIN and
+            epoch_difference <= gates["dual_epoch_delta_samples"] and
+            learned_cfo_difference <= LEARNED_MAXIMUM_CFO_DIFFERENCE_HZ)
+        full_frame_evidence = {
+            "available": True,
+            "candidate": learned_candidate,
+            "template_source": learned_template_source,
+            "receivers": learned_receivers,
+            "cfo_difference_hz": float(learned_cfo_difference),
+            "gates": {"minimum_dual_frame_margin": LEARNED_DUAL_FRAME_MARGIN,
+                      "maximum_epoch_delta_samples": gates[
+                          "dual_epoch_delta_samples"],
+                      "maximum_cfo_difference_hz":
+                          LEARNED_MAXIMUM_CFO_DIFFERENCE_HZ},
+        }
+    learned_candidate = bool(full_frame_evidence["candidate"])
+    candidate = bool(pilot_candidate or learned_candidate)
     qualified = (min(match_margins) >= gates["qualified_match_margin"] and
                  min(margins) >= gates["qualified_symbol_margin"] and
                  min(coherences) >= gates["qualified_coherence"] and
                  epoch_difference <= gates["qualified_epoch_delta_samples"])
-    followup_trigger = bool(any(receiver_candidates) or
+    followup_trigger = bool(learned_candidate or any(receiver_candidates) or
                             (epoch_difference <= gates["dual_epoch_delta_samples"] and
                              max(match_margins) >= gates["dual_match_margin"]))
     return {"start_sample": int(start_sample), "start_s": start_sample / source_rate_hz,
             "duration_s": paired.shape[0] / source_rate_hz, "receivers": receivers,
             "epoch_difference_samples": epoch_difference,
             "pss_epoch_difference_samples": pss_epoch_difference,
-            "cfo_difference_hz": cfo_difference, "candidate": bool(candidate),
+            "cfo_difference_hz": cfo_difference, "candidate": candidate,
+            "candidate_basis": ([basis for basis, present in
+                                  (("published_pilot", pilot_candidate),
+                                   ("learned_full_frame", learned_candidate)) if present]),
+            "full_frame_evidence": full_frame_evidence,
             "qualified": bool(qualified), "receiver_candidates": receiver_candidates,
             "receiver_qualified": receiver_qualified, "followup_trigger": followup_trigger,
             "detection_gates": gates, "exact_acquisition_method": acquisition_method}
@@ -152,7 +211,8 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                     exact_subband_rate_hz: float = 2_500_000,
                     exact_acquisition_method: str = "coherent_grid_v1",
                     exact_start_s: float = 0,
-                    exact_stop_s: float | None = None) -> dict:
+                    exact_stop_s: float | None = None,
+                    learned_beacon_path: Path | None = None) -> dict:
     """Analyze independent windows without loading a complete long capture into RAM."""
     if min(window_s, maximum_analysis_rate_hz, exact_interval_s, exact_window_s,
            acquisition_step_hz, exact_subband_rate_hz) <= 0:
@@ -176,6 +236,18 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
     carry = np.empty((0, 2), np.complex64)
     region = capture.manifest.get("metadata", {}).get("region", "center")
     edge = region.removesuffix("-edge") if region in ("lower-edge", "upper-edge") else None
+    learned_templates = None
+    learned_template_source = None
+    if learned_beacon_path is not None:
+        learned_report, learned_arrays = load_learned_beacon(learned_beacon_path)
+        if not learned_report.get("summary", {}).get("qualified", False):
+            raise ValueError("learned beacon did not pass held-out qualification")
+        if (abs(float(learned_report["sample_rate_hz"]) - source_rate) > 1e-6 or
+                learned_report["region"] != region):
+            raise ValueError("learned beacon rate or region does not match capture")
+        learned_templates = tuple(learned_arrays[f"template_rx{receiver}"]
+                                  for receiver in range(2))
+        learned_template_source = str(Path(learned_beacon_path).resolve())
     for record, values in capture.chunks():
         chunk_stop = record.first_sample_index + record.sample_count
         while edge and next_exact_sample < chunk_stop and next_exact_sample < exact_stop_sample:
@@ -196,7 +268,9 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                 start_sample=next_exact_sample, acquisition_span_hz=acquisition_span_hz,
                 acquisition_step_hz=acquisition_step_hz,
                 exact_subband_rate_hz=exact_subband_rate_hz,
-                acquisition_method=exact_acquisition_method))
+                acquisition_method=exact_acquisition_method,
+                learned_templates=learned_templates,
+                learned_template_source=learned_template_source))
             next_exact_sample += round(exact_interval_s * source_rate)
         selected = values[::decimation]
         combined = np.concatenate((carry, selected), axis=0)
@@ -226,6 +300,7 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                      "acquisition_step_hz": acquisition_step_hz,
                      "exact_subband_rate_hz": min(source_rate, exact_subband_rate_hz),
                      "exact_acquisition_method": exact_acquisition_method,
+                     "learned_beacon": learned_template_source,
                      "detection_gates": detection_gates(exact_acquisition_method),
                      "exact_start_s": exact_start_s, "exact_stop_s": exact_stop_s},
         "windows": windows,

@@ -15,6 +15,7 @@ from sgp4.api import Satrec, SatrecArray, jday
 
 from .artifacts import PASSES_SCHEMA, TLECatalogArtifact, parse_catalog, parse_utc, utc_iso
 from .archive import archive_catalog
+from .association import associate_tracks
 from .doppler import predicted_doppler_hz
 from .topocentric import Observer
 from leo_tracker.passes import predict_passes, sample_track
@@ -138,6 +139,30 @@ def _parser() -> argparse.ArgumentParser:
     source.add_argument("--url", help="fetch and archive a new catalog")
     archive.add_argument("--archive-dir", type=Path, required=True)
     archive.add_argument("--label", default="starlink")
+    associate = commands.add_parser("associate",
+        help="rank archived TLEs against a continuous 10 Hz Starlink Doppler track")
+    associate.add_argument("--observations", type=Path, required=True)
+    associate.add_argument("--catalog", type=Path, required=True)
+    associate.add_argument("--lat", type=float, required=True)
+    associate.add_argument("--lon", type=float, required=True)
+    associate.add_argument("--alt-m", type=float, default=0.0)
+    associate.add_argument("--horizon-deg", type=float, default=5.0)
+    associate.add_argument("--candidate-limit", type=int, default=256)
+    associate.add_argument("--minimum-duration-s", type=float, default=20.0)
+    associate.add_argument("--minimum-dual-epochs", type=int, default=45)
+    associate.add_argument("--minimum-coverage-fraction", type=float, default=.18)
+    associate.add_argument("--epoch-search-s", type=float, default=2.5,
+        help=("bounded along-track time search; Kassas et al. report small "
+              "epoch corrections, and broad searches admit unrelated Starlink arcs"))
+    associate.add_argument("--epoch-step-s", type=float, default=.05)
+    associate.add_argument("--epoch-coarse-step-s", type=float, default=.5,
+        help="coarse TLE epoch grid before fine local refinement")
+    associate.add_argument("--prediction-step-s", type=float, default=.1)
+    associate.add_argument("--maximum-nuisance-drift-hz-s", type=float, default=200.0,
+        help="physical bound preventing LNB drift from absorbing orbital Doppler slope")
+    associate.add_argument("--maximum-holdout-rms-hz", type=float, default=500.0)
+    associate.add_argument("--minimum-margin-hz", type=float, default=100.0)
+    associate.add_argument("--output", type=Path, required=True)
     for name in ("passes", "schedule"):
         command = commands.add_parser(name, help="predict visible passes" if name == "passes" else "create a recording schedule")
         command.add_argument("--catalog", type=Path, required=True)
@@ -169,6 +194,25 @@ def main(argv: list[str] | None = None) -> int:
                     fetch_catalog(args.url))
         result = archive_catalog(artifact, args.archive_dir, label=args.label)
         print(json.dumps(result, sort_keys=True))
+        return 0
+    if args.command == "associate":
+        if args.candidate_limit < 0:
+            raise ValueError("candidate limit cannot be negative")
+        result = associate_tracks(
+            args.observations, args.catalog, args.output,
+            observer=Observer(args.lat, args.lon, args.alt_m),
+            horizon_deg=args.horizon_deg, candidate_limit=args.candidate_limit,
+            minimum_duration_s=args.minimum_duration_s,
+            minimum_dual_epochs=args.minimum_dual_epochs,
+            minimum_coverage_fraction=args.minimum_coverage_fraction,
+            epoch_search_s=args.epoch_search_s, epoch_step_s=args.epoch_step_s,
+            epoch_coarse_step_s=args.epoch_coarse_step_s,
+            prediction_step_s=args.prediction_step_s,
+            maximum_nuisance_drift_hz_s=args.maximum_nuisance_drift_hz_s,
+            maximum_holdout_rms_hz=args.maximum_holdout_rms_hz,
+            minimum_margin_hz=args.minimum_margin_hz)
+        print(json.dumps({"association": str(args.output), **result["summary"]},
+                         sort_keys=True))
         return 0
     catalog = TLECatalogArtifact.read(args.catalog)
     if args.candidate_limit < 0:

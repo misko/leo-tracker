@@ -53,6 +53,7 @@ class FakePairedSource:
         if self.values[0].shape != self.values[1].shape: raise ValueError("fake channels differ in shape")
         self._configs = (replace(config, channel=0), replace(config, channel=1))
         self.block_size, self.start_utc_ns, self.closed = block_size, start_utc_ns, False
+        self.retune_history: list[float] = []
 
     @property
     def configs(self): return self._configs
@@ -64,6 +65,10 @@ class FakePairedSource:
             yield PairedSampleBlock(self.values[0][start:start+self.block_size],
                                     self.values[1][start:start+self.block_size], start, utc)
     def close(self): self.closed = True
+    def retune(self, center_frequency_hz: float):
+        if center_frequency_hz <= 0:
+            raise ValueError("center frequency must be positive")
+        self.retune_history.append(float(center_frequency_hz))
 
 
 def capture_pair_to_artifacts(source: PairedRadioSource, destination: str | Path, *,

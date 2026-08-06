@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import datetime
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -13,7 +14,8 @@ import pytest
 from scipy.signal import resample_poly
 
 from leo_tracker.radio.cli import main
-from leo_tracker.radio.beacon.analysis import (analyze_capture, detection_gates,
+from leo_tracker.radio.beacon.analysis import (analyze_capture, analyze_exact_window,
+                                               detection_gates,
                                                summarize_doppler_track)
 from leo_tracker.radio.beacon.acquisition import (acquire_exact_receiver,
     acquisition_centers, extract_complex_subband)
@@ -83,6 +85,80 @@ def test_published_lower_edge_pilot_codes_and_waveform():
     assert edge_pilot_frame(2_500_000).shape == (3333,)
     assert edge_pilot_symbols("upper").shape == (300, 8)
     assert edge_pilot_frame(2_500_000, "upper").shape == (3333,)
+
+
+def test_learned_full_frame_is_an_independent_dual_receiver_acquisition_gate(
+        monkeypatch):
+    rate = 2_500_000.0; epoch = 137; count = round(.01 * rate)
+    rng = np.random.default_rng(411)
+    template = (rng.normal(size=3333) + 1j * rng.normal(size=3333)).astype(np.complex64)
+    template /= np.linalg.norm(template)
+    cfos = (12_345.0, 12_405.0)
+    paired = np.column_stack([(rng.normal(size=count) + 1j * rng.normal(size=count))
+                              for _ in range(2)]).astype(np.complex64)
+    period = rate / 750
+    for receiver, cfo in enumerate(cfos):
+        frame = 0
+        while True:
+            start = epoch + round(frame * period)
+            if start + template.size > count:
+                break
+            indexes = np.arange(template.size) + start
+            paired[start:start + template.size, receiver] += (
+                500 * template * np.exp(2j * np.pi * cfo * indexes / rate))
+            frame += 1
+    calls = 0
+
+    def weak_pilot(*_args, **_kwargs):
+        nonlocal calls
+        receiver = calls; calls += 1
+        return {"pss": {"epoch_sample": epoch},
+            "pilot": {"frequency_offset_hz": cfos[receiver],
+                      "score_margin": 0.0, "coherence": 0.0},
+            "acquisition": {"subband_rate_hz": rate,
+                "selected_epoch_sample": epoch, "match_score_margin": 0.0}}
+
+    monkeypatch.setattr("leo_tracker.radio.beacon.analysis.acquire_exact_receiver",
+                        weak_pilot)
+    result = analyze_exact_window(paired, rate, edge="lower",
+        acquisition_method="pilot_symbolwise_v3",
+        learned_templates=(template, template),
+        learned_template_source="qualified-template.json")
+
+    assert result["candidate"]
+    assert result["candidate_basis"] == ["learned_full_frame"]
+    assert result["full_frame_evidence"]["candidate"]
+    assert result["full_frame_evidence"]["template_source"] == "qualified-template.json"
+    assert min(item["score_margin"] for item in
+               result["full_frame_evidence"]["receivers"]) > .5
+    assert [item["frequency_offset_hz"] for item in
+            result["full_frame_evidence"]["receivers"]] == pytest.approx(cfos, abs=3)
+
+
+def test_learned_full_frame_dual_gate_rejects_independent_noise(monkeypatch):
+    rate = 2_500_000.0; epoch = 137; count = round(.01 * rate)
+    rng = np.random.default_rng(412)
+    template = (rng.normal(size=3333) + 1j * rng.normal(size=3333)).astype(np.complex64)
+    template /= np.linalg.norm(template)
+    paired = (rng.normal(size=(count, 2)) +
+              1j * rng.normal(size=(count, 2))).astype(np.complex64)
+
+    def weak_pilot(*_args, **_kwargs):
+        return {"pss": {"epoch_sample": epoch},
+            "pilot": {"frequency_offset_hz": 12_345.0,
+                      "score_margin": 0.0, "coherence": 0.0},
+            "acquisition": {"subband_rate_hz": rate,
+                "selected_epoch_sample": epoch, "match_score_margin": 0.0}}
+
+    monkeypatch.setattr("leo_tracker.radio.beacon.analysis.acquire_exact_receiver",
+                        weak_pilot)
+    result = analyze_exact_window(paired, rate, edge="lower",
+        acquisition_method="pilot_symbolwise_v3",
+        learned_templates=(template, template))
+
+    assert not result["candidate"]
+    assert not result["full_frame_evidence"]["candidate"]
+    assert result["candidate_basis"] == []
 
 
 def test_exact_pss_noncoherent_frame_folding_finds_epoch():
@@ -317,6 +393,11 @@ def test_chunked_beacon_capture_round_trip_and_checksums(tmp_path):
     assert report["stored_bytes"] == size * 8
     assert report["stream_timing"]["read_count"] == 7
     assert report["stream_timing"]["maximum_read_duration_s"] > 0
+    assert len(report["stream_timing"]["clock_samples"]) == 7
+    assert [item["first_sample_index"] for item in
+            report["stream_timing"]["clock_samples"]] == sorted(
+                item["first_sample_index"] for item in
+                report["stream_timing"]["clock_samples"])
 
 
 def test_beacon_capture_records_hardware_gain_and_adc_utilization(tmp_path):
@@ -426,9 +507,10 @@ def test_exact_replay_can_be_restricted_to_a_targeted_time_interval(tmp_path):
     assert report["analysis"]["exact_acquisition_method"] == "pss_symbolwise_v2"
 
 
-def test_retention_preserves_candidates_and_bounds_negative_ring(tmp_path):
+def test_retention_preserves_confirmed_and_pending_and_bounds_rejections(tmp_path):
     root = tmp_path / "store"
-    (root / "captures").mkdir(parents=True); (root / "reports").mkdir()
+    (root / "captures").mkdir(parents=True)
+    (root / "reports" / "followups").mkdir(parents=True)
     for index, candidates in enumerate((0, 1, 0, 0)):
         capture = root / "captures" / f"capture-{index}"
         capture.mkdir()
@@ -438,12 +520,159 @@ def test_retention_preserves_candidates_and_bounds_negative_ring(tmp_path):
         (root / "reports" / f"capture-{index}.json").write_text(json.dumps({
             "summary": {"exact_candidate_count": candidates,
                         "single_receiver_candidate_count": int(index == 3)}}) + "\n")
+        if index < 3:
+            (root / "reports" / "followups" / f"capture-{index}.json").write_text(
+                json.dumps({"confirmation": {"confirmed": index == 1}}) + "\n")
     report = apply_retention(root, keep_negative=1)
     assert not (root / "captures" / "capture-0").exists()
     assert (root / "captures" / "capture-1").exists()
     assert (root / "captures" / "capture-2").exists()
     assert (root / "captures" / "capture-3").exists()
     assert report["removed"] == [str(root / "captures" / "capture-0")]
+
+
+def test_retention_bounds_only_fully_derived_confirmed_iq_and_preserves_template_source(
+        tmp_path):
+    root = tmp_path / "store"
+    for directory in ("captures", "reports/followups", "reports/decoded",
+                      "reports/tracks", "reports/learned-beacons"):
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    for index in range(5):
+        name = f"confirmed-{index}"
+        capture = root / "captures" / name; capture.mkdir()
+        (capture / "manifest.json").write_text(json.dumps({
+            "schema": "leo-tracker.beacon-iq/v1", "state": "complete",
+            "created_utc_ns": index}) + "\n")
+        (root / "reports" / f"{name}.json").write_text("{}\n")
+        (root / "reports" / "followups" / f"{name}.json").write_text(
+            json.dumps({"confirmation": {"confirmed": True}}) + "\n")
+        if index != 1:  # incomplete derivatives remain protected regardless of age
+            (root / "reports" / "decoded" / f"{name}.json").write_text("{}\n")
+            (root / "reports" / "tracks" / f"{name}.json").write_text("{}\n")
+    (root / "reports" / "learned-beacons" / "active.json").write_text(json.dumps({
+        "capture": str((root / "captures" / "confirmed-0").resolve())}) + "\n")
+
+    dry = apply_retention(root, keep_confirmed=2, dry_run=True)
+    assert dry["removed_confirmed"] == [str(root / "captures" / "confirmed-2")]
+    assert all((root / "captures" / f"confirmed-{index}").exists()
+               for index in range(5))
+
+    report = apply_retention(root, keep_confirmed=2)
+    assert report["removed_confirmed"] == [str(root / "captures" / "confirmed-2")]
+    assert (root / "captures" / "confirmed-0").exists()
+    assert (root / "captures" / "confirmed-1").exists()
+    assert not (root / "captures" / "confirmed-2").exists()
+    assert (root / "captures" / "confirmed-3").exists()
+    assert (root / "captures" / "confirmed-4").exists()
+
+
+def test_retention_durably_pins_channel_link_sources_after_association_changes(tmp_path):
+    root = tmp_path / "store"
+    for directory in ("captures", "reports/followups", "reports/decoded",
+                      "reports/tracks", "reports/channel-links", "reports/associations"):
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    for index in range(3):
+        name = f"narrow-{index}"
+        capture = root / "captures" / name; capture.mkdir()
+        (capture / "manifest.json").write_text(json.dumps({
+            "schema": "leo-tracker.beacon-iq/v1", "state": "complete",
+            "created_utc_ns": index,
+            "metadata": {"observation_mode": "narrow"}}) + "\n")
+        (root / "reports" / f"{name}.json").write_text("{}\n")
+        (root / "reports" / "followups" / f"{name}.json").write_text(
+            json.dumps({"confirmation": {"confirmed": True}}) + "\n")
+        (root / "reports" / "decoded" / f"{name}.json").write_text("{}\n")
+    track = root / "reports" / "tracks" / "narrow-0.json"
+    track.write_text(json.dumps({
+        "capture": str((root / "captures" / "narrow-0").resolve())}) + "\n")
+    linked = root / "reports" / "channel-links" / "rolling.json"
+    linked.write_text(json.dumps({"source_track_artifacts": [str(track)]}) + "\n")
+    association = root / "reports" / "associations" / "rolling.json"
+    association.write_text(json.dumps({
+        "source_observations": str(linked),
+        "associations": [{"qualified": True, "best_norad_id": 68000}]}) + "\n")
+
+    report = apply_retention(root, keep_confirmed=0)
+    pinned = str((root / "captures" / "narrow-0").resolve())
+    assert report["newly_pinned"] == [pinned]
+    assert (root / "captures" / "narrow-0").is_dir()
+    assert not (root / "captures" / "narrow-1").exists()
+    assert not (root / "captures" / "narrow-2").exists()
+    ledger = json.loads(Path(report["qualified_pin_ledger"]).read_text())
+    assert ledger["schema"] == "leo-tracker.qualified-capture-pins/v1"
+    assert ledger["captures"][0]["path"] == pinned
+
+    # A rolling association can later be overwritten by a new sky interval.
+    # Its historical source must remain pinned by the durable ledger.
+    association.write_text(json.dumps({
+        "source_observations": str(linked),
+        "associations": [{"qualified": False}]}) + "\n")
+    second = apply_retention(root, keep_confirmed=0)
+    assert second["newly_pinned"] == []
+    assert second["qualified_capture_pins"] == [pinned]
+    assert (root / "captures" / "narrow-0").is_dir()
+
+
+def test_retention_bounds_complete_hop_sessions_but_preserves_pending_and_qualified(
+        tmp_path):
+    root = tmp_path / "store"
+    for directory in ("captures", "hop-sessions", "reports/followups",
+                      "reports/tracks", "reports/associations"):
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    children = []
+    for index in range(4):
+        session = root / "hop-sessions" / f"hop-{index}"
+        child = session / "00-ch1-lower-edge"; child.mkdir(parents=True)
+        children.append(child)
+        (child / "manifest.json").write_text(json.dumps({
+            "schema": "leo-tracker.beacon-iq/v1", "state": "complete",
+            "created_utc_ns": index,
+            "metadata": {"observation_mode": "channel-hop"}}) + "\n")
+        report_name = f"{session.name}-{child.name}"
+        (root / "reports" / f"{report_name}.json").write_text("{}\n")
+        if index != 3:  # an incomplete analysis session is never aged out
+            (root / "reports" / "followups" / f"{report_name}.json").write_text(
+                json.dumps({"confirmation": {"confirmed": False}}) + "\n")
+    track = root / "reports" / "tracks" / "hop-0.json"
+    track.write_text(json.dumps({"capture": str(children[0].resolve())}) + "\n")
+    (root / "reports" / "associations" / "hop-qualified.json").write_text(json.dumps({
+        "source_observations": str(track),
+        "associations": [{"qualified": True}]}) + "\n")
+
+    report = apply_retention(root, keep_hop_sessions=1)
+    assert (root / "hop-sessions" / "hop-0").is_dir()  # qualified
+    assert not (root / "hop-sessions" / "hop-1").exists()
+    assert (root / "hop-sessions" / "hop-2").is_dir()  # newest completed
+    assert (root / "hop-sessions" / "hop-3").is_dir()  # pending
+    assert report["removed_hop_sessions"] == [str(root / "hop-sessions" / "hop-1")]
+    assert str(root / "hop-sessions" / "hop-3") in report["protected_hop_sessions"]
+
+
+def test_retention_uses_small_separate_rings_for_wide_and_oversampled_iq(tmp_path):
+    root = tmp_path / "store"
+    for directory in ("captures", "reports/followups", "reports/decoded"):
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    for mode in ("wide", "oversample"):
+        for index in range(3):
+            name = f"capture-{mode}-{index}"
+            capture = root / "captures" / name; capture.mkdir()
+            (capture / "manifest.json").write_text(json.dumps({
+                "schema": "leo-tracker.beacon-iq/v1", "state": "complete",
+                "created_utc_ns": index,
+                "metadata": {"observation_mode": mode}}) + "\n")
+            (root / "reports" / f"{name}.json").write_text("{}\n")
+            (root / "reports" / "followups" / f"{name}.json").write_text(
+                json.dumps({"confirmation": {"confirmed": False}}) + "\n")
+
+    report = apply_retention(root, keep_wide=1, keep_oversample=2)
+    assert report["removed_wide"] == [
+        str(root / "captures" / "capture-wide-0"),
+        str(root / "captures" / "capture-wide-1")]
+    assert report["removed_oversample"] == [
+        str(root / "captures" / "capture-oversample-0")]
+    assert (root / "captures" / "capture-wide-2").is_dir()
+    assert (root / "captures" / "capture-oversample-1").is_dir()
+    assert (root / "captures" / "capture-oversample-2").is_dir()
 
 
 def test_recovery_analyzes_complete_unreported_capture_and_is_idempotent(tmp_path):
@@ -554,6 +783,17 @@ def test_temporal_followup_requires_consecutive_stable_epoch_and_cfo():
         dual_point(2.0, 100, (-100_000, -97_000)),
         dual_point(2.1, 2_000, (-100_400, -95_000))], interval_s=.1)
     assert not divergent["confirmed"]
+
+    learned = [dual_point(3.0, 100, (-200_000, 100_000)),
+               dual_point(3.1, 100, (150_000, -200_000))]
+    for point_value, frequencies in zip(
+            learned, ((-100_000, -97_000), (-100_400, -97_450)), strict=True):
+        point_value["full_frame_evidence"] = {"candidate": True,
+            "receivers": [{"frequency_offset_hz": value} for value in frequencies]}
+    learned_confirmation = summarize_temporal_confirmation(learned, interval_s=.1)
+    assert learned_confirmation["dual_receiver_confirmed"]
+    assert learned_confirmation["dual_receiver_links"][0][
+        "slope_difference_hz_s"] == pytest.approx(500)
 
 
 def test_followup_without_triggers_is_fast_idempotent_cli_artifact(tmp_path):
@@ -797,23 +1037,84 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert 'LEO_BEACON_WIDE_EVERY_CYCLES:-15' in script
     assert 'LEO_BEACON_OVERSAMPLE_EVERY_CYCLES:-10' in script
     assert 'LEO_BEACON_OVERSAMPLE_ON_STARTUP:-1' in script
-    assert "Exactly one analyzer is allowed" in script
-    assert "start_pending_analysis" in script
+    assert 'LEO_BEACON_HOP_EVERY_CYCLES:-2' in script
+    assert 'LEO_BEACON_HOP_BURST_SESSIONS:-3' in script
+    assert 'LEO_BEACON_HOP_CHANNELS:-1 2 3 4' in script
+    assert 'LEO_BEACON_HOP_DWELL_S:-2' in script
+    assert 'LEO_BEACON_HOP_EXACT_INTERVAL_S:-0.7' in script
+    assert 'LEO_BEACON_HOP_EXACT_WINDOW_S:-0.02' in script
+    assert 'LEO_BEACON_HOP_ACQUISITION_METHOD:-pilot_symbolwise_v3' in script
+    assert "starlink-beacon-hop-capture" in script
+    assert 'pending_mode="hop"' in script
+    assert "analysis_worker" in script
+    assert "analysis_worker ordinary &" in script
+    assert "analysis_worker hop &" in script
+    # The ordinary worker must not regress to unbounded FIFO latency when
+    # expensive full-frame analysis falls behind acquisition. Four newest jobs
+    # are selected for every oldest recovery job, preserving both freshness
+    # and eventual durable backlog progress.
+    assert "ordinary_selection_count=1" in script
+    assert "$((ordinary_selection_count % 5)) -ne 0" in script
+    assert "index=$((${#jobs[@]} - 1))" in script
+    assert "ordinary_selection_count=$((ordinary_selection_count + 1))" in script
+    assert '.running.${BASHPID}' in script
+    assert 'running_jobs=("${analysis_queue}"/*.running.*)' in script
+    assert "terminate_process_tree" in script
+    assert "enqueue_pending_analysis" in script
+    assert 'analysis_queue="${storage_root}/staging/analysis-queue"' in script
+    assert 'analysis_execution_lock="${storage_root}/staging/analysis-execution.lock"' in script
+    assert 'exec 8>"${analysis_execution_lock}"' in script
+    assert "flock 8" in script
     assert 'LEO_BEACON_MAX_CYCLES:-0' in script
     assert "--sample-rate-hz 10000000" in script
     assert "--sample-rate-hz 5000000" in script
+    assert '--sample-rate-hz 2500000' in script
+    assert '--bandwidth-hz 2500000' in script
     assert "--bandwidth-hz 3000000" in script
     assert "--acquisition-span-hz 3500000" in script
     assert 'LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3' in script
-    assert 'LEO_BEACON_NARROW_EXACT_INTERVAL_S:-3' in script
+    assert 'LEO_BEACON_NARROW_EXACT_INTERVAL_S:-6' in script
     assert 'LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10' in script
+    assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-5' in script
+    assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-5000' in script
+    assert 'LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600' in script
     assert '--exact-acquisition-method "${exact_acquisition_method}"' in script
+    assert '--exact-acquisition-method "${analysis_method}"' in script
+    assert 'template_analysis_args=(--beacon-template "${learned_beacon}")' in script
+    assert '"${analysis_args[@]}" "${template_analysis_args[@]}"' in script
     assert "--plot \"${plot}\"" in script
     assert "starlink-beacon-recover" in script
+    assert "recover_startup" in script
+    assert '"startup_recovery_deferred":true' in script
     assert "starlink-beacon-followup" in script
     assert "starlink-beacon-decode" in script
     assert "starlink-beacon-fingerprint" in script
+    assert "starlink-beacon-track" in script
+    assert "starlink-beacon-frame-track" in script
+    assert "starlink-beacon-channel-link" in script
+    assert "refresh_capture_links" in script
+    capture_link_function = script.split("refresh_capture_links() {", 1)[1].split(
+        "refresh_rolling_narrow_links() {", 1)[0]
+    assert '"capture_link_unavailable":true' in capture_link_function
+    assert "return 0" in capture_link_function
+    assert capture_link_function.index("return 0") < capture_link_function.index(
+        'associate --observations "${linked}"')
+    assert "refresh_rolling_narrow_links" in script
+    assert 'channel-links/rolling-${channel}-${region}.json' in script
+    assert '--maximum-gap-s 45' in script
+    assert "--maximum-same-tuning-quadratic-rms-hz 2000" in script
+    assert "--minimum-dual-epochs 30 --minimum-coverage-fraction .1" in script
+    assert "reports/frame-tracks" in script
+    assert '--maximum-gap-s "${track_maximum_gap_s}"' in script
+    assert '--measurement-source conditioned_frames' in script
+    assert '--measurement-source dense_followup' in script
+    assert '("${mode}" == "narrow" || "${mode}" == "hop")' in script
+    assert '"dual_valid_frame_count": [1-9]' in script
+    assert '"conditioned_frame_track_empty":true' in script
+    assert "leo-orbit" in script and "associate --observations" in script
+    assert "reports/tracks" in script and "reports/associations" in script
     assert '[[ "${mode}" != "wide" && -f "${confirmation_marker}" ]]' in script
+    assert '"dual_receiver_confirmed": true' in script
     assert "starlink-beacon-calibrate" in script
     assert "LEO_BEACON_MAX_PI_TEMP_MILLIC" in script
     assert 'LEO_BEACON_AGC_PERCENT:-50' in script
@@ -821,6 +1122,8 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "--gain-experiment-id" in script
     assert "starlink-beacon-gain-summary" in script
     assert "starlink-beacon-dashboard-index" in script
+    assert '[[ "${mode}" != "hop" ]]' in script
+    assert '[[ "${mode}" != "hop" || -f "${confirmation_marker}" ]]' in script
 
 
 def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
@@ -830,6 +1133,7 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
         "LEO_TRACKER_REPO": str(repo), "LEO_BEACON_STORAGE": str(storage),
         "LEO_BEACON_DWELL_S": ".04", "LEO_BEACON_WIDE_DWELL_S": ".04",
         "LEO_BEACON_OVERSAMPLE_ON_STARTUP": "0",
+        "LEO_BEACON_HOP_EVERY_CYCLES": "0",
         "LEO_BEACON_WIDE_EVERY_CYCLES": "1",
         "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
         "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
@@ -857,6 +1161,13 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
         assert metadata["agc_assignment_probability"] == .5
         assert metadata["assigned_gain_mode"] in {"manual", "slow_attack"}
         assert (storage / "reports" / "followups" / report_path.name).is_file()
+    by_mode = {json.loads(path.read_text())["capture_manifest"]["metadata"]
+               ["observation_mode"]: json.loads(path.read_text()) for path in reports}
+    # The wide comparison began while the prior narrow report was still being
+    # computed: the capture scheduler is independent from the serialized worker.
+    assert by_mode["wide"]["capture_manifest"]["created_utc_ns"] < int(
+        datetime.fromisoformat(by_mode["narrow"]["created_utc"]).timestamp() * 1e9)
+    assert not list((storage / "staging" / "analysis-queue").glob("*.job"))
     assert (storage / "reports" / "calibration" / "calibration.json").is_file()
     fingerprint_index = storage / "reports" / "fingerprints" / "index.json"
     assert json.loads(fingerprint_index.read_text())["fingerprint_count"] == 0
@@ -865,6 +1176,69 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
     assert gain_summary["randomized_capture_count"] == 2
     dashboard_index = json.loads((storage / "reports" / "dashboard-index.json").read_text())
     assert len(dashboard_index["recordings"]) == 2
+
+
+def test_beacon_watch_fake_e2e_claims_ordinary_and_hop_jobs_exactly_once(tmp_path):
+    repo = Path(__file__).parents[1]
+    storage = tmp_path / "dual-worker-store"
+    environment = os.environ | {
+        "LEO_TRACKER_REPO": str(repo), "LEO_BEACON_STORAGE": str(storage),
+        "LEO_BEACON_DWELL_S": ".04", "LEO_BEACON_OVERSAMPLE_ON_STARTUP": "0",
+        "LEO_BEACON_OVERSAMPLE_EVERY_CYCLES": "0",
+        "LEO_BEACON_WIDE_EVERY_CYCLES": "0",
+        "LEO_BEACON_HOP_EVERY_CYCLES": "1",
+        "LEO_BEACON_HOP_BURST_SESSIONS": "1",
+        "LEO_BEACON_HOP_CHANNELS": "1 2", "LEO_BEACON_HOP_DWELL_S": ".04",
+        "LEO_BEACON_HOP_SETTLE_BUFFERS": "0",
+        "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
+        "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
+        "UV_CACHE_DIR": str(repo / ".uv-cache"), "UV_BIN": shutil.which("uv") or "uv"}
+
+    result = subprocess.run(["bash", str(repo / "scripts/starlink-beacon-watch.sh")],
+        cwd=repo, env=environment, text=True, capture_output=True, timeout=180)
+
+    assert result.returncode == 0, result.stderr
+    reports = [path for path in (storage / "reports").glob("*.json")
+               if path.name != "dashboard-index.json"]
+    assert len(reports) == 3
+    modes = [json.loads(path.read_text())["capture_manifest"]["metadata"]
+             ["observation_mode"] for path in reports]
+    assert modes.count("narrow") == 1
+    assert modes.count("channel-hop") == 2
+    queue = storage / "staging" / "analysis-queue"
+    assert not list(queue.glob("*.job"))
+    assert not list(queue.glob("*.running.*"))
+    assert not list(queue.glob("*.failed"))
+
+
+def test_beacon_watch_default_cadence_runs_three_sessions_after_second_cycle(tmp_path):
+    repo = Path(__file__).parents[1]
+    storage = tmp_path / "three-session-store"
+    environment = os.environ | {
+        "LEO_TRACKER_REPO": str(repo), "LEO_BEACON_STORAGE": str(storage),
+        "LEO_BEACON_DWELL_S": ".04", "LEO_BEACON_OVERSAMPLE_ON_STARTUP": "0",
+        "LEO_BEACON_OVERSAMPLE_EVERY_CYCLES": "0",
+        "LEO_BEACON_WIDE_EVERY_CYCLES": "0",
+        "LEO_BEACON_HOP_CHANNELS": "1 2", "LEO_BEACON_HOP_DWELL_S": ".04",
+        "LEO_BEACON_HOP_SETTLE_BUFFERS": "0",
+        "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "2",
+        "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
+        "UV_CACHE_DIR": str(repo / ".uv-cache"), "UV_BIN": shutil.which("uv") or "uv"}
+
+    result = subprocess.run(["bash", str(repo / "scripts/starlink-beacon-watch.sh")],
+        cwd=repo, env=environment, text=True, capture_output=True, timeout=180)
+
+    assert result.returncode == 0, result.stderr
+    sessions = sorted((storage / "hop-sessions").glob("hop-lower-edge-*-b??"))
+    assert len(sessions) == 3
+    assert all(len(list(session.glob("[0-9][0-9]-ch*-lower-edge"))) == 2
+               for session in sessions)
+    reports = [path for path in (storage / "reports").glob("*.json")
+               if path.name != "dashboard-index.json"]
+    assert len(reports) == 8  # two fixed captures plus three two-channel sessions
+    queue = storage / "staging" / "analysis-queue"
+    assert not list(queue.glob("*.job"))
+    assert not list(queue.glob("*.running.*"))
 
 
 def test_doppler_summary_uses_lnb_slopes_not_absolute_cfo_agreement():

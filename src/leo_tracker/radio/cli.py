@@ -69,6 +69,11 @@ from .beacon.decode import plot_decode_report as plot_beacon_decode
 from .beacon.fingerprint import update_fingerprint_store
 from .beacon.gain_comparison import build_gain_comparison
 from .beacon.dashboard_index import update_dashboard_index
+from .beacon.continuous import track_capture as track_beacon_capture
+from .beacon.hopping import capture_hop_session
+from .beacon.frame_tracking import track_conditioned_frames
+from .beacon.template_learning import learn_bandpass_beacon
+from .beacon.channel_link import link_channel_tracks
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -239,12 +244,14 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
             "agc_assignment_probability": args.gain_assignment_probability,
             "assigned_gain_mode": args.gain_mode,
             "agc_settle_s": args.agc_settle_s if args.gain_mode != "manual" else 0.0}
+    nominal_center_hz = (starlink_if_hz(args.channel_number, args.lnb_lo_hz)
+                         if args.region == "center" else
+                         starlink_edge_pilot_if_hz(
+                             args.channel_number, args.region.removesuffix("-edge"),
+                             args.lnb_lo_hz))
     center_hz = args.center_frequency_hz
     if center_hz is None:
-        center_hz = (starlink_if_hz(args.channel_number, args.lnb_lo_hz)
-                     if args.region == "center" else
-                     starlink_edge_pilot_if_hz(args.channel_number, args.region.removesuffix("-edge"),
-                                               args.lnb_lo_hz))
+        center_hz = nominal_center_hz
     configured_gain_db = args.gain_db if args.gain_mode == "manual" else None
     config = RadioConfig(center_hz, args.sample_rate_hz, args.bandwidth_hz,
                          configured_gain_db, gain_mode=args.gain_mode)
@@ -278,6 +285,9 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
             configured_gain_db=configured_gain_db,
             metadata={"channel_number": args.channel_number, "region": args.region,
                       "observation_mode": args.observation_mode,
+                      "nominal_if_hz": nominal_center_hz,
+                      "nominal_rf_hz": nominal_center_hz + args.lnb_lo_hz,
+                      "configured_tuning_offset_hz": center_hz - nominal_center_hz,
                       "tuning_basis": "published Starlink channel and edge-pilot geometry",
                       **experiment_metadata})
     finally:
@@ -291,6 +301,42 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
+    """Capture short settled edge-band dwells while keeping one Pluto open."""
+    channels = tuple(args.channels)
+    initial_center = starlink_edge_pilot_if_hz(
+        channels[0], args.region.removesuffix("-edge"), args.lnb_lo_hz)
+    configured_gain_db = args.gain_db if args.gain_mode == "manual" else None
+    config = RadioConfig(initial_center, args.sample_rate_hz, args.bandwidth_hz,
+                         configured_gain_db, gain_mode=args.gain_mode)
+    if args.fake:
+        samples_per_dwell = round(args.dwell_s * args.sample_rate_hz)
+        blocks_per_dwell = int(np.ceil(samples_per_dwell / args.block_size))
+        block_count = len(channels) * (args.settle_buffers + blocks_per_dwell)
+        count = block_count * args.block_size
+        rng = np.random.default_rng(args.seed)
+        rx0 = (rng.normal(size=count) + 1j * rng.normal(size=count)) * 100
+        rx1 = (rng.normal(size=count) + 1j * rng.normal(size=count)) * 100
+        source = FakePairedSource(rx0, rx1, config, block_size=args.block_size,
+                                  start_utc_ns=args.fake_start_utc_ns)
+    else:
+        source = PairedPlutoSource(config, uri=args.uri, block_size=args.block_size,
+                                   transport="iio", serial=args.serial)
+    if not args.fake and args.gain_mode != "manual" and args.agc_settle_s > 0:
+        time.sleep(args.agc_settle_s)
+    report = capture_hop_session(source, args.output, channels=channels,
+        region=args.region, dwell_s=args.dwell_s,
+        sample_rate_hz=args.sample_rate_hz, bandwidth_hz=args.bandwidth_hz,
+        lnb_lo_hz=args.lnb_lo_hz, settle_buffers=args.settle_buffers,
+        chunk_s=args.chunk_s, gain_mode=args.gain_mode,
+        configured_gain_db=configured_gain_db,
+        metadata={"command": "leo-radio starlink-beacon-hop-capture"})
+    print(json.dumps({"hop_session": str(args.output), "state": report["state"],
+        "segment_count": len(report["segments"]),
+        "duration_wall_s": report["duration_wall_s"]}, sort_keys=True))
+    return 0
+
+
 def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
     report = analyze_beacon_capture(args.capture, args.output, window_s=args.window_s,
         maximum_analysis_rate_hz=args.maximum_analysis_rate_hz,
@@ -299,7 +345,8 @@ def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
         acquisition_step_hz=args.acquisition_step_hz,
         exact_subband_rate_hz=args.exact_subband_rate_hz,
         exact_acquisition_method=args.exact_acquisition_method,
-        exact_start_s=args.exact_start_s, exact_stop_s=args.exact_stop_s)
+        exact_start_s=args.exact_start_s, exact_stop_s=args.exact_stop_s,
+        learned_beacon_path=args.beacon_template)
     if args.plot:
         plot_beacon_report(report, args.plot)
     print(json.dumps({"analysis": str(args.output), **report["summary"]}, sort_keys=True))
@@ -308,6 +355,10 @@ def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
 
 def command_starlink_beacon_retain(args: argparse.Namespace) -> int:
     print(json.dumps(apply_beacon_retention(args.root, keep_negative=args.keep_negative,
+                                            keep_confirmed=args.keep_confirmed,
+                                            keep_wide=args.keep_wide,
+                                            keep_oversample=args.keep_oversample,
+                                            keep_hop_sessions=args.keep_hop_sessions,
                                             dry_run=args.dry_run), sort_keys=True))
     return 0
 
@@ -347,6 +398,65 @@ def command_starlink_beacon_followup_rescore(args: argparse.Namespace) -> int:
                       "dual_receiver_confirmed": report["confirmation"].get(
                           "dual_receiver_confirmed", False),
                       "overlapping_pass_count": len(report["overlapping_passes"])},
+                     sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_track(args: argparse.Namespace) -> int:
+    report = track_beacon_capture(
+        args.capture, args.followup, args.output,
+        output_rate_hz=args.output_rate_hz,
+        search_span_hz=args.search_span_hz,
+        maximum_reacquisition_span_hz=args.maximum_reacquisition_span_hz,
+        search_step_hz=args.search_step_hz,
+        minimum_margin=args.minimum_margin,
+        tracking_margin=args.tracking_margin,
+        maximum_relative_error_hz=args.maximum_relative_error_hz,
+        maximum_gap_s=args.maximum_gap_s,
+        maximum_drift_hz_s=args.maximum_drift_hz_s,
+        measurement_source=args.measurement_source,
+        frame_track_path=args.frame_track)
+    print(json.dumps({"track": str(args.output), **report["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_frame_track(args: argparse.Namespace) -> int:
+    report = track_conditioned_frames(args.capture, args.followup, args.output,
+        args.samples, window_s=args.window_s, minimum_margin=args.minimum_margin,
+        maximum_relative_error_hz=args.maximum_relative_error_hz,
+        beacon_template_path=args.beacon_template,
+        maximum_extension_s=args.maximum_extension_s,
+        maximum_missed_windows=args.maximum_missed_windows,
+        minimum_extension_window_margin=args.minimum_extension_window_margin,
+        minimum_sparse_frame_margin=args.minimum_sparse_frame_margin)
+    print(json.dumps({"frame_track": str(args.output), "samples": str(args.samples),
+        **report["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_template_learn(args: argparse.Namespace) -> int:
+    report = learn_bandpass_beacon(
+        args.capture, args.followup, args.output, args.samples,
+        window_s=args.window_s, maximum_frames=args.maximum_frames,
+        iterations=args.iterations)
+    print(json.dumps({"learned_beacon": str(args.output),
+        "samples": str(args.samples), **report["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_channel_link(args: argparse.Namespace) -> int:
+    report = link_channel_tracks(args.tracks, args.output,
+        maximum_gap_s=args.maximum_gap_s,
+        maximum_acceleration_difference_m_s2=
+            args.maximum_acceleration_difference_m_s2,
+        minimum_ambiguity_margin_m_s2=args.minimum_ambiguity_margin_m_s2,
+        maximum_same_tuning_quadratic_rms_hz=
+            args.maximum_same_tuning_quadratic_rms_hz,
+        maximum_same_tuning_range_jerk_m_s3=
+            args.maximum_same_tuning_range_jerk_m_s3,
+        minimum_segment_epochs=args.minimum_segment_epochs,
+        minimum_segment_duration_s=args.minimum_segment_duration_s)
+    print(json.dumps({"channel_link": str(args.output), **report["summary"]},
                      sort_keys=True))
     return 0
 
@@ -1411,7 +1521,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="explicit L-band IF; defaults to the published channel center minus the LNB LO")
     beacon_capture.add_argument("--lnb-lo-hz", type=float, default=9_750_000_000)
     beacon_capture.add_argument("--sample-rate-hz", type=float, default=2_500_000)
-    beacon_capture.add_argument("--bandwidth-hz", type=float, default=2_300_000)
+    beacon_capture.add_argument("--bandwidth-hz", type=float, default=2_500_000)
     beacon_capture.add_argument("--observation-mode",
         choices=("narrow", "oversample", "wide"), default="narrow")
     beacon_capture.add_argument("--gain-mode", choices=("manual", "slow_attack", "fast_attack"), default="manual")
@@ -1433,6 +1543,32 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_capture.add_argument("--fake-start-utc-ns", type=int, default=1_700_000_000_000_000_000)
     beacon_capture.add_argument("--seed", type=int, default=0)
     beacon_capture.set_defaults(handler=command_starlink_beacon_capture)
+    beacon_hop = commands.add_parser("starlink-beacon-hop-capture",
+        help="retune one open dual-RX stream across settled Starlink edge dwells")
+    beacon_hop.add_argument("output", type=Path)
+    beacon_hop.add_argument("--channels", type=int, nargs="+", choices=range(1, 9),
+        default=list(range(1, 9)))
+    beacon_hop.add_argument("--region", choices=("lower-edge", "upper-edge"),
+        default="lower-edge")
+    beacon_hop.add_argument("--dwell-s", type=float, default=1.0)
+    beacon_hop.add_argument("--lnb-lo-hz", type=float, default=9_750_000_000)
+    beacon_hop.add_argument("--sample-rate-hz", type=float, default=2_500_000)
+    beacon_hop.add_argument("--bandwidth-hz", type=float, default=2_500_000)
+    beacon_hop.add_argument("--gain-mode",
+        choices=("manual", "slow_attack", "fast_attack"), default="manual")
+    beacon_hop.add_argument("--gain-db", type=float, default=50)
+    beacon_hop.add_argument("--agc-settle-s", type=float, default=2.0)
+    beacon_hop.add_argument("--settle-buffers", type=int, default=2,
+        help="discard this many complete IIO refills after every LO retune")
+    beacon_hop.add_argument("--block-size", type=int, default=262_144)
+    beacon_hop.add_argument("--chunk-s", type=float, default=1.0)
+    beacon_hop.add_argument("--uri", default="pluto://ip:192.168.2.1")
+    beacon_hop.add_argument("--serial")
+    beacon_hop.add_argument("--fake", action="store_true")
+    beacon_hop.add_argument("--fake-start-utc-ns", type=int,
+        default=1_700_000_000_000_000_000)
+    beacon_hop.add_argument("--seed", type=int, default=0)
+    beacon_hop.set_defaults(handler=command_starlink_beacon_hop_capture)
     beacon_analyze = commands.add_parser("starlink-beacon-analyze",
         help="verify and score a beacon IQ artifact for the published 750 Hz frame cadence")
     beacon_analyze.add_argument("capture", type=Path)
@@ -1452,13 +1588,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="begin exact-code replay at this capture offset")
     beacon_analyze.add_argument("--exact-stop-s", type=float,
         help="stop exact-code replay at this capture offset")
+    beacon_analyze.add_argument("--beacon-template", type=Path,
+        help="qualified learned full-frame template used as an independent dual-RX gate")
     beacon_analyze.add_argument("--plot", type=Path,
         help="write an exact-PSS, pilot-control, and CFO evidence PNG")
     beacon_analyze.set_defaults(handler=command_starlink_beacon_analyze)
     beacon_retain = commands.add_parser("starlink-beacon-retain",
-        help="retain all candidates and only the newest non-candidate IQ captures")
+        help="pin qualified evidence and bound fully-derived raw IQ rings")
     beacon_retain.add_argument("root", type=Path)
-    beacon_retain.add_argument("--keep-negative", type=int, default=12)
+    beacon_retain.add_argument("--keep-negative", type=int, default=6)
+    beacon_retain.add_argument("--keep-confirmed", type=int, default=8,
+        help="retain this many newest fully-derived confirmed raw IQ captures")
+    beacon_retain.add_argument("--keep-wide", type=int, default=2,
+        help="retain this many newest fully-derived wide raw IQ captures")
+    beacon_retain.add_argument("--keep-oversample", type=int, default=4,
+        help="retain this many newest fully-derived oversampled raw IQ captures")
+    beacon_retain.add_argument("--keep-hop-sessions", type=int, default=6,
+        help="retain this many newest fully-derived, non-qualified hop sessions")
     beacon_retain.add_argument("--dry-run", action="store_true")
     beacon_retain.set_defaults(handler=command_starlink_beacon_retain)
     beacon_recover = commands.add_parser("starlink-beacon-recover",
@@ -1491,6 +1637,79 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_rescore.add_argument("--plot-start-s", type=float)
     beacon_rescore.add_argument("--plot-stop-s", type=float)
     beacon_rescore.set_defaults(handler=command_starlink_beacon_followup_rescore)
+    beacon_frame_track = commands.add_parser("starlink-beacon-frame-track",
+        help="condition dense acquisitions into checksummed 750 Hz frame observations")
+    beacon_frame_track.add_argument("capture", type=Path)
+    beacon_frame_track.add_argument("followup", type=Path)
+    beacon_frame_track.add_argument("output", type=Path)
+    beacon_frame_track.add_argument("--samples", type=Path, required=True)
+    beacon_frame_track.add_argument("--window-s", type=float, default=.1)
+    beacon_frame_track.add_argument("--minimum-margin", type=float, default=.005)
+    beacon_frame_track.add_argument("--maximum-relative-error-hz", type=float, default=500)
+    beacon_frame_track.add_argument("--maximum-extension-s", type=float, default=30,
+        help="propagate each acquired lock through this much unsearched IQ")
+    beacon_frame_track.add_argument("--maximum-missed-windows", type=int, default=3,
+        help="coast through this many consecutive invalid 100-ms windows")
+    beacon_frame_track.add_argument("--minimum-extension-window-margin", type=float,
+        default=.02, help="median dual exact-minus-control gate for propagated lock")
+    beacon_frame_track.add_argument("--minimum-sparse-frame-margin", type=float,
+        default=.05, help="dual-RX gate allowing one predicted low-PRF frame to update lock")
+    beacon_frame_track.add_argument("--beacon-template", type=Path,
+        help="qualified learned bandpass beacon artifact; defaults to published edge pilots")
+    beacon_frame_track.set_defaults(handler=command_starlink_beacon_frame_track)
+    beacon_template = commands.add_parser("starlink-beacon-template-learn",
+        help="learn a checksummed full-duration bandpass beacon from aligned frames")
+    beacon_template.add_argument("capture", type=Path)
+    beacon_template.add_argument("followup", type=Path)
+    beacon_template.add_argument("output", type=Path)
+    beacon_template.add_argument("--samples", type=Path, required=True)
+    beacon_template.add_argument("--window-s", type=float, default=.1)
+    beacon_template.add_argument("--maximum-frames", type=int, default=600)
+    beacon_template.add_argument("--iterations", type=int, default=5)
+    beacon_template.set_defaults(handler=command_starlink_beacon_template_learn)
+    beacon_channel_link = commands.add_parser("starlink-beacon-channel-link",
+        help="build conservative cross-channel Doppler continuation hypotheses")
+    beacon_channel_link.add_argument("output", type=Path)
+    beacon_channel_link.add_argument("tracks", type=Path, nargs="+")
+    beacon_channel_link.add_argument("--maximum-gap-s", type=float, default=30)
+    beacon_channel_link.add_argument(
+        "--maximum-acceleration-difference-m-s2", type=float, default=35)
+    beacon_channel_link.add_argument(
+        "--minimum-ambiguity-margin-m-s2", type=float, default=5)
+    beacon_channel_link.add_argument(
+        "--maximum-same-tuning-quadratic-rms-hz", type=float, default=2000)
+    beacon_channel_link.add_argument(
+        "--maximum-same-tuning-range-jerk-m-s3", type=float, default=5)
+    beacon_channel_link.add_argument("--minimum-segment-epochs", type=int, default=5,
+        help="exclude tiny fragments that cannot establish motion continuity")
+    beacon_channel_link.add_argument("--minimum-segment-duration-s", type=float,
+        default=.5, help="minimum measured span of a continuation fragment")
+    beacon_channel_link.set_defaults(handler=command_starlink_beacon_channel_link)
+    beacon_track = commands.add_parser("starlink-beacon-track",
+        help="follow acquired full-frame edge pilots and emit calibrated 10 Hz Doppler")
+    beacon_track.add_argument("capture", type=Path)
+    beacon_track.add_argument("followup", type=Path)
+    beacon_track.add_argument("output", type=Path)
+    beacon_track.add_argument("--output-rate-hz", type=float, default=10)
+    beacon_track.add_argument("--search-span-hz", type=float, default=2_000)
+    beacon_track.add_argument("--maximum-reacquisition-span-hz", type=float, default=15_000,
+        help="bounded adaptive search after intermittent beacon outages")
+    beacon_track.add_argument("--search-step-hz", type=float, default=200,
+        help="coarse CFO bank spacing; the reported peak is parabolically refined")
+    beacon_track.add_argument("--minimum-margin", type=float, default=.015)
+    beacon_track.add_argument("--tracking-margin", type=float, default=.005,
+        help="lower exact/control gate allowed only with dual-RX frequency continuity")
+    beacon_track.add_argument("--maximum-relative-error-hz", type=float, default=500)
+    beacon_track.add_argument("--maximum-gap-s", type=float, default=5,
+        help="propagate CFO without inventing observations through intermittent beacon gaps")
+    beacon_track.add_argument("--maximum-drift-hz-s", type=float, default=15_000)
+    beacon_track.add_argument("--measurement-source",
+        choices=("auto", "conditioned_frames", "dense_followup", "periodic_epoch"),
+        default="auto",
+        help="use independent dense full-frame epochs when available")
+    beacon_track.add_argument("--frame-track", type=Path,
+        help="checksummed 750 Hz conditioned frame artifact to aggregate at 10 Hz")
+    beacon_track.set_defaults(handler=command_starlink_beacon_track)
     beacon_calibrate = commands.add_parser("starlink-beacon-calibrate",
         help="publish empirical exact/control null distributions and gate exceedances")
     beacon_calibrate.add_argument("reports", type=Path)
@@ -1656,7 +1875,7 @@ def build_parser() -> argparse.ArgumentParser:
                             help="measured LNB IF correction added to the nominal channel center")
     sl_observe.add_argument("--duration-s", type=float, default=120)
     sl_observe.add_argument("--sample-rate-hz", type=float, default=2_500_000)
-    sl_observe.add_argument("--bandwidth-hz", type=float, default=2_300_000)
+    sl_observe.add_argument("--bandwidth-hz", type=float, default=2_500_000)
     sl_observe.add_argument("--gain-db", type=float, default=40)
     sl_observe.add_argument("--block-size", type=int, default=262_144)
     sl_observe.add_argument("--ring-seconds", type=float, default=2)

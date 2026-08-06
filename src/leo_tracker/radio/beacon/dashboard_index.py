@@ -151,13 +151,24 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     decode_path = root / "reports" / "decoded" / f"{name}.json"
     fingerprint_path = root / "reports" / "fingerprints" / f"{name}.json"
     fingerprint_plot_path = root / "reports" / "fingerprints" / f"{name}.png"
+    frame_track_path = root / "reports" / "frame-tracks" / f"{name}.json"
+    track_path = root / "reports" / "tracks" / f"{name}.json"
+    association_path = root / "reports" / "associations" / f"{name}.json"
+    channel_link_path = root / "reports" / "channel-links" / f"{name}.json"
+    linked_association_path = (root / "reports" / "associations" /
+                               f"{name}-channel-link.json")
     paths = (report_path, followup_path, decode_path, fingerprint_path,
-             fingerprint_plot_path)
+             fingerprint_plot_path, frame_track_path, track_path, association_path,
+             channel_link_path, linked_association_path)
     report = _json(report_path)
     if report.get("schema") != "leo-tracker.starlink-beacon-analysis/v1":
         return None
     manifest, summary = report.get("capture_manifest", {}), report.get("summary", {})
     followup, decode = _json(followup_path), _json(decode_path)
+    frame_track = _json(frame_track_path)
+    track_report, association = _json(track_path), _json(association_path)
+    channel_link, linked_association = (_json(channel_link_path),
+                                        _json(linked_association_path))
     confirmation = followup.get("confirmation", {})
     combined = decode.get("combined", {})
     pilot = (combined.get("soft_dual_rx") or {}).get("pilot") or {}
@@ -195,7 +206,16 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     for label, path, url in (
         ("Follow-up JSON", followup_path, f"/beacon-followups/{name}.json"),
         ("Decode JSON", decode_path, f"/beacon-decodes/{name}.json"),
-        ("Fingerprint JSON", fingerprint_path, f"/beacon-fingerprints/{name}.json")):
+        ("Fingerprint JSON", fingerprint_path, f"/beacon-fingerprints/{name}.json"),
+        ("Conditioned 750 Hz frame JSON", frame_track_path,
+         f"/beacon-frame-tracks/{name}.json"),
+        ("Continuous 10 Hz track JSON", track_path, f"/beacon-tracks/{name}.json"),
+        ("Gapped 10 Hz hypothesis JSON", channel_link_path,
+         f"/beacon-channel-links/{name}.json"),
+        ("TLE association JSON", association_path,
+         f"/beacon-associations/{name}.json"),
+        ("Gapped-track TLE association JSON", linked_association_path,
+         f"/beacon-associations/{name}-channel-link.json")):
         if path.is_file():
             artifacts.append({"label": label, "url": url})
     common = {"kind": "beacon", "recording_id": name, "start_utc": created_utc,
@@ -220,6 +240,20 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         "decode_frame_count": combined.get("minimum_frame_count"),
         "strongest_drift_hz_s": strongest.get("drift_hz_s"),
         "tle_overlap_count": len(followup.get("overlapping_passes", [])),
+        "continuous_track_count": track_report.get("summary", {}).get("track_count", 0),
+        "conditioned_frame_count": frame_track.get("summary", {}).get(
+            "frame_observation_count", 0),
+        "conditioned_dual_valid_frame_count": frame_track.get("summary", {}).get(
+            "dual_valid_frame_count", 0),
+        "longest_track_duration_s": max(filter(lambda value: value is not None, [
+            track_report.get("summary", {}).get("longest_dual_valid_duration_s",
+                track_report.get("summary", {}).get("longest_valid_duration_s")),
+            channel_link.get("summary", {}).get("longest_hypothesis_duration_s")]),
+            default=None),
+        "qualified_tle_association_count": (
+            association.get("summary", {}).get("qualified_association_count", 0) +
+            linked_association.get("summary", {}).get(
+                "qualified_association_count", 0)),
         "fingerprint_family": cluster_id,
         "fingerprint_family_size": cluster_sizes.get(cluster_id, 0),
         "fingerprint_plot_url": (f"/beacon-fingerprint-plots/{name}.png"
@@ -249,6 +283,13 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         "exact_checks": exact_checks,
         "overlapping_passes": followup.get("overlapping_passes", [])[:10],
         "decode": combined,
+        "frame_tracking": frame_track,
+        "continuous_tracking": {"configuration": track_report.get("configuration", {}),
+                                "summary": track_report.get("summary", {}),
+                                "tracks": track_report.get("tracks", [])},
+        "continuous_linking": channel_link,
+        "tle_association": association,
+        "linked_tle_association": linked_association,
         "fingerprint": {"cluster_id": cluster_id,
             "cluster_size": cluster_sizes.get(cluster_id, 0)}}
     return {**common, "_source_signature": _signature(paths),
@@ -270,7 +311,13 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
         sidecars = (report_path, root / "reports" / "followups" / report_path.name,
             root / "reports" / "decoded" / report_path.name,
             root / "reports" / "fingerprints" / report_path.name,
-            root / "reports" / "fingerprints" / f"{name}.png")
+            root / "reports" / "fingerprints" / f"{name}.png",
+            root / "reports" / "frame-tracks" / report_path.name,
+            root / "reports" / "tracks" / report_path.name,
+            root / "reports" / "associations" / report_path.name,
+            root / "reports" / "channel-links" / report_path.name,
+            root / "reports" / "associations" /
+                f"{report_path.stem}-channel-link.json")
         radio_parameters = rows.get(name, {}).get("_statistics", {}).get(
             "radio_parameters", {})
         if (capture_name is None and name in rows and
@@ -301,6 +348,12 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
             "temporally_confirmed_capture_count": sum(bool(row.get("confirmed"))
                 for row in ordered),
             "decoded_capture_count": len(list((root / "reports" / "decoded").glob("*.json"))),
+            "continuous_track_capture_count": len(list(
+                (root / "reports" / "tracks").glob("*.json"))),
+            "conditioned_frame_track_capture_count": len(list(
+                (root / "reports" / "frame-tracks").glob("*.json"))),
+            "tle_association_capture_count": len(list(
+                (root / "reports" / "associations").glob("*.json"))),
             "fingerprint_count": fingerprint_index.get("fingerprint_count", 0)},
         "recordings": ordered}
     output.parent.mkdir(parents=True, exist_ok=True)

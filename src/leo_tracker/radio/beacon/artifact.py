@@ -135,6 +135,7 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
     expected_source_index: int | None = None
     read_count = total_read_duration_ns = maximum_read_duration_ns = 0
     total_host_gap_ns = maximum_host_gap_ns = 0
+    clock_samples: list[dict] = []
     power_sum = np.zeros(2, dtype=np.float64)
     peak_abs_component = np.zeros(2, dtype=np.float64)
     near_adc_full_scale_count = np.zeros(2, dtype=np.int64)
@@ -152,6 +153,10 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
             "total_positive_host_gap_s": total_host_gap_ns / 1e9,
             "maximum_positive_host_gap_s": maximum_host_gap_ns / 1e9,
             "host_read_duty_fraction": (total_read_duration_ns / span_ns if span_ns > 0 else None),
+            "clock_samples": clock_samples,
+            "clock_sample_semantics": ("sample range plus midpoint of the host UTC "
+                "bracket around each blocking IIO refill; diagnostic, not an RF "
+                "hardware timestamp"),
             "note": "host syscall timing diagnoses writer stalls but is not an RF hardware timestamp"}
 
     def add_measurement_diagnostics() -> None:
@@ -218,6 +223,10 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
             available = min(block.rx0.size, requested_samples - total)
             if available <= 0:
                 break
+            if block.read_duration_ns is not None:
+                clock_samples.append({"first_sample_index": int(total),
+                    "sample_count": int(available), "utc_ns": int(block.utc_ns),
+                    "read_duration_ns": int(block.read_duration_ns)})
             if block.gain_db is not None:
                 gains = [None if not np.isfinite(value) else float(value)
                          for value in block.gain_db]
@@ -237,6 +246,10 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
             pending_reads.append(block); pending_count += available; total += available
             while pending_count >= chunk_samples:
                 commit(chunk_samples)
+            # Do not request and silently discard the next source block.  A
+            # hop session deliberately reuses this iterator after retuning.
+            if total >= requested_samples:
+                break
         if pending_count:
             commit(pending_count)
         if total != requested_samples:

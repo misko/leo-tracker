@@ -4,7 +4,7 @@ from leo_tracker.radio.beacon.dashboard_index import (capture_radio_parameters,
                                                        confirmed_beacon_events,
                                                        update_dashboard_index)
 from leo_tracker.radio.cli import main
-from leo_tracker.radio.dashboard import DashboardModel
+from leo_tracker.radio.dashboard import DETAIL_HTML, DashboardModel
 
 
 def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
@@ -66,13 +66,51 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
                     "soft_mean_confidence": .75, "rms_evm": .4}}}}))
     (root / "reports" / "plots" / f"{name}.png").write_bytes(b"png")
     (root / "reports" / "fingerprints" / f"{name}.png").write_bytes(b"fingerprint")
+    if confirmed:
+        (root / "reports" / "frame-tracks" / f"{name}.json").write_text(json.dumps({
+            "schema": "leo-tracker.starlink-conditioned-frame-track/v1",
+            "summary": {"frame_observation_count": 7500,
+                        "dual_valid_frame_count": 6200,
+                        "dual_valid_fraction": .8267, "measured_span_s": 12.4}}))
+        (root / "reports" / "tracks" / f"{name}.json").write_text(json.dumps({
+            "schema": "leo-tracker.starlink-continuous-track/v1",
+            "configuration": {"measurement_source": "dense_followup"},
+            "summary": {"track_count": 2, "longest_valid_duration_s": 23.5,
+                        "longest_dual_valid_duration_s": 23.5},
+            "tracks": [{"track_id": "track-000", "observations": [],
+                "summary": {"dual_valid_duration_s": 23.5,
+                            "dual_valid_observation_count": 61},
+                "relative_receiver_calibration": {"residual_rms_hz": 125}}]}))
+        (root / "reports" / "associations" / f"{name}.json").write_text(json.dumps({
+            "schema": "leo-tracker.starlink-tle-association/v1",
+            "summary": {"qualified_association_count": 1},
+            "associations": [{"track_id": "track-000", "qualified": True,
+                "best_norad_id": 123, "best_holdout_residual_rms_hz": 210,
+                "margin_to_second_hz": 330, "stability": {"passed": True},
+                "candidates": [{"name": "STARLINK-X", "norad_id": 123}]}]}))
+        (root / "reports" / "channel-links" / f"{name}.json").write_text(json.dumps({
+            "schema": "leo-tracker.starlink-continuous-track/v1",
+            "summary": {"longest_hypothesis_duration_s": 29.4},
+            "tracks": [{"track_id": "channel-hypothesis-000",
+                "summary": {"source_segment_count": 2,
+                    "dual_valid_duration_s": 29.4,
+                    "dual_valid_observation_count": 76}}]}))
+        (root / "reports" / "associations" /
+         f"{name}-channel-link.json").write_text(json.dumps({
+            "schema": "leo-tracker.starlink-tle-association/v2",
+            "summary": {"qualified_association_count": 0},
+            "associations": [{"track_id": "channel-hypothesis-000",
+                "qualified": False, "stability": {"passed": False},
+                "candidates": [{"name": "STARLINK-Y", "norad_id": 456}]}]}))
 
 
 def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_path,
                                                                           capsys):
     root = tmp_path / "beacons"
     for directory in ("reports/followups", "reports/decoded", "reports/fingerprints",
-                      "reports/plots", "captures"):
+                      "reports/frame-tracks",
+                      "reports/tracks", "reports/channel-links",
+                      "reports/associations", "reports/plots", "captures"):
         (root / directory).mkdir(parents=True, exist_ok=True)
     first, second = "ch4-lower-edge-narrow-first", "ch4-lower-edge-narrow-second"
     _capture(root, first, 1_700_000_000_000_000_000, confirmed=True, decoded=True)
@@ -96,6 +134,21 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert row["pilot_accuracy"] == .8
     assert row["fingerprint_family"] == "wf-1"
     assert row["fingerprint_plot_url"] == f"/beacon-fingerprint-plots/{first}.png"
+    assert row["continuous_track_count"] == 2
+    assert row["conditioned_frame_count"] == 7500
+    assert row["conditioned_dual_valid_frame_count"] == 6200
+    assert row["longest_track_duration_s"] == 29.4
+    assert row["qualified_tle_association_count"] == 1
+    assert any(item["url"] == f"/beacon-tracks/{first}.json"
+               for item in row["_artifacts"])
+    assert any(item["url"] == f"/beacon-frame-tracks/{first}.json"
+               for item in row["_artifacts"])
+    assert any(item["url"] == f"/beacon-associations/{first}.json"
+               for item in row["_artifacts"])
+    assert any(item["url"] == f"/beacon-channel-links/{first}.json"
+               for item in row["_artifacts"])
+    assert any(item["url"] == f"/beacon-associations/{first}-channel-link.json"
+               for item in row["_artifacts"])
     assert row["fingerprint_nearest_matches"][0]["temporal_qpsk_similarity"] == .8
     assert row["_statistics"]["exact_checks"][0]["receivers"][0][
         "pilot_frequency_offset_hz"] == -30_000
@@ -122,7 +175,22 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert detail["statistics"]["confirmation"]["confirmed"]
     assert detail["statistics"]["radio_parameters"]["gain_experiment"][
         "experiment_id"] == "gain-ab-v1"
+    assert detail["statistics"]["continuous_tracking"]["summary"][
+        "longest_valid_duration_s"] == 23.5
+    assert detail["statistics"]["frame_tracking"]["summary"][
+        "dual_valid_frame_count"] == 6200
+    assert detail["statistics"]["continuous_tracking"]["configuration"][
+        "measurement_source"] == "dense_followup"
+    assert detail["statistics"]["tle_association"]["summary"][
+        "qualified_association_count"] == 1
+    assert detail["statistics"]["continuous_linking"]["summary"][
+        "longest_hypothesis_duration_s"] == 29.4
+    assert detail["statistics"]["linked_tle_association"]["summary"][
+        "qualified_association_count"] == 0
     assert detail["plots"] == [f"/beacon-plots/{first}.png"]
+    assert "Calibrated 10 Hz tracks" in DETAIL_HTML
+    assert "Conditioned 750 Hz frames" in DETAIL_HTML
+    assert "Held-out TLE association" in DETAIL_HTML
 
     assert main(["starlink-beacon-dashboard-index", str(root), str(output),
                  "--capture-name", second]) == 0

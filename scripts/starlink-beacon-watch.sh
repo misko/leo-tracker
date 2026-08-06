@@ -6,13 +6,41 @@ storage_root="${LEO_BEACON_STORAGE:-/mnt/leo-nvme/leo-tracker}"
 duration_s="${LEO_BEACON_DWELL_S:-120}"
 wide_duration_s="${LEO_BEACON_WIDE_DWELL_S:-10}"
 oversample_duration_s="${LEO_BEACON_OVERSAMPLE_DWELL_S:-15}"
-# Once narrow lock has demonstrated the LNB offset is inside the 2.3 MHz
+# Once narrow lock has demonstrated the LNB offset is inside the 2.5 MHz
 # passband, a wide reacquisition every ~30 minutes is enough to detect LO drift
 # without repeatedly sacrificing near-continuous beacon coverage.
 wide_every_cycles="${LEO_BEACON_WIDE_EVERY_CYCLES:-15}"
 oversample_every_cycles="${LEO_BEACON_OVERSAMPLE_EVERY_CYCLES:-10}"
 oversample_on_startup="${LEO_BEACON_OVERSAMPLE_ON_STARTUP:-1}"
-keep_negative="${LEO_BEACON_KEEP_NEGATIVE:-12}"
+# A short low-band channel survey keeps one Pluto stream open across retunes.
+# The installed universal LNB is currently in 9.75 GHz low-band mode, making
+# Starlink channels 1--4 the settled, in-spec search set without a 22 kHz tone.
+# Three sessions span about 34 seconds on the installed Pluto.  That crosses
+# at least two of the documented 15-second Starlink channel boundaries and can
+# therefore produce the >=20-second elapsed arc required by TLE association.
+# Running the burst every second 120-second fixed dwell gives the dedicated
+# worker about 274 seconds to process 12 symbolwise children, above its measured
+# retained-field replay time.
+hop_every_cycles="${LEO_BEACON_HOP_EVERY_CYCLES:-2}"
+hop_burst_sessions="${LEO_BEACON_HOP_BURST_SESSIONS:-3}"
+hop_dwell_s="${LEO_BEACON_HOP_DWELL_S:-2}"
+hop_channels="${LEO_BEACON_HOP_CHANNELS:-1 2 3 4}"
+hop_settle_buffers="${LEO_BEACON_HOP_SETTLE_BUFFERS:-2}"
+# A hop child is only 1.5 seconds long.  Sampling one 10-ms window (the
+# ordinary narrow cadence) covers less than one percent of it and has poor
+# probability of intersecting Starlink's documented 2% baseline frame PRF.
+# Three independent 20-ms windows cover 3% of every child.  A retained-field
+# replay showed that pilot_symbolwise_v3 confirmed a real dual-RX channel-2
+# event that coherent_grid_v1 rejected from the identical IQ.  Halving the
+# probe count keeps the measured per-child runtime approximately unchanged.
+hop_exact_interval_s="${LEO_BEACON_HOP_EXACT_INTERVAL_S:-0.7}"
+hop_exact_window_s="${LEO_BEACON_HOP_EXACT_WINDOW_S:-0.02}"
+hop_acquisition_method="${LEO_BEACON_HOP_ACQUISITION_METHOD:-pilot_symbolwise_v3}"
+keep_negative="${LEO_BEACON_KEEP_NEGATIVE:-6}"
+keep_confirmed="${LEO_BEACON_KEEP_CONFIRMED:-8}"
+keep_wide="${LEO_BEACON_KEEP_WIDE:-2}"
+keep_oversample="${LEO_BEACON_KEEP_OVERSAMPLE:-4}"
+keep_hop_sessions="${LEO_BEACON_KEEP_HOP_SESSIONS:-6}"
 uv_cache="${UV_CACHE_DIR:-${repo_dir}/.uv-cache}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
 maximum_pi_temp_millic="${LEO_BEACON_MAX_PI_TEMP_MILLIC:-75000}"
@@ -27,8 +55,19 @@ gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-a
 # coherent grid.  These cadences keep analysis inside the following 120 s
 # capture on the Pi while retaining enough temporal samples to trigger the
 # dense 100 ms follow-up around a beacon hit.
-narrow_exact_interval_s="${LEO_BEACON_NARROW_EXACT_INTERVAL_S:-3}"
+narrow_exact_interval_s="${LEO_BEACON_NARROW_EXACT_INTERVAL_S:-6}"
 wide_exact_interval_s="${LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10}"
+# Dense follow-up supplies independent measured epochs.  Keep outage joining
+# shorter than Starlink's observed 15-second channel-hop cadence so separate
+# emitters at one fixed tuning cannot be merged into an artificial long arc.
+track_maximum_gap_s="${LEO_BEACON_TRACK_MAXIMUM_GAP_S:-5}"
+track_maximum_reacquisition_span_hz="${LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-5000}"
+rolling_association_interval_s="${LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600}"
+observer_lat="${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}"
+observer_lon="${LEO_BEACON_OBSERVER_LON:--122.48567658142287}"
+observer_alt_m="${LEO_BEACON_OBSERVER_ALT_M:-0}"
+tle_catalog="${LEO_BEACON_TLE_CATALOG:-/mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history/latest.json}"
+learned_beacon="${LEO_BEACON_LEARNED_BEACON:-${storage_root}/reports/learned-beacons/active.json}"
 read -r -a targets <<< "${target_spec}"
 if (( ${#targets[@]} == 0 )); then
   echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2
@@ -45,9 +84,18 @@ if [[ "${fake_source}" == "1" ]]; then
 fi
 
 mkdir -p "${storage_root}/captures" "${storage_root}/reports" "${storage_root}/staging"
+mkdir -p "${storage_root}/hop-sessions"
+mkdir -p "${storage_root}/reports/channel-links"
 mkdir -p "${storage_root}/reports/plots" "${storage_root}/reports/decoded"
 mkdir -p "${storage_root}/reports/fingerprints"
+mkdir -p "${storage_root}/reports/tracks" "${storage_root}/reports/associations"
+mkdir -p "${storage_root}/reports/frame-tracks"
 mkdir -p "${storage_root}/reports/gain-experiment"
+analysis_queue="${storage_root}/staging/analysis-queue"
+mkdir -p "${analysis_queue}"
+maintenance_lock="${storage_root}/staging/analysis-maintenance.lock"
+analysis_execution_lock="${storage_root}/staging/analysis-execution.lock"
+analysis_ready="${storage_root}/staging/analysis-workers.ready"
 cd "${repo_dir}"
 
 capture_target() {
@@ -104,7 +152,7 @@ capture_target() {
         --bandwidth-hz 3000000 --block-size 524288)
     else
       capture_args=(--duration-s "${duration_s}" --sample-rate-hz 2500000
-        --bandwidth-hz 2300000 --block-size 262144)
+        --bandwidth-hz 2500000 --block-size 262144)
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \
@@ -117,6 +165,115 @@ capture_target() {
     pending_mode="${mode}"
 }
 
+capture_hop_survey() {
+    local stamp session_name session_path child child_name label="${1:-}"
+    local -a channel_args
+    read -r -a channel_args <<< "${hop_channels}"
+    stamp="${label:-$(date -u +%Y%m%dT%H%M%SZ)}"
+    session_name="hop-lower-edge-${stamp}"
+    session_path="${storage_root}/hop-sessions/${session_name}"
+    if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-hop-capture "${session_path}" \
+      --channels "${channel_args[@]}" --region lower-edge \
+      --dwell-s "${hop_dwell_s}" --settle-buffers "${hop_settle_buffers}" \
+      --sample-rate-hz 2500000 --bandwidth-hz 2500000 --block-size 262144 \
+      --chunk-s "${hop_dwell_s}" --gain-mode manual --gain-db 50 \
+      "${source_args[@]}"; then
+      printf '{"hop_capture_error":true,"session":"%s"}\n' "${session_name}" >&2
+      return
+    fi
+    for child in "${session_path}"/[0-9][0-9]-ch*-lower-edge; do
+      [[ -d "${child}" ]] || continue
+      child_name="${session_name}-$(basename "${child}")"
+      pending_name="${child_name}"
+      pending_capture="${child}"
+      pending_mode="hop"
+      enqueue_pending_analysis
+    done
+}
+
+refresh_hop_links() {
+    local name="$1" burst_prefix linked association
+    local -a inputs
+    [[ "${name}" == hop-lower-edge-*-b[0-9][0-9]-* ]] || return 0
+    burst_prefix="${name%-b[0-9][0-9]-*}"
+    shopt -s nullglob
+    inputs=("${storage_root}/reports/tracks/${burst_prefix}"-b*.json)
+    shopt -u nullglob
+    (( ${#inputs[@]} >= 2 )) || return 0
+    linked="${storage_root}/reports/channel-links/${burst_prefix}.json"
+    association="${storage_root}/reports/associations/${burst_prefix}-channel-link.json"
+    env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-channel-link "${linked}" "${inputs[@]}"
+    if [[ -f "${tle_catalog}" ]]; then
+      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-orbit \
+        associate --observations "${linked}" --catalog "${tle_catalog}" \
+        --lat "${observer_lat}" --lon "${observer_lon}" --alt-m "${observer_alt_m}" \
+        --minimum-dual-epochs 30 --minimum-coverage-fraction .1 \
+        --output "${association}"
+    fi
+}
+
+refresh_capture_links() {
+    local name="$1" track="$2" linked association
+    linked="${storage_root}/reports/channel-links/${name}.json"
+    association="${storage_root}/reports/associations/${name}-channel-link.json"
+    # A fixed tuning can contain several pieces of one smooth Doppler path when
+    # Starlink OFDM traffic goes quiet. The linker retains the outage as missing
+    # data and requires a low-residual quadratic continuation before combining
+    # the measured 10 Hz epochs.
+    if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-channel-link "${linked}" "${track}" \
+      --maximum-gap-s 30 --maximum-acceleration-difference-m-s2 35 \
+      --maximum-same-tuning-quadratic-rms-hz 2000; then
+      # A confirmed hop child can contain only one or two calibrated epochs.
+      # The linker deliberately rejects such fragments and does not create an
+      # output artifact.  That is an expected insufficient-evidence outcome,
+      # not a reason to invoke association on a nonexistent path.
+      printf '{"capture_link_unavailable":true,"capture":"%s"}\n' \
+        "${name}" >&2
+      return 0
+    fi
+    if [[ -f "${tle_catalog}" ]]; then
+      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-orbit \
+        associate --observations "${linked}" --catalog "${tle_catalog}" \
+        --lat "${observer_lat}" --lon "${observer_lon}" --alt-m "${observer_alt_m}" \
+        --minimum-dual-epochs 30 --minimum-coverage-fraction .1 \
+        --output "${association}"
+    fi
+}
+
+refresh_rolling_narrow_links() {
+    local name="$1" channel region linked association now previous
+    local -a inputs
+    channel="${name%%-*}"
+    region="${name#${channel}-}"
+    region="${region%-narrow-*}"
+    mapfile -t inputs < <(find "${storage_root}/reports/tracks" -maxdepth 1 \
+      -type f -name "${channel}-${region}-narrow-*.json" -printf '%p\n' | \
+      sort | tail -n 8)
+    (( ${#inputs[@]} >= 2 )) || return 0
+    linked="${storage_root}/reports/channel-links/rolling-${channel}-${region}.json"
+    association="${storage_root}/reports/associations/rolling-${channel}-${region}.json"
+    env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-channel-link "${linked}" "${inputs[@]}" \
+      --maximum-gap-s 45 --maximum-acceleration-difference-m-s2 35 \
+      --maximum-same-tuning-quadratic-rms-hz 2000
+    now="$(date +%s)"
+    previous=0
+    if [[ -f "${association}" ]]; then
+      previous="$(stat -c %Y "${association}")"
+    fi
+    if [[ -f "${tle_catalog}" ]] &&
+       (( now - previous >= rolling_association_interval_s )); then
+      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-orbit \
+        associate --observations "${linked}" --catalog "${tle_catalog}" \
+        --lat "${observer_lat}" --lon "${observer_lon}" --alt-m "${observer_alt_m}" \
+        --minimum-dual-epochs 30 --minimum-coverage-fraction .1 \
+        --output "${association}"
+    fi
+}
+
 process_capture() {
     local name="$1" capture="$2" mode="$3"
     local report="${storage_root}/reports/${name}.json"
@@ -126,7 +283,15 @@ process_capture() {
     local decode="${storage_root}/reports/decoded/${name}.json"
     local decode_plot="${storage_root}/reports/decoded/${name}.png"
     local decode_symbols="${storage_root}/reports/decoded/${name}.npz"
-    local analysis_args
+    local track="${storage_root}/reports/tracks/${name}.json"
+    local frame_track="${storage_root}/reports/frame-tracks/${name}.json"
+    local frame_samples="${storage_root}/reports/frame-tracks/${name}.npz"
+    local association="${storage_root}/reports/associations/${name}.json"
+    local analysis_args track_args analysis_method template_analysis_args
+    local -a plot_args
+    analysis_method="${exact_acquisition_method}"
+    plot_args=(--plot "${plot}")
+    template_analysis_args=()
     if [[ "${mode}" == "wide" ]]; then
       analysis_args=(--exact-interval-s "${wide_exact_interval_s}" --exact-window-s .01
         --acquisition-span-hz 3500000 --acquisition-step-hz 500000
@@ -134,14 +299,25 @@ process_capture() {
     elif [[ "${mode}" == "oversample" ]]; then
       analysis_args=(--exact-interval-s "${narrow_exact_interval_s}" --exact-window-s .01
         --exact-subband-rate-hz 5000000)
+    elif [[ "${mode}" == "hop" ]]; then
+      analysis_args=(--exact-interval-s "${hop_exact_interval_s}"
+        --exact-window-s "${hop_exact_window_s}")
+      analysis_method="${hop_acquisition_method}"
+      # Negative hop children are survey evidence rather than dashboard
+      # products.  Avoid spending more time rendering them than recording them.
+      plot_args=()
     else
       analysis_args=(--exact-interval-s "${narrow_exact_interval_s}" --exact-window-s .01)
+    fi
+    if [[ ("${mode}" == "narrow" || "${mode}" == "hop") &&
+          -f "${learned_beacon}" ]]; then
+      template_analysis_args=(--beacon-template "${learned_beacon}")
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-analyze "${capture}" "${report}" \
       --window-s 1 --maximum-analysis-rate-hz 50000 \
-      --exact-acquisition-method "${exact_acquisition_method}" \
-      "${analysis_args[@]}" --plot "${plot}"
+      --exact-acquisition-method "${analysis_method}" \
+      "${analysis_args[@]}" "${template_analysis_args[@]}" "${plot_args[@]}"
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-followup "${capture}" "${report}" "${followup}" \
       --radius-s .5 --interval-s .1 --window-s .01 \
@@ -149,47 +325,118 @@ process_capture() {
       --confirmation-marker "${confirmation_marker}"
     # Wide reacquisitions can place the selected pilot bank away from baseband
     # zero; fixed-center narrow and oversampled captures are directly decodable.
-    if [[ "${mode}" != "wide" && -f "${confirmation_marker}" ]]; then
-      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-        starlink-beacon-decode "${capture}" "${followup}" "${decode}" \
-        --plot "${decode_plot}" --symbols "${decode_symbols}"
-      if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-        starlink-beacon-fingerprint "${storage_root}" --capture-name "${name}"; then
-        printf '{"fingerprint_error":true,"capture":"%s"}\n' "${name}" >&2
+    if [[ "${mode}" != "wide" && -f "${confirmation_marker}" ]] &&
+       grep -Eq '"dual_receiver_confirmed": true' "${followup}"; then
+      frame_track_args=()
+      if [[ ("${mode}" == "narrow" || "${mode}" == "hop") &&
+            -f "${learned_beacon}" ]]; then
+        # The Starlink edge resource grid is channel-invariant. Pluto retuning
+        # preserves the relative 2.5-MHz baseband response, so the qualified
+        # full-duration template transfers across the four low-band channels.
+        # A zero-support result falls back to dense pilot observations below.
+        frame_track_args=(--beacon-template "${learned_beacon}")
+      fi
+      if env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-frame-track "${capture}" "${followup}" "${frame_track}" \
+        --samples "${frame_samples}" "${frame_track_args[@]}"; then
+        if grep -Eq '"dual_valid_frame_count": [1-9]' "${frame_track}"; then
+          track_args=(--measurement-source conditioned_frames --frame-track "${frame_track}")
+        else
+          printf '{"conditioned_frame_track_empty":true,"capture":"%s"}\n' \
+            "${name}" >&2
+          track_args=(--measurement-source dense_followup)
+        fi
+      else
+        printf '{"conditioned_frame_track_error":true,"capture":"%s"}\n' "${name}" >&2
+        track_args=(--measurement-source dense_followup)
+      fi
+      if [[ "${mode}" != "hop" ]]; then
+        env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+          starlink-beacon-decode "${capture}" "${followup}" "${decode}" \
+          --plot "${decode_plot}" --symbols "${decode_symbols}"
+        if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+          starlink-beacon-fingerprint "${storage_root}" --capture-name "${name}"; then
+          printf '{"fingerprint_error":true,"capture":"%s"}\n' "${name}" >&2
+        fi
+      fi
+      if env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-track "${capture}" "${followup}" "${track}" \
+        --maximum-gap-s "${track_maximum_gap_s}" \
+        --maximum-reacquisition-span-hz "${track_maximum_reacquisition_span_hz}" \
+        "${track_args[@]}"; then
+        if [[ -f "${tle_catalog}" ]]; then
+          if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-orbit \
+            associate --observations "${track}" --catalog "${tle_catalog}" \
+            --lat "${observer_lat}" --lon "${observer_lon}" --alt-m "${observer_alt_m}" \
+            --output "${association}"; then
+            printf '{"tle_association_error":true,"capture":"%s"}\n' "${name}" >&2
+          fi
+        fi
+      else
+        printf '{"continuous_track_error":true,"capture":"%s"}\n' "${name}" >&2
+      fi
+      if [[ -f "${track}" ]]; then
+        refresh_capture_links "${name}" "${track}" || printf \
+          '{"capture_link_error":true,"capture":"%s"}\n' "${name}" >&2
+        if [[ "${mode}" == "narrow" ]]; then
+          refresh_rolling_narrow_links "${name}" || printf \
+            '{"rolling_link_error":true,"capture":"%s"}\n' "${name}" >&2
+        fi
       fi
     fi
-    env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-      starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
-    env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-      starlink-beacon-calibrate "${storage_root}/reports" \
-      "${storage_root}/reports/calibration/calibration.json"
-    if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-      starlink-beacon-gain-summary "${storage_root}" \
-      "${storage_root}/reports/gain-experiment/summary.json"; then
-      printf '{"gain_summary_error":true}\n' >&2
+    if [[ "${mode}" == "hop" && -f "${track}" ]]; then
+      refresh_hop_links "${name}" || printf \
+        '{"channel_link_error":true,"capture":"%s"}\n' "${name}" >&2
     fi
-    if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-      starlink-beacon-dashboard-index "${storage_root}" \
-      "${storage_root}/reports/dashboard-index.json" --capture-name "${name}"; then
-      printf '{"dashboard_index_error":true,"capture":"%s"}\n' "${name}" >&2
+    # Repository-wide maintenance is intentionally amortized by the next
+    # ordinary capture.  A 16-child hop burst previously ran all four global
+    # scans 16 times and allowed the durable analysis queue to grow without
+    # bound.  Confirmed hop products still receive an immediate dashboard row.
+    if [[ "${mode}" != "hop" ]]; then
+      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}" \
+          --keep-confirmed "${keep_confirmed}" --keep-wide "${keep_wide}" \
+          --keep-oversample "${keep_oversample}" \
+          --keep-hop-sessions "${keep_hop_sessions}"
+      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-calibrate "${storage_root}/reports" \
+        "${storage_root}/reports/calibration/calibration.json"
+      if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-gain-summary "${storage_root}" \
+        "${storage_root}/reports/gain-experiment/summary.json"; then
+        printf '{"gain_summary_error":true}\n' >&2
+      fi
+    fi
+    if [[ "${mode}" != "hop" || -f "${confirmation_marker}" ]]; then
+      if ! flock "${maintenance_lock}" env UV_CACHE_DIR="${uv_cache}" \
+        "${uv_bin}" run --active --no-sync leo-radio \
+        starlink-beacon-dashboard-index "${storage_root}" \
+        "${storage_root}/reports/dashboard-index.json" --capture-name "${name}"; then
+        printf '{"dashboard_index_error":true,"capture":"%s"}\n' "${name}" >&2
+      fi
     fi
 }
 
-analysis_pid=""
-analysis_name=""
-wait_for_analysis() {
-  if [[ -n "${analysis_pid}" ]]; then
-    wait "${analysis_pid}"
-    analysis_pid=""
-    analysis_name=""
-  fi
+analysis_pids=()
+
+terminate_process_tree() {
+  local parent="$1" child
+  while read -r child; do
+    [[ -n "${child}" ]] || continue
+    terminate_process_tree "${child}"
+  done < <(pgrep -P "${parent}" 2>/dev/null || true)
+  kill "${parent}" 2>/dev/null || true
 }
 
 stop_analysis() {
-  if [[ -n "${analysis_pid}" ]]; then
-    kill "${analysis_pid}" 2>/dev/null || true
-    wait "${analysis_pid}" 2>/dev/null || true
-  fi
+  local pid
+  for pid in "${analysis_pids[@]}"; do
+    # The durable .job remains until a whole analysis succeeds. Terminate the
+    # active uv/python descendants as well as the worker shell so a service
+    # restart does not wait for the entire queued analysis to drain.
+    terminate_process_tree "${pid}"
+    wait "${pid}" 2>/dev/null || true
+  done
 }
 handle_signal() {
   trap - EXIT INT TERM
@@ -199,56 +446,189 @@ handle_signal() {
 trap stop_analysis EXIT
 trap handle_signal INT TERM
 
-start_pending_analysis() {
-  # Exactly one analyzer is allowed. Capture N+1 overlaps analysis N, but a
-  # backlog can never grow without bound or consume the NVMe silently.
-  wait_for_analysis
-  process_capture "${pending_name}" "${pending_capture}" "${pending_mode}" &
-  analysis_pid=$!
-  analysis_name="${pending_name}"
+enqueue_pending_analysis() {
+  local marker temporary
+  marker="${analysis_queue}/$(date -u +%Y%m%dT%H%M%S%NZ)-${pending_name}.job"
+  temporary="${marker}.next"
+  printf '%s\t%s\t%s\n' "${pending_name}" "${pending_capture}" \
+    "${pending_mode}" > "${temporary}"
+  mv "${temporary}" "${marker}"
 }
 
-env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-  starlink-beacon-recover "${storage_root}" \
-  --exact-acquisition-method "${exact_acquisition_method}" \
-  --narrow-exact-interval-s "${narrow_exact_interval_s}" \
-  --wide-exact-interval-s "${wide_exact_interval_s}" \
-  --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json"
-if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-  starlink-beacon-fingerprint "${storage_root}"; then
-  printf '{"fingerprint_backfill_error":true}\n' >&2
-fi
-env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-  starlink-beacon-gain-summary "${storage_root}" \
-  "${storage_root}/reports/gain-experiment/summary.json"
-env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-  starlink-beacon-dashboard-index "${storage_root}" \
-  "${storage_root}/reports/dashboard-index.json"
-env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-  starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
+recover_startup() {
+  local running restored
+  local -a queued_jobs running_jobs
+  shopt -s nullglob
+  running_jobs=("${analysis_queue}"/*.running.*)
+  shopt -u nullglob
+  for running in "${running_jobs[@]}"; do
+    restored="${running%%.running.*}.job"
+    if [[ -e "${restored}" ]]; then
+      restored="${running%%.running.*}.recovered.$$.job"
+    fi
+    mv "${running}" "${restored}"
+  done
+  shopt -s nullglob
+  queued_jobs=("${analysis_queue}"/*.job)
+  shopt -u nullglob
+  if (( ${#queued_jobs[@]} > 0 )); then
+    printf '{"startup_recovery_deferred":true,"queued_jobs":%d}\n' \
+      "${#queued_jobs[@]}"
+    return
+  fi
+  env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+    starlink-beacon-recover "${storage_root}" \
+    --exact-acquisition-method "${exact_acquisition_method}" \
+    --narrow-exact-interval-s "${narrow_exact_interval_s}" \
+    --wide-exact-interval-s "${wide_exact_interval_s}" \
+    --passes "${repo_dir}/artifacts/starlink_hybrid_watch/passes.json"
+  if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+    starlink-beacon-fingerprint "${storage_root}"; then
+    printf '{"fingerprint_backfill_error":true}\n' >&2
+  fi
+  env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+    starlink-beacon-gain-summary "${storage_root}" \
+    "${storage_root}/reports/gain-experiment/summary.json"
+  env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+    starlink-beacon-dashboard-index "${storage_root}" \
+    "${storage_root}/reports/dashboard-index.json"
+  env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+    starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}" \
+      --keep-confirmed "${keep_confirmed}" --keep-wide "${keep_wide}" \
+      --keep-oversample "${keep_oversample}" \
+      --keep-hop-sessions "${keep_hop_sessions}"
+}
+
+analysis_worker() {
+  local accepted_mode="$1"
+  local -a jobs
+  local marker claim name capture mode failed selected index
+  # Ordinary full captures are more expensive than their acquisition cadence,
+  # so a pure FIFO queue can make current sky decisions several hours late.
+  # Prefer four fresh jobs, then retire one oldest job.  This bounds decision
+  # latency without abandoning durable historical recovery.
+  local ordinary_selection_count=1
+  if [[ "${accepted_mode}" == "ordinary" ]]; then
+    # Keep capture startup independent from disk-only recovery, while ensuring
+    # exactly one worker performs it and restores interrupted claims.
+    recover_startup
+    : > "${analysis_ready}"
+  else
+    while [[ ! -e "${analysis_ready}" ]]; do sleep .1; done
+  fi
+  while true; do
+    shopt -s nullglob
+    jobs=("${analysis_queue}"/*.job)
+    shopt -u nullglob
+    if (( ${#jobs[@]} == 0 )); then
+      sleep 1
+      continue
+    fi
+    selected=""
+    if [[ "${accepted_mode}" == "ordinary" &&
+          $((ordinary_selection_count % 5)) -ne 0 ]]; then
+      # Bash pathname expansion is ascending; walk it backwards for freshness.
+      index=$((${#jobs[@]} - 1))
+    else
+      index=0
+    fi
+    while (( index >= 0 && index < ${#jobs[@]} )); do
+      marker="${jobs[index]}"
+      IFS=$'\t' read -r name capture mode < "${marker}"
+      if [[ ("${accepted_mode}" == "hop" && "${mode}" != "hop") ||
+            ("${accepted_mode}" == "ordinary" && "${mode}" == "hop") ]]; then
+        if [[ "${accepted_mode}" == "ordinary" &&
+              $((ordinary_selection_count % 5)) -ne 0 ]]; then
+          index=$((index - 1))
+        else
+          index=$((index + 1))
+        fi
+        continue
+      fi
+      claim="${marker%.job}.running.${BASHPID}"
+      if mv "${marker}" "${claim}" 2>/dev/null; then
+        selected="${claim}"
+        break
+      fi
+      if [[ "${accepted_mode}" == "ordinary" &&
+            $((ordinary_selection_count % 5)) -ne 0 ]]; then
+        index=$((index - 1))
+      else
+        index=$((index + 1))
+      fi
+    done
+    if [[ -z "${selected}" ]]; then
+      sleep 1
+      continue
+    fi
+    IFS=$'\t' read -r name capture mode < "${selected}"
+    if [[ "${accepted_mode}" == "ordinary" ]]; then
+      ordinary_selection_count=$((ordinary_selection_count + 1))
+    fi
+    # Full-frame and hop DSP can each consume more than one CPU core. Running
+    # both simultaneously with live IIO capture crosses the Pi's thermal
+    # ceiling and pauses RF acquisition. Claims stay disjoint, while this lock
+    # gives capture the thermal budget by admitting one heavy DSP job at once.
+    if (set -e
+        exec 8>"${analysis_execution_lock}"
+        flock 8
+        process_capture "${name}" "${capture}" "${mode}"); then
+      rm -f "${selected}"
+    else
+      failed="${selected%%.running.*}.failed"
+      mv "${selected}" "${failed}"
+      printf '{"analysis_job_error":true,"capture":"%s","job":"%s"}\n' \
+        "${name}" "${failed}" >&2
+    fi
+  done
+}
+
+# Captures never wait for analysis. The durable queue absorbs short oversample
+# and wide comparison dwells. Recovery completes before two disjoint workers
+# start: one preserves ordinary-capture ordering, while the lightweight hop
+# worker prevents short channel surveys from delaying full-frame tracking by
+# hours. Atomic .job -> .running claims make every capture exactly-once across
+# both workers and recover safely after a service restart.
+rm -f "${analysis_ready}"
+analysis_worker ordinary &
+analysis_pids+=("$!")
+analysis_worker hop &
+analysis_pids+=("$!")
 
 cycle=0
 while true; do
   for target in "${targets[@]}"; do
     capture_target "${target}" narrow
-    start_pending_analysis
+    enqueue_pending_analysis
   done
   cycle=$((cycle + 1))
+  if (( hop_every_cycles > 0 && cycle % hop_every_cycles == 0 )); then
+    hop_burst_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    for ((hop_session = 0; hop_session < hop_burst_sessions; hop_session++)); do
+      capture_hop_survey "${hop_burst_stamp}-b$(printf '%02d' "${hop_session}")"
+    done
+  fi
   if (( (oversample_on_startup == 1 && cycle == 1) ||
         (oversample_every_cycles > 0 && cycle % oversample_every_cycles == 0) )); then
     for target in "${targets[@]}"; do
       capture_target "${target}" oversample
-      start_pending_analysis
+      enqueue_pending_analysis
     done
   fi
   if (( wide_every_cycles > 0 && cycle % wide_every_cycles == 0 )); then
     for target in "${targets[@]}"; do
       capture_target "${target}" wide
-      start_pending_analysis
+      enqueue_pending_analysis
     done
   fi
   if (( maximum_cycles > 0 && cycle >= maximum_cycles )); then
-    wait_for_analysis
+    while [[ ! -e "${analysis_ready}" ]]; do sleep .1; done
+    while compgen -G "${analysis_queue}/*.job" > /dev/null ||
+          compgen -G "${analysis_queue}/*.running.*" > /dev/null; do
+      sleep .1
+    done
+    stop_analysis
+    analysis_pids=()
     break
   fi
 done

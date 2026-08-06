@@ -522,6 +522,9 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         assert index_row["fingerprint_family_size"] == 1
         detail_page = urlopen(base + index_row["detail_url"], timeout=2).read()
         assert b"Diagnostic plot" in detail_page
+        assert b"Doppler and predicted-pass matching" in detail_page
+        assert b"Dual-receiver detector and decode evidence" in detail_page
+        assert b"Raw signal and analysis plots" in detail_page
         detail = json.loads(urlopen(
             base + "/api" + index_row["detail_url"], timeout=2).read())
         assert row["decode_plot_url"] in detail["plots"]

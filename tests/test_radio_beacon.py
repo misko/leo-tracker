@@ -820,6 +820,7 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "/dev/urandom" in script
     assert "--gain-experiment-id" in script
     assert "starlink-beacon-gain-summary" in script
+    assert "starlink-beacon-dashboard-index" in script
 
 
 def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
@@ -836,7 +837,8 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
     result = subprocess.run(["bash", str(repo / "scripts/starlink-beacon-watch.sh")],
         cwd=repo, env=environment, text=True, capture_output=True, timeout=120)
     assert result.returncode == 0, result.stderr
-    reports = list((storage / "reports").glob("*.json"))
+    reports = [path for path in (storage / "reports").glob("*.json")
+               if path.name != "dashboard-index.json"]
     assert len(reports) == 2
     assert {"narrow", "wide"} == {
         "wide" if report.stem.split("-")[-2] == "wide" else "narrow"
@@ -861,6 +863,8 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
     gain_summary = json.loads((storage / "reports" / "gain-experiment" /
                                "summary.json").read_text())
     assert gain_summary["randomized_capture_count"] == 2
+    dashboard_index = json.loads((storage / "reports" / "dashboard-index.json").read_text())
+    assert len(dashboard_index["recordings"]) == 2
 
 
 def test_doppler_summary_uses_lnb_slopes_not_absolute_cfo_agreement():

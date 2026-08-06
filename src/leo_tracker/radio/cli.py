@@ -68,6 +68,7 @@ from .beacon.decode import decode_followup as decode_beacon_followup
 from .beacon.decode import plot_decode_report as plot_beacon_decode
 from .beacon.fingerprint import update_fingerprint_store
 from .beacon.gain_comparison import build_gain_comparison
+from .beacon.dashboard_index import update_dashboard_index
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -414,6 +415,15 @@ def command_starlink_beacon_gain_summary(args: argparse.Namespace) -> int:
                            "analyzed_count": value["analyzed_count"]}
                    for mode, value in report["groups"].items()},
         "decision_ready": report["decision_guidance"]["ready"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_beacon_dashboard_index(args: argparse.Namespace) -> int:
+    report = update_dashboard_index(args.root, args.output,
+                                    capture_name=args.capture_name)
+    print(json.dumps({"dashboard_index": str(args.output),
+        "recording_count": len(report["recordings"]),
+        "summary": report["summary"]}, sort_keys=True))
     return 0
 
 
@@ -1523,6 +1533,12 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_gain_summary.add_argument("root", type=Path)
     beacon_gain_summary.add_argument("output", type=Path)
     beacon_gain_summary.set_defaults(handler=command_starlink_beacon_gain_summary)
+    beacon_dashboard_index = commands.add_parser("starlink-beacon-dashboard-index",
+        help="incrementally build the lightweight beacon dashboard index")
+    beacon_dashboard_index.add_argument("root", type=Path)
+    beacon_dashboard_index.add_argument("output", type=Path)
+    beacon_dashboard_index.add_argument("--capture-name")
+    beacon_dashboard_index.set_defaults(handler=command_starlink_beacon_dashboard_index)
     analyze = commands.add_parser("analyze", help="create blind ridge data and waterfall")
     analyze.add_argument("capture"); analyze.add_argument("output_dir")
     analyze.add_argument("--fft-size", type=int, default=4096); analyze.add_argument("--hop-size", type=int)

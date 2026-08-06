@@ -74,6 +74,8 @@ class DashboardModel:
         self._beacon_cache_signature: tuple | None = None
         self._beacon_cache: dict | None = None
         self._beacon_cache_lock = threading.RLock()
+        self._recording_index_signature: tuple[int, int] | None = None
+        self._recording_index_cache: dict = {}
         self._snapshot_cache_lock = threading.Lock()
         self._snapshot_cache_created = 0.0
         self._snapshot_cache: dict | None = None
@@ -98,6 +100,23 @@ class DashboardModel:
         except OSError:
             version = 0
         return f"/plots/{plot_name}?v={version}"
+
+    def _beacon_recording_index(self) -> dict:
+        if self.beacon_root is None:
+            return {}
+        path = self.beacon_root / "reports" / "dashboard-index.json"
+        try:
+            stat = path.stat()
+            signature = (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            return {}
+        with self._beacon_cache_lock:
+            if signature == self._recording_index_signature:
+                return self._recording_index_cache
+            value = self._json(path, {})
+            self._recording_index_signature = signature
+            self._recording_index_cache = value
+            return value
 
     def records(self) -> list[dict]:
         legacy = self.root / "index.jsonl"
@@ -895,7 +914,40 @@ class DashboardModel:
         """Return a lightweight, image-free index of recent recording artifacts."""
         limit = max(1, min(int(limit), 200))
         rows = []
-        beacon = self.beacon(limit=min(limit, 100))
+        persisted = self._beacon_recording_index()
+        if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v1":
+            persisted_rows = persisted.get("recordings", [])
+            rows.extend({key: value for key, value in item.items()
+                         if not key.startswith("_")}
+                        for item in persisted_rows[:limit])
+            beacon = {"inventory": persisted.get("summary", {}),
+                "fingerprints": {"count": persisted.get("summary", {}).get(
+                    "fingerprint_count", 0)}, "captures": [], "active": None}
+            manifest_paths = sorted((self.beacon_root / "captures").glob("*/manifest.json"),
+                                    key=lambda path: path.stat().st_mtime_ns, reverse=True)
+            for manifest_path in manifest_paths[:3]:
+                manifest = self._json(manifest_path, {})
+                name = manifest_path.parent.name
+                report_exists = (self.beacon_root / "reports" / f"{name}.json").is_file()
+                if manifest.get("state") == "capturing" or (
+                        manifest.get("state") == "complete" and not report_exists):
+                    metadata = manifest.get("metadata", {})
+                    created_ns = int(manifest.get("created_utc_ns", 0) or 0)
+                    beacon["active"] = {"name": name,
+                        "stage": "capturing" if manifest.get("state") == "capturing" else "analyzing",
+                        "created_utc": _iso_from_ns(created_ns) if created_ns else None,
+                        "channel_number": metadata.get("channel_number"),
+                        "region": metadata.get("region"),
+                        "observation_mode": metadata.get("observation_mode", "narrow"),
+                        "if_center_hz": manifest.get("center_frequency_hz"),
+                        "rf_center_hz": manifest.get("rf_center_hz"),
+                        "sample_rate_hz": manifest.get("sample_rate_hz"),
+                        "bandwidth_hz": manifest.get("bandwidth_hz"),
+                        "gain_mode": manifest.get("gain_mode"),
+                        "configured_gain_db": manifest.get("configured_gain_db")}
+                    break
+        else:
+            beacon = self.beacon(limit=min(limit, 100))
         active = beacon.get("active")
         if active:
             rows.append({"kind": "beacon", "recording_id": active.get("name"),
@@ -903,8 +955,12 @@ class DashboardModel:
                 "mode": active.get("observation_mode"),
                 "channel": active.get("channel_number"), "region": active.get("region"),
                 "if_center_hz": active.get("if_center_hz"),
-                "rf_center_hz": active.get("rf_center_hz"), "sample_rate_hz": None,
-                "bandwidth_hz": None, "duration_s": None, "gain": None,
+                "rf_center_hz": active.get("rf_center_hz"),
+                "sample_rate_hz": active.get("sample_rate_hz"),
+                "bandwidth_hz": active.get("bandwidth_hz"), "duration_s": None,
+                "gain": (active.get("gain_mode") or "unknown") + (
+                    f" {float(active['configured_gain_db']):g} dB"
+                    if active.get("configured_gain_db") is not None else ""),
                 "candidate_count": None, "confirmed": None, "decoded": None,
                 "pilot_accuracy": None,
                 "detail_url": f"/recordings/beacon/{active.get('name')}"})
@@ -946,7 +1002,9 @@ class DashboardModel:
                 "fingerprint_family_size": item.get("fingerprint_cluster_size", 0),
                 "exact_coverage_fraction": item.get("exact_temporal_coverage_fraction"),
                 "detail_url": f"/recordings/beacon/{item.get('name')}"})
-        for item in self.waterfalls(limit=min(limit, 100)).get("waterfalls", []):
+        remaining = max(0, limit - len(rows))
+        for item in (self.waterfalls(limit=min(remaining, 100)).get("waterfalls", [])
+                     if remaining else []):
             recording_id = item.get("capture_id") or f"chunk-{int(item['chunk']):05d}"
             gain = item.get("gain_mode") or "unknown"
             if item.get("configured_gain_db") is not None:
@@ -985,6 +1043,15 @@ class DashboardModel:
     def recording_detail(self, kind: str, recording_id: str) -> dict | None:
         """Return one recording's statistics and plot links on demand."""
         if kind == "beacon":
+            persisted = self._beacon_recording_index()
+            if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v1":
+                row = next((item for item in persisted.get("recordings", [])
+                            if item.get("recording_id") == recording_id), None)
+                if row is not None:
+                    return {"kind": kind, "recording_id": recording_id, "active": False,
+                            "statistics": row.get("_statistics", {}),
+                            "plots": row.get("_plots", []),
+                            "artifacts": row.get("_artifacts", [])}
             report = self.beacon(limit=100)
             if (report.get("active") or {}).get("name") == recording_id:
                 return {"kind": kind, "recording_id": recording_id,
@@ -1126,7 +1193,7 @@ DETAIL_HTML = r'''<!doctype html>
 :root{color-scheme:dark;--bg:#071018;--panel:#0d1a24;--line:#223646;--text:#dcebf4;--muted:#8ba4b4;--cyan:#3ed5d7;--amber:#ffbf69}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}main{max-width:1350px;margin:auto;padding:20px}a{color:var(--cyan);text-decoration:none}h1{font:600 26px/1.15 system-ui;margin:14px 0 4px}h2{font:600 17px system-ui;margin:0 0 12px}.muted{color:var(--muted)}.panel{margin-top:14px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}th{width:240px;color:var(--muted)}.plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.plots a{display:block}.plots img{display:block;width:100%;border:1px solid var(--line);border-radius:9px;background:#091722}pre{white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto;color:#b9ceda}.artifact{display:inline-block;margin:4px 14px 4px 0}.error{color:var(--amber)}
 @media(max-width:800px){main{padding:12px}.plots{grid-template-columns:1fr}th{width:130px}}
-</style></head><body><main><a href="/">← All recordings</a><h1 id="title">Recording statistics</h1><div id="subtitle" class="muted">loading…</div><section class="panel"><h2>Capture summary</h2><table><tbody id="summary"></tbody></table></section><section id="artifactpanel" class="panel"><h2>Structured artifacts</h2><div id="artifacts"></div></section><section id="plotpanel" class="panel"><h2>Plots</h2><div id="plots" class="plots"></div></section><details class="panel"><summary>Complete statistics JSON</summary><pre id="raw"></pre></details></main><script>
+</style></head><body><main><a href="/">← All recordings</a><h1 id="title">Recording statistics</h1><div id="subtitle" class="muted">loading…</div><section class="panel"><h2>Capture summary</h2><table><tbody id="summary"></tbody></table></section><section id="dopplerpanel" class="panel"><h2>Doppler and predicted-pass matching</h2><div id="doppler"></div></section><section id="detectorpanel" class="panel"><h2>Dual-receiver detector and decode evidence</h2><div id="detector"></div></section><section id="artifactpanel" class="panel"><h2>Structured artifacts</h2><div id="artifacts"></div></section><section id="plotpanel" class="panel"><h2>Raw signal and analysis plots</h2><div id="plots" class="plots"></div></section><details class="panel"><summary>Complete statistics JSON</summary><pre id="raw"></pre></details></main><script>
 const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeUrl=v=>typeof v==='string'&&v.startsWith('/')?v:'#';const f=(v,n=2)=>Number.isFinite(v)?Number(v).toFixed(n):'—';
 const parts=location.pathname.split('/').filter(Boolean),api='/api/recordings/'+encodeURIComponent(parts[1]||'')+'/'+encodeURIComponent(parts.slice(2).join('/')||'');
@@ -1134,6 +1201,8 @@ function value(v){if(v===null||v===undefined)return '—';if(typeof v==='boolean
 async function load(){try{const d=await fetch(api,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}),s=d.statistics||{};document.title=d.recording_id+' · LEO Tracker';document.querySelector('#title').textContent=d.recording_id;document.querySelector('#subtitle').textContent=d.kind+' recording · '+(d.active?'capture in progress':'completed analysis');
 const preferred=[['Recorded',s.created_utc||s.start_utc],['Status',s.stage||(d.active?'active':s.followup_confirmed?'confirmed':s.qualified_count?'qualified':s.candidate_count?'candidate':'analyzed')],['Mode',s.observation_mode],['Channel',s.channel_number],['Region',s.region],['IF center',Number.isFinite(s.if_center_hz)?f(s.if_center_hz/1e6,3)+' MHz':Number.isFinite(s.channel?.if_center_hz)?f(s.channel.if_center_hz/1e6,3)+' MHz':null],['Ku RF center',Number.isFinite(s.rf_center_hz)?f(s.rf_center_hz/1e9,6)+' GHz':null],['Sample rate',Number.isFinite(s.sample_rate_hz)?f(s.sample_rate_hz/1e6,2)+' MS/s':null],['RF bandwidth',Number.isFinite(s.bandwidth_hz)?f(s.bandwidth_hz/1e6,2)+' MHz':null],['Gain control',s.gain_mode],['Configured gain',Number.isFinite(s.configured_gain_db)?f(s.configured_gain_db,1)+' dB':null],['Duration',Number.isFinite(s.duration_s)?f(s.duration_s,1)+' s':Number.isFinite(s.wall_duration_s)?f(s.wall_duration_s,1)+' s':null],['Exact candidates',s.candidate_count],['Single-RX candidates',s.single_receiver_candidate_count],['Temporally confirmed',s.followup_confirmed],['Doppler observations',s.doppler_observation_count],['Fingerprint family',s.fingerprint_cluster_id],['Fingerprint family size',s.fingerprint_cluster_size]];
 document.querySelector('#summary').innerHTML=preferred.filter(([,v])=>v!==null&&v!==undefined).map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(value(v))}</td></tr>`).join('');
+const confirmation=s.confirmation||{},links=[...(confirmation.cross_receiver_links||[]),...(confirmation.dual_receiver_links||[]),...(confirmation.receivers||[]).flatMap(x=>x.links||[])],passes=[...(s.overlapping_passes||[])];if(s.coherent_joint_track?.qualified)links.push({drift_hz_s:s.coherent_joint_track.mean_drift_hz_s,kind:'coherent dual-receiver track'});if(s.best_tle_candidate)passes.push({name:s.best_tle_candidate.name,norad_id:s.best_tle_candidate.norad_id,nearest_prediction:{expected_doppler_hz:s.best_tle_candidate.expected_doppler_hz}});document.querySelector('#dopplerpanel').hidden=!links.length&&!passes.length;document.querySelector('#doppler').innerHTML=`${links.length?'<table><thead><tr><th>Start–stop</th><th>Drift</th><th>Evidence</th></tr></thead><tbody>'+links.map(x=>`<tr><td>${Number.isFinite(x.start_s)?f(x.start_s,2):'—'}–${Number.isFinite(x.stop_s)?f(x.stop_s,2):'—'} s</td><td>${Number.isFinite(x.drift_hz_s)?f(x.drift_hz_s/1000,3)+' kHz/s':'—'}</td><td>${esc(x.kind||x.classification||'dual-receiver temporal link')}</td></tr>`).join('')+'</tbody></table>':''}${passes.length?'<h2 style="margin-top:18px">Overlapping Starlink predictions</h2><table><thead><tr><th>Satellite</th><th>NORAD</th><th>Maximum elevation</th><th>Predicted Doppler</th></tr></thead><tbody>'+passes.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.norad_id)}</td><td>${Number.isFinite(p.culmination_elevation_deg)?f(p.culmination_elevation_deg,1)+'°':'—'}</td><td>${Number.isFinite(p.nearest_prediction?.expected_doppler_hz)?f(p.nearest_prediction.expected_doppler_hz/1000,1)+' kHz':'—'}</td></tr>`).join('')+'</tbody></table>':''}`;
+const checks=s.exact_checks||[],candidates=checks.filter(x=>x.candidate),decode=s.decode||{},soft=((decode.soft_dual_rx||{}).pilot||{});document.querySelector('#detector').innerHTML=`<table><tbody><tr><th>Exact checks / candidates / qualified</th><td>${checks.length} / ${candidates.length} / ${checks.filter(x=>x.qualified).length}</td></tr><tr><th>Exact temporal coverage</th><td>${Number.isFinite(s.exact_coverage_fraction)?f(100*s.exact_coverage_fraction,3)+'%':Number.isFinite(s.summary?.exact_temporal_coverage_fraction)?f(100*s.summary.exact_temporal_coverage_fraction,3)+'%':'—'}</td></tr><tr><th>Soft dual-RX pilot accuracy</th><td>${Number.isFinite(soft.hard_symbol_accuracy)?f(100*soft.hard_symbol_accuracy,2)+'%':'—'}</td></tr><tr><th>Soft confidence / EVM</th><td>${Number.isFinite(soft.soft_mean_confidence)?f(100*soft.soft_mean_confidence,2)+'%':'—'} / ${f(soft.rms_evm,3)}</td></tr><tr><th>Decoded frames / SSS accuracy</th><td>${esc(decode.minimum_frame_count)} / ${Number.isFinite(decode.minimum_sss_accuracy)?f(100*decode.minimum_sss_accuracy,2)+'%':'—'}</td></tr></tbody></table>${candidates.length?'<h2 style="margin-top:18px">Candidate checks</h2><table><thead><tr><th>Time</th><th>Qualified</th><th>CFO Δ</th><th>RX pilot CFO</th><th>Match margins</th></tr></thead><tbody>'+candidates.map(x=>`<tr><td>${f(x.start_s,2)} s</td><td>${x.qualified?'yes':'no'}</td><td>${Number.isFinite(x.cfo_difference_hz)?f(x.cfo_difference_hz/1000,2)+' kHz':'—'}</td><td>${(x.receivers||[]).map(r=>Number.isFinite(r.pilot_frequency_offset_hz)?f(r.pilot_frequency_offset_hz/1000,2):'—').join(' / ')} kHz</td><td>${(x.receivers||[]).map(r=>f(r.match_score_margin,4)).join(' / ')}</td></tr>`).join('')+'</tbody></table>':''}`;
 const artifacts=d.artifacts||[];document.querySelector('#artifactpanel').hidden=!artifacts.length;document.querySelector('#artifacts').innerHTML=artifacts.map(x=>`<a class="artifact" href="${esc(safeUrl(x.url))}" target="_blank">${esc(x.label)} ↗</a>`).join('');
 const plots=d.plots||[];document.querySelector('#plotpanel').hidden=!plots.length;document.querySelector('#plots').innerHTML=plots.map((url,index)=>`<a href="${esc(safeUrl(url))}" target="_blank"><img loading="lazy" src="${esc(safeUrl(url))}" alt="Diagnostic plot ${index+1}"></a>`).join('');document.querySelector('#raw').textContent=JSON.stringify(s,null,2);if(d.active)setTimeout(load,5000);
 }catch(error){document.querySelector('#subtitle').innerHTML='<span class="error">Recording not found or dashboard unavailable.</span>';document.querySelector('#summary').innerHTML='';console.error(error)}}load();
@@ -1205,6 +1274,11 @@ def make_handler(model: DashboardModel):
                 if name.endswith(".png") and target.is_file():
                     return self._send(target.read_bytes(), "image/png",
                                       cache_control="public, max-age=300")
+            if path.startswith("/beacon-analyses/") and model.beacon_root is not None:
+                name = Path(path).name
+                target = model.beacon_root / "reports" / name
+                if name.endswith(".json") and target.is_file():
+                    return self._send(target.read_bytes(), "application/json")
             if path.startswith("/beacon-followups/") and model.beacon_root is not None:
                 name = Path(path).name
                 target = model.beacon_root / "reports" / "followups" / name

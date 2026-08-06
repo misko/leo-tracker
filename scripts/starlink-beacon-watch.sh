@@ -168,6 +168,11 @@ process_capture() {
       "${storage_root}/reports/gain-experiment/summary.json"; then
       printf '{"gain_summary_error":true}\n' >&2
     fi
+    if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-dashboard-index "${storage_root}" \
+      "${storage_root}/reports/dashboard-index.json" --capture-name "${name}"; then
+      printf '{"dashboard_index_error":true,"capture":"%s"}\n' "${name}" >&2
+    fi
 }
 
 analysis_pid=""
@@ -216,6 +221,9 @@ fi
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   starlink-beacon-gain-summary "${storage_root}" \
   "${storage_root}/reports/gain-experiment/summary.json"
+env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+  starlink-beacon-dashboard-index "${storage_root}" \
+  "${storage_root}/reports/dashboard-index.json"
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
 

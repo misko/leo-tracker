@@ -1,12 +1,13 @@
 import json
 from pathlib import Path
+from xml.etree import ElementTree
 
 import numpy as np
 
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.beacon.fingerprint import (
     FINGERPRINT_SCHEMA, INDEX_SCHEMA, compare_fingerprints,
-    fingerprint_decode, update_fingerprint_store)
+    fingerprint_decode, render_fingerprint_svg, update_fingerprint_store)
 
 
 def _probabilities(states, confidence=.97):
@@ -98,6 +99,13 @@ def test_fingerprint_cli_backfills_store_and_builds_clusters(tmp_path):
     nearest = index["nearest_matches"]["capture-a"][0]
     assert nearest["capture_name"] == "capture-b"
     assert nearest["waveform_family_similarity"] == 1
+
+    svg = render_fingerprint_svg(index)
+    assert ElementTree.fromstring(svg).tag.endswith("svg")
+    assert b"Nearest-neighbor fingerprint evidence map" in svg
+    assert b"family-link threshold" in svg
+    assert b"capture-a" in svg
+    assert b"not satellite identity" in svg
 
     reused = update_fingerprint_store(tmp_path)
     assert reused["written"] == []

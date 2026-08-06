@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
+from html import escape
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -329,3 +331,117 @@ def update_fingerprint_store(root: Path, *, capture_name: str | None = None) -> 
             "fingerprint_count": index["fingerprint_count"],
             "cluster_count": len(index["clusters"]),
             "index": str((fingerprints / "index.json").resolve())}
+
+
+def render_fingerprint_svg(index: dict, *, width: int = 1100,
+                           height: int = 540) -> bytes:
+    """Render an interpretable nearest-neighbor cluster map without JS dependencies."""
+    left, top, plot_width, plot_height = 72, 92, 720, 370
+    y_min = .5
+    palette = ("#3ed5d7", "#ffbf69", "#8ea1ff", "#ef7fbf", "#7ee081",
+               "#ff8c69", "#b99cff", "#57c7ff")
+    clusters = index.get("clusters", [])
+    cluster_sizes = {item.get("cluster_id"): int(item.get("member_count", 0))
+                     for item in clusters}
+    membership = index.get("membership", {})
+    nearest = index.get("nearest_matches", {})
+    points = []
+    for name, matches in nearest.items():
+        if not matches:
+            continue
+        match = matches[0]
+        cluster_id = membership.get(name)
+        cluster_size = cluster_sizes.get(cluster_id, 1)
+        points.append({"name": name, "nearest": match.get("capture_name"),
+            "waveform": float(match.get("waveform_family_similarity", 0)),
+            "channel": float(match.get("conditional_channel_similarity", 0)),
+            "confidence": float(match.get("minimum_pilot_confidence", 0)),
+            "family_link": bool(match.get("family_link")),
+            "cluster_id": cluster_id, "cluster_size": cluster_size,
+            "shared_norad": match.get("shared_overlapping_norad_ids", [])})
+
+    def color(cluster_id: str | None, cluster_size: int) -> str:
+        if not cluster_id or cluster_size <= 1:
+            return "#718696"
+        value = int(hashlib.sha256(cluster_id.encode()).hexdigest()[:8], 16)
+        return palette[value % len(palette)]
+
+    def x_position(value: float) -> float:
+        return left + np.clip(value, 0, 1) * plot_width
+
+    def y_position(value: float) -> float:
+        return top + (1 - np.clip((value - y_min) / (1 - y_min), 0, 1)) * plot_height
+
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" role="img" aria-labelledby="title description">',
+        '<title id="title">Starlink waveform fingerprint clusters</title>',
+        '<desc id="description">Nearest-neighbor waveform and conditional channel similarity. '
+        'Clusters are waveform families, not satellite identities.</desc>',
+        '<rect width="100%" height="100%" rx="12" fill="#091722"/>',
+        '<style>text{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}'
+        '.axis{fill:#8ba4b4;font-size:11px}.heading{fill:#dcebf4;font-size:18px;font-weight:600}'
+        '.note{fill:#8ba4b4;font-size:11px}.cluster{fill:#dcebf4;font-size:12px}</style>',
+        '<text x="32" y="34" class="heading">Nearest-neighbor fingerprint evidence map</text>',
+        f'<text x="32" y="55" class="note">{len(points)} comparable fingerprints · '
+        f'{int(index.get("linked_fingerprint_count", 0))} linked · '
+        f'{int(index.get("unresolved_singleton_count", 0))} unresolved</text>',
+        '<text x="32" y="73" class="note">X: repeated pilot/SSS code · Y: fixed LNB/RX-conditioned channel shape · not satellite identity</text>',
+        f'<rect x="{left}" y="{top}" width="{plot_width}" height="{plot_height}" '
+        'fill="#0d1f2a" stroke="#294151"/>']
+    for tick in (0, .25, .5, .72, .75, 1):
+        x = x_position(tick)
+        dashed = ' stroke-dasharray="5 5"' if tick == .72 else ''
+        stroke = "#ffbf69" if tick == .72 else "#243b4a"
+        lines.append(f'<line x1="{x:.1f}" y1="{top}" x2="{x:.1f}" '
+                     f'y2="{top + plot_height}" stroke="{stroke}"{dashed}/>')
+        lines.append(f'<text x="{x:.1f}" y="{top + plot_height + 20}" '
+                     f'text-anchor="middle" class="axis">{tick * 100:.0f}%</text>')
+    for tick in (.5, .6, .7, .8, .9, 1):
+        y = y_position(tick)
+        lines.append(f'<line x1="{left}" y1="{y:.1f}" x2="{left + plot_width}" '
+                     'y2="{:.1f}" stroke="#243b4a"/>'.format(y))
+        lines.append(f'<text x="{left - 9}" y="{y + 4:.1f}" text-anchor="end" '
+                     f'class="axis">{tick * 100:.0f}%</text>')
+    threshold_x = x_position(FAMILY_LINK_THRESHOLD)
+    lines.append(f'<text x="{threshold_x + 5:.1f}" y="{top + 14}" '
+                 'fill="#ffbf69" font-size="10">family-link threshold</text>')
+    lines.append(f'<text x="{left + plot_width / 2:.1f}" y="{height - 20}" '
+                 'text-anchor="middle" class="axis">nearest-neighbor waveform-family similarity</text>')
+    lines.append(f'<text x="17" y="{top + plot_height / 2:.1f}" text-anchor="middle" '
+                 'class="axis" transform="rotate(-90 17 {:.1f})">conditional channel similarity</text>'.format(
+                     top + plot_height / 2))
+    for point in sorted(points, key=lambda item: (item["cluster_size"] > 1,
+                                                   item["cluster_size"])):
+        x, y = x_position(point["waveform"]), y_position(point["channel"])
+        radius = 3.5 + min(math.log2(max(point["cluster_size"], 1)), 4)
+        point_color = color(point["cluster_id"], point["cluster_size"])
+        opacity = .92 if point["family_link"] else .55
+        title = escape(f'{point["name"]}\nnearest: {point["nearest"]}\n'
+            f'waveform: {100 * point["waveform"]:.1f}%\n'
+            f'conditional channel: {100 * point["channel"]:.1f}%\n'
+            f'confidence: {100 * point["confidence"]:.1f}%\n'
+            f'family: {point["cluster_id"]} ({point["cluster_size"]})\n'
+            f'shared TLE candidates: {point["shared_norad"]}')
+        lines.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{radius:.1f}" '
+                     f'fill="{point_color}" fill-opacity="{opacity}" stroke="#dcebf4" '
+                     f'stroke-opacity=".35"><title>{title}</title></circle>')
+    table_x = left + plot_width + 34
+    lines.extend([f'<text x="{table_x}" y="{top + 5}" class="heading" font-size="15">Families</text>',
+                  f'<text x="{table_x}" y="{top + 27}" class="note">linked clusters by size</text>'])
+    linked_clusters = [item for item in clusters if int(item.get("member_count", 0)) > 1]
+    for row, cluster in enumerate(linked_clusters[:9]):
+        cluster_id = str(cluster.get("cluster_id"))
+        size = int(cluster.get("member_count", 0))
+        y = top + 58 + row * 29
+        point_color = color(cluster_id, size)
+        lines.append(f'<circle cx="{table_x + 7}" cy="{y - 4}" r="6" fill="{point_color}"/>')
+        lines.append(f'<text x="{table_x + 22}" y="{y}" class="cluster">'
+                     f'{escape(cluster_id)} · {size} observations</text>')
+    if not linked_clusters:
+        lines.append(f'<text x="{table_x}" y="{top + 58}" class="note">No linked family yet</text>')
+    lines.extend([f'<circle cx="{table_x + 7}" cy="{top + 342}" r="5" fill="#718696" fill-opacity=".55"/>',
+                  f'<text x="{table_x + 22}" y="{top + 346}" class="cluster">unresolved / low confidence</text>',
+                  f'<text x="{table_x}" y="{top + 382}" class="note">Hover a point for capture, nearest match,</text>',
+                  f'<text x="{table_x}" y="{top + 399}" class="note">confidence, family, and shared TLE candidates.</text>',
+                  '</svg>'])
+    return "".join(lines).encode()

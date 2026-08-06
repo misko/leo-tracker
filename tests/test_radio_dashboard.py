@@ -484,11 +484,19 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
     thread = Thread(target=server.serve_forever, daemon=True); thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
     try:
+        dashboard_html = urlopen(base + "/", timeout=2).read()
+        assert b'id="fingerprintplot"' in dashboard_html
+        assert b"beacon-fingerprint-map.svg" in dashboard_html
         served = json.loads(urlopen(base + row["decode_url"], timeout=2).read())
         assert served["combined"]["minimum_frame_count"] == 7
         assert urlopen(base + row["decode_plot_url"], timeout=2).read() == b"decode-png"
         served_fingerprint = json.loads(urlopen(
             base + row["fingerprint_url"], timeout=2).read())
         assert not served_fingerprint["interpretation"]["satellite_identity_claim"]
+        fingerprint_svg = urlopen(
+            base + "/beacon-fingerprint-map.svg", timeout=2).read()
+        assert fingerprint_svg.startswith(b'<svg xmlns="http://www.w3.org/2000/svg"')
+        assert b"Nearest-neighbor fingerprint evidence map" in fingerprint_svg
+        assert b"No linked family yet" in fingerprint_svg
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)

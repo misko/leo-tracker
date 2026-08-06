@@ -1,12 +1,17 @@
-"""Four C-clips in a cross, unioned by a flush cross web. One printed part.
+"""Four C-clips in a cross on a central pedestal. One printed part.
 
 Each clamp is tilted TILT deg outward with its mouth facing outward. All four
-forward ends are cut by ONE horizontal plane; the cross web's top face sits in
-that same plane, so the whole assembly has a single flat face. Printed on it,
-every surface is within TILT deg of vertical -> no supports.
+forward ends and the cross web's top face are cut by ONE horizontal plane, so
+the assembly has a single flush face. Printed on it, every surface is within
+TILT deg of vertical -> no supports.
 
 The web's outer ends are trimmed to the clamps' actual outer surfaces (found by
 ray marching), so each arm cradles its clamp instead of stabbing into it.
+
+The centre drops into a hollow pedestal that reaches below the LNBF tails and
+flares into a foot, so the assembly stands on itself. Because the boresights
+tilt outward, the LNBF bodies lean *inward* going down and converge on the
+centre -- that convergence, not the clamps, is what sets the arm length.
 """
 import math, struct
 import numpy as np
@@ -15,7 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-# ---- parameters (mm) -------------------------------------------------
+# ---- clamp (see clamp.py / lnbf-clamp.md) ----------------------------
 R_BORE   = 20.2      # bore radius, for a 40.0 neck
 T_ROOT   = 6.0       # wall at bottom dead centre
 T_TIP    = 3.5       # wall at the tips
@@ -25,10 +30,22 @@ PHI_CON  = 23.7
 CHAM_DEG = 7.0
 CHAM_R   = 2.5
 TILT     = 27.0      # boresight tilt from zenith
-R_ARM    = 75.0      # centre to bore axis, measured in the trim plane
+
+# ---- the LNBF itself. MEASURE THESE - they set R_ARM -----------------
+BODY_D   = 50.0      # body diameter behind the neck
+BODY_L   = 65.0      # clamp aft face to back of connector, along the axis
+HORN_D   = 66.0      # feedhorn diameter (render only)
+
+# ---- assembly --------------------------------------------------------
+R_ARM    = 105.0     # centre to bore axis, in the flush plane
 WEB_W    = 24.0      # cross width = half the clamp's 48.7 mm width
-WEB_T    = 12.0      # cross thickness, hanging below the flush top face
+WEB_T    = 12.0      # cross thickness below the flush face
+PED_D    = 50.0      # pedestal outside diameter
+PED_WALL = 5.0       # pedestal wall
+FOOT_D   = 66.0      # flared foot diameter
+FOOT_H   = 10.0      # flare height, entirely below the LNBF tails
 EMBED    = 0.8       # how far the web buries into the clamp wall (wall >= 6)
+
 PHI_TIP  = PHI_CON + CHAM_DEG
 SWEEP    = 180.0 + 2 * PHI_TIP
 N        = 168
@@ -68,22 +85,29 @@ inner = np.array([[profile(f)[0] * math.cos(math.radians(f)),
 outer = np.array([[profile(f)[1] * math.cos(math.radians(f)),
                    profile(f)[1] * math.sin(math.radians(f))] for f in phis])
 
-# Rz(-90) puts the mouth on +X; Ry(TILT) tips the bore axis toward +X, which
-# carries the mouth downhill/outboard and the closed back inboard, so the web
-# lands on solid material rather than on the gap.
+# Rz(-90) puts the mouth on +X; Ry(TILT) tips the bore axis toward +X, carrying
+# the mouth outboard and the closed back inboard, so the web lands on material.
 M0 = ry(TILT) @ rz(-90)
-# world z of a base point is -y*sin + z*cos, so the flush plane is:
-H = LEN_MAX * CT - outer[:, 1].max() * ST
+H = LEN_MAX * CT - outer[:, 1].max() * ST          # the flush plane
 zf = lambda y: (H + y * ST) / CT
 zi, zo = zf(inner[:, 1]), zf(outer[:, 1])
 OFF0 = np.array([R_ARM - H * math.tan(tr), 0.0, 0.0])
 
-print(f"tilt {TILT}deg, wrap {SWEEP:.1f}deg, mouth "
-      f"{2*min(profile(f)[0]*math.cos(math.radians(f)) for f in phis if f>0):.2f} mm")
-print(f"grip {min(zi.min(), zo.min()):.1f} to {max(zi.max(), zo.max()):.1f} mm "
-      f"(root {min(zi.min(), zo.min()):.1f} mm -> arms softer than the single clamp)")
-print(f"flush plane at z={H:.1f}, bore-axis spacing "
-      f"{R_ARM*math.sqrt(2):.0f} mm adjacent / {2*R_ARM:.0f} mm opposite")
+r_aft = R_ARM - H * math.tan(tr)                   # bore axis at the clamp aft
+r_tail = r_aft - BODY_L * ST                       # ... and at the LNBF tail
+z_tail = -BODY_L * CT
+Z_BASE = z_tail - FOOT_H                           # foot sits below the tails
+
+gap_adj = r_tail * math.sqrt(2) - BODY_D
+gap_ped = r_tail - BODY_D / 2 - PED_D / 2
+print(f"grip {min(zi.min(), zo.min()):.1f} to {max(zi.max(), zo.max()):.1f} mm, "
+      f"flush plane z={H:.1f}, bore-axis spacing {R_ARM*math.sqrt(2):.0f} mm")
+print(f"LNBF tail at r={r_tail:.1f} z={z_tail:.1f}")
+print(f"  clearance LNBF to LNBF (adjacent) {gap_adj:+.1f} mm")
+print(f"  clearance LNBF to pedestal       {gap_ped:+.1f} mm")
+if min(gap_adj, gap_ped) < 5.0:
+    print("  *** TIGHT - raise R_ARM or shrink PED_D ***")
+print(f"pedestal {H - Z_BASE:.0f} mm tall, foot Ø{FOOT_D:.0f} at z={Z_BASE:.1f}")
 
 
 def q(a, b, c, d):
@@ -114,7 +138,6 @@ clamps = [[f @ M.T + o for f in CF] for M, o in XF]
 
 
 def in_clamp(P, M, o):
-    """Is world point P inside the clamp's material?"""
     p = M.T @ (P - o)
     r = math.hypot(p[0], p[1])
     if r < 1e-9:
@@ -131,9 +154,7 @@ def in_clamp(P, M, o):
 
 
 def cradle_u(uhat, vhat, v, w, M, o):
-    """Radial distance from the centre to the clamp's outer surface."""
-    lo = None
-    u = 0.0
+    lo, u = None, 0.0
     while u < R_ARM + 45.0:
         if in_clamp(u * uhat + v * vhat + np.array([0, 0, w]), M, o):
             lo = u
@@ -164,21 +185,20 @@ def web_arm(az, M, o):
         for j, w in enumerate(ws):
             r = cradle_u(uhat, vhat, v, w, M, o)
             if r is None:
-                raise SystemExit(f"web arm at az={az} misses its clamp "
-                                 f"at v={v:.1f} w={w:.1f} - check R_ARM/WEB_W")
+                raise SystemExit(f"web arm at az={az} misses its clamp")
             U[i, j] = r
     P = lambda u, v, w: u * uhat + v * vhat + np.array([0, 0, w])
     f = []
-    for i in range(NV - 1):                       # cradle surface
+    for i in range(NV - 1):
         for j in range(NW - 1):
             f.append(q(P(U[i, j], vs[i], ws[j]), P(U[i+1, j], vs[i+1], ws[j]),
                        P(U[i+1, j+1], vs[i+1], ws[j+1]), P(U[i, j+1], vs[i], ws[j+1])))
-    for i, sgn in ((0, -1), (NV - 1, 1)):         # side walls
+    for i, sgn in ((0, -1), (NV - 1, 1)):
         for j in range(NW - 1):
             e = q(P(0, vs[i], ws[j]), P(U[i, j], vs[i], ws[j]),
                   P(U[i, j+1], vs[i], ws[j+1]), P(0, vs[i], ws[j+1]))
             f.append(e if sgn > 0 else e[::-1])
-    for j, sgn in ((0, -1), (NW - 1, 1)):         # top and bottom
+    for j, sgn in ((0, -1), (NW - 1, 1)):
         for i in range(NV - 1):
             e = q(P(0, vs[i], ws[j]), P(U[i, j], vs[i], ws[j]),
                   P(U[i+1, j], vs[i+1], ws[j]), P(0, vs[i+1], ws[j]))
@@ -188,29 +208,52 @@ def web_arm(az, M, o):
     return [np.array(x) for x in f]
 
 
+def revolve(rz_pairs, n=72, flip=False):
+    """Surface of revolution through a list of (r, z), as quads."""
+    f = []
+    for k in range(len(rz_pairs) - 1):
+        (r0, za), (r1, zb) = rz_pairs[k], rz_pairs[k + 1]
+        for i in range(n):
+            a0, a1 = 2*math.pi*i/n, 2*math.pi*(i+1)/n
+            p = [(r0*math.cos(a0), r0*math.sin(a0), za),
+                 (r0*math.cos(a1), r0*math.sin(a1), za),
+                 (r1*math.cos(a1), r1*math.sin(a1), zb),
+                 (r1*math.cos(a0), r1*math.sin(a0), zb)]
+            f.append(np.array(p[::-1] if flip else p))
+    return f
+
+
+ri_ped = PED_D / 2 - PED_WALL
+pedestal = (
+    revolve([(PED_D/2, H), (PED_D/2, Z_BASE + FOOT_H), (FOOT_D/2, Z_BASE)]) +
+    revolve([(ri_ped, Z_BASE), (ri_ped, H - WEB_T)], flip=True) +
+    revolve([(ri_ped, Z_BASE), (FOOT_D/2, Z_BASE)], flip=True) +
+    revolve([(0.0, H), (PED_D/2, H)], flip=True) +
+    revolve([(0.0, H - WEB_T), (ri_ped, H - WEB_T)])
+)
+
 arms = [web_arm(a, M, o) for a, (M, o) in zip(AZ, XF)]
-web = [x for a in arms for x in a]
-allf = [f for c in clamps for f in c] + web
+allf = [f for c in clamps for f in c] + [x for a in arms for x in a] + pedestal
 
 ap = np.vstack(allf)
 print(f"envelope {ap[:,0].max()-ap[:,0].min():.0f} x {ap[:,1].max()-ap[:,1].min():.0f}"
-      f" x {ap[:,2].max()-ap[:,2].min():.0f} mm")
+      f" x {ap[:,2].max()-ap[:,2].min():.0f} mm  "
+      f"({(ap[:,0].max()-ap[:,0].min())/math.sqrt(2)+FOOT_D/2:.0f} mm bed if rotated 45°)")
 
 FLIP = np.diag([1.0, -1.0, -1.0])
 printo = [f @ FLIP.T for f in allf]
 dz = min(f[:, 2].min() for f in printo)
 printo = [f - np.array([0, 0, dz]) for f in printo]
-pp = np.vstack(printo)
-print(f"print height {pp[:,2].max():.1f} mm, bed "
-      f"{pp[:,0].max()-pp[:,0].min():.0f} x {pp[:,1].max()-pp[:,1].min():.0f} mm")
+print(f"print height {max(f[:,2].max() for f in printo):.0f} mm")
 
 ring = np.vstack([outer, inner[::-1]])
 area = 0.5 * abs(np.dot(ring[:, 0], np.roll(ring[:, 1], -1)) -
                  np.dot(ring[:, 1], np.roll(ring[:, 0], -1)))
-vol = (4 * area * float(np.mean(np.concatenate([zi, zo]))) +
-       (2 * WEB_W * 2 * R_ARM - WEB_W ** 2) * WEB_T) / 1000.0
-print(f"solid volume ~{vol:.0f} cm3; expect ~{vol*1.24*0.6:.0f}-{vol*1.24*0.75:.0f} g "
-      f"and 8-12 h at 40% infill")
+vol = (4 * area * float(np.mean(np.concatenate([zi, zo])))
+       + (2 * WEB_W * 2 * R_ARM - WEB_W ** 2) * WEB_T
+       + math.pi * ((PED_D/2)**2 - ri_ped**2) * (H - WEB_T - Z_BASE)) / 1000.0
+print(f"solid volume ~{vol:.0f} cm3; expect ~{vol*1.24*0.5:.0f}-{vol*1.24*0.65:.0f} g "
+      f"and 14-20 h at 40% infill")
 
 
 def write_stl(name, polys):
@@ -232,7 +275,7 @@ write_stl("quad-clamp-installed.stl", allf)
 
 # ---- render ----------------------------------------------------------
 BASE = np.array([0.560, 0.530, 0.900])
-WEBC = np.array([0.430, 0.400, 0.800])
+TEAL = np.array([0.114, 0.620, 0.459])
 LIGHT = np.array([0.45, -0.55, 0.70]); LIGHT /= np.linalg.norm(LIGHT)
 
 
@@ -246,18 +289,33 @@ def shaded(polys, base):
     return out
 
 
-def draw(ax, polys, el, az, title, ground=None, nclamp=None):
+def lnbf(M, o):
+    """Stand-in LNBF: body, neck, feedhorn, along the clamp's bore axis."""
+    f = (revolve([(BODY_D/2, -BODY_L), (BODY_D/2, -2.0)]) +
+         revolve([(0, -BODY_L), (BODY_D/2, -BODY_L)]) +
+         revolve([(20.0, -2.0), (20.0, LEN_MAX + 4)]) +
+         revolve([(HORN_D/2, LEN_MAX + 4), (HORN_D/2, LEN_MAX + 34)]) +
+         revolve([(0, LEN_MAX + 34), (HORN_D/2, LEN_MAX + 34)]))
+    return [x @ M.T + o for x in f]
+
+
+LN = [x for M, o in XF for x in lnbf(M, o)]
+
+
+def draw(ax, parts, el, az, title, ground=None):
     if ground is not None:
-        s = 130
+        s = 175
         ax.add_collection3d(Poly3DCollection(
             [np.array([(-s, -s, ground), (s, -s, ground), (s, s, ground),
                        (-s, s, ground)])], facecolors=[(0.88, 0.88, 0.90)],
             edgecolors="none", alpha=0.5))
-    nc = len(polys) if nclamp is None else min(nclamp, len(polys))
-    cols = shaded(polys[:nc], BASE) + shaded(polys[nc:], WEBC)
-    ax.add_collection3d(Poly3DCollection(polys, facecolors=cols,
-                                         edgecolors=cols, linewidths=0.25))
-    a = np.vstack(polys); c = (a.max(0) + a.min(0)) / 2
+    pts = []
+    for polys, base, alpha in parts:
+        c = shaded(polys, base)
+        ax.add_collection3d(Poly3DCollection(polys, facecolors=c, edgecolors=c,
+                                             linewidths=0.25, alpha=alpha))
+        pts.append(np.vstack(polys))
+    a = np.vstack(pts); c = (a.max(0) + a.min(0)) / 2
     sp = (a.max(0) - a.min(0)).max() / 2 * 1.02
     ax.set_xlim(c[0]-sp, c[0]+sp); ax.set_ylim(c[1]-sp, c[1]+sp)
     ax.set_zlim(c[2]-sp, c[2]+sp)
@@ -265,21 +323,20 @@ def draw(ax, polys, el, az, title, ground=None, nclamp=None):
     ax.set_axis_off(); ax.set_title(title, fontsize=12, color="#333333", pad=-6)
 
 
-ncl = sum(len(c) for c in clamps)
-g = min(f[:, 2].min() for f in allf)
+P = [(allf, BASE, 1.0)]
+PL = [(allf, BASE, 1.0), (LN, TEAL, 0.35)]
 fig = plt.figure(figsize=(15, 9.4), dpi=105)
-for i, (t, el, az, pol, gr) in enumerate([
-        ("installed, isometric", 24, -55, allf, g),
-        ("plan view", 86, -90, allf, None),
-        ("installed, side on", 6, -90, allf, g),
-        ("print orientation, flush face on bed", 22, -55, printo, 0.0),
-        ("print orientation, from below the bed", -28, -55, printo, None),
+for i, (t, el, az, parts, gr) in enumerate([
+        ("standing, with LNBFs", 12, -55, PL, Z_BASE),
+        ("side on - foot clears the tails", 2, -90, PL, Z_BASE),
+        ("plan view", 86, -90, P, None),
+        ("mount alone, isometric", 20, -55, P, Z_BASE),
+        ("print orientation, flush face on bed", 20, -55, [(printo, BASE, 1.0)], 0.0),
         ("cradle detail, one junction", 12, 150,
-         clamps[0] + arms[0], None)], 1):
-    draw(fig.add_subplot(2, 3, i, projection="3d"), pol, el, az, t,
-         ground=gr, nclamp=(len(clamps[0]) if i == 6 else ncl))
-fig.suptitle("Four C-clips at 27° on a flush cross web · one printed part "
-             "· mouths outward · no supports",
+         [(clamps[0] + arms[0], BASE, 1.0)], None)], 1):
+    draw(fig.add_subplot(2, 3, i, projection="3d"), parts, el, az, t, ground=gr)
+fig.suptitle("Four C-clips at 27° on a flush cross with a dropped pedestal · "
+             "one printed part · stands on its own foot",
              fontsize=14, color="#222222", y=0.965)
 fig.tight_layout(rect=[0, 0, 1, 0.94])
 fig.savefig("quad-clamp-views.png", facecolor="white")

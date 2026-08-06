@@ -2,8 +2,10 @@
 
 Four of the [C-clips](lnbf-clamp.md) at 90°, each tilted 27° outward with its
 mouth facing outward, unioned by a cross web whose top face is coplanar with all
-four trimmed clamp faces. The whole assembly has one flat plane; printed on it,
-nothing needs support.
+four trimmed clamp faces. The centre drops into a hollow pedestal that reaches
+below the LNBF tails and flares into a foot, so the whole thing stands on itself
+with the LNBFs off the ground. One flat plane on top; printed on it, nothing
+needs support.
 
 ![six views of the assembly](quad-clamp-views.png)
 
@@ -13,12 +15,13 @@ nothing needs support.
 | --- | --- |
 | Clamps | 4 × C-clip, Ø40.4 bore, 37 mm mouth, 241° wrap |
 | Tilt | 27° from zenith, boresight 63° elevation |
-| Arm radius | 75 mm, centre to bore axis in the flush plane |
-| Bore-axis spacing | 106 mm adjacent, 150 mm opposite |
+| Arm radius | 105 mm, centre to bore axis in the flush plane |
+| Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
 | Cross web | 24 mm wide × 12 mm thick |
+| Pedestal | Ø50 × 5 mm wall, 100 mm tall, flaring to a Ø66 foot |
 | Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
-| Envelope | 177 × 177 × 37 mm |
-| Print | 37.4 mm tall, 177 × 177 bed, ~105–130 g, 8–12 h |
+| Envelope | 237 × 237 × 100 mm (201 mm bed rotated 45°) |
+| Print | 100 mm tall, ~150–190 g, 14–20 h |
 
 `quad-clamp-print.stl` is oriented on its flush face — slice as-is.
 `quad-clamp-installed.stl` is the same solid at its service attitude.
@@ -52,6 +55,43 @@ a flat face against a curve. Two consequences:
   line contact, which is what you want at the one joint that sees the LNBF's
   full cantilever.
 
+## The arm length is set by the LNBFs, not the clamps
+
+The boresights tilt outward, so each LNBF body leans **inward** as it goes down
+and the four tails converge on the centre. That convergence — not clamp
+clearance — is what sizes the cross.
+
+An LNBF tail sits 58 mm below its clamp's aft face and 30 mm further inboard.
+With 75 mm arms that puts the tails at r = 29 mm, where **adjacent bodies
+overlap each other by 9 mm**: the mount could not have been assembled. At 105 mm
+they land at r = 59 mm:
+
+| Clearance | Value |
+| --- | --- |
+| LNBF to adjacent LNBF | +34 mm |
+| LNBF to the Ø50 pedestal | +9 mm |
+
+The pedestal is now the binding constraint, not the neighbouring LNBFs. Both
+numbers come straight from `BODY_D` and `BODY_L` at the top of `assembly.py`,
+which are **assumptions about your LNBF** — measure them and re-run before
+printing, because they move `R_ARM` directly.
+
+## Standing on the pedestal
+
+The centre drops 100 mm to a hollow Ø50 column with a Ø66 flared foot, reaching
+10 mm below the lowest LNBF. Three details make it work:
+
+- **The top face stays flat all the way across.** The cross does not slope down
+  to the centre — it keeps a flush top and gets *deeper*. Sloping arms would put
+  their upper surfaces in overhang once the part is flipped for printing; a flat
+  top with a deeper centre prints as a slab with a column rising out of it.
+- **The column is hollow and open at the bottom**, so it drains, saves ~90 cm³
+  of material, and its bore prints as a plain vertical hole with the web slab as
+  its floor.
+- **The foot flare sits entirely below the LNBF tails**, at 39° from vertical.
+  Below the tails there is nothing to hit, so the foot can spread; above them it
+  could not. 39° also keeps it inside the 45° overhang rule when inverted.
+
 ## The wall went back to 6 mm
 
 Worth tracking, because it reverses the change made when the single clamp was
@@ -77,7 +117,9 @@ Slice `quad-clamp-print.stl` as it comes. **Do not re-orient it.**
   with no ceiling to bridge, the outer walls overhang at most 27°, and the aft
   ends are upward-facing 27° slopes.
 - The web becomes a solid 12 mm slab in the first layers, giving a large flat
-  footprint — no brim needed here, unlike the single clamp.
+  footprint — no brim needed here, unlike the single clamp. The pedestal then
+  rises as a 100 mm column; check it is not the tallest thin feature your
+  printer struggles with before starting a 16-hour job.
 - 0.2 mm layers, 5 perimeters, 40% infill. The clamp walls are almost all
   perimeter; the web is where the infill goes.
 - PLA is fine for a first article. Outdoors use ASA — PLA softens near 55 °C and
@@ -96,6 +138,8 @@ for CAD work, run it through a mesh boolean first.
 - **Print one single clamp first** ([lnbf-clamp.md](lnbf-clamp.md)) and check
   insertion force and that the mouth springs fully back. The mouth width is the
   dimension to tune, and tuning it on a 16 g part beats tuning it on a 120 g one.
-- Adjacent bore axes are 106 mm apart, at the low end of the 10–15 cm the brief
-  asked for. Apertures diverge above the clamps, so the real spacing is wider —
-  raise `R_ARM` if you want more, at the cost of bed size and web deflection.
+- **Measure `BODY_D` and `BODY_L`.** They set the LNBF convergence, which sets
+  `R_ARM`, which sets everything else. `assembly.py` prints both clearances on
+  every run and warns below 5 mm.
+- Adjacent bore axes are 148 mm apart, comfortably inside the 10–15 cm the brief
+  asked for, and apertures diverge further above the clamps.

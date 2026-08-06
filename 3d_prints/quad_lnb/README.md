@@ -11,8 +11,10 @@ the angles being *known* than about being adjustable.
 ![the assembly](quad-clamp-views.png)
 
 The whole mount is **one printed part**: four C-clip clamps unioned by a cross
-web. No fasteners, no metal, no supports. Each LNBF snaps in radially through the
-mouth of its clamp and is held by geometry, not by clamping force.
+web, with the centre dropped into a pedestal so the assembly stands on its own
+foot and holds the LNBFs off the ground. No fasteners, no metal, no supports.
+Each LNBF snaps in radially through the mouth of its clamp and is held by
+geometry, not by clamping force.
 
 ## Contents
 
@@ -47,14 +49,24 @@ mass so you can see immediately whether the change broke something.
 | --- | --- |
 | Elements | 4 × Ø40 mm D-profile feed neck, 90° apart |
 | Tilt | 27° from zenith (63° elevation boresight) |
-| Bore-axis spacing | 106 mm adjacent, 150 mm opposite |
+| Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
 | Clamp bore | Ø40.4, 37 mm mouth, 241° wrap |
 | Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
-| Cross web | 24 mm wide × 12 mm thick |
-| Envelope | 177 × 177 × 37 mm |
-| Print | 37.4 mm tall, ~105–130 g, 8–12 h |
+| Cross web | 24 mm wide × 12 mm thick, 105 mm arms |
+| Pedestal | Ø50 × 100 mm tall, flaring to a Ø66 foot |
+| Envelope | 237 × 237 × 100 mm (201 mm bed rotated 45°) |
+| Print | 100 mm tall, ~150–190 g, 14–20 h |
 
-## The three decisions that shape it
+## What shapes the design
+
+**The LNBFs set the arm length, not the clamps.** Boresights tilt outward, so
+each LNBF body leans *inward* going down and the four tails converge on the
+centre. A tail sits 58 mm below its clamp and 30 mm further inboard. At 75 mm
+arms the tails land at r = 29 mm, where adjacent bodies overlap each other by
+9 mm — the mount could not be assembled. At 105 mm they clear each other by
+34 mm and the pedestal by 9 mm. `BODY_D` and `BODY_L` in `assembly.py` are
+assumptions about your LNBF; the script reports both clearances every run and
+warns below 5 mm.
 
 **Retention is geometric, so nothing has to stay tight.** A 37 mm mouth against
 a Ø40 neck leaves 1.5 mm of overhang each side. That is what holds the LNBF in —
@@ -69,6 +81,14 @@ the grip, from a feature only meant to ease insertion. The wrap is 241° instead
 putting the constriction 7° *inside* the material and letting the chamfer flare
 the entry to 39 mm above it. This was found by building the solid and measuring
 it, not by inspection.
+
+**The cross gets deeper toward the centre, it does not slope.** The top face
+stays flat all the way across; the centre extends *downward* into a hollow
+column with a flared foot. Sloping arms would put their upper surfaces in
+overhang once the part is inverted for printing — a flat top with a deeper
+middle prints as a slab with a column rising out of it. The column is open at
+the bottom so it drains, and the foot flares only below the LNBF tails, where
+there is nothing left to hit.
 
 **One horizontal cut makes it printable.** All four clamps' forward ends and the
 web's top face lie in a single plane. Flipped onto that plane, every surface is
@@ -97,15 +117,18 @@ The STL is a union of overlapping solids rather than one manifold shell (four
 clamps plus four web arms that interpenetrate at the joins). Slicers handle this
 correctly; run a mesh boolean first if you need a watertight body for CAD.
 
-## Before committing 8–12 hours of filament
+## Before committing 15 hours of filament
 
-1. **Measure the usable neck** between the feedhorn flange and the LNBF body.
-   `LEN_MAX = 42` is an assumption. The clamp is captured axially between those
-   two features, so if your neck is shorter the clamp will not fit at all.
+1. **Measure the LNBF.** Three numbers drive the geometry: the usable neck
+   between the feedhorn flange and the body (`LEN_MAX`, currently 42 mm — the
+   clamp is captured axially between those two features and will not fit at all
+   if the neck is shorter), and the body diameter and length below the clamp
+   (`BODY_D`, `BODY_L`), which set how far the tails converge and therefore
+   `R_ARM`.
 2. **Print one single clamp first** (`clamp.py`, ~16 g, ~1.5 h) and check the
    insertion force and that the mouth springs fully back. The mouth width is the
    dimension to tune — FDM holes come out 0.1–0.4 mm undersize — and tuning it on
-   a 16 g part beats discovering it on a 130 g one.
+   a 16 g part beats discovering it on a 190 g one.
 3. **Check the flat's clock position.** The land at the bottom of the bore keys
    the LNBF's roll against the moulded flat on its neck. Mount one LNBF with its
    connector pointing down, see where the flat actually lands, and set `LAND_Y`

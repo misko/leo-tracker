@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 import threading
 import time
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import numpy as np
 
@@ -886,6 +886,109 @@ class DashboardModel:
             self._beacon_cache = result
         return result
 
+    def recordings(self, limit: int = 100) -> dict:
+        """Return a lightweight, image-free index of recent recording artifacts."""
+        limit = max(1, min(int(limit), 200))
+        rows = []
+        beacon = self.beacon(limit=min(limit, 100))
+        active = beacon.get("active")
+        if active:
+            rows.append({"kind": "beacon", "recording_id": active.get("name"),
+                "start_utc": active.get("created_utc"), "status": active.get("stage", "active"),
+                "mode": active.get("observation_mode"),
+                "channel": active.get("channel_number"), "region": active.get("region"),
+                "if_center_hz": active.get("if_center_hz"),
+                "rf_center_hz": active.get("rf_center_hz"), "sample_rate_hz": None,
+                "bandwidth_hz": None, "duration_s": None, "gain": None,
+                "candidate_count": None, "confirmed": None, "decoded": None,
+                "pilot_accuracy": None,
+                "detail_url": f"/recordings/beacon/{active.get('name')}"})
+        for item in beacon.get("captures", []):
+            decode = item.get("decode") or {}
+            pilot = (decode.get("soft_dual_rx") or {}).get("pilot") or {}
+            pilot_accuracy = pilot.get("hard_symbol_accuracy",
+                decode.get("minimum_pilot_accuracy"))
+            status = ("confirmed" if item.get("followup_confirmed") else
+                      "qualified" if item.get("qualified_count") else
+                      "candidate" if (item.get("candidate_count") or
+                                      item.get("single_receiver_candidate_count")) else
+                      "analyzed")
+            gain = item.get("gain_mode") or "unknown"
+            if item.get("configured_gain_db") is not None:
+                gain += f" {float(item['configured_gain_db']):g} dB"
+            rows.append({"kind": "beacon", "recording_id": item.get("name"),
+                "start_utc": item.get("created_utc"), "status": status,
+                "mode": item.get("observation_mode"), "channel": item.get("channel_number"),
+                "region": item.get("region"), "if_center_hz": item.get("if_center_hz"),
+                "rf_center_hz": item.get("rf_center_hz"),
+                "sample_rate_hz": item.get("sample_rate_hz"),
+                "bandwidth_hz": item.get("bandwidth_hz"),
+                "duration_s": item.get("duration_s"), "gain": gain,
+                "candidate_count": item.get("candidate_count", 0) +
+                    item.get("single_receiver_candidate_count", 0),
+                "confirmed": bool(item.get("followup_confirmed")),
+                "decoded": bool(item.get("decode_url")), "pilot_accuracy": pilot_accuracy,
+                "detail_url": f"/recordings/beacon/{item.get('name')}"})
+        for item in self.waterfalls(limit=min(limit, 100)).get("waterfalls", []):
+            recording_id = item.get("capture_id") or f"chunk-{int(item['chunk']):05d}"
+            gain = item.get("gain_mode") or "unknown"
+            if item.get("configured_gain_db") is not None:
+                gain += f" {float(item['configured_gain_db']):g} dB"
+            rows.append({"kind": "sweep", "recording_id": recording_id,
+                "start_utc": item.get("start_utc"), "status": (
+                    "doppler" if item.get("doppler_observation_count") else
+                    "candidate" if item.get("detected") else "analyzed"),
+                "mode": item.get("observation_mode"),
+                "channel": (item.get("channel") or {}).get("channel_number"),
+                "region": (item.get("channel") or {}).get("region"),
+                "if_center_hz": (item.get("channel") or {}).get("if_center_hz"),
+                "rf_center_hz": (item.get("channel") or {}).get("rf_center_hz"),
+                "sample_rate_hz": item.get("sample_rate_hz"),
+                "bandwidth_hz": item.get("bandwidth_hz"),
+                "duration_s": item.get("wall_duration_s"), "gain": gain,
+                "candidate_count": item.get("joint_event_count", 0),
+                "confirmed": bool(item.get("qualified_event_count")), "decoded": False,
+                "pilot_accuracy": None,
+                "detail_url": f"/recordings/sweep/{recording_id}"})
+        rows.sort(key=lambda item: item.get("start_utc") or "", reverse=True)
+        return {"schema": "leo-tracker.dashboard-recording-index/v1",
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+                "recordings": rows[:limit]}
+
+    def recording_detail(self, kind: str, recording_id: str) -> dict | None:
+        """Return one recording's statistics and plot links on demand."""
+        if kind == "beacon":
+            report = self.beacon(limit=100)
+            if (report.get("active") or {}).get("name") == recording_id:
+                return {"kind": kind, "recording_id": recording_id,
+                        "active": True, "statistics": report["active"], "plots": [],
+                        "artifacts": []}
+            item = next((row for row in report.get("captures", [])
+                         if row.get("name") == recording_id), None)
+            if item is None:
+                return None
+            plots = [value for value in (item.get("plot_url"), item.get("decode_plot_url"))
+                     if value]
+            artifacts = [{"label": label, "url": item.get(key)} for label, key in (
+                ("Follow-up JSON", "followup_url"), ("Decode JSON", "decode_url"),
+                ("Fingerprint JSON", "fingerprint_url")) if item.get(key)]
+            return {"kind": kind, "recording_id": recording_id, "active": False,
+                    "statistics": item, "plots": plots, "artifacts": artifacts}
+        if kind == "sweep":
+            item = next((row for row in self.waterfalls(limit=100).get("waterfalls", [])
+                if (row.get("capture_id") or f"chunk-{int(row['chunk']):05d}") == recording_id),
+                None)
+            if item is None:
+                return None
+            plots = [value for value in (item.get("plot_url"), item.get("tracker_plot_url"),
+                item.get("wide_plot_url"), item.get("carrier_zoom_url")) if value]
+            artifacts = ([{"label": "Structured observation JSON",
+                           "url": item["structured_observation_url"]}]
+                         if item.get("structured_observation_url") else [])
+            return {"kind": kind, "recording_id": recording_id, "active": False,
+                    "statistics": item, "plots": plots, "artifacts": artifacts}
+        return None
+
     def snapshot(self, now: datetime | None = None) -> dict:
         # A browser tab can issue another refresh before a cold snapshot has
         # finished. Coalesce those requests so they cannot start parallel scans
@@ -909,7 +1012,7 @@ class DashboardModel:
             return result
 
 
-HTML = r'''<!doctype html>
+LEGACY_HTML = r'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LEO Tracker</title><style>
 :root{color-scheme:dark;--bg:#071018;--panel:#0d1a24;--line:#223646;--text:#dcebf4;--muted:#8ba4b4;--cyan:#3ed5d7;--amber:#ffbf69;--red:#ff6b6b}
@@ -964,6 +1067,51 @@ document.querySelector('#logs').innerHTML=d.logs.events.slice(0,18).map(e=>`<div
 </script></body></html>'''
 
 
+INDEX_HTML = r'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LEO Tracker Recordings</title><style>
+:root{color-scheme:dark;--bg:#071018;--panel:#0d1a24;--line:#223646;--text:#dcebf4;--muted:#8ba4b4;--cyan:#3ed5d7;--amber:#ffbf69}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+main{max-width:1900px;margin:auto;padding:20px}.top{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:16px}h1{font:600 27px/1.1 system-ui;margin:0}.muted{color:var(--muted)}.live{color:var(--cyan)}.yes{color:var(--amber)}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}th{position:sticky;top:0;background:#10202b;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}tbody tr{cursor:pointer}tbody tr:hover{background:#142936}tbody tr:last-child td{border-bottom:0}a{color:var(--cyan);text-decoration:none}.empty{text-align:center;color:var(--muted);padding:30px}
+@media(max-width:700px){main{padding:12px}.top{align-items:start;flex-direction:column}h1{font-size:23px}}
+</style></head><body><main>
+<div class="top"><div><h1>LEO / Starlink recordings</h1><div class="muted">Click any recording for statistics, artifacts, and plots.</div></div><div id="stamp" class="muted">loading…</div></div>
+<div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Type</th><th>Recording</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Candidates</th><th>Confirmed</th><th>Decoded</th><th>Pilot accuracy</th></tr></thead><tbody><tr><td colspan="15" class="empty">Loading recordings…</td></tr></tbody></table></div>
+</main><script>
+const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f=(v,n=2)=>Number.isFinite(v)?Number(v).toFixed(n):'—';
+const when=v=>v?new Date(v).toLocaleString([],{month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+let refreshing=false;
+async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/recordings',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()});const rows=d.recordings||[];
+document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString()+' · '+rows.length+' recordings';
+document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.kind)}</td><td><a href="${esc(x.detail_url)}">${esc(x.recording_id)}</a></td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.candidate_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td></tr>`).join(''):'<tr><td colspan="15" class="empty">No recordings available.</td></tr>';
+document.querySelectorAll('tr[data-href]').forEach(row=>row.addEventListener('click',event=>{if(event.target.closest('a'))return;location.href=row.dataset.href}));
+}catch(error){document.querySelector('#stamp').textContent='offline';console.error(error)}finally{refreshing=false}}
+refresh();setInterval(refresh,10000);
+</script></body></html>'''
+
+
+DETAIL_HTML = r'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recording statistics</title><style>
+:root{color-scheme:dark;--bg:#071018;--panel:#0d1a24;--line:#223646;--text:#dcebf4;--muted:#8ba4b4;--cyan:#3ed5d7;--amber:#ffbf69}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}main{max-width:1350px;margin:auto;padding:20px}a{color:var(--cyan);text-decoration:none}h1{font:600 26px/1.15 system-ui;margin:14px 0 4px}h2{font:600 17px system-ui;margin:0 0 12px}.muted{color:var(--muted)}.panel{margin-top:14px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}th{width:240px;color:var(--muted)}.plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.plots a{display:block}.plots img{display:block;width:100%;border:1px solid var(--line);border-radius:9px;background:#091722}pre{white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto;color:#b9ceda}.artifact{display:inline-block;margin:4px 14px 4px 0}.error{color:var(--amber)}
+@media(max-width:800px){main{padding:12px}.plots{grid-template-columns:1fr}th{width:130px}}
+</style></head><body><main><a href="/">← All recordings</a><h1 id="title">Recording statistics</h1><div id="subtitle" class="muted">loading…</div><section class="panel"><h2>Capture summary</h2><table><tbody id="summary"></tbody></table></section><section id="artifactpanel" class="panel"><h2>Structured artifacts</h2><div id="artifacts"></div></section><section id="plotpanel" class="panel"><h2>Plots</h2><div id="plots" class="plots"></div></section><details class="panel"><summary>Complete statistics JSON</summary><pre id="raw"></pre></details></main><script>
+const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=v=>typeof v==='string'&&v.startsWith('/')?v:'#';const f=(v,n=2)=>Number.isFinite(v)?Number(v).toFixed(n):'—';
+const parts=location.pathname.split('/').filter(Boolean),api='/api/recordings/'+encodeURIComponent(parts[1]||'')+'/'+encodeURIComponent(parts.slice(2).join('/')||'');
+function value(v){if(v===null||v===undefined)return '—';if(typeof v==='boolean')return v?'yes':'no';if(typeof v==='object')return Array.isArray(v)?v.length+' item(s)':Object.keys(v).length+' field(s)';return String(v)}
+async function load(){try{const d=await fetch(api,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}),s=d.statistics||{};document.title=d.recording_id+' · LEO Tracker';document.querySelector('#title').textContent=d.recording_id;document.querySelector('#subtitle').textContent=d.kind+' recording · '+(d.active?'capture in progress':'completed analysis');
+const preferred=[['Recorded',s.created_utc||s.start_utc],['Status',s.stage||(d.active?'active':s.followup_confirmed?'confirmed':s.qualified_count?'qualified':s.candidate_count?'candidate':'analyzed')],['Mode',s.observation_mode],['Channel',s.channel_number],['Region',s.region],['IF center',Number.isFinite(s.if_center_hz)?f(s.if_center_hz/1e6,3)+' MHz':Number.isFinite(s.channel?.if_center_hz)?f(s.channel.if_center_hz/1e6,3)+' MHz':null],['Ku RF center',Number.isFinite(s.rf_center_hz)?f(s.rf_center_hz/1e9,6)+' GHz':null],['Sample rate',Number.isFinite(s.sample_rate_hz)?f(s.sample_rate_hz/1e6,2)+' MS/s':null],['RF bandwidth',Number.isFinite(s.bandwidth_hz)?f(s.bandwidth_hz/1e6,2)+' MHz':null],['Gain control',s.gain_mode],['Configured gain',Number.isFinite(s.configured_gain_db)?f(s.configured_gain_db,1)+' dB':null],['Duration',Number.isFinite(s.duration_s)?f(s.duration_s,1)+' s':Number.isFinite(s.wall_duration_s)?f(s.wall_duration_s,1)+' s':null],['Exact candidates',s.candidate_count],['Single-RX candidates',s.single_receiver_candidate_count],['Temporally confirmed',s.followup_confirmed],['Doppler observations',s.doppler_observation_count],['Fingerprint family',s.fingerprint_cluster_id],['Fingerprint family size',s.fingerprint_cluster_size]];
+document.querySelector('#summary').innerHTML=preferred.filter(([,v])=>v!==null&&v!==undefined).map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(value(v))}</td></tr>`).join('');
+const artifacts=d.artifacts||[];document.querySelector('#artifactpanel').hidden=!artifacts.length;document.querySelector('#artifacts').innerHTML=artifacts.map(x=>`<a class="artifact" href="${esc(safeUrl(x.url))}" target="_blank">${esc(x.label)} ↗</a>`).join('');
+const plots=d.plots||[];document.querySelector('#plotpanel').hidden=!plots.length;document.querySelector('#plots').innerHTML=plots.map((url,index)=>`<a href="${esc(safeUrl(url))}" target="_blank"><img loading="lazy" src="${esc(safeUrl(url))}" alt="Diagnostic plot ${index+1}"></a>`).join('');document.querySelector('#raw').textContent=JSON.stringify(s,null,2);if(d.active)setTimeout(load,5000);
+}catch(error){document.querySelector('#subtitle').innerHTML='<span class="error">Recording not found or dashboard unavailable.</span>';document.querySelector('#summary').innerHTML='';console.error(error)}}load();
+</script></body></html>'''
+
+
 def make_handler(model: DashboardModel):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, payload: bytes, content_type: str, status=HTTPStatus.OK,
@@ -981,7 +1129,29 @@ def make_handler(model: DashboardModel):
         def do_GET(self):
             path = urlparse(self.path).path
             if path == "/":
-                return self._send(HTML.encode(), "text/html; charset=utf-8")
+                return self._send(INDEX_HTML.encode(), "text/html; charset=utf-8")
+            if path == "/api/recordings":
+                return self._send(json.dumps(model.recordings(), allow_nan=False).encode(),
+                                  "application/json")
+            if path.startswith("/api/recordings/"):
+                parts = path.split("/", 4)
+                if len(parts) == 5:
+                    kind, recording_id = unquote(parts[3]), unquote(parts[4])
+                    if (kind in {"beacon", "sweep"} and
+                            re.fullmatch(r"[A-Za-z0-9_.-]+", recording_id)):
+                        detail = model.recording_detail(kind, recording_id)
+                        if detail is not None:
+                            return self._send(json.dumps(detail, allow_nan=False).encode(),
+                                              "application/json")
+                return self._send(b'{"error":"recording not found"}', "application/json",
+                                  HTTPStatus.NOT_FOUND)
+            if path.startswith("/recordings/"):
+                parts = path.split("/", 3)
+                if (len(parts) == 4 and parts[2] in {"beacon", "sweep"} and
+                        re.fullmatch(r"[A-Za-z0-9_.-]+", unquote(parts[3]))):
+                    return self._send(DETAIL_HTML.encode(), "text/html; charset=utf-8")
+                return self._send(b'{"error":"recording not found"}', "application/json",
+                                  HTTPStatus.NOT_FOUND)
             endpoints = {"/api/snapshot": model.snapshot, "/api/status": model.status,
                          "/api/passes": model.expected_passes, "/api/detections": model.detections,
                          "/api/logs": model.logs, "/api/waterfalls": model.waterfalls,

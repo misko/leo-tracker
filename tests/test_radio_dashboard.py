@@ -89,7 +89,20 @@ def test_dashboard_http_e2e_serves_html_json_and_plot(tmp_path):
     thread = Thread(target=server.serve_forever, daemon=True); thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
     try:
-        assert b"LEO / Starlink tracker" in urlopen(base + "/", timeout=2).read()
+        index_html = urlopen(base + "/", timeout=2).read()
+        assert b"LEO / Starlink recordings" in index_html
+        assert b"/api/recordings" in index_html
+        assert b"<img" not in index_html
+        assert b"<object" not in index_html
+        recordings = json.loads(urlopen(base + "/api/recordings", timeout=2).read())
+        assert recordings["schema"] == "leo-tracker.dashboard-recording-index/v1"
+        assert recordings["recordings"][0]["recording_id"] == "chunk-00000"
+        assert recordings["recordings"][0]["candidate_count"] == 0
+        detail_url = recordings["recordings"][0]["detail_url"]
+        assert b"Capture summary" in urlopen(base + detail_url, timeout=2).read()
+        detail = json.loads(urlopen(base + "/api" + detail_url, timeout=2).read())
+        assert detail["kind"] == "sweep"
+        assert detail["plots"][0].startswith("/plots/chunk-00000.png")
         snapshot = json.loads(urlopen(base + "/api/snapshot", timeout=2).read())
         assert snapshot["status"]["detection_count"] == 1
         assert urlopen(base + "/plots/chunk-00000.png", timeout=2).read() == b"png-test"
@@ -289,10 +302,15 @@ def test_dashboard_distinguishes_moving_rf_from_orbital_shape(tmp_path):
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(model))
     thread = Thread(target=server.serve_forever, daemon=True); thread.start()
     try:
-        html = urlopen(f"http://127.0.0.1:{server.server_port}/", timeout=2).read()
-        assert b"curvature unproven" in html
-        assert b"best TLE / affine RMS" in html
-        assert b"predicted curvature" in html
+        base = f"http://127.0.0.1:{server.server_port}"
+        index = json.loads(urlopen(base + "/api/recordings", timeout=2).read())
+        detail_url = index["recordings"][0]["detail_url"]
+        detail = json.loads(urlopen(base + "/api" + detail_url, timeout=2).read())
+        candidate = detail["statistics"]["best_wide_feature_candidate"]
+        assert not candidate["orbital_shape_qualified"]
+        assert candidate["tle_comparisons"][0]["affine_drift_rms_error_hz"] == 4433
+        assert candidate["best_tle_curvature_resolution_bins"] == .42
+        assert b"Complete statistics JSON" in urlopen(base + detail_url, timeout=2).read()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)
 
@@ -485,8 +503,20 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
     base = f"http://127.0.0.1:{server.server_port}"
     try:
         dashboard_html = urlopen(base + "/", timeout=2).read()
-        assert b'id="fingerprintplot"' in dashboard_html
-        assert b"beacon-fingerprint-map.svg" in dashboard_html
+        assert b'id="recordings"' in dashboard_html
+        assert b"<img" not in dashboard_html
+        recordings = json.loads(urlopen(base + "/api/recordings", timeout=2).read())
+        index_row = next(item for item in recordings["recordings"]
+                         if item["recording_id"] == name)
+        assert index_row["confirmed"]
+        assert index_row["decoded"]
+        assert index_row["pilot_accuracy"] == .719
+        detail_page = urlopen(base + index_row["detail_url"], timeout=2).read()
+        assert b"Diagnostic plot" in detail_page
+        detail = json.loads(urlopen(
+            base + "/api" + index_row["detail_url"], timeout=2).read())
+        assert row["decode_plot_url"] in detail["plots"]
+        assert row["fingerprint_url"] in [item["url"] for item in detail["artifacts"]]
         served = json.loads(urlopen(base + row["decode_url"], timeout=2).read())
         assert served["combined"]["minimum_frame_count"] == 7
         assert urlopen(base + row["decode_plot_url"], timeout=2).read() == b"decode-png"

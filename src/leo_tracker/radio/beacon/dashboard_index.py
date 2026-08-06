@@ -136,7 +136,8 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
     rows = {row.get("recording_id"): row for row in previous.get("recordings", [])
             if row.get("recording_id")}
     fingerprint_index = _json(root / "reports" / "fingerprints" / "index.json")
-    reports = sorted((root / "reports").glob("*.json"))
+    reports = sorted(path for path in (root / "reports").glob("*.json")
+                     if path.resolve() != output.resolve())
     targets = ([root / "reports" / f"{capture_name}.json"] if capture_name else reports)
     for report_path in targets:
         name = report_path.stem

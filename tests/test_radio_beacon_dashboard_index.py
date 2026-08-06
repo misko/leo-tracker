@@ -86,4 +86,4 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
                  "--capture-name", second]) == 0
     cli = json.loads(capsys.readouterr().out)
     assert cli["recording_count"] == 2
-
+    assert cli["summary"]["analyzed_capture_count"] == 2

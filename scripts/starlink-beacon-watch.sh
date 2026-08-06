@@ -21,6 +21,8 @@ target_spec="${LEO_BEACON_TARGETS:-4:lower-edge}"
 maximum_cycles="${LEO_BEACON_MAX_CYCLES:-0}"
 fake_source="${LEO_BEACON_FAKE:-0}"
 exact_acquisition_method="${LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3}"
+agc_probability_percent="${LEO_BEACON_AGC_PERCENT:-50}"
+gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-attack-v1}"
 # The all-epoch v3 search is deliberately more expensive than the legacy
 # coherent grid.  These cadences keep analysis inside the following 120 s
 # capture on the Pi while retaining enough temporal samples to trigger the
@@ -32,6 +34,11 @@ if (( ${#targets[@]} == 0 )); then
   echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2
   exit 2
 fi
+if ! [[ "${agc_probability_percent}" =~ ^[0-9]+$ ]] ||
+   (( agc_probability_percent < 0 || agc_probability_percent > 100 )); then
+  echo "LEO_BEACON_AGC_PERCENT must be an integer from 0 through 100" >&2
+  exit 2
+fi
 source_args=()
 if [[ "${fake_source}" == "1" ]]; then
   source_args+=(--fake)
@@ -40,12 +47,14 @@ fi
 mkdir -p "${storage_root}/captures" "${storage_root}/reports" "${storage_root}/staging"
 mkdir -p "${storage_root}/reports/plots" "${storage_root}/reports/decoded"
 mkdir -p "${storage_root}/reports/fingerprints"
+mkdir -p "${storage_root}/reports/gain-experiment"
 cd "${repo_dir}"
 
 capture_target() {
     local target="$1" mode="$2" channel region stamp name capture
     local pi_temp_millic pi_temp radio_temp_millic radio_temp
-    local -a temperature_args capture_args
+    local gain_draw gain_bucket gain_probability gain_mode
+    local -a temperature_args capture_args gain_args
     channel="${target%%:*}"
     region="${target##*:}"
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -72,6 +81,21 @@ capture_target() {
       radio_temp="$(awk -v value="${radio_temp_millic}" 'BEGIN {printf "%.3f", value/1000}')"
       temperature_args+=(--radio-temperature-c "${radio_temp}")
     fi
+    gain_draw="$(od -An -N4 -tu4 /dev/urandom | tr -d '[:space:]')"
+    gain_bucket=$((gain_draw % 10000))
+    gain_probability="$(awk -v value="${agc_probability_percent}" 'BEGIN {printf "%.4f", value/100}')"
+    if (( gain_bucket < agc_probability_percent * 100 )); then
+      gain_mode="slow_attack"
+      gain_args=(--gain-mode slow_attack --agc-settle-s 2)
+    else
+      gain_mode="manual"
+      gain_args=(--gain-mode manual --gain-db 50)
+    fi
+    gain_args+=(--gain-experiment-id "${gain_experiment_id}"
+      --gain-random-draw-u32 "${gain_draw}"
+      --gain-assignment-probability "${gain_probability}")
+    printf '{"gain_experiment":"%s","assignment":"%s","draw_u32":%s,"agc_probability":%s}\n' \
+      "${gain_experiment_id}" "${gain_mode}" "${gain_draw}" "${gain_probability}"
     if [[ "${mode}" == "wide" ]]; then
       capture_args=(--duration-s "${wide_duration_s}" --sample-rate-hz 10000000
         --bandwidth-hz 9000000 --block-size 1048576)
@@ -86,7 +110,7 @@ capture_target() {
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \
       --channel-number "${channel}" --region "${region}" \
       --observation-mode "${mode}" \
-      --gain-mode manual --gain-db 50 --chunk-s 5 --queue-blocks 16 \
+      "${gain_args[@]}" --chunk-s 5 --queue-blocks 16 \
       "${temperature_args[@]}" "${source_args[@]}"
     pending_name="${name}"
     pending_capture="${capture}"
@@ -139,6 +163,11 @@ process_capture() {
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-calibrate "${storage_root}/reports" \
       "${storage_root}/reports/calibration/calibration.json"
+    if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-gain-summary "${storage_root}" \
+      "${storage_root}/reports/gain-experiment/summary.json"; then
+      printf '{"gain_summary_error":true}\n' >&2
+    fi
 }
 
 analysis_pid=""
@@ -184,6 +213,9 @@ if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio
   starlink-beacon-fingerprint "${storage_root}"; then
   printf '{"fingerprint_backfill_error":true}\n' >&2
 fi
+env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+  starlink-beacon-gain-summary "${storage_root}" \
+  "${storage_root}/reports/gain-experiment/summary.json"
 env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
   starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}"
 

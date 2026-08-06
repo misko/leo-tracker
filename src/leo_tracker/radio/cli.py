@@ -67,6 +67,7 @@ from .beacon.null_replay import replay_null_calibration as replay_beacon_null_ca
 from .beacon.decode import decode_followup as decode_beacon_followup
 from .beacon.decode import plot_decode_report as plot_beacon_decode
 from .beacon.fingerprint import update_fingerprint_store
+from .beacon.gain_comparison import build_gain_comparison
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -224,6 +225,19 @@ def command_paired_capture(args: argparse.Namespace) -> int:
 
 
 def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
+    if args.agc_settle_s < 0:
+        raise ValueError("AGC settle time cannot be negative")
+    experiment_metadata = {}
+    if args.gain_experiment_id is not None:
+        if args.gain_random_draw_u32 is None or args.gain_assignment_probability is None:
+            raise ValueError("gain experiment metadata requires random draw and assignment probability")
+        if not 0 <= args.gain_assignment_probability <= 1:
+            raise ValueError("gain assignment probability must lie between zero and one")
+        experiment_metadata = {"gain_experiment_id": args.gain_experiment_id,
+            "gain_random_draw_u32": args.gain_random_draw_u32,
+            "agc_assignment_probability": args.gain_assignment_probability,
+            "assigned_gain_mode": args.gain_mode,
+            "agc_settle_s": args.agc_settle_s if args.gain_mode != "manual" else 0.0}
     center_hz = args.center_frequency_hz
     if center_hz is None:
         center_hz = (starlink_if_hz(args.channel_number, args.lnb_lo_hz)
@@ -247,6 +261,8 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
         source = PairedPlutoSource(config, uri=args.uri, block_size=args.block_size,
                                    transport="iio", serial=args.serial)
     identity = dict(source.identity)
+    if not args.fake and args.gain_mode != "manual" and args.agc_settle_s > 0:
+        time.sleep(args.agc_settle_s)
     if args.host_temperature_c is not None:
         identity["host_temperature_c"] = args.host_temperature_c
     if args.radio_temperature_c is not None:
@@ -261,7 +277,8 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
             configured_gain_db=configured_gain_db,
             metadata={"channel_number": args.channel_number, "region": args.region,
                       "observation_mode": args.observation_mode,
-                      "tuning_basis": "published Starlink channel and edge-pilot geometry"})
+                      "tuning_basis": "published Starlink channel and edge-pilot geometry",
+                      **experiment_metadata})
     finally:
         if "queued" in locals():
             queued.close()
@@ -387,6 +404,17 @@ def command_starlink_beacon_fingerprint(args: argparse.Namespace) -> int:
     report = update_fingerprint_store(args.root, capture_name=args.capture_name)
     print(json.dumps(report, sort_keys=True))
     return 1 if report["errors"] else 0
+
+
+def command_starlink_beacon_gain_summary(args: argparse.Namespace) -> int:
+    report = build_gain_comparison(args.root, args.output)
+    print(json.dumps({"gain_summary": str(args.output),
+        "randomized_capture_count": report["randomized_capture_count"],
+        "groups": {mode: {"capture_count": value["capture_count"],
+                           "analyzed_count": value["analyzed_count"]}
+                   for mode, value in report["groups"].items()},
+        "decision_ready": report["decision_guidance"]["ready"]}, sort_keys=True))
+    return 0
 
 
 def command_analyze(args: argparse.Namespace) -> int:
@@ -1378,6 +1406,10 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("narrow", "oversample", "wide"), default="narrow")
     beacon_capture.add_argument("--gain-mode", choices=("manual", "slow_attack", "fast_attack"), default="manual")
     beacon_capture.add_argument("--gain-db", type=float, default=50)
+    beacon_capture.add_argument("--agc-settle-s", type=float, default=2.0)
+    beacon_capture.add_argument("--gain-experiment-id")
+    beacon_capture.add_argument("--gain-random-draw-u32", type=int)
+    beacon_capture.add_argument("--gain-assignment-probability", type=float)
     beacon_capture.add_argument("--block-size", type=int, default=262_144)
     beacon_capture.add_argument("--chunk-s", type=float, default=5)
     beacon_capture.add_argument("--queue-blocks", type=int, default=16,
@@ -1486,6 +1518,11 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_fingerprint.add_argument("--capture-name",
         help="update one decoded capture before rebuilding the comparison index")
     beacon_fingerprint.set_defaults(handler=command_starlink_beacon_fingerprint)
+    beacon_gain_summary = commands.add_parser("starlink-beacon-gain-summary",
+        help="compare randomized manual and slow-attack beacon captures")
+    beacon_gain_summary.add_argument("root", type=Path)
+    beacon_gain_summary.add_argument("output", type=Path)
+    beacon_gain_summary.set_defaults(handler=command_starlink_beacon_gain_summary)
     analyze = commands.add_parser("analyze", help="create blind ridge data and waterfall")
     analyze.add_argument("capture"); analyze.add_argument("output_dir")
     analyze.add_argument("--fft-size", type=int, default=4096); analyze.add_argument("--hop-size", type=int)

@@ -113,6 +113,8 @@ class PairedPlutoSource:
         from dataclasses import replace
         self._configs = (replace(config, channel=0), replace(config, channel=1))
         self._closed = False
+        self._gain_snapshot_interval_samples = max(1, round(config.sample_rate_hz))
+        self._next_gain_snapshot_sample = 0
         if device_factory is not None:
             self._device = device_factory(config=config, uri=uri, block_size=block_size,
                                           transport=transport, serial=serial)
@@ -126,6 +128,9 @@ class PairedPlutoSource:
                           "timestamp_semantics": "midpoint of host UTC bracket around blocking IIO read",
                           "gain_mode": config.gain_mode or ("manual" if config.gain_db is not None else "slow_attack"),
                           "configured_gain_db": config.gain_db}
+        mode_reader = getattr(self._device, "gain_mode_snapshot", None)
+        if mode_reader is not None:
+            self._identity["gain_mode_readback"] = list(mode_reader())
     @property
     def configs(self): return self._configs
     @property
@@ -136,10 +141,15 @@ class PairedPlutoSource:
             before_ns = time.time_ns(); values = np.asarray(self._device.rx()); after_ns = time.time_ns()
             if values.ndim != 2 or values.shape[0] != 2:
                 raise RuntimeError(f"paired Pluto read must return 2xN, got {values.shape}")
+            gain_db = None
+            if index >= self._next_gain_snapshot_sample:
+                gain_db = self.gain_snapshot()
+                self._next_gain_snapshot_sample = index + self._gain_snapshot_interval_samples
             yield PairedSampleBlock(np.asarray(values[0], np.complex64),
                                     np.asarray(values[1], np.complex64), index,
                                     (before_ns+after_ns)//2,
-                                    read_duration_ns=after_ns-before_ns)
+                                    read_duration_ns=after_ns-before_ns,
+                                    gain_db=gain_db)
             index += values.shape[1]
     def close(self):
         if not self._closed:
@@ -184,3 +194,6 @@ class _PyadiPairedRx:
     def close(self): self.sdr.rx_destroy_buffer()
     def gain_snapshot(self):
         return tuple(float(getattr(self.sdr, f"rx_hardwaregain_chan{channel}")) for channel in (0, 1))
+    def gain_mode_snapshot(self):
+        return tuple(str(getattr(self.sdr, f"gain_control_mode_chan{channel}"))
+                     for channel in (0, 1))

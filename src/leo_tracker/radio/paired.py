@@ -27,6 +27,7 @@ class PairedSampleBlock:
     utc_ns: int
     dropped_samples: int = 0
     read_duration_ns: int | None = None
+    gain_db: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
         a, b = np.asarray(self.rx0), np.asarray(self.rx1)

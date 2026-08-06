@@ -85,6 +85,29 @@ def test_gain_telemetry_transport_failure_is_nonfatal():
     assert all(np.isnan(source.gain_snapshot()))
 
 
+def test_paired_pluto_samples_gain_about_once_per_second_and_reads_back_mode(monkeypatch):
+    class Device:
+        gain_calls = 0
+        def rx(self): return np.vstack((np.ones(8), np.ones(8)))
+        def gain_snapshot(self):
+            self.gain_calls += 1
+            return (30 + self.gain_calls, 40 + self.gain_calls)
+        def gain_mode_snapshot(self): return ("slow_attack", "slow_attack")
+        def close(self): pass
+    device = Device()
+    clock = iter(range(1_000, 2_000, 100))
+    monkeypatch.setattr("leo_tracker.radio.pluto.time.time_ns", lambda: next(clock))
+    source = PairedPlutoSource(
+        RadioConfig(1e9, 16, 8, gain_mode="slow_attack"), uri="pluto://test",
+        block_size=8, device_factory=lambda **kwargs: device)
+    blocks = source.blocks()
+    first, second, third = next(blocks), next(blocks), next(blocks)
+    assert first.gain_db == (31, 41)
+    assert second.gain_db is None
+    assert third.gain_db == (32, 42)
+    assert source.identity["gain_mode_readback"] == ["slow_attack", "slow_attack"]
+
+
 def test_paired_cli_fake_end_to_end(tmp_path, capsys):
     destination = tmp_path / "session"
     result = main(["paired-capture", str(destination), "--duration-s", ".1",

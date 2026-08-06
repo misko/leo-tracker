@@ -319,6 +319,27 @@ def test_chunked_beacon_capture_round_trip_and_checksums(tmp_path):
     assert report["stream_timing"]["maximum_read_duration_s"] > 0
 
 
+def test_beacon_capture_records_hardware_gain_and_adc_utilization(tmp_path):
+    rate, size = 10_000.0, 10_000
+    rx0 = np.full(size, 3 + 4j, np.complex64)
+    rx1 = np.full(size, 6 + 8j, np.complex64)
+    blocks = [PairedSampleBlock(rx0[:5000], rx1[:5000], 0, 100,
+        read_duration_ns=10, gain_db=(31.5, 42.5)),
+        PairedSampleBlock(rx0[5000:], rx1[5000:], 5000, 200,
+        read_duration_ns=10, gain_db=(32.5, 43.5))]
+    report = capture_beacon_iq(blocks, tmp_path / "telemetry",
+        sample_rate_hz=rate, center_frequency_hz=1.5e9,
+        bandwidth_hz=9_000, duration_s=1, chunk_s=.5,
+        gain_mode="slow_attack")
+    assert [entry["rx_gain_db"] for entry in report["gain_telemetry"]["entries"]] == [
+        [31.5, 42.5], [32.5, 43.5]]
+    stats = report["sample_statistics"]["receivers"]
+    assert stats[0]["rms_magnitude"] == pytest.approx(5)
+    assert stats[1]["rms_magnitude"] == pytest.approx(10)
+    assert [row["peak_abs_component"] for row in stats] == [4, 8]
+    assert [row["near_full_scale_fraction"] for row in stats] == [0, 0]
+
+
 def test_capture_leaves_a_recoverable_interrupted_manifest(tmp_path):
     rx = np.ones(4_096, np.complex64)
     root = tmp_path / "short"
@@ -631,11 +652,16 @@ def test_beacon_agc_does_not_silently_apply_manual_gain(tmp_path):
     assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".01",
                  "--sample-rate-hz", "100000", "--bandwidth-hz", "90000",
                  "--gain-mode", "slow_attack", "--gain-db", "50",
+                 "--gain-experiment-id", "test-ab", "--gain-random-draw-u32", "17",
+                 "--gain-assignment-probability", ".5",
                  "--host-temperature-c", "54", "--radio-temperature-c", "46.5",
                  "--fake"]) == 0
     manifest = json.loads((capture / "manifest.json").read_text())
     assert manifest["gain_mode"] == "slow_attack"
     assert manifest["configured_gain_db"] is None
+    assert manifest["metadata"]["assigned_gain_mode"] == "slow_attack"
+    assert manifest["metadata"]["gain_random_draw_u32"] == 17
+    assert manifest["metadata"]["agc_assignment_probability"] == .5
     assert manifest["identity"]["host_temperature_c"] == 54
     assert manifest["identity"]["radio_temperature_c"] == 46.5
 
@@ -646,6 +672,11 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
     (beacon / "captures").mkdir()
     (beacon / "reports" / "calibration").mkdir()
     (beacon / "reports" / "followups").mkdir()
+    (beacon / "reports" / "gain-experiment").mkdir()
+    (beacon / "reports" / "gain-experiment" / "summary.json").write_text(json.dumps({
+        "schema": "leo-tracker.beacon-gain-comparison/v1",
+        "randomized_capture_count": 12, "groups": {},
+        "experiment_ids": ["gain-ab"], "decision_guidance": {"ready": False}}))
     (beacon / "reports" / "calibration" / "calibration.json").write_text(json.dumps({
         "schema": "leo-tracker.starlink-beacon-calibration/v2",
         "modes": {"narrow": {"check_count": 123}},
@@ -686,6 +717,7 @@ def test_dashboard_exposes_exact_beacon_evidence(tmp_path):
     model = DashboardModel(observation, beacon_root=beacon)
     report = model.beacon()
     assert report["candidate_count"] == 1
+    assert report["gain_experiment"]["randomized_capture_count"] == 12
     assert report["calibration"]["modes"]["narrow"]["check_count"] == 123
     assert report["active_acquisition_method"] == "pss_symbolwise_v2"
     assert report["calibration"]["acquisition_methods"]["pss_symbolwise_v2"][
@@ -784,6 +816,10 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert '[[ "${mode}" != "wide" && -f "${confirmation_marker}" ]]' in script
     assert "starlink-beacon-calibrate" in script
     assert "LEO_BEACON_MAX_PI_TEMP_MILLIC" in script
+    assert 'LEO_BEACON_AGC_PERCENT:-50' in script
+    assert "/dev/urandom" in script
+    assert "--gain-experiment-id" in script
+    assert "starlink-beacon-gain-summary" in script
 
 
 def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
@@ -808,14 +844,23 @@ def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):
     for report_path in reports:
         report = json.loads(report_path.read_text())
         assert report["capture_manifest"]["state"] == "complete"
-        assert report["capture_manifest"]["metadata"] == {
-            "channel_number": 4, "region": "lower-edge",
-            "observation_mode": ("wide" if "-wide-" in report_path.stem else "narrow"),
-            "tuning_basis": "published Starlink channel and edge-pilot geometry"}
+        metadata = report["capture_manifest"]["metadata"]
+        assert metadata["channel_number"] == 4
+        assert metadata["region"] == "lower-edge"
+        assert metadata["observation_mode"] == (
+            "wide" if "-wide-" in report_path.stem else "narrow")
+        assert metadata["tuning_basis"] == "published Starlink channel and edge-pilot geometry"
+        assert metadata["gain_experiment_id"] == "randomized-manual-vs-slow-attack-v1"
+        assert isinstance(metadata["gain_random_draw_u32"], int)
+        assert metadata["agc_assignment_probability"] == .5
+        assert metadata["assigned_gain_mode"] in {"manual", "slow_attack"}
         assert (storage / "reports" / "followups" / report_path.name).is_file()
     assert (storage / "reports" / "calibration" / "calibration.json").is_file()
     fingerprint_index = storage / "reports" / "fingerprints" / "index.json"
     assert json.loads(fingerprint_index.read_text())["fingerprint_count"] == 0
+    gain_summary = json.loads((storage / "reports" / "gain-experiment" /
+                               "summary.json").read_text())
+    assert gain_summary["randomized_capture_count"] == 2
 
 
 def test_doppler_summary_uses_lnb_slopes_not_absolute_cfo_agreement():

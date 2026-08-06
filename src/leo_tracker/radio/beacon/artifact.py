@@ -123,6 +123,8 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
         "requested_samples_per_receiver": requested_samples,
         "chunk_samples": chunk_samples, "gain_mode": gain_mode,
         "configured_gain_db": configured_gain_db, "identity": identity or {},
+        "gain_telemetry": {"target_interval_s": 1.0, "entries": [],
+            "note": "gain readback is sampled after a blocking IQ refill; it is diagnostic, not sample-synchronous"},
         "metadata": metadata or {},
         "created_utc_ns": started_ns, "chunks": []}
     _atomic_json(manifest_path, manifest)
@@ -133,6 +135,9 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
     expected_source_index: int | None = None
     read_count = total_read_duration_ns = maximum_read_duration_ns = 0
     total_host_gap_ns = maximum_host_gap_ns = 0
+    power_sum = np.zeros(2, dtype=np.float64)
+    peak_abs_component = np.zeros(2, dtype=np.float64)
+    near_adc_full_scale_count = np.zeros(2, dtype=np.int64)
     first_read_start_ns: int | None = None
     previous_read_stop_ns: int | None = None
 
@@ -148,6 +153,18 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
             "maximum_positive_host_gap_s": maximum_host_gap_ns / 1e9,
             "host_read_duty_fraction": (total_read_duration_ns / span_ns if span_ns > 0 else None),
             "note": "host syscall timing diagnoses writer stalls but is not an RF hardware timestamp"}
+
+    def add_measurement_diagnostics() -> None:
+        manifest["sample_statistics"] = {"adc_nominal_full_scale": 2048.0,
+            "near_full_scale_threshold": 2040.0,
+            "note": "near-full-scale assumes raw AD9361 12-bit samples delivered by pyadi",
+            "receivers": [{"receiver": receiver,
+                "rms_magnitude": (float(np.sqrt(power_sum[receiver] / total))
+                                  if total else None),
+                "peak_abs_component": float(peak_abs_component[receiver]),
+                "near_full_scale_fraction": (float(
+                    near_adc_full_scale_count[receiver] / total) if total else None)}
+                for receiver in range(2)]}
 
     def commit(count: int) -> None:
         nonlocal pending, pending_count, pending_reads, chunk_index, committed_samples
@@ -201,6 +218,21 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
             available = min(block.rx0.size, requested_samples - total)
             if available <= 0:
                 break
+            if block.gain_db is not None:
+                gains = [None if not np.isfinite(value) else float(value)
+                         for value in block.gain_db]
+                manifest["gain_telemetry"]["entries"].append({
+                    "sample_index": int(total), "utc_ns": int(block.utc_ns),
+                    "rx_gain_db": gains})
+            for receiver, values in enumerate((block.rx0[:available], block.rx1[:available])):
+                values = np.asarray(values)
+                power_sum[receiver] += float(np.sum(
+                    values.real * values.real + values.imag * values.imag,
+                    dtype=np.float64))
+                components = np.maximum(np.abs(values.real), np.abs(values.imag))
+                peak_abs_component[receiver] = max(
+                    peak_abs_component[receiver], float(np.max(components, initial=0)))
+                near_adc_full_scale_count[receiver] += int(np.count_nonzero(components >= 2040))
             pending.append(_complex_to_ci16(block.rx0[:available], block.rx1[:available]))
             pending_reads.append(block); pending_count += available; total += available
             while pending_count >= chunk_samples:
@@ -212,10 +244,12 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
     except BaseException:
         manifest["state"] = "interrupted"; manifest["captured_samples_per_receiver"] = total
         manifest["stream_timing"] = stream_timing()
+        add_measurement_diagnostics()
         _atomic_json(manifest_path, manifest)
         raise
     manifest["state"] = "complete"; manifest["captured_samples_per_receiver"] = total
     manifest["stream_timing"] = stream_timing()
+    add_measurement_diagnostics()
     manifest["completed_utc_ns"] = time.time_ns()
     manifest["stored_bytes"] = sum(item["bytes"] for item in manifest["chunks"])
     _atomic_json(manifest_path, manifest)

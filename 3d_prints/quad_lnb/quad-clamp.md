@@ -25,9 +25,10 @@ needs support.
 | Tip angle | 27.6° |
 | Print | 180 mm tall, ~180–240 g, 18–24 h |
 
-`quad-clamp-print.stl` is oriented on its flush face — slice as-is.
-`quad-clamp-installed.stl` is the same solid at its service attitude.
-`assembly.py` builds both from the constants at the top.
+`assembly.py` writes both printable files: `quad-clamp-print.stl`, oriented on
+its flush face, and `clamp-fit-test.stl`, a 12 mm slice of one clamp for
+checking the fit before committing to the long print. Both come from the same
+`profile()` and the same constants, so the coupon cannot drift from the part.
 
 ## Why the mouths face outward
 

@@ -7,7 +7,7 @@ Trim:       the forward end is cut by a horizontal plane (in the installed
             attitude), giving one flat face. Printed on that face, every
             surface is within TILT deg of vertical, so nothing needs support.
 """
-import math, struct
+import math
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -108,22 +108,10 @@ print(f"print height {max(f[:,2].max() for f in printo):.1f} mm, "
       f"first-layer footprint {area/math.cos(tr):.0f} mm2")
 
 
-def write_stl(name, polys):
-    tris = []
-    for f in polys:
-        tris.append((f[0], f[1], f[2])); tris.append((f[0], f[2], f[3]))
-    with open(name, "wb") as fh:
-        fh.write(b"\0" * 80)
-        fh.write(struct.pack("<I", len(tris)))
-        for a, b, c in tris:
-            n = np.cross(b - a, c - a); ln = np.linalg.norm(n)
-            n = n / ln if ln > 1e-12 else np.zeros(3)
-            fh.write(struct.pack("<12fH", *n, *a, *b, *c, 0))
-    print(f"wrote {name} ({len(tris)} triangles)")
-
-
-write_stl("lnbf-clamp-print.stl", printo)
-write_stl("lnbf-clamp-installed.stl", installed)
+# No STL output: the shipped parts both come from assembly.py. This script
+# exists to document and render the clamp geometry. Note its walls (5.0/3.0)
+# differ from the assembly's (6.0/3.5) because the trim direction flips which
+# side of the clamp is the arm root -- see quad-clamp.md.
 
 # ---- render ----------------------------------------------------------
 BASE = np.array([0.560, 0.530, 0.900])

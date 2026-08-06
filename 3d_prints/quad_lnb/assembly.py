@@ -49,6 +49,7 @@ FLARE_H  = 60.0      # flare height. Kept separate from FOOT_CLR so the column
 FOOT_D   = 160.0     # foot diameter. The 45 deg overhang limit caps this at
                      # FOOT_D <= PED_D + 2*FLARE_H, and FLARE_H <= FOOT_CLR
 EMBED    = 0.8       # how far the web buries into the clamp wall (wall >= 6)
+TEST_D   = 12.0      # fit-test coupon depth: a short slice of one clamp
 
 PHI_TIP  = PHI_CON + CHAM_DEG
 SWEEP    = 180.0 + 2 * PHI_TIP
@@ -286,7 +287,33 @@ def write_stl(name, polys):
 
 
 write_stl("quad-clamp-print.stl", printo)
-write_stl("quad-clamp-installed.stl", allf)
+
+# ---- fit-test coupon: a short straight slice of one clamp ------------
+# Same profile and the same walls as the shipped part, so insertion feel is
+# representative. Prints flat on the bed, bore axis vertical -- the same layer
+# orientation the real clamp arms get.
+def coupon_faces(depth):
+    f = []
+    for k in range(N - 1):
+        ox, oy = outer[k]; ox2, oy2 = outer[k + 1]
+        ix, iy = inner[k]; ix2, iy2 = inner[k + 1]
+        f.append(q((ox, oy, 0), (ox2, oy2, 0), (ox2, oy2, depth), (ox, oy, depth)))
+        f.append(q((ix, iy, depth), (ix2, iy2, depth), (ix2, iy2, 0), (ix, iy, 0)))
+        f.append(q((ix, iy, depth), (ox, oy, depth),
+                   (ox2, oy2, depth), (ix2, iy2, depth)))
+        f.append(q((ix2, iy2, 0), (ox2, oy2, 0), (ox, oy, 0), (ix, iy, 0)))
+    for k, fwd in ((0, True), (N - 1, False)):
+        ix, iy = inner[k]; ox, oy = outer[k]
+        e = q((ix, iy, 0), (ox, oy, 0), (ox, oy, depth), (ix, iy, depth))
+        f.append(e if fwd else e[::-1])
+    return [np.array(x) for x in f]
+
+
+write_stl("clamp-fit-test.stl", coupon_faces(TEST_D))
+root = min(zi.min(), zo.min())
+print(f"coupon {TEST_D:.0f} mm deep, {area*TEST_D/1000*1.24*0.9:.0f} g, ~15 min")
+print(f"  arms are {TEST_D:.0f} mm wide vs {root:.1f} mm at the real root, so the "
+      f"full clamp needs about {root/TEST_D:.1f}x the push you feel")
 
 # ---- render ----------------------------------------------------------
 BASE = np.array([0.560, 0.530, 0.900])

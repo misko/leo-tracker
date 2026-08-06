@@ -22,10 +22,9 @@ off the bed already at its installed angle.
 | Print height | 37.4 mm, first-layer footprint 462 mm² |
 | Volume | 13.9 cm³ → ~16 g in PLA |
 
-Files: **`lnbf-clamp-print.stl`** (slice this — already sitting on its flat face)
-and `lnbf-clamp-installed.stl` (same solid at its 27° service attitude, for
-dropping into an assembly). `clamp.py` generates both from the constants at the
-top and prints the resulting mouth, grip, footprint and mass.
+`clamp.py` builds this geometry and renders it, reporting the resulting mouth,
+grip, footprint and mass. It writes no STL — the two printable files both come
+from `assembly.py`, so the fit-test coupon cannot drift from the shipped part.
 
 ## The four numbers that matter
 
@@ -73,9 +72,13 @@ flipped onto it every surface is within 27° of vertical:
 apart, so adjacent patterns cross near their −3 dB contours while all four still
 overlap within about 20° of zenith. That overlap is the handoff region.
 
-Four of these on a cross web are in [quad-clamp.md](quad-clamp.md) — note the
-mouth points the other way there, because a cross arm arriving from the centre
-has to land on the closed back of the ring, not in the gap.
+Four of these on a cross web are in [quad-clamp.md](quad-clamp.md), which is the
+part that actually ships. Two things differ there: the mouth points the other
+way, because a cross arm arriving from the centre has to land on the closed back
+of the ring rather than in the gap; and the walls are 6.0/3.5 mm rather than
+5.0/3.0, because flipping the mouth flips which side of the clamp the trim
+leaves short, and that side is the arm root. This file documents the standalone
+clamp and emits no STL.
 
 The single part is rotated so the **mouth goes uphill and the land downhill**. Gravity's
 in-plane component then pushes the neck away from the opening and onto the roll
@@ -103,10 +106,12 @@ matters: too long and the clamp will not fit between them at all.
 
 ## Printing
 
-Slice `lnbf-clamp-print.stl` as it comes — the flat face is already on the bed.
-**Do not re-orient it.** Any other orientation either needs supports in the bore
-or puts the ring arms' bending stress across layer lines, and they crack at a
-layer boundary on the first insertion.
+This file emits no STL. To print, use `clamp-fit-test.stl` (a 12 mm slice of the
+shipped clamp) or the full `quad-clamp-print.stl`, both from `assembly.py`. The
+orientation rule is the same either way: **the flat face goes on the bed and the
+part is not re-oriented.** Any other orientation either needs supports in the
+bore or puts the ring arms' bending stress across layer lines, and they crack at
+a layer boundary on the first insertion.
 
 - 0.2 mm layers, 5 perimeters, 40% infill. The arms are almost all wall.
 - **Use a brim.** The first layer is a thin C only ~4 mm wide in section holding

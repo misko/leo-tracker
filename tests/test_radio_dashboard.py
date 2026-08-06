@@ -527,6 +527,8 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         assert b"Diagnostic plot" in detail_page
         assert b"Radio parameters" in detail_page
         assert b"Hardware gain readback" in detail_page
+        assert b"Signal levels" in detail_page
+        assert b"Stream continuity" in detail_page
         assert b"Temporal QPSK fingerprint" in detail_page
         assert b"Nearest fingerprint comparisons" in detail_page
         assert b"Doppler and predicted-pass matching" in detail_page

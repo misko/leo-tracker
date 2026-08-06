@@ -25,6 +25,15 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
                      "gain_random_draw_u32": 123, "agc_settle_s": 0},
         "gain_telemetry": {"target_interval_s": 1, "entries": [
             {"rx_gain_db": [49.5, 50]}, {"rx_gain_db": [50.5, 50]}]},
+        "sample_statistics": {"adc_nominal_full_scale": 2048,
+            "near_full_scale_threshold": 2040, "receivers": [
+                {"receiver": 0, "rms_magnitude": 91, "peak_abs_component": 900,
+                 "near_full_scale_fraction": 0},
+                {"receiver": 1, "rms_magnitude": 52, "peak_abs_component": 700,
+                 "near_full_scale_fraction": 0}]},
+        "stream_timing": {"sample_time_s": 5, "wall_span_s": 5.2,
+            "host_read_duty_fraction": .96, "read_count": 48,
+            "maximum_positive_host_gap_s": .01},
         "identity": {"enabled_channels": [0, 1],
                      "gain_mode_readback": ["manual", "manual"],
                      "kind": "plutoplus-paired", "implementation": "pyadi.ad9361",
@@ -95,6 +104,8 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert radio["receivers"]["gain_mode_readback"] == ["manual", "manual"]
     assert radio["receivers"]["gain_readback_by_receiver"][0]["median_db"] == 50
     assert radio["hardware"]["radio_temperature_c"] == 55.25
+    assert radio["signal"]["receivers"][0]["rms_magnitude"] == 91
+    assert radio["stream"]["host_read_duty_fraction"] == .96
     assert radio["capture"]["captured_samples_per_receiver"] == 12_500_000
     assert row["_plots"] == [f"/beacon-plots/{first}.png"]
     assert row["_artifacts"][0]["url"] == f"/beacon-analyses/{first}.json"

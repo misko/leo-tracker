@@ -61,6 +61,8 @@ def capture_radio_parameters(manifest: dict) -> dict:
     identity = manifest.get("identity", {}) or {}
     metadata = manifest.get("metadata", {}) or {}
     telemetry = manifest.get("gain_telemetry", {}) or {}
+    sample_statistics = manifest.get("sample_statistics", {}) or {}
+    stream_timing = manifest.get("stream_timing", {}) or {}
     entries = telemetry.get("entries", []) or []
     receiver_count = int(manifest.get("receiver_count", 0) or 0)
     enabled = identity.get("enabled_channels") or list(range(receiver_count))
@@ -111,6 +113,17 @@ def capture_radio_parameters(manifest: dict) -> dict:
             "host_temperature_c": identity.get("host_temperature_c"),
             "radio_temperature_c": identity.get("radio_temperature_c"),
         },
+        "signal": {
+            "adc_nominal_full_scale": sample_statistics.get("adc_nominal_full_scale"),
+            "near_full_scale_threshold": sample_statistics.get(
+                "near_full_scale_threshold"),
+            "receivers": sample_statistics.get("receivers", []),
+            "note": sample_statistics.get("note"),
+        },
+        "stream": {key: stream_timing.get(key) for key in (
+            "sample_time_s", "wall_span_s", "host_read_duty_fraction", "read_count",
+            "total_read_duration_s", "maximum_read_duration_s",
+            "total_positive_host_gap_s", "maximum_positive_host_gap_s", "note")},
         "capture": {
             "state": manifest.get("state"),
             "observation_mode": metadata.get("observation_mode"),
@@ -258,8 +271,10 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
             root / "reports" / "decoded" / report_path.name,
             root / "reports" / "fingerprints" / report_path.name,
             root / "reports" / "fingerprints" / f"{name}.png")
+        radio_parameters = rows.get(name, {}).get("_statistics", {}).get(
+            "radio_parameters", {})
         if (capture_name is None and name in rows and
-                rows[name].get("_statistics", {}).get("radio_parameters") and
+                "signal" in radio_parameters and "stream" in radio_parameters and
                 rows[name].get("_source_signature") == _signature(sidecars)):
             continue
         row = _capture_row(root, name, fingerprint_index)

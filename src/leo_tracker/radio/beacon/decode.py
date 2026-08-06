@@ -132,6 +132,28 @@ def _metric_summary(equalized: np.ndarray, expected: np.ndarray, *,
              "soft_noise_variance": noise_variance}, correct, probabilities)
 
 
+def _temporal_probability_summary(probabilities: np.ndarray, correct: np.ndarray,
+                                  expected_states: np.ndarray) -> dict:
+    """Summarize a QPSK posterior tensor independently for every frame."""
+    values = np.asarray(probabilities)
+    decisions = np.asarray(correct, bool)
+    if values.ndim < 3 or values.shape[-1] != 4 or decisions.shape != values.shape[:-1]:
+        raise ValueError("temporal QPSK probabilities must end in a four-state axis")
+    known = np.broadcast_to(np.asarray(expected_states), decisions.shape)
+    expected_probability = np.take_along_axis(values, known[..., None], axis=-1)[..., 0]
+    entropy = -np.sum(values * np.log2(np.maximum(values, 1e-12)), axis=-1)
+    reduction_axes = tuple(range(1, decisions.ndim))
+    return {
+        "frame_count": int(values.shape[0]),
+        "hard_symbol_accuracy": np.mean(decisions, axis=reduction_axes).tolist(),
+        "mean_confidence": np.mean(np.max(values, axis=-1), axis=reduction_axes).tolist(),
+        "mean_expected_probability": np.mean(
+            expected_probability, axis=reduction_axes).tolist(),
+        "mean_entropy_bits": np.mean(entropy, axis=reduction_axes).tolist(),
+        "mean_state_probabilities": np.mean(values, axis=reduction_axes).tolist(),
+    }
+
+
 def _sss_decode(coefficients: np.ndarray, frame_phase: np.ndarray,
                 pilot_channel: np.ndarray, expected: np.ndarray
                 ) -> tuple[dict, dict[str, np.ndarray]]:
@@ -154,7 +176,10 @@ def _sss_decode(coefficients: np.ndarray, frame_phase: np.ndarray,
     metrics, correct, probabilities = _metric_summary(
         equalized, expected[None, :], rotation_quarters=0)
     metrics.update({"frame_count": int(frame_phase.size),
-                    "per_subcarrier_accuracy": np.mean(correct, axis=0).tolist()})
+                    "per_subcarrier_accuracy": np.mean(correct, axis=0).tolist(),
+                    "temporal_qpsk": _temporal_probability_summary(
+                        probabilities, correct,
+                        _constellation_states(expected, rotation_quarters=0))})
     return metrics, {"expected": expected, "equalized": equalized,
                      "correct": correct, "probabilities": probabilities}
 
@@ -254,6 +279,11 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
     residual = pilots - modeled
     pilot_metrics, pilot_correct, pilot_probabilities = _metric_summary(
         equalized, expected_pilots, rotation_quarters=.5)
+    frame_equalized = (aligned / np.where(np.abs(full_channel) > 1e-20,
+                                          full_channel, np.complex64(1))[None, None, :])
+    _, frame_correct, frame_probabilities = _metric_summary(
+        frame_equalized, expected_pilots[None, :, :], rotation_quarters=.5)
+    expected_states = _constellation_states(expected_pilots, rotation_quarters=.5)
     pilot_metrics.update({"frame_count": len(pilot_frames),
         "effective_frame_count": float(1 / np.sum(frame_weights ** 2)),
         "stacking_gain_db": float(10 * np.log10(1 / np.sum(frame_weights ** 2))),
@@ -264,7 +294,9 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
         "per_subcarrier_accuracy": np.mean(pilot_correct, axis=0).tolist(),
         "channel_magnitude": np.abs(full_channel).tolist(),
         "channel_phase_deg": np.rad2deg(np.angle(full_channel)).tolist(),
-        "frame_phase_deg": np.rad2deg(frame_phase).tolist()})
+        "frame_phase_deg": np.rad2deg(frame_phase).tolist(),
+        "temporal_qpsk": _temporal_probability_summary(
+            frame_probabilities, frame_correct, expected_states)})
     sss_expected = sss_edge_symbols(edge)
     sss_metrics, sss_arrays = _sss_decode(
         sss_coefficients, frame_phase, full_channel, sss_expected)
@@ -273,6 +305,9 @@ def demodulate_edge_window(samples: np.ndarray, sample_rate_hz: float, *,
               "pilot_stacked": stacked,
               "pilot_correct": pilot_correct,
               "pilot_probabilities": pilot_probabilities,
+              "pilot_frame_equalized": frame_equalized,
+              "pilot_frame_correct": frame_correct,
+              "pilot_frame_probabilities": frame_probabilities,
               "sss_expected": sss_arrays["expected"],
               "sss_equalized": sss_arrays["equalized"],
               "sss_correct": sss_arrays["correct"],
@@ -330,6 +365,16 @@ def _combine_receiver_symbols(receivers: list[dict],
     pilot_metrics, pilot_correct, pilot_probabilities = _metric_summary(
         pilot_equalized, pilot_expected, rotation_quarters=.5)
     pilot_metrics["receiver_weights"] = pilot_weights.tolist()
+    pilot_frame_count = min(arrays[f"rx{receiver}_pilot_frame_equalized"].shape[0]
+                            for receiver in range(2))
+    pilot_frame_equalized = sum(pilot_weights[receiver] *
+        arrays[f"rx{receiver}_pilot_frame_equalized"][:pilot_frame_count]
+        for receiver in range(2))
+    _, pilot_frame_correct, pilot_frame_probabilities = _metric_summary(
+        pilot_frame_equalized, pilot_expected[None, :, :], rotation_quarters=.5)
+    pilot_metrics["temporal_qpsk"] = _temporal_probability_summary(
+        pilot_frame_probabilities, pilot_frame_correct,
+        _constellation_states(pilot_expected, rotation_quarters=.5))
 
     sss_noise = np.asarray([max(item["sss"]["soft_noise_variance"], 1e-6)
                             for item in receivers], dtype=float)
@@ -345,13 +390,19 @@ def _combine_receiver_symbols(receivers: list[dict],
     sss_metrics.update({"receiver_weights": sss_weights.tolist(),
                         "frame_count": int(sss_equalized.shape[0]),
                         "per_subcarrier_accuracy": np.mean(
-                            sss_correct, axis=0).tolist()})
+                            sss_correct, axis=0).tolist(),
+                        "temporal_qpsk": _temporal_probability_summary(
+                            sss_probabilities, sss_correct,
+                            _constellation_states(sss_expected, rotation_quarters=0))})
     metrics = {"method": "inverse-noise equalized dual-RX combining",
                "pilot": pilot_metrics, "sss": sss_metrics}
     combined_arrays = {"combined_pilot_expected": pilot_expected,
         "combined_pilot_equalized": pilot_equalized,
         "combined_pilot_correct": pilot_correct,
         "combined_pilot_probabilities": pilot_probabilities,
+        "combined_pilot_frame_equalized": pilot_frame_equalized,
+        "combined_pilot_frame_correct": pilot_frame_correct,
+        "combined_pilot_frame_probabilities": pilot_frame_probabilities,
         "combined_sss_expected": sss_expected,
         "combined_sss_equalized": sss_equalized,
         "combined_sss_correct": sss_correct,

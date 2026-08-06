@@ -1,6 +1,7 @@
 import json
 
-from leo_tracker.radio.beacon.dashboard_index import (confirmed_beacon_events,
+from leo_tracker.radio.beacon.dashboard_index import (capture_radio_parameters,
+                                                       confirmed_beacon_events,
                                                        update_dashboard_index)
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.dashboard import DashboardModel
@@ -12,9 +13,23 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
     manifest = {"state": "complete", "created_utc_ns": created_ns,
         "sample_rate_hz": 2_500_000, "bandwidth_hz": 2_300_000,
         "center_frequency_hz": 1_709_687_500, "rf_center_hz": 11_459_687_500,
+        "lnb_lo_hz": 9_750_000_000, "receiver_count": 2,
+        "requested_samples_per_receiver": 300_000_000, "chunk_samples": 12_500_000,
+        "dtype": "ci16_le", "layout": "sample,receiver,component",
+        "chunks": [{"sample_count": 12_500_000, "bytes": 100_000_000,
+                    "read_count": 48}],
         "requested_duration_s": 120, "gain_mode": "manual", "configured_gain_db": 50,
         "metadata": {"channel_number": 4, "region": "lower-edge",
-                     "observation_mode": "narrow"}}
+                     "observation_mode": "narrow", "assigned_gain_mode": "manual",
+                     "gain_experiment_id": "gain-ab-v1", "agc_assignment_probability": .5,
+                     "gain_random_draw_u32": 123, "agc_settle_s": 0},
+        "gain_telemetry": {"target_interval_s": 1, "entries": [
+            {"rx_gain_db": [49.5, 50]}, {"rx_gain_db": [50.5, 50]}]},
+        "identity": {"enabled_channels": [0, 1],
+                     "gain_mode_readback": ["manual", "manual"],
+                     "kind": "plutoplus-paired", "implementation": "pyadi.ad9361",
+                     "transport": "iio", "uri": "pluto://ip:192.168.2.1",
+                     "host_temperature_c": 59.5, "radio_temperature_c": 55.25}}
     (capture / "manifest.json").write_text(json.dumps(manifest))
     report = {"schema": "leo-tracker.starlink-beacon-analysis/v1",
         "capture_manifest": manifest,
@@ -41,6 +56,7 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
                 "soft_dual_rx": {"pilot": {"hard_symbol_accuracy": .8,
                     "soft_mean_confidence": .75, "rms_evm": .4}}}}))
     (root / "reports" / "plots" / f"{name}.png").write_bytes(b"png")
+    (root / "reports" / "fingerprints" / f"{name}.png").write_bytes(b"fingerprint")
 
 
 def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_path,
@@ -54,7 +70,10 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     _capture(root, second, 1_700_000_100_000_000_000)
     (root / "reports" / "fingerprints" / "index.json").write_text(json.dumps({
         "fingerprint_count": 1, "membership": {first: "wf-1"},
-        "clusters": [{"cluster_id": "wf-1", "member_count": 2}]}))
+        "clusters": [{"cluster_id": "wf-1", "member_count": 2}],
+        "nearest_matches": {first: [{"capture_name": second,
+            "waveform_family_similarity": .9, "temporal_qpsk_similarity": .8,
+            "conditional_channel_similarity": .7, "family_link": True}]}}))
     output = root / "reports" / "dashboard-index.json"
 
     report = update_dashboard_index(root, output)
@@ -67,8 +86,16 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert row["strongest_drift_hz_s"] == -4100
     assert row["pilot_accuracy"] == .8
     assert row["fingerprint_family"] == "wf-1"
+    assert row["fingerprint_plot_url"] == f"/beacon-fingerprint-plots/{first}.png"
+    assert row["fingerprint_nearest_matches"][0]["temporal_qpsk_similarity"] == .8
     assert row["_statistics"]["exact_checks"][0]["receivers"][0][
         "pilot_frequency_offset_hz"] == -30_000
+    radio = row["_statistics"]["radio_parameters"]
+    assert radio["tuning"]["lnb_lo_hz"] == 9_750_000_000
+    assert radio["receivers"]["gain_mode_readback"] == ["manual", "manual"]
+    assert radio["receivers"]["gain_readback_by_receiver"][0]["median_db"] == 50
+    assert radio["hardware"]["radio_temperature_c"] == 55.25
+    assert radio["capture"]["captured_samples_per_receiver"] == 12_500_000
     assert row["_plots"] == [f"/beacon-plots/{first}.png"]
     assert row["_artifacts"][0]["url"] == f"/beacon-analyses/{first}.json"
 
@@ -82,6 +109,8 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert "_statistics" not in index["recordings"][0]
     detail = model.recording_detail("beacon", first)
     assert detail["statistics"]["confirmation"]["confirmed"]
+    assert detail["statistics"]["radio_parameters"]["gain_experiment"][
+        "experiment_id"] == "gain-ab-v1"
     assert detail["plots"] == [f"/beacon-plots/{first}.png"]
 
     assert main(["starlink-beacon-dashboard-index", str(root), str(output),
@@ -89,6 +118,21 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     cli = json.loads(capsys.readouterr().out)
     assert cli["recording_count"] == 2
     assert cli["summary"]["analyzed_capture_count"] == 2
+
+
+def test_capture_radio_parameters_handles_partial_active_manifest():
+    report = capture_radio_parameters({"state": "capturing", "sample_rate_hz": 2_500_000,
+        "receiver_count": 2, "gain_mode": "slow_attack", "chunks": [],
+        "identity": {"enabled_channels": [0, 1],
+                     "gain_mode_readback": ["slow_attack", "slow_attack"]}})
+    assert report["capture"]["state"] == "capturing"
+    assert report["capture"]["captured_samples_per_receiver"] == 0
+    assert report["receivers"]["enabled_channels"] == [0, 1]
+    assert report["receivers"]["gain_readback_by_receiver"] == [
+        {"receiver": 0, "sample_count": 0, "minimum_db": None,
+         "median_db": None, "maximum_db": None},
+        {"receiver": 1, "sample_count": 0, "minimum_db": None,
+         "median_db": None, "maximum_db": None}]
 
 
 def test_confirmed_beacon_count_merges_duplicate_receiver_links_and_time_runs():

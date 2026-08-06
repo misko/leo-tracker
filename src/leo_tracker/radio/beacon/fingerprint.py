@@ -17,7 +17,8 @@ import numpy as np
 
 FINGERPRINT_SCHEMA = "leo-tracker.starlink-waveform-fingerprint/v1"
 INDEX_SCHEMA = "leo-tracker.starlink-waveform-fingerprint-index/v1"
-FINGERPRINT_REVISION = 1
+FINGERPRINT_REVISION = 2
+TEMPORAL_PLOT_REVISION = 2
 FAMILY_LINK_THRESHOLD = .72
 MINIMUM_LINK_CONFIDENCE = .65
 
@@ -79,6 +80,32 @@ def _confirmed_drifts(followup: dict) -> list[float]:
             if link.get("drift_hz_s") is not None]
 
 
+def _frame_probability_summary(probabilities: np.ndarray) -> dict:
+    values = np.asarray(probabilities, dtype=float)
+    if values.ndim < 2 or values.shape[-1] != 4:
+        return {"frame_count": 0}
+    axes = tuple(range(1, values.ndim - 1))
+    entropy = -np.sum(values * np.log2(np.maximum(values, 1e-12)), axis=-1)
+    return {"frame_count": int(values.shape[0]),
+            "mean_confidence": np.mean(np.max(values, axis=-1), axis=axes).tolist(),
+            "mean_entropy_bits": np.mean(entropy, axis=axes).tolist(),
+            "mean_state_probabilities": np.mean(values, axis=axes).tolist()}
+
+
+def _soft_qpsk_probabilities(equalized: np.ndarray, *, rotation_quarters: float) -> np.ndarray:
+    values = np.asarray(equalized)
+    constellation = np.exp(1j * np.pi / 2 *
+                           (np.arange(4, dtype=float) + rotation_quarters))
+    distance = np.abs(values[..., None] - constellation) ** 2
+    nearest = np.min(distance, axis=-1)
+    noise = max(float(np.median(nearest)), 1e-3)
+    logits = -distance / noise
+    logits -= np.max(logits, axis=-1, keepdims=True)
+    likelihood = np.exp(logits)
+    return np.asarray(likelihood / np.sum(likelihood, axis=-1, keepdims=True),
+                      np.float32)
+
+
 def fingerprint_decode(decode_path: Path, symbols_path: Path, output: Path,
                        *, followup_path: Path | None = None) -> dict:
     """Extract a compact, comparable fingerprint from one decoded observation."""
@@ -104,14 +131,23 @@ def fingerprint_decode(decode_path: Path, symbols_path: Path, output: Path,
             pilot_states = np.argmin(
                 np.abs(pilot_equalized[..., None] - pilot_constellation), axis=-1
                 ).astype(np.uint8)
+            pilot_probabilities = _soft_qpsk_probabilities(
+                pilot_equalized, rotation_quarters=.5)
             frame_count = min(arrays["rx0_sss_equalized"].shape[0],
                               arrays["rx1_sss_equalized"].shape[0])
             sss_equalized = (np.asarray(arrays["rx0_sss_equalized"][:frame_count]) +
                              np.asarray(arrays["rx1_sss_equalized"][:frame_count])) / 2
+            sss_probabilities = _soft_qpsk_probabilities(
+                sss_equalized, rotation_quarters=0)
             sss_constellation = np.exp(1j * np.pi / 2 * np.arange(4))
             sss_states = np.argmin(np.abs(np.mean(sss_equalized, axis=0)[..., None] -
                                          sss_constellation), axis=-1).astype(np.uint8)
             extraction_mode = "legacy_hard_dual_rx"
+        pilot_temporal = (_frame_probability_summary(
+            arrays["combined_pilot_frame_probabilities"])
+            if "combined_pilot_frame_probabilities" in arrays.files else
+            {"frame_count": 0, "availability": "stacked pilot archive only"})
+        sss_temporal = _frame_probability_summary(sss_probabilities)
         channel = [_channel_features(arrays[f"rx{receiver}_channel"])
                    for receiver in range(2)]
     followup = (json.loads(Path(followup_path).read_text())
@@ -127,6 +163,7 @@ def fingerprint_decode(decode_path: Path, symbols_path: Path, output: Path,
     report = {
         "schema": FINGERPRINT_SCHEMA,
         "fingerprint_revision": FINGERPRINT_REVISION,
+        "temporal_plot_revision": TEMPORAL_PLOT_REVISION,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "capture_name": decode_path.stem,
         "source": {"decode": str(decode_path.resolve()),
@@ -154,6 +191,17 @@ def fingerprint_decode(decode_path: Path, symbols_path: Path, output: Path,
                 combined.get("minimum_sss_accuracy")),
             "sss_mean_confidence": sss.get("soft_mean_confidence",
                 combined.get("minimum_sss_accuracy"))},
+        "temporal_qpsk_signature": {
+            "representation": ("per-frame posterior probability over four QPSK states; "
+                               "pilots are pi/4-rotated QPSK and SSS is QPSK"),
+            "pilot": {**pilot_temporal,
+                **({key: value for key, value in pilot.get(
+                    "temporal_qpsk", {}).items() if key != "frame_count"})},
+            "sss": {**sss_temporal,
+                **({key: value for key, value in sss.get(
+                    "temporal_qpsk", {}).items() if key != "frame_count"})},
+            "limitations": ("PSS is represented by acquisition correlation, not QAM symbols; "
+                            "known pilot/SSS states identify waveform structure, not payload")},
         "conditional_receiver_signature": {
             "channels": channel,
             "carrier_offsets_hz": [item.get("carrier_offset_hz") for item in receivers],
@@ -215,6 +263,27 @@ def compare_fingerprints(first: dict, second: dict) -> dict:
     drift_difference = (min(abs(float(a) - float(b)) for a in first_drifts
                             for b in second_drifts)
                         if first_drifts and second_drifts else None)
+    temporal_scores = {}
+    for component in ("pilot", "sss"):
+        first_temporal = first.get("temporal_qpsk_signature", {}).get(component, {})
+        second_temporal = second.get("temporal_qpsk_signature", {}).get(component, {})
+        scores = []
+        for key, scale in (("mean_expected_probability", 1),
+                           ("hard_symbol_accuracy", 1),
+                           ("mean_confidence", 1), ("mean_entropy_bits", 2)):
+            a_values = np.asarray(first_temporal.get(key, []), dtype=float).reshape(-1)
+            b_values = np.asarray(second_temporal.get(key, []), dtype=float).reshape(-1)
+            if not a_values.size or not b_values.size:
+                continue
+            positions = np.linspace(0, 1, max(a_values.size, b_values.size))
+            a_resampled = np.interp(positions, np.linspace(0, 1, a_values.size), a_values)
+            b_resampled = np.interp(positions, np.linspace(0, 1, b_values.size), b_values)
+            scores.append(float(np.clip(1 - np.mean(np.abs(
+                a_resampled - b_resampled)) / scale, 0, 1)))
+        temporal_scores[component] = float(np.mean(scores)) if scores else None
+    available_temporal = [value for value in temporal_scores.values() if value is not None]
+    temporal_similarity = (float(np.mean(available_temporal))
+                           if available_temporal else None)
     family_link = bool(waveform_similarity >= FAMILY_LINK_THRESHOLD and
                        minimum_confidence >= MINIMUM_LINK_CONFIDENCE)
     return {"pilot_state_agreement": pilot_agreement,
@@ -224,6 +293,11 @@ def compare_fingerprints(first: dict, second: dict) -> dict:
             "waveform_family_similarity": waveform_similarity,
             "minimum_pilot_confidence": minimum_confidence,
             "conditional_channel_similarity": channel_similarity,
+            "temporal_qpsk_similarity": temporal_similarity,
+            "temporal_qpsk_components": [key for key, value in temporal_scores.items()
+                                         if value is not None],
+            "temporal_pilot_similarity": temporal_scores["pilot"],
+            "temporal_sss_similarity": temporal_scores["sss"],
             "shared_overlapping_norad_ids": sorted(first_norad & second_norad),
             "minimum_confirmed_drift_difference_hz_s": drift_difference,
             "family_link": family_link,
@@ -300,10 +374,11 @@ def update_fingerprint_store(root: Path, *, capture_name: str | None = None) -> 
     fingerprints.mkdir(parents=True, exist_ok=True)
     paths = ([decoded / f"{capture_name}.json"] if capture_name else
              sorted(decoded.glob("*.json")))
-    written, reused, skipped, errors = [], [], [], []
+    written, reused, plotted, skipped, errors = [], [], [], [], []
     for decode_path in paths:
         symbols_path = decode_path.with_suffix(".npz")
         output = fingerprints / decode_path.name
+        plot_output = fingerprints / f"{decode_path.stem}.png"
         if not decode_path.is_file() or not symbols_path.is_file():
             skipped.append(decode_path.stem)
             continue
@@ -317,20 +392,148 @@ def update_fingerprint_store(root: Path, *, capture_name: str | None = None) -> 
                     existing.get("source", {}).get("symbol_archive_sha256") ==
                     symbol_sha256):
                 reused.append(decode_path.stem)
+                if (not plot_output.is_file() or existing.get(
+                        "temporal_plot_revision") != TEMPORAL_PLOT_REVISION):
+                    render_temporal_fingerprint(existing, symbols_path, plot_output)
+                    existing["temporal_plot_revision"] = TEMPORAL_PLOT_REVISION
+                    _atomic_json(output, existing)
+                    plotted.append(decode_path.stem)
                 continue
-            fingerprint_decode(decode_path, symbols_path, output,
+            report = fingerprint_decode(decode_path, symbols_path, output,
                 followup_path=root / "reports" / "followups" / decode_path.name)
+            render_temporal_fingerprint(report, symbols_path, plot_output)
             written.append(decode_path.stem)
+            plotted.append(decode_path.stem)
         except Exception as exc:
             errors.append({"capture": decode_path.stem,
                            "error": f"{type(exc).__name__}: {exc}"})
     index = build_fingerprint_index(fingerprints, fingerprints / "index.json")
     return {"schema": "leo-tracker.starlink-waveform-fingerprint-update/v1",
             "root": str(root), "written": written, "reused_count": len(reused),
+            "plotted": plotted,
             "skipped": skipped, "errors": errors,
             "fingerprint_count": index["fingerprint_count"],
             "cluster_count": len(index["clusters"]),
             "index": str((fingerprints / "index.json").resolve())}
+
+
+def render_temporal_fingerprint(fingerprint: dict, symbols_path: Path,
+                                output: Path) -> None:
+    """Plot time-resolved soft QPSK evidence for one decoded observation."""
+    import matplotlib.pyplot as plt
+
+    with np.load(symbols_path, allow_pickle=False) as arrays:
+        if "combined_pilot_probabilities" in arrays.files:
+            pilot = np.asarray(arrays["combined_pilot_probabilities"])
+        else:
+            pilot_equalized = (np.asarray(arrays["rx0_pilot_equalized"]) +
+                               np.asarray(arrays["rx1_pilot_equalized"])) / 2
+            pilot = _soft_qpsk_probabilities(
+                pilot_equalized, rotation_quarters=.5)
+        pilot_expected = (np.asarray(arrays["combined_pilot_expected"])
+            if "combined_pilot_expected" in arrays.files else
+            np.asarray(arrays["rx0_pilot_expected"])
+            if "rx0_pilot_expected" in arrays.files else None)
+        pilot_frames = (np.asarray(arrays["combined_pilot_frame_probabilities"])
+                        if "combined_pilot_frame_probabilities" in arrays.files else None)
+        if "combined_sss_probabilities" in arrays.files:
+            sss = np.asarray(arrays["combined_sss_probabilities"])
+        else:
+            frame_count = min(arrays["rx0_sss_equalized"].shape[0],
+                              arrays["rx1_sss_equalized"].shape[0])
+            sss_equalized = (np.asarray(arrays["rx0_sss_equalized"][:frame_count]) +
+                             np.asarray(arrays["rx1_sss_equalized"][:frame_count])) / 2
+            sss = _soft_qpsk_probabilities(sss_equalized, rotation_quarters=0)
+        sss_expected = (np.asarray(arrays["combined_sss_expected"])
+            if "combined_sss_expected" in arrays.files else
+            np.asarray(arrays["rx0_sss_expected"])
+            if "rx0_sss_expected" in arrays.files else None)
+    signature = fingerprint.get("waveform_signature", {})
+    if pilot_expected is not None:
+        pilot_constellation = np.exp(1j * np.pi / 2 * (np.arange(4) + .5))
+        pilot_known = np.argmin(
+            np.abs(pilot_expected[..., None] - pilot_constellation), axis=-1)
+    else:
+        pilot_known = _unpack_states(signature["pilot_states_2bit_hex"],
+            int(signature["pilot_state_count"])).reshape(pilot.shape[-3:-1])
+    if sss_expected is not None:
+        sss_constellation = np.exp(1j * np.pi / 2 * np.arange(4))
+        sss_known = np.argmin(
+            np.abs(sss_expected[..., None] - sss_constellation), axis=-1)
+    else:
+        sss_known = np.asarray(signature["sss_states"], dtype=int)
+    figure, axes = plt.subplots(4, 1, figsize=(14, 15), constrained_layout=True)
+    if pilot_frames is not None:
+        pilot_expected_probability = np.take_along_axis(
+            pilot_frames, pilot_known[None, :, :, None], axis=-1)[..., 0]
+        expected_heatmap = np.mean(pilot_expected_probability, axis=2)
+        image = axes[0].imshow(expected_heatmap, origin="lower", aspect="auto",
+            interpolation="nearest", cmap="viridis", vmin=.25, vmax=1,
+            extent=(2, 302, -.5, expected_heatmap.shape[0] - .5))
+        axes[0].set(title="Probability assigned to the known pilot QPSK state",
+                    xlabel="OFDM symbol index", ylabel="Frame index")
+    else:
+        pilot_expected_probability = np.take_along_axis(
+            pilot, pilot_known[..., None], axis=-1)[..., 0]
+        image = axes[0].imshow(pilot_expected_probability.T, origin="lower", aspect="auto",
+            interpolation="nearest", cmap="viridis", vmin=.25, vmax=1,
+            extent=(2, 302, -.5, 7.5))
+        axes[0].set(title="Known-pilot probability (legacy stacked archive: no frame axis)",
+                    xlabel="OFDM symbol index", ylabel="Edge subcarrier")
+    figure.colorbar(image, ax=axes[0], label="expected-state probability")
+
+    if pilot_frames is not None:
+        pilot_confidence = np.mean(np.max(pilot_frames, axis=-1), axis=(1, 2))
+        pilot_expected_mean = np.mean(pilot_expected_probability, axis=(1, 2))
+        pilot_accuracy = np.mean(
+            np.argmax(pilot_frames, axis=-1) == pilot_known[None, :, :], axis=(1, 2))
+        axes[1].plot(pilot_confidence, marker=".", label="maximum-state confidence")
+        axes[1].plot(pilot_expected_mean, marker=".", label="known-state probability")
+        axes[1].plot(pilot_accuracy, marker=".", label="hard-decision accuracy")
+        axes[1].set(title="Pilot code agreement by frame", xlabel="Frame index",
+                    ylabel="fraction / probability", ylim=(0, 1))
+        axes[1].legend(ncol=3)
+    else:
+        axes[1].plot(np.mean(np.max(pilot, axis=-1), axis=1),
+                     label="maximum-state confidence")
+        axes[1].plot(np.mean(pilot_expected_probability, axis=1),
+                     label="known-state probability")
+        axes[1].plot(np.mean(np.argmax(pilot, axis=-1) == pilot_known, axis=1),
+                     label="hard-decision accuracy")
+        axes[1].set(title="Stacked pilot code agreement by OFDM symbol",
+                    xlabel="OFDM symbol index", ylabel="fraction / probability", ylim=(0, 1))
+        axes[1].legend(ncol=3)
+
+    sss_expected_probability = np.take_along_axis(
+        sss, sss_known[None, :, None], axis=-1)[..., 0]
+    image = axes[2].imshow(sss_expected_probability.T, origin="lower", aspect="auto",
+        interpolation="nearest", cmap="magma", vmin=.25, vmax=1,
+        extent=(-.5, sss.shape[0] - .5, -.5, sss.shape[1] - .5))
+    axes[2].set(title="Probability assigned to the known SSS QPSK state",
+                xlabel="Frame index", ylabel="Edge SSS subcarrier")
+    figure.colorbar(image, ax=axes[2], label="expected-state probability")
+
+    sss_confidence = np.mean(np.max(sss, axis=-1), axis=1)
+    sss_accuracy = np.mean(np.argmax(sss, axis=-1) == sss_known[None, :], axis=1)
+    axes[3].plot(sss_confidence, marker="o", label="SSS confidence")
+    axes[3].plot(np.mean(sss_expected_probability, axis=1), marker="o",
+                 label="SSS known-state probability")
+    axes[3].plot(sss_accuracy, marker="o", label="SSS hard accuracy")
+    if pilot_frames is not None:
+        axes[3].plot(pilot_expected_mean, marker=".", label="pilot known-state probability")
+    axes[3].set(title="Temporal sync-symbol reliability",
+                xlabel="Frame index", ylabel="fraction / probability", ylim=(0, 1))
+    axes[3].grid(alpha=.25); axes[3].legend()
+    observation = fingerprint.get("observation", {})
+    figure.suptitle(
+        "Temporal Starlink sync/pilot fingerprint\n"
+        f"{fingerprint.get('capture_name', 'capture')} · RF "
+        f"{float(observation.get('rf_center_hz') or 0)/1e9:.6f} GHz · "
+        f"pilot confidence {float(signature.get('pilot_mean_confidence') or 0):.1%}\n"
+        "Soft four-state QPSK evidence; known sync structure, not decoded user payload",
+        fontsize=14)
+    output = Path(output); output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, dpi=140); plt.close(figure)
 
 
 def render_fingerprint_svg(index: dict, *, width: int = 1100,

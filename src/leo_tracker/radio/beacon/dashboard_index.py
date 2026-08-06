@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+from statistics import median
 
 
 SCHEMA = "leo-tracker.beacon-dashboard-index/v2"
@@ -55,12 +56,90 @@ def confirmed_beacon_events(confirmation: dict, *, merge_gap_s: float = .25) -> 
     return merged
 
 
+def capture_radio_parameters(manifest: dict) -> dict:
+    """Return a compact, display-ready audit of configured and observed radio state."""
+    identity = manifest.get("identity", {}) or {}
+    metadata = manifest.get("metadata", {}) or {}
+    telemetry = manifest.get("gain_telemetry", {}) or {}
+    entries = telemetry.get("entries", []) or []
+    receiver_count = int(manifest.get("receiver_count", 0) or 0)
+    enabled = identity.get("enabled_channels") or list(range(receiver_count))
+    gains = []
+    for receiver in range(receiver_count):
+        values = [float(entry["rx_gain_db"][receiver]) for entry in entries
+                  if isinstance(entry.get("rx_gain_db"), list) and
+                  len(entry["rx_gain_db"]) > receiver and
+                  entry["rx_gain_db"][receiver] is not None]
+        gains.append({"receiver": receiver, "sample_count": len(values),
+                      "minimum_db": min(values) if values else None,
+                      "median_db": median(values) if values else None,
+                      "maximum_db": max(values) if values else None})
+    chunks = manifest.get("chunks", []) or []
+    return {
+        "tuning": {
+            "if_center_hz": manifest.get("center_frequency_hz"),
+            "lnb_lo_hz": manifest.get("lnb_lo_hz"),
+            "rf_center_hz": manifest.get("rf_center_hz"),
+            "sample_rate_hz": manifest.get("sample_rate_hz"),
+            "rf_bandwidth_hz": manifest.get("bandwidth_hz"),
+            "tuning_basis": metadata.get("tuning_basis"),
+        },
+        "receivers": {
+            "receiver_count": receiver_count or None,
+            "enabled_channels": enabled,
+            "layout": manifest.get("layout"),
+            "gain_mode_requested": manifest.get("gain_mode"),
+            "configured_manual_gain_db": manifest.get("configured_gain_db"),
+            "gain_mode_readback": identity.get("gain_mode_readback"),
+            "gain_readback_by_receiver": gains,
+            "gain_telemetry_interval_s": telemetry.get("target_interval_s"),
+            "gain_telemetry_note": telemetry.get("note"),
+        },
+        "gain_experiment": {
+            "experiment_id": metadata.get("gain_experiment_id"),
+            "assigned_gain_mode": metadata.get("assigned_gain_mode"),
+            "agc_assignment_probability": metadata.get("agc_assignment_probability"),
+            "random_draw_u32": metadata.get("gain_random_draw_u32"),
+            "agc_settle_s": metadata.get("agc_settle_s"),
+        },
+        "hardware": {
+            "kind": identity.get("kind"),
+            "implementation": identity.get("implementation"),
+            "transport": identity.get("transport"),
+            "uri": identity.get("uri"),
+            "serial": identity.get("serial"),
+            "host_temperature_c": identity.get("host_temperature_c"),
+            "radio_temperature_c": identity.get("radio_temperature_c"),
+        },
+        "capture": {
+            "state": manifest.get("state"),
+            "observation_mode": metadata.get("observation_mode"),
+            "channel_number": metadata.get("channel_number"),
+            "region": metadata.get("region"),
+            "created_utc_ns": manifest.get("created_utc_ns"),
+            "requested_duration_s": manifest.get("requested_duration_s"),
+            "requested_samples_per_receiver": manifest.get(
+                "requested_samples_per_receiver"),
+            "captured_samples_per_receiver": sum(int(chunk.get("sample_count", 0) or 0)
+                                                   for chunk in chunks),
+            "chunk_samples": manifest.get("chunk_samples"),
+            "chunk_count": len(chunks),
+            "read_count": sum(int(chunk.get("read_count", 0) or 0) for chunk in chunks),
+            "stored_bytes": sum(int(chunk.get("bytes", 0) or 0) for chunk in chunks),
+            "dtype": manifest.get("dtype"),
+            "timestamp_semantics": identity.get("timestamp_semantics"),
+        },
+    }
+
+
 def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     report_path = root / "reports" / f"{name}.json"
     followup_path = root / "reports" / "followups" / f"{name}.json"
     decode_path = root / "reports" / "decoded" / f"{name}.json"
     fingerprint_path = root / "reports" / "fingerprints" / f"{name}.json"
-    paths = (report_path, followup_path, decode_path, fingerprint_path)
+    fingerprint_plot_path = root / "reports" / "fingerprints" / f"{name}.png"
+    paths = (report_path, followup_path, decode_path, fingerprint_path,
+             fingerprint_plot_path)
     report = _json(report_path)
     if report.get("schema") != "leo-tracker.starlink-beacon-analysis/v1":
         return None
@@ -80,6 +159,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     cluster_id = membership.get(name)
     cluster_sizes = {item.get("cluster_id"): item.get("member_count", 0)
         for item in fingerprint_index.get("clusters", [])}
+    nearest_matches = fingerprint_index.get("nearest_matches", {}).get(name, [])[:5]
     metadata = manifest.get("metadata", {})
     created_ns = int(manifest.get("created_utc_ns", 0) or 0)
     created_utc = (datetime.fromtimestamp(created_ns / 1e9, timezone.utc).isoformat()
@@ -129,6 +209,9 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         "tle_overlap_count": len(followup.get("overlapping_passes", [])),
         "fingerprint_family": cluster_id,
         "fingerprint_family_size": cluster_sizes.get(cluster_id, 0),
+        "fingerprint_plot_url": (f"/beacon-fingerprint-plots/{name}.png"
+                                 if fingerprint_plot_path.is_file() else None),
+        "fingerprint_nearest_matches": nearest_matches,
         "exact_coverage_fraction": summary.get("exact_temporal_coverage_fraction"),
         "detail_url": f"/recordings/beacon/{name}"}
     exact_checks = [{"start_s": item.get("start_s"),
@@ -146,7 +229,8 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
                 "selected_center_offset_hz")}
             for receiver in item.get("receivers", [])]}
         for item in report.get("exact_checks", [])]
-    statistics = {**common, "capture_manifest": manifest, "summary": summary,
+    statistics = {**common, "capture_manifest": manifest,
+        "radio_parameters": capture_radio_parameters(manifest), "summary": summary,
         "analysis": report.get("analysis", {}), "confirmation": confirmation,
         "confirmed_beacon_events": beacon_events,
         "exact_checks": exact_checks,
@@ -172,8 +256,10 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
         name = report_path.stem
         sidecars = (report_path, root / "reports" / "followups" / report_path.name,
             root / "reports" / "decoded" / report_path.name,
-            root / "reports" / "fingerprints" / report_path.name)
+            root / "reports" / "fingerprints" / report_path.name,
+            root / "reports" / "fingerprints" / f"{name}.png")
         if (capture_name is None and name in rows and
+                rows[name].get("_statistics", {}).get("radio_parameters") and
                 rows[name].get("_source_signature") == _signature(sidecars)):
             continue
         row = _capture_row(root, name, fingerprint_index)
@@ -186,8 +272,12 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
         cluster_id = membership.get(name)
         row["fingerprint_family"] = cluster_id
         row["fingerprint_family_size"] = cluster_sizes.get(cluster_id, 0)
+        row["fingerprint_nearest_matches"] = fingerprint_index.get(
+            "nearest_matches", {}).get(name, [])[:5]
         row.setdefault("_statistics", {})["fingerprint"] = {
             "cluster_id": cluster_id, "cluster_size": cluster_sizes.get(cluster_id, 0)}
+        row["_statistics"]["fingerprint_nearest_matches"] = row[
+            "fingerprint_nearest_matches"]
     ordered = sorted(rows.values(), key=lambda row: row.get("start_utc") or "", reverse=True)
     report = {"schema": SCHEMA, "created_utc": datetime.now(timezone.utc).isoformat(),
         "root": str(root), "summary": {"analyzed_capture_count": len(reports),

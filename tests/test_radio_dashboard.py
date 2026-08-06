@@ -484,6 +484,7 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
     fingerprint = {"schema": "leo-tracker.starlink-waveform-fingerprint/v1",
         "capture_name": name, "interpretation": {"satellite_identity_claim": False}}
     (reports / "fingerprints" / f"{name}.json").write_text(json.dumps(fingerprint))
+    (reports / "fingerprints" / f"{name}.png").write_bytes(b"fingerprint-png")
     (reports / "fingerprints" / "index.json").write_text(json.dumps({
         "schema": "leo-tracker.starlink-waveform-fingerprint-index/v1",
         "fingerprint_count": 1, "membership": {name: "wf-test"},
@@ -524,11 +525,19 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         assert index_row["fingerprint_family_size"] == 1
         detail_page = urlopen(base + index_row["detail_url"], timeout=2).read()
         assert b"Diagnostic plot" in detail_page
+        assert b"Radio parameters" in detail_page
+        assert b"Hardware gain readback" in detail_page
+        assert b"Temporal QPSK fingerprint" in detail_page
+        assert b"Nearest fingerprint comparisons" in detail_page
         assert b"Doppler and predicted-pass matching" in detail_page
         assert b"Dual-receiver detector and decode evidence" in detail_page
         assert b"Raw signal and analysis plots" in detail_page
         detail = json.loads(urlopen(
             base + "/api" + index_row["detail_url"], timeout=2).read())
+        assert detail["statistics"]["radio_parameters"]["tuning"][
+            "sample_rate_hz"] == 2_500_000
+        assert detail["statistics"]["fingerprint_plot_url"] == (
+            f"/beacon-fingerprint-plots/{name}.png")
         assert row["decode_plot_url"] in detail["plots"]
         assert row["fingerprint_url"] in [item["url"] for item in detail["artifacts"]]
         served = json.loads(urlopen(base + row["decode_url"], timeout=2).read())
@@ -537,6 +546,8 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         served_fingerprint = json.loads(urlopen(
             base + row["fingerprint_url"], timeout=2).read())
         assert not served_fingerprint["interpretation"]["satellite_identity_claim"]
+        assert urlopen(base + detail["statistics"]["fingerprint_plot_url"],
+                       timeout=2).read() == b"fingerprint-png"
         fingerprint_svg = urlopen(
             base + "/beacon-fingerprint-map.svg", timeout=2).read()
         assert fingerprint_svg.startswith(b'<svg xmlns="http://www.w3.org/2000/svg"')

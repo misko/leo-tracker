@@ -7,7 +7,8 @@ import numpy as np
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.beacon.fingerprint import (
     FINGERPRINT_SCHEMA, INDEX_SCHEMA, compare_fingerprints,
-    fingerprint_decode, render_fingerprint_svg, update_fingerprint_store)
+    fingerprint_decode, render_fingerprint_svg, render_temporal_fingerprint,
+    update_fingerprint_store)
 
 
 def _probabilities(states, confidence=.97):
@@ -74,6 +75,8 @@ def test_fingerprint_similarity_separates_repeated_code_from_chance(tmp_path):
     assert same["family_link"]
     # Linear channel phase is removed before comparison.
     assert same["conditional_channel_similarity"] > .99
+    assert same["temporal_qpsk_similarity"] == 1
+    assert same["temporal_sss_similarity"] == 1
     assert same["shared_overlapping_norad_ids"] == [12345]
     assert same["minimum_confirmed_drift_difference_hz_s"] == 0
     assert different["waveform_family_similarity"] < .11
@@ -91,6 +94,9 @@ def test_fingerprint_cli_backfills_store_and_builds_clusters(tmp_path):
     saved = json.loads((fingerprints / "capture-a.json").read_text())
     index = json.loads((fingerprints / "index.json").read_text())
     assert saved["schema"] == FINGERPRINT_SCHEMA
+    assert saved["fingerprint_revision"] == 2
+    assert saved["temporal_qpsk_signature"]["sss"]["frame_count"] == 6
+    assert saved["temporal_qpsk_signature"]["pilot"]["frame_count"] == 0
     assert saved["trajectory_context"]["confirmed_drift_hz_s"] == [-31_000]
     assert not saved["interpretation"]["satellite_identity_claim"]
     assert index["schema"] == INDEX_SCHEMA
@@ -99,6 +105,8 @@ def test_fingerprint_cli_backfills_store_and_builds_clusters(tmp_path):
     nearest = index["nearest_matches"]["capture-a"][0]
     assert nearest["capture_name"] == "capture-b"
     assert nearest["waveform_family_similarity"] == 1
+    assert nearest["temporal_qpsk_similarity"] == 1
+    assert (fingerprints / "capture-a.png").read_bytes().startswith(b"\x89PNG")
 
     svg = render_fingerprint_svg(index)
     assert ElementTree.fromstring(svg).tag.endswith("svg")
@@ -124,6 +132,10 @@ def test_fingerprint_accepts_legacy_hard_symbol_archive(tmp_path):
         rx1_sss_equalized=sss, rx0_channel=channel, rx1_channel=channel)
 
     saved = fingerprint_decode(decode_path, symbols, tmp_path / "legacy.json")
+    plot = tmp_path / "legacy.png"
+    render_temporal_fingerprint(saved, symbols, plot)
 
     assert saved["waveform_signature"]["extraction_mode"] == "legacy_hard_dual_rx"
     assert saved["waveform_signature"]["pilot_state_count"] == 2400
+    assert saved["temporal_qpsk_signature"]["sss"]["frame_count"] == 6
+    assert plot.read_bytes().startswith(b"\x89PNG")

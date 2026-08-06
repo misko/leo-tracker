@@ -142,10 +142,18 @@ def test_decode_followup_writes_json_symbols_and_plot(tmp_path):
     assert saved["decoder_revision"] == 2
     assert saved["combined"]["soft_dual_rx"]["pilot"][
         "hard_symbol_accuracy"] > .98
+    temporal = saved["combined"]["soft_dual_rx"]["pilot"]["temporal_qpsk"]
+    assert temporal["frame_count"] >= 2
+    assert len(temporal["mean_state_probabilities"]) == temporal["frame_count"]
     assert saved["waveform"]["decoded_sss_subcarriers_per_frame"] == 8
     assert saved["symbol_archive_bytes"] == symbols.stat().st_size
     assert len(saved["symbol_archive_sha256"]) == 64
     assert symbols.read_bytes().startswith(b"PK")
+    with np.load(symbols, allow_pickle=False) as archived:
+        assert archived["combined_pilot_frame_probabilities"].shape == (
+            temporal["frame_count"], 300, 8, 4)
+        assert archived["combined_pilot_frame_correct"].shape == (
+            temporal["frame_count"], 300, 8)
     assert plot.read_bytes().startswith(b"\x89PNG")
 
 

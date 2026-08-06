@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 
-SCHEMA = "leo-tracker.beacon-dashboard-index/v1"
+SCHEMA = "leo-tracker.beacon-dashboard-index/v2"
 
 
 def _json(path: Path) -> dict:
@@ -27,6 +27,32 @@ def _signature(paths: tuple[Path, ...]) -> list[int]:
         except OSError:
             values.extend((0, 0))
     return values
+
+
+def confirmed_beacon_events(confirmation: dict, *, merge_gap_s: float = .25) -> list[dict]:
+    """Merge duplicate/adjacent RX confirmation links into distinct time events."""
+    links = (confirmation.get("cross_receiver_links", []) +
+        confirmation.get("dual_receiver_links", []) + [
+            link for receiver in confirmation.get("receivers", [])
+            for link in receiver.get("links", [])])
+    intervals = []
+    for link in links:
+        start, stop = link.get("start_s"), link.get("stop_s")
+        if start is None or stop is None:
+            continue
+        start, stop = float(start), float(stop)
+        intervals.append({"start_s": min(start, stop), "stop_s": max(start, stop),
+                          "link_count": 1})
+    merged = []
+    for interval in sorted(intervals, key=lambda item: (item["start_s"], item["stop_s"])):
+        if merged and interval["start_s"] <= merged[-1]["stop_s"] + merge_gap_s:
+            merged[-1]["stop_s"] = max(merged[-1]["stop_s"], interval["stop_s"])
+            merged[-1]["link_count"] += 1
+        else:
+            merged.append(dict(interval))
+    if not merged and confirmation.get("confirmed"):
+        return [{"start_s": None, "stop_s": None, "link_count": 0}]
+    return merged
 
 
 def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
@@ -49,6 +75,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
             for link in receiver.get("links", [])])
     strongest = max(links, key=lambda item: abs(float(item.get("drift_hz_s", 0))),
                     default={})
+    beacon_events = confirmed_beacon_events(confirmation)
     membership = fingerprint_index.get("membership", {})
     cluster_id = membership.get(name)
     cluster_sizes = {item.get("cluster_id"): item.get("member_count", 0)
@@ -92,6 +119,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         "single_receiver_candidate_count": int(
             summary.get("single_receiver_candidate_count", 0) or 0),
         "confirmed": bool(confirmation.get("confirmed")),
+        "beacon_detected_count": len(beacon_events),
         "decoded": decode.get("schema") == "leo-tracker.starlink-edge-decode/v1",
         "pilot_accuracy": pilot_accuracy,
         "pilot_confidence": pilot.get("soft_mean_confidence"),
@@ -120,6 +148,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         for item in report.get("exact_checks", [])]
     statistics = {**common, "capture_manifest": manifest, "summary": summary,
         "analysis": report.get("analysis", {}), "confirmation": confirmation,
+        "confirmed_beacon_events": beacon_events,
         "exact_checks": exact_checks,
         "overlapping_passes": followup.get("overlapping_passes", [])[:10],
         "decode": combined,
@@ -133,8 +162,8 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
     """Incrementally update a compact index; unchanged multi-MB reports are not reparsed."""
     root, output = Path(root).resolve(), Path(output)
     previous = _json(output)
-    rows = {row.get("recording_id"): row for row in previous.get("recordings", [])
-            if row.get("recording_id")}
+    rows = ({row.get("recording_id"): row for row in previous.get("recordings", [])
+             if row.get("recording_id")} if previous.get("schema") == SCHEMA else {})
     fingerprint_index = _json(root / "reports" / "fingerprints" / "index.json")
     reports = sorted(path for path in (root / "reports").glob("*.json")
                      if path.resolve() != output.resolve())

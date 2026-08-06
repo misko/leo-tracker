@@ -1,6 +1,7 @@
 import json
 
-from leo_tracker.radio.beacon.dashboard_index import update_dashboard_index
+from leo_tracker.radio.beacon.dashboard_index import (confirmed_beacon_events,
+                                                       update_dashboard_index)
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.dashboard import DashboardModel
 
@@ -62,6 +63,7 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert report["summary"]["temporally_confirmed_capture_count"] == 1
     row = next(item for item in report["recordings"] if item["recording_id"] == first)
     assert row["candidate_count"] == 5
+    assert row["beacon_detected_count"] == 1
     assert row["strongest_drift_hz_s"] == -4100
     assert row["pilot_accuracy"] == .8
     assert row["fingerprint_family"] == "wf-1"
@@ -87,3 +89,17 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     cli = json.loads(capsys.readouterr().out)
     assert cli["recording_count"] == 2
     assert cli["summary"]["analyzed_capture_count"] == 2
+
+
+def test_confirmed_beacon_count_merges_duplicate_receiver_links_and_time_runs():
+    confirmation = {"confirmed": True,
+        "cross_receiver_links": [
+            {"start_s": 1.0, "stop_s": 1.1},
+            {"start_s": 1.1, "stop_s": 1.3},
+            {"start_s": 4.0, "stop_s": 4.1}],
+        "dual_receiver_links": [{"start_s": 1.0, "stop_s": 1.1}],
+        "receivers": [{"links": [{"start_s": 1.2, "stop_s": 1.3}]}]}
+    events = confirmed_beacon_events(confirmation)
+    assert events == [
+        {"start_s": 1.0, "stop_s": 1.3, "link_count": 4},
+        {"start_s": 4.0, "stop_s": 4.1, "link_count": 1}]

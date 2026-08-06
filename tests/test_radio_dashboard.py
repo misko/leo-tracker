@@ -94,6 +94,7 @@ def test_dashboard_http_e2e_serves_html_json_and_plot(tmp_path):
         assert b"/api/recordings" in index_html
         assert b"<img" not in index_html
         assert b"<object" not in index_html
+        assert b"Beacons detected" in index_html
         recordings = json.loads(urlopen(base + "/api/recordings", timeout=2).read())
         assert recordings["schema"] == "leo-tracker.dashboard-recording-index/v1"
         assert recordings["recordings"][0]["recording_id"] == "chunk-00000"
@@ -516,6 +517,7 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         assert index_row["decoded"]
         assert index_row["dual_candidate_count"] == 1
         assert index_row["single_receiver_candidate_count"] == 0
+        assert index_row["beacon_detected_count"] == 1
         assert index_row["decode_frame_count"] == 7
         assert index_row["pilot_accuracy"] == .719
         assert index_row["fingerprint_family"] == "wf-test"

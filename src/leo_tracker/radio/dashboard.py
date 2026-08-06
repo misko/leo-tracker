@@ -17,6 +17,7 @@ import numpy as np
 from .physics import doppler_radial_acceleration_m_s2
 from .tuning_dither import dither_phase_locked
 from .beacon.fingerprint import render_fingerprint_svg
+from .beacon.dashboard_index import confirmed_beacon_events
 
 
 def _utc(value: str) -> datetime:
@@ -839,6 +840,7 @@ class DashboardModel:
                 "exact_temporal_coverage_fraction": summary.get(
                     "exact_temporal_coverage_fraction"),
                 "followup_check_count": len(followup.get("checks", [])),
+                "beacon_detected_count": len(confirmed_beacon_events(confirmation)),
                 "followup_url": (f"/beacon-followups/{report_path.name}"
                                  if followup_path.is_file() else None),
                 "decode_url": (f"/beacon-decodes/{report_path.name}"
@@ -915,7 +917,7 @@ class DashboardModel:
         limit = max(1, min(int(limit), 200))
         rows = []
         persisted = self._beacon_recording_index()
-        if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v1":
+        if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v2":
             persisted_rows = persisted.get("recordings", [])
             rows.extend({key: value for key, value in item.items()
                          if not key.startswith("_")}
@@ -962,6 +964,7 @@ class DashboardModel:
                     f" {float(active['configured_gain_db']):g} dB"
                     if active.get("configured_gain_db") is not None else ""),
                 "candidate_count": None, "confirmed": None, "decoded": None,
+                "beacon_detected_count": None,
                 "pilot_accuracy": None,
                 "detail_url": f"/recordings/beacon/{active.get('name')}"})
         for item in beacon.get("captures", []):
@@ -992,6 +995,7 @@ class DashboardModel:
                 "single_receiver_candidate_count": item.get(
                     "single_receiver_candidate_count", 0),
                 "confirmed": bool(item.get("followup_confirmed")),
+                "beacon_detected_count": item.get("beacon_detected_count", 0),
                 "decoded": bool(item.get("decode_url")), "pilot_accuracy": pilot_accuracy,
                 "pilot_confidence": pilot.get("soft_mean_confidence"),
                 "pilot_evm": pilot.get("rms_evm"),
@@ -1025,6 +1029,7 @@ class DashboardModel:
                 "dual_candidate_count": item.get("joint_event_count", 0),
                 "single_receiver_candidate_count": None,
                 "confirmed": bool(item.get("qualified_event_count")), "decoded": False,
+                "beacon_detected_count": None,
                 "pilot_accuracy": None, "pilot_confidence": None, "pilot_evm": None,
                 "decode_frame_count": None,
                 "strongest_drift_hz_s": ((item.get("coherent_joint_track") or {}).get(
@@ -1044,7 +1049,7 @@ class DashboardModel:
         """Return one recording's statistics and plot links on demand."""
         if kind == "beacon":
             persisted = self._beacon_recording_index()
-            if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v1":
+            if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v2":
                 row = next((item for item in persisted.get("recordings", [])
                             if item.get("recording_id") == recording_id), None)
                 if row is not None:
@@ -1170,8 +1175,8 @@ main{max-width:1900px;margin:auto;padding:20px}.top{display:flex;align-items:end
 .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}th{position:sticky;top:0;background:#10202b;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}tbody tr{cursor:pointer}tbody tr:hover{background:#142936}tbody tr:last-child td{border-bottom:0}a{color:var(--cyan);text-decoration:none}.empty{text-align:center;color:var(--muted);padding:30px}
 @media(max-width:700px){main{padding:12px}.top{align-items:start;flex-direction:column}h1{font-size:23px}}
 </style></head><body><main>
-<div class="top"><div><h1>LEO / Starlink recordings</h1><div class="muted">Click any recording for statistics, artifacts, and plots.</div><div id="totals" class="muted">Counting beacon observations…</div></div><div id="stamp" class="muted">loading…</div></div>
-<div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Type</th><th>Recording</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Dual / single candidates</th><th>Strongest drift</th><th>TLE overlaps</th><th>Confirmed</th><th>Decoded</th><th>Frames</th><th>Pilot accuracy</th><th>Confidence</th><th>EVM</th><th>Fingerprint family</th></tr></thead><tbody><tr><td colspan="21" class="empty">Loading recordings…</td></tr></tbody></table></div>
+<div class="top"><div><h1>LEO / Starlink recordings</h1><div class="muted">Click any recording for statistics, artifacts, and plots. “Beacons detected” counts distinct confirmed time intervals, not unique satellite identities.</div><div id="totals" class="muted">Counting beacon observations…</div></div><div id="stamp" class="muted">loading…</div></div>
+<div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Type</th><th>Recording</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Dual / single candidates</th><th>Beacons detected</th><th>Strongest drift</th><th>TLE overlaps</th><th>Confirmed</th><th>Decoded</th><th>Frames</th><th>Pilot accuracy</th><th>Confidence</th><th>EVM</th><th>Fingerprint family</th></tr></thead><tbody><tr><td colspan="22" class="empty">Loading recordings…</td></tr></tbody></table></div>
 </main><script>
 const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const f=(v,n=2)=>Number.isFinite(v)?Number(v).toFixed(n):'—';
@@ -1180,7 +1185,7 @@ let refreshing=false;
 async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/recordings',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()});const rows=d.recordings||[];
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString()+' · '+rows.length+' recordings';
 const s=d.summary||{};document.querySelector('#totals').textContent=`${s.analyzed_capture_count||0} capture windows analyzed · ${s.temporally_confirmed_capture_count||0} temporally confirmed beacon observations · ${s.decoded_capture_count||0} decoded · ${s.retained_iq_capture_count||0} IQ captures retained · ${s.fingerprint_count||0} fingerprints`;
-document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.kind)}</td><td><a href="${esc(x.detail_url)}">${esc(x.recording_id)}</a></td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.dual_candidate_count)} / ${esc(x.single_receiver_candidate_count)}</td><td>${Number.isFinite(x.strongest_drift_hz_s)?f(x.strongest_drift_hz_s/1000,2)+' kHz/s':'—'}</td><td>${esc(x.tle_overlap_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${esc(x.decode_frame_count)}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_confidence)?f(100*x.pilot_confidence,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_evm)?f(x.pilot_evm,3):'—'}</td><td>${x.fingerprint_family?esc(x.fingerprint_family)+' ('+esc(x.fingerprint_family_size)+')':'—'}</td></tr>`).join(''):'<tr><td colspan="21" class="empty">No recordings available.</td></tr>';
+document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.kind)}</td><td><a href="${esc(x.detail_url)}">${esc(x.recording_id)}</a></td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.dual_candidate_count)} / ${esc(x.single_receiver_candidate_count)}</td><td class="${x.beacon_detected_count?'yes':''}">${x.beacon_detected_count===null||x.beacon_detected_count===undefined?'—':esc(x.beacon_detected_count)}</td><td>${Number.isFinite(x.strongest_drift_hz_s)?f(x.strongest_drift_hz_s/1000,2)+' kHz/s':'—'}</td><td>${esc(x.tle_overlap_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${esc(x.decode_frame_count)}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_confidence)?f(100*x.pilot_confidence,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_evm)?f(x.pilot_evm,3):'—'}</td><td>${x.fingerprint_family?esc(x.fingerprint_family)+' ('+esc(x.fingerprint_family_size)+')':'—'}</td></tr>`).join(''):'<tr><td colspan="22" class="empty">No recordings available.</td></tr>';
 document.querySelectorAll('tr[data-href]').forEach(row=>row.addEventListener('click',event=>{if(event.target.closest('a'))return;location.href=row.dataset.href}));
 }catch(error){document.querySelector('#stamp').textContent='offline';console.error(error)}finally{refreshing=false}}
 refresh();setInterval(refresh,10000);

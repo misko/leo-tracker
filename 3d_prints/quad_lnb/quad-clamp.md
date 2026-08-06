@@ -18,10 +18,11 @@ needs support.
 | Arm radius | 105 mm, centre to bore axis in the flush plane |
 | Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
 | Cross web | 24 mm wide × 12 mm thick |
-| Pedestal | Ø50 × 5 mm wall, 100 mm tall, flaring to a Ø66 foot |
+| Pedestal | Ø50 × 6 mm wall, 115 mm tall, flaring to a Ø90 foot |
 | Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
-| Envelope | 237 × 237 × 100 mm (201 mm bed rotated 45°) |
-| Print | 100 mm tall, ~150–190 g, 14–20 h |
+| Envelope | 237 × 237 × 115 mm (213 mm bed rotated 45°) |
+| Ground clearance | 25 mm under the LNBF tails |
+| Print | 115 mm tall, ~160–210 g, 14–20 h |
 
 `quad-clamp-print.stl` is oriented on its flush face — slice as-is.
 `quad-clamp-installed.stl` is the same solid at its service attitude.
@@ -78,8 +79,8 @@ printing, because they move `R_ARM` directly.
 
 ## Standing on the pedestal
 
-The centre drops 100 mm to a hollow Ø50 column with a Ø66 flared foot, reaching
-10 mm below the lowest LNBF. Three details make it work:
+The centre drops 115 mm to a hollow Ø50 column with a Ø90 flared foot, reaching
+25 mm below the lowest LNBF. Three details make it work:
 
 - **The top face stays flat all the way across.** The cross does not slope down
   to the centre — it keeps a flush top and gets *deeper*. Sloping arms would put
@@ -88,9 +89,17 @@ The centre drops 100 mm to a hollow Ø50 column with a Ø66 flared foot, reachin
 - **The column is hollow and open at the bottom**, so it drains, saves ~90 cm³
   of material, and its bore prints as a plain vertical hole with the web slab as
   its floor.
-- **The foot flare sits entirely below the LNBF tails**, at 39° from vertical.
-  Below the tails there is nothing to hit, so the foot can spread; above them it
-  could not. 39° also keeps it inside the 45° overhang rule when inverted.
+- **The foot flare sits entirely below the LNBF tails**, at 38.7° from
+  vertical. Below the tails there is nothing to hit, so the foot can spread;
+  above them it could not.
+
+**Foot width and ground clearance are the same knob.** The flare starts at the
+LNBF tails and ends at the ground, so its angle is fixed by the two:
+`atan((FOOT_D − PED_D)/2 / FOOT_CLR)`. Holding that under 45° for supportless
+printing caps the foot at **`FOOT_D ≤ PED_D + 2 × FOOT_CLR`** — every extra
+millimetre of ground clearance buys at most two millimetres of foot diameter.
+Ø90 on 25 mm of clearance lands at 38.7°, with margin. `assembly.py` computes
+the angle and flags it if it goes over.
 
 ## The wall went back to 6 mm
 

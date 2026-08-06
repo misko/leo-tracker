@@ -41,9 +41,11 @@ R_ARM    = 105.0     # centre to bore axis, in the flush plane
 WEB_W    = 24.0      # cross width = half the clamp's 48.7 mm width
 WEB_T    = 12.0      # cross thickness below the flush face
 PED_D    = 50.0      # pedestal outside diameter
-PED_WALL = 5.0       # pedestal wall
-FOOT_D   = 66.0      # flared foot diameter
-FOOT_H   = 10.0      # flare height, entirely below the LNBF tails
+PED_WALL = 6.0       # pedestal wall
+FOOT_D   = 90.0      # flared foot diameter
+FOOT_CLR = 25.0      # LNBF tail to ground. The flare occupies all of it, so
+                     # this and FOOT_D are linked by the 45 deg overhang limit:
+                     # FOOT_D <= PED_D + 2*FOOT_CLR
 EMBED    = 0.8       # how far the web buries into the clamp wall (wall >= 6)
 
 PHI_TIP  = PHI_CON + CHAM_DEG
@@ -96,7 +98,8 @@ OFF0 = np.array([R_ARM - H * math.tan(tr), 0.0, 0.0])
 r_aft = R_ARM - H * math.tan(tr)                   # bore axis at the clamp aft
 r_tail = r_aft - BODY_L * ST                       # ... and at the LNBF tail
 z_tail = -BODY_L * CT
-Z_BASE = z_tail - FOOT_H                           # foot sits below the tails
+Z_BASE = z_tail - FOOT_CLR                         # foot sits below the tails
+FLARE = math.degrees(math.atan2((FOOT_D - PED_D) / 2, FOOT_CLR))
 
 gap_adj = r_tail * math.sqrt(2) - BODY_D
 gap_ped = r_tail - BODY_D / 2 - PED_D / 2
@@ -107,7 +110,10 @@ print(f"  clearance LNBF to LNBF (adjacent) {gap_adj:+.1f} mm")
 print(f"  clearance LNBF to pedestal       {gap_ped:+.1f} mm")
 if min(gap_adj, gap_ped) < 5.0:
     print("  *** TIGHT - raise R_ARM or shrink PED_D ***")
-print(f"pedestal {H - Z_BASE:.0f} mm tall, foot Ø{FOOT_D:.0f} at z={Z_BASE:.1f}")
+print(f"pedestal {H - Z_BASE:.0f} mm tall, foot Ø{FOOT_D:.0f} at z={Z_BASE:.1f}, "
+      f"{FOOT_CLR:.0f} mm under the tails")
+print(f"  foot flare {FLARE:.1f}° from vertical"
+      + ("  *** OVER 45° - needs supports ***" if FLARE > 45 else "  (supportless)"))
 
 
 def q(a, b, c, d):
@@ -223,11 +229,12 @@ def revolve(rz_pairs, n=72, flip=False):
     return f
 
 
-ri_ped = PED_D / 2 - PED_WALL
+ri_ped, ri_foot = PED_D / 2 - PED_WALL, FOOT_D / 2 - PED_WALL
 pedestal = (
-    revolve([(PED_D/2, H), (PED_D/2, Z_BASE + FOOT_H), (FOOT_D/2, Z_BASE)]) +
-    revolve([(ri_ped, Z_BASE), (ri_ped, H - WEB_T)], flip=True) +
-    revolve([(ri_ped, Z_BASE), (FOOT_D/2, Z_BASE)], flip=True) +
+    revolve([(PED_D/2, H), (PED_D/2, Z_BASE + FOOT_CLR), (FOOT_D/2, Z_BASE)]) +
+    revolve([(ri_foot, Z_BASE), (ri_ped, Z_BASE + FOOT_CLR),
+             (ri_ped, H - WEB_T)], flip=True) +
+    revolve([(ri_foot, Z_BASE), (FOOT_D/2, Z_BASE)], flip=True) +
     revolve([(0.0, H), (PED_D/2, H)], flip=True) +
     revolve([(0.0, H - WEB_T), (ri_ped, H - WEB_T)])
 )

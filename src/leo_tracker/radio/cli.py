@@ -74,6 +74,9 @@ from .beacon.hopping import capture_hop_session
 from .beacon.frame_tracking import track_conditioned_frames
 from .beacon.template_learning import learn_bandpass_beacon
 from .beacon.channel_link import link_channel_tracks
+from .beacon.evidence_archive import (archive_evidence, audit_evidence, extract_evidence,
+                                      materialize_evidence_clip, plan_evidence,
+                                      verify_evidence)
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -360,6 +363,61 @@ def command_starlink_beacon_retain(args: argparse.Namespace) -> int:
                                             keep_oversample=args.keep_oversample,
                                             keep_hop_sessions=args.keep_hop_sessions,
                                             dry_run=args.dry_run), sort_keys=True))
+    return 0
+
+
+def command_starlink_evidence_plan(args: argparse.Namespace) -> int:
+    report = plan_evidence(args.capture, args.reports, args.output,
+                           guard_s=args.guard_s,
+                           control_duration_s=args.control_duration_s,
+                           control_count=args.control_count)
+    print(json.dumps({"plan": str(args.output), **report["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_evidence_extract(args: argparse.Namespace) -> int:
+    report = extract_evidence(args.capture, args.plan, args.output)
+    print(json.dumps({"bundle": str(args.output), **report["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_evidence_verify(args: argparse.Namespace) -> int:
+    report = verify_evidence(args.bundle, capture_path=args.source,
+                             write=not args.no_write)
+    print(json.dumps({"bundle": str(args.bundle), "valid": report["valid"],
+                      "source_verified": report["source_verified"],
+                      "clip_count": len(report["checks"])}, sort_keys=True))
+    return 0 if report["valid"] else 1
+
+
+def command_starlink_evidence_audit(args: argparse.Namespace) -> int:
+    report = audit_evidence(args.source_root, args.evidence_root, args.output)
+    print(json.dumps({"audit": None if args.output is None else str(args.output),
+                      "source_capture_count": report["source_capture_count"],
+                      "bundle_count": report["bundle_count"],
+                      "verified_bundle_count": report["verified_bundle_count"],
+                      "invalid_count": len(report["invalid"]),
+                      "missing_count": len(report["missing_recordings"])}, sort_keys=True))
+    return 0 if not report["invalid"] else 1
+
+
+def command_starlink_evidence_archive(args: argparse.Namespace) -> int:
+    receipt = archive_evidence(args.capture, args.reports, args.qnap_root,
+                               guard_s=args.guard_s,
+                               control_duration_s=args.control_duration_s,
+                               control_count=args.control_count)
+    print(json.dumps({"receipt": str(args.qnap_root / "catalog" / "receipts" /
+                                     f"{args.capture.name}.json"),
+                      **receipt["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_evidence_materialize(args: argparse.Namespace) -> int:
+    manifest = materialize_evidence_clip(args.bundle, args.interval_id, args.output)
+    print(json.dumps({"capture": str(args.output),
+                      "samples_per_receiver": manifest["captured_samples_per_receiver"],
+                      "source_first_sample": manifest["metadata"]["evidence"][
+                          "source_first_sample"]}, sort_keys=True))
     return 0
 
 
@@ -1607,6 +1665,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="retain this many newest fully-derived, non-qualified hop sessions")
     beacon_retain.add_argument("--dry-run", action="store_true")
     beacon_retain.set_defaults(handler=command_starlink_beacon_retain)
+    evidence_plan = commands.add_parser("starlink-evidence-plan",
+        help="plan conservative signal and control clips from one immutable capture")
+    evidence_plan.add_argument("capture", type=Path)
+    evidence_plan.add_argument("reports", type=Path)
+    evidence_plan.add_argument("output", type=Path)
+    evidence_plan.add_argument("--guard-s", type=float, default=10)
+    evidence_plan.add_argument("--control-duration-s", type=float, default=1)
+    evidence_plan.add_argument("--control-count", type=int, default=3)
+    evidence_plan.set_defaults(handler=command_starlink_evidence_plan)
+    evidence_extract = commands.add_parser("starlink-evidence-extract",
+        help="losslessly extract a planned dual-RX evidence bundle")
+    evidence_extract.add_argument("capture", type=Path)
+    evidence_extract.add_argument("plan", type=Path)
+    evidence_extract.add_argument("output", type=Path)
+    evidence_extract.set_defaults(handler=command_starlink_evidence_extract)
+    evidence_verify = commands.add_parser("starlink-evidence-verify",
+        help="read back evidence hashes and optionally compare exact source samples")
+    evidence_verify.add_argument("bundle", type=Path)
+    evidence_verify.add_argument("--source", type=Path)
+    evidence_verify.add_argument("--no-write", action="store_true")
+    evidence_verify.set_defaults(handler=command_starlink_evidence_verify)
+    evidence_audit = commands.add_parser("starlink-evidence-audit",
+        help="inventory local captures and verify corresponding evidence bundles")
+    evidence_audit.add_argument("source_root", type=Path)
+    evidence_audit.add_argument("evidence_root", type=Path)
+    evidence_audit.add_argument("--output", type=Path)
+    evidence_audit.set_defaults(handler=command_starlink_evidence_audit)
+    evidence_archive = commands.add_parser("starlink-evidence-archive",
+        help="publish one verified clip bundle, derived artifacts, and receipt")
+    evidence_archive.add_argument("capture", type=Path)
+    evidence_archive.add_argument("reports", type=Path)
+    evidence_archive.add_argument("qnap_root", type=Path)
+    evidence_archive.add_argument("--guard-s", type=float, default=10)
+    evidence_archive.add_argument("--control-duration-s", type=float, default=1)
+    evidence_archive.add_argument("--control-count", type=int, default=3)
+    evidence_archive.set_defaults(handler=command_starlink_evidence_archive)
+    evidence_materialize = commands.add_parser("starlink-evidence-materialize",
+        help="create a standard replayable BeaconCapture view of one exact clip")
+    evidence_materialize.add_argument("bundle", type=Path)
+    evidence_materialize.add_argument("interval_id")
+    evidence_materialize.add_argument("output", type=Path)
+    evidence_materialize.set_defaults(handler=command_starlink_evidence_materialize)
     beacon_recover = commands.add_parser("starlink-beacon-recover",
         help="idempotently analyze complete captures left unreported by a restart")
     beacon_recover.add_argument("root", type=Path)

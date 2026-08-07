@@ -1103,6 +1103,10 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-5' in script
     assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-5000' in script
     assert 'LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600' in script
+    assert 'LEO_BEACON_PRESERVE_RAW:-0' in script
+    assert 'LEO_BEACON_MINIMUM_FREE_GB:-150' in script
+    assert 'if [[ "${preserve_raw}" != "1" ]]' in script
+    assert '"storage_backoff":true' in script
     assert '--exact-acquisition-method "${exact_acquisition_method}"' in script
     assert '--exact-acquisition-method "${analysis_method}"' in script
     assert 'template_analysis_args=(--beacon-template "${learned_beacon}")' in script

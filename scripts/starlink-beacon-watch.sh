@@ -41,6 +41,8 @@ keep_confirmed="${LEO_BEACON_KEEP_CONFIRMED:-8}"
 keep_wide="${LEO_BEACON_KEEP_WIDE:-2}"
 keep_oversample="${LEO_BEACON_KEEP_OVERSAMPLE:-4}"
 keep_hop_sessions="${LEO_BEACON_KEEP_HOP_SESSIONS:-6}"
+preserve_raw="${LEO_BEACON_PRESERVE_RAW:-0}"
+minimum_free_gb="${LEO_BEACON_MINIMUM_FREE_GB:-150}"
 uv_cache="${UV_CACHE_DIR:-${repo_dir}/.uv-cache}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
 maximum_pi_temp_millic="${LEO_BEACON_MAX_PI_TEMP_MILLIC:-75000}"
@@ -78,6 +80,14 @@ if ! [[ "${agc_probability_percent}" =~ ^[0-9]+$ ]] ||
   echo "LEO_BEACON_AGC_PERCENT must be an integer from 0 through 100" >&2
   exit 2
 fi
+if [[ "${preserve_raw}" != "0" && "${preserve_raw}" != "1" ]]; then
+  echo "LEO_BEACON_PRESERVE_RAW must be 0 or 1" >&2
+  exit 2
+fi
+if ! [[ "${minimum_free_gb}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "LEO_BEACON_MINIMUM_FREE_GB must be a positive integer" >&2
+  exit 2
+fi
 source_args=()
 if [[ "${fake_source}" == "1" ]]; then
   source_args+=(--fake)
@@ -103,6 +113,12 @@ capture_target() {
     local pi_temp_millic pi_temp radio_temp_millic radio_temp
     local gain_draw gain_bucket gain_probability gain_mode
     local -a temperature_args capture_args gain_args
+    while [[ "${preserve_raw}" == "1" ]] &&
+          (( $(df -Pk "${storage_root}" | awk 'NR==2 {print $4}') < minimum_free_gb * 1024 * 1024 )); do
+      printf '{"storage_backoff":true,"preserve_raw":true,"minimum_free_gb":%d}\n' \
+        "${minimum_free_gb}" >&2
+      sleep 60
+    done
     channel="${target%%:*}"
     region="${target##*:}"
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -393,11 +409,13 @@ process_capture() {
     # scans 16 times and allowed the durable analysis queue to grow without
     # bound.  Confirmed hop products still receive an immediate dashboard row.
     if [[ "${mode}" != "hop" ]]; then
-      env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-        starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}" \
-          --keep-confirmed "${keep_confirmed}" --keep-wide "${keep_wide}" \
-          --keep-oversample "${keep_oversample}" \
-          --keep-hop-sessions "${keep_hop_sessions}"
+      if [[ "${preserve_raw}" != "1" ]]; then
+        env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+          starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}" \
+            --keep-confirmed "${keep_confirmed}" --keep-wide "${keep_wide}" \
+            --keep-oversample "${keep_oversample}" \
+            --keep-hop-sessions "${keep_hop_sessions}"
+      fi
       env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
         starlink-beacon-calibrate "${storage_root}/reports" \
         "${storage_root}/reports/calibration/calibration.json"
@@ -492,11 +510,13 @@ recover_startup() {
   env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
     starlink-beacon-dashboard-index "${storage_root}" \
     "${storage_root}/reports/dashboard-index.json"
-  env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
-    starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}" \
-      --keep-confirmed "${keep_confirmed}" --keep-wide "${keep_wide}" \
-      --keep-oversample "${keep_oversample}" \
-      --keep-hop-sessions "${keep_hop_sessions}"
+  if [[ "${preserve_raw}" != "1" ]]; then
+    env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
+      starlink-beacon-retain "${storage_root}" --keep-negative "${keep_negative}" \
+        --keep-confirmed "${keep_confirmed}" --keep-wide "${keep_wide}" \
+        --keep-oversample "${keep_oversample}" \
+        --keep-hop-sessions "${keep_hop_sessions}"
+  fi
 }
 
 analysis_worker() {

@@ -64,7 +64,17 @@ def create_context_bundle(context_root: Path, *, learned: Path | None = None,
     if passes is not None and Path(passes).is_file():
         inputs["passes.json"] = Path(passes).resolve()
     if tle_catalog is not None and Path(tle_catalog).is_file():
-        inputs["tle-catalog.json"] = Path(tle_catalog).resolve()
+        tle_catalog = Path(tle_catalog).resolve()
+        tle_value = _read_json(tle_catalog)
+        if tle_value.get("schema") == "leo-tracker.tle-archive-snapshot/v1":
+            archive_root = (tle_catalog.parent.parent
+                            if tle_catalog.parent.name == "snapshots"
+                            else tle_catalog.parent)
+            tle_catalog = (archive_root / tle_value["object"]).resolve()
+            if not tle_catalog.is_file():
+                raise FileNotFoundError(
+                    f"TLE snapshot object is missing: {tle_catalog}")
+        inputs["tle-catalog.json"] = tle_catalog
 
     identity = hashlib.sha256()
     if learned_report is not None:

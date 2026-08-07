@@ -149,6 +149,7 @@ while true; do
     sleep "${poll_s}"
     continue
   fi
+  sync_context
   if ! export_one "${jobs[0]}"; then
     (( once == 1 )) && break
     sleep "${poll_s}"

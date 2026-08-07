@@ -32,7 +32,8 @@ def _learned_fixture(root: Path) -> Path:
 def test_context_bundle_is_atomic_self_contained_and_mount_independent(tmp_path):
     learned = _learned_fixture(tmp_path)
     passes = tmp_path / "passes.json"; passes.write_text("[]")
-    tle = tmp_path / "tle.json"; tle.write_text("[]")
+    tle = tmp_path / "tle.json"
+    tle.write_text(json.dumps({"schema": "leo-tracker.tle-catalog/v1"}))
 
     bundle = create_context_bundle(tmp_path / "context", learned=learned,
                                    passes=passes, tle_catalog=tle)
@@ -45,6 +46,25 @@ def test_context_bundle_is_atomic_self_contained_and_mount_independent(tmp_path)
     assert loaded["validation"]["qualified"]
     assert arrays["template_rx0"].shape == (8,)
     assert not list((tmp_path / "context/bundles").glob("*.partial.*"))
+
+
+def test_context_bundle_flattens_tle_archive_snapshot(tmp_path):
+    archive = tmp_path / "tle-history"
+    objects = archive / "objects"; objects.mkdir(parents=True)
+    catalog = objects / "catalog.json"
+    catalog.write_text(json.dumps({"schema": "leo-tracker.tle-catalog/v1",
+                                   "content": "fixture"}))
+    snapshot = archive / "latest.json"
+    snapshot.write_text(json.dumps({
+        "schema": "leo-tracker.tle-archive-snapshot/v1",
+        "object": "objects/catalog.json",
+    }))
+
+    bundle = create_context_bundle(tmp_path / "context", tle_catalog=snapshot)
+
+    assert json.loads((bundle / "tle-catalog.json").read_text())["schema"] == \
+        "leo-tracker.tle-catalog/v1"
+    assert not (bundle / "objects").exists()
 
 
 def test_output_validation_requires_analysis_and_followup(tmp_path):

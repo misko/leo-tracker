@@ -531,6 +531,31 @@ def test_retention_preserves_confirmed_and_pending_and_bounds_rejections(tmp_pat
     assert report["removed"] == [str(root / "captures" / "capture-0")]
 
 
+def test_retention_never_removes_capture_claimed_by_parallel_analysis_worker(tmp_path):
+    root = tmp_path / "store"
+    for directory in ("captures", "reports/followups",
+                      "staging/analysis-queue"):
+        (root / directory).mkdir(parents=True, exist_ok=True)
+    for index in range(2):
+        name = f"capture-{index}"
+        capture = root / "captures" / name
+        capture.mkdir()
+        (capture / "manifest.json").write_text(json.dumps({
+            "schema": "leo-tracker.beacon-iq/v1", "state": "complete",
+            "created_utc_ns": index}) + "\n")
+        (root / "reports" / f"{name}.json").write_text("{}\n")
+        (root / "reports" / "followups" / f"{name}.json").write_text(
+            json.dumps({"confirmation": {"confirmed": False}}) + "\n")
+    (root / "staging" / "analysis-queue" / "0001.running.3.99").write_text(
+        f"capture-0\tcaptures/capture-0\tnarrow\n")
+
+    report = apply_retention(root, keep_negative=0)
+
+    assert (root / "captures" / "capture-0").is_dir()
+    assert not (root / "captures" / "capture-1").exists()
+    assert str(root / "captures" / "capture-0") in report["protected"]
+
+
 def test_retention_bounds_only_fully_derived_confirmed_iq_and_preserves_template_source(
         tmp_path):
     root = tmp_path / "store"

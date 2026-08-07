@@ -121,6 +121,21 @@ def _capture_mode(manifest: dict, capture: Path) -> str:
     return "other"
 
 
+def _active_analysis_jobs(root: Path) -> set[str]:
+    """Return captures which a local or remote analysis worker may still read."""
+    queue = root / "staging" / "analysis-queue"
+    active: set[str] = set()
+    for pattern in ("*.job", "*.running.*"):
+        for marker in queue.glob(pattern):
+            try:
+                name = marker.read_text().split("\t", 1)[0].strip()
+            except OSError:
+                continue
+            if name:
+                active.add(name)
+    return active
+
+
 def _fully_derived(root: Path, capture: Path, mode: str) -> tuple[bool, bool]:
     reports = root / "reports"
     report = _read_json(reports / f"{capture.name}.json")
@@ -163,6 +178,7 @@ def apply_retention(root: Path, *, keep_negative: int = 6,
         raise ValueError("invalid beacon storage root")
     quarantine_root = (root / "quarantine").resolve()
     pins, pin_ledger, newly_pinned = _qualified_capture_pins(root, dry_run=dry_run)
+    active_jobs = _active_analysis_jobs(root)
 
     # Captures used by a learned template are scientific fixtures independent
     # of the ordinary rolling rings.
@@ -181,6 +197,10 @@ def apply_retention(root: Path, *, keep_negative: int = 6,
     for capture in sorted(captures_root.iterdir() if captures_root.exists() else []):
         if not capture.is_dir():
             continue
+        # A parallel server can have written enough derivatives for a capture
+        # to look eligible while a worker still needs its IQ for a later stage.
+        if capture.name in active_jobs:
+            protected.append(str(capture)); continue
         manifest = _read_json(capture / "manifest.json")
         if manifest is None:
             incomplete.append(str(capture)); continue

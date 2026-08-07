@@ -22,6 +22,9 @@ def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     assert 'print_progress heartbeat' in source
     assert "average_job=" in source
     assert "eta=" in source
+    assert "run_retention" in source
+    assert "starlink-beacon-retain" in source
+    assert 'flock -n 10' in source
 
 
 def test_server_worker_exits_cleanly_when_once_queue_is_empty(tmp_path):

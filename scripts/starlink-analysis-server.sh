@@ -55,6 +55,12 @@ fi
 metrics="${queue}/metrics"
 progress_log="${reports}/analysis-server.log"
 progress_lock="${queue}/progress.lock"
+retention_lock="${queue}/retention.lock"
+keep_negative="${LEO_ANALYSIS_KEEP_NEGATIVE:-6}"
+keep_confirmed="${LEO_ANALYSIS_KEEP_CONFIRMED:-8}"
+keep_wide="${LEO_ANALYSIS_KEEP_WIDE:-2}"
+keep_oversample="${LEO_ANALYSIS_KEEP_OVERSAMPLE:-4}"
+keep_hop_sessions="${LEO_ANALYSIS_KEEP_HOP_SESSIONS:-6}"
 mkdir -p "${queue}/done" "${queue}/failed" "${metrics}" \
   "${reports}"/{plots,followups,decoded,frame-tracks,tracks,associations,fingerprints}
 exec 8>"${queue}/server.lock"
@@ -68,6 +74,22 @@ cd "${repo_dir}"
 radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
 orbit() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-orbit "$@"; }
 protocol() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python -m leo_tracker.radio.beacon.offload "$@"; }
+
+run_retention() {
+  local worker_id="$1" result
+  (
+    exec 10>"${retention_lock}"
+    flock -n 10 || exit 0
+    if result="$(radio starlink-beacon-retain "${root}" \
+        --keep-negative "${keep_negative}" --keep-confirmed "${keep_confirmed}" \
+        --keep-wide "${keep_wide}" --keep-oversample "${keep_oversample}" \
+        --keep-hop-sessions "${keep_hop_sessions}")"; then
+      emit "retention_done worker=${worker_id} policy=negative:${keep_negative},confirmed:${keep_confirmed},wide:${keep_wide},oversample:${keep_oversample},hop:${keep_hop_sessions}"
+    else
+      emit "retention_failed worker=${worker_id}"
+    fi
+  )
+}
 
 emit() {
   local line
@@ -226,6 +248,7 @@ worker() {
       metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
       printf 'success\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
+      run_retention "${worker_id}"
       emit "job_done worker=${worker_id} job=${name} mode=${mode} elapsed=$(human_duration "${elapsed}") report=${reports}/${name}.json"
       print_progress "job_done"
     else

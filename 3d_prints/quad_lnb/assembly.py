@@ -33,11 +33,12 @@ TIGHTEN  = 0.5       # diametral, taken off the as-tested coupon bore. The
 R_BORE   = 20.2 - TIGHTEN / 2
 T_ROOT   = 6.0       # wall at bottom dead centre
 T_TIP    = 3.5       # wall at the tips
-LEN_MAX  = 28.0      # clamp width along the neck, at its longest. MUST be <=
-                     # usable neck length. The flush trim always costs
-                     # (profile height * tan TILT) = 19.3 mm of variation, so
-                     # the narrow side lands at LEN_MAX - 19.3, and WEB_T_MAX
-                     # falls with it -- see the note in quad-clamp.md.
+CLAMP_W  = 28.0      # clamp band width along the neck, and it is CONSTANT.
+                     # Both ends are cut by horizontal planes CLAMP_W*cos(TILT)
+                     # apart, so the clamp is a uniform band rather than a
+                     # wedge. Trimming only the forward end left the C-tips as
+                     # long thin prongs on the deep side and starved the arm
+                     # root on the other.
 LAND_OFF = 17.2 - TIGHTEN / 2   # neck is 37.2 mm flat-to-opposite-arc, so
                                 # its flat sits 17.2 mm off the axis
 LAND_AT  = -55.0     # clock angle of the land, and so of the neck's flat and
@@ -58,9 +59,9 @@ HORN_D   = 66.0      # feedhorn diameter (render only)
 # ---- assembly --------------------------------------------------------
 R_ARM    = 105.0     # centre to bore axis, in the flush plane
 WEB_W    = 24.0      # cross width = half the clamp's 48.7 mm width
-WEB_T    =  7.5      # cross thickness below the flush face. Capped by
-                     # WEB_T_MAX, which is what LEN_MAX leaves of the clamp's
-                     # inboard back. At LEN_MAX 28 that ceiling is 7.8 mm.
+WEB_T    = 19.0      # cross thickness below the flush face. With both ends
+                     # trimmed the whole clamp lies between the two planes, so
+                     # the web can go all the way to WEB_T_MAX = CLAMP_W*cos.
 PED_D    = 50.0      # pedestal outside diameter (solid - set density with
                      # the slicer's infill, not by hollowing the model)
 FOOT_CLR = 90.0      # LNBF tail to ground: room for an F connector and boot
@@ -113,18 +114,27 @@ outer = np.array([[profile(f)[1] * math.cos(math.radians(f)),
 # Rz(-90) puts the mouth on +X; Ry(TILT) tips the bore axis toward +X, carrying
 # the mouth outboard and the closed back inboard, so the web lands on material.
 M0 = ry(TILT) @ rz(-90)
-H = LEN_MAX * CT - outer[:, 1].max() * ST          # the flush plane
-zf = lambda y: (H + y * ST) / CT
-zi, zo = zf(inner[:, 1]), zf(outer[:, 1])
+# Two horizontal cuts, CLAMP_W*cos(TILT) apart. Because both planes are
+# horizontal and the clamp is a prism along the tilted bore, the band between
+# them is exactly CLAMP_W long at every point of the profile -- the wedge
+# cancels. It also puts the entire clamp between the two planes, which is what
+# lets the web reach its back over the full depth.
+H_AFT = -outer[:, 1].min() * ST                    # aft cut; clamp starts at 0
+H = H_AFT + CLAMP_W * CT                           # forward cut, the flush face
+zt = lambda y: (H + y * ST) / CT
+zb = lambda y: (H_AFT + y * ST) / CT
+zi, zo = zt(inner[:, 1]), zt(outer[:, 1])          # forward edge
+bi, bo = zb(inner[:, 1]), zb(outer[:, 1])          # aft edge
+NECK_SPAN = max(zi.max(), zo.max()) - min(bi.min(), bo.min())
 OFF0 = np.array([R_ARM - H * math.tan(tr), 0.0, 0.0])
 
 # The clamp's inboard back is bounded below by its aft face, a plane normal to
 # the tilted bore axis. Below that world height the back simply does not exist,
 # so the web has nothing to reach: this is the deepest the joint can ever be.
-WEB_T_MAX = H + outer[:, 1].min() * ST
+WEB_T_MAX = CLAMP_W * CT                           # the whole slab, now
 if WEB_T > WEB_T_MAX:
     raise SystemExit(f"WEB_T {WEB_T} exceeds {WEB_T_MAX:.1f} mm - the web would "
-                     f"hang past the clamp's back and float")
+                     f"hang past the clamp and float")
 
 r_aft = R_ARM - H * math.tan(tr)                   # bore axis at the clamp aft
 r_tail = r_aft - BODY_L * ST                       # ... and at the LNBF tail
@@ -138,10 +148,11 @@ mouth = 2 * min(profile(f)[0] * math.cos(math.radians(f)) for f in phis if f > 0
 print(f"bore Ø{2*R_BORE:.2f} on a Ø{NECK_D:.1f} neck "
       f"({2*R_BORE-NECK_D:+.2f} mm diametral), mouth {mouth:.2f} mm")
 print(f"  capture {(NECK_D-mouth)/2:.2f} mm per side = how far each arm flexes")
-print(f"grip {min(zi.min(), zo.min()):.1f} to {max(zi.max(), zo.max()):.1f} mm, "
-      f"flush plane z={H:.1f}, bore-axis spacing {R_ARM*math.sqrt(2):.0f} mm")
+print(f"clamp band {CLAMP_W:.1f} mm, constant; needs {NECK_SPAN:.1f} mm of neck "
+      f"(band + profile height * tan{TILT:.0f}°)")
+print(f"flush plane z={H:.1f}, bore-axis spacing {R_ARM*math.sqrt(2):.0f} mm")
 print(f"web {WEB_T:.1f} mm deep of a possible {WEB_T_MAX:.1f} mm "
-      f"({100*WEB_T/WEB_T_MAX:.0f}% of the clamp's inboard back)")
+      f"({100*WEB_T/WEB_T_MAX:.0f}% of the clamp band)")
 bearing = LAND_AT - 90.0                           # land relative to outboard
 print(f"land/connector {abs(bearing):.0f}° from outboard, "
       f"{180-abs(bearing):.0f}° from inboard (LAND_AT={LAND_AT:.0f})")
@@ -165,14 +176,17 @@ def clamp_faces():
     for k in range(N - 1):
         ox, oy = outer[k]; ox2, oy2 = outer[k + 1]
         ix, iy = inner[k]; ix2, iy2 = inner[k + 1]
-        f.append(q((ox, oy, 0), (ox2, oy2, 0), (ox2, oy2, zo[k+1]), (ox, oy, zo[k])))
-        f.append(q((ix, iy, zi[k]), (ix2, iy2, zi[k+1]), (ix2, iy2, 0), (ix, iy, 0)))
+        f.append(q((ox, oy, bo[k]), (ox2, oy2, bo[k+1]),
+                   (ox2, oy2, zo[k+1]), (ox, oy, zo[k])))
+        f.append(q((ix, iy, zi[k]), (ix2, iy2, zi[k+1]),
+                   (ix2, iy2, bi[k+1]), (ix, iy, bi[k])))
         f.append(q((ix, iy, zi[k]), (ox, oy, zo[k]),
                    (ox2, oy2, zo[k+1]), (ix2, iy2, zi[k+1])))
-        f.append(q((ix2, iy2, 0), (ox2, oy2, 0), (ox, oy, 0), (ix, iy, 0)))
+        f.append(q((ix2, iy2, bi[k+1]), (ox2, oy2, bo[k+1]),
+                   (ox, oy, bo[k]), (ix, iy, bi[k])))
     for k, fwd in ((0, True), (N - 1, False)):
         ix, iy = inner[k]; ox, oy = outer[k]
-        e = q((ix, iy, 0), (ox, oy, 0), (ox, oy, zo[k]), (ix, iy, zi[k]))
+        e = q((ix, iy, bi[k]), (ox, oy, bo[k]), (ox, oy, zo[k]), (ix, iy, zi[k]))
         f.append(e if fwd else e[::-1])
     return [np.array(x) for x in f]
 
@@ -196,7 +210,8 @@ def in_clamp(P, M, o):
     if d < phi_b:
         return False
     ri, ro = profile(d)
-    return ri <= r <= ro and 0.0 <= p[2] <= zf(p[1])
+    # epsilon: the web's top row samples sit exactly on the forward cut
+    return ri <= r <= ro and zb(p[1]) - 1e-6 <= p[2] <= zt(p[1]) + 1e-6
 
 
 def cradle_u(uhat, vhat, v, w, M, o):
@@ -358,7 +373,7 @@ for pct in (10, 15, 25, 40):
 # Tip stability, now that the mount's own mass is worth counting. A solid base
 # puts most of that mass low down, which drags the loaded CG toward the foot.
 LNBF_G = 180.0
-z_lnbf = (LEN_MAX + 34 - BODY_L) / 2 * CT
+z_lnbf = (NECK_SPAN + 34 - BODY_L) / 2 * CT
 for pct in (15, 25):
     m_mount = vol * pct / 100 * 1.24 * 1.15
     m_lnbf = 4 * LNBF_G
@@ -388,10 +403,10 @@ def coupon_faces(depth):
 
 coupon = shell(coupon_faces(TEST_D), "coupon")
 coupon.export("clamp-fit-test.stl")
-root = min(zi.min(), zo.min())
+root = CLAMP_W
 print(f"wrote clamp-fit-test.stl, {TEST_D:.0f} mm deep, "
       f"{coupon.volume/1000*1.24*0.9:.0f} g, ~15 min")
-print(f"  arms are {TEST_D:.0f} mm wide vs {root:.1f} mm at the real root, so the "
+print(f"  arms are {TEST_D:.0f} mm wide vs {root:.1f} mm on the real clamp, so the "
       f"full clamp needs about {root/TEST_D:.1f}x the push you feel")
 
 printo = [f @ np.diag([1.0, -1.0, -1.0]).T for f in allf]
@@ -433,9 +448,9 @@ def lnbf(M, o):
     """Stand-in LNBF: body, neck, feedhorn, along the clamp's bore axis."""
     f = (revolve([(BODY_D/2, -BODY_L), (BODY_D/2, -2.0)]) +
          revolve([(0, -BODY_L), (BODY_D/2, -BODY_L)]) +
-         revolve([(20.0, -2.0), (20.0, LEN_MAX + 4)]) +
-         revolve([(HORN_D/2, LEN_MAX + 4), (HORN_D/2, LEN_MAX + 34)]) +
-         revolve([(0, LEN_MAX + 34), (HORN_D/2, LEN_MAX + 34)]))
+         revolve([(20.0, -2.0), (20.0, NECK_SPAN + 4)]) +
+         revolve([(HORN_D/2, NECK_SPAN + 4), (HORN_D/2, NECK_SPAN + 34)]) +
+         revolve([(0, NECK_SPAN + 34), (HORN_D/2, NECK_SPAN + 34)]))
     off = np.array([BODY_D / 4 * math.cos(math.radians(LAND_AT)),
                     BODY_D / 4 * math.sin(math.radians(LAND_AT)), 0.0])
     f += [x + off for x in                        # F connector, on the flat side

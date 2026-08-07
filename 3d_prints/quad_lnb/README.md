@@ -64,13 +64,13 @@ mass so you can see immediately whether the change broke something.
 | Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
 | Clamp bore | Ø39.9, 36.6 mm mouth, 241° wrap |
 | Land / connector | 35° off inboard (`LAND_AT = -55`) |
-| Clamp width | 8.7 mm at the arm root to 28 mm at the mouth side |
-| Cross web | 24 mm wide × 7.5 mm deep, 105 mm arms |
-| Pedestal | Ø50 × 167 mm tall, solid, flaring to a Ø160 foot |
-| Envelope | 237 × 237 × 167 mm (196 mm bed rotated 45°) |
+| Clamp band | 28 mm, constant — needs 47.3 mm of usable neck |
+| Cross web | 24 mm wide × 19 mm deep, 105 mm arms |
+| Pedestal | Ø50 × 185 mm tall, solid, flaring to a Ø160 foot |
+| Envelope | 237 × 237 × 185 mm (196 mm bed rotated 45°) |
 | Ground clearance | 90 mm under the LNBF tails |
-| Tip angle | 32.0° at 15% infill |
-| Print | 167 mm tall, 845 cm³ solid — **weight is your infill setting** |
+| Tip angle | 30.4° at 15% infill |
+| Print | 185 mm tall, 953 cm³ solid — **weight is your infill setting** |
 
 ## What shapes the design
 
@@ -129,17 +129,17 @@ deliberately:
 
 | Infill | Weight | Time |
 | --- | --- | --- |
-| 10% | ~120 g | 11–15 h |
-| **15%** | **~181 g** | **16–23 h** |
-| 25% | ~301 g | 27–38 h |
-| 40% | ~482 g | 44–60 h |
+| 10% | ~136 g | 12–17 h |
+| **15%** | **~204 g** | **19–25 h** |
+| 25% | ~340 g | 31–42 h |
+| 40% | ~544 g | 49–68 h |
 
 15% is plenty: the pedestal is a compression column carrying under a kilo, and
 nothing about the design depends on it being dense.
 
 **The extra mass sits where it helps.** Filling the base moved the loaded centre
-of gravity down to 128 mm above the foot, taking the tip angle from 27.6° to
-**32.0°**. `assembly.py` now computes this from the union's
+of gravity down to 136 mm above the foot, holding the tip angle at **30.4°**
+despite the mount being taller. `assembly.py` now computes this from the union's
 real centre of mass and the LNBF mass, rather than assuming the mount weighs
 nothing.
 
@@ -157,24 +157,27 @@ ratio — Ø160 is what restores the tip angle the shorter version had. The flar
 confined to the bottom 60 mm so the cone does not grow with the column; the cap
 is `FOOT_D ≤ PED_D + 2 × FLARE_H` at the 45° overhang limit.
 
-**Clamp width and web depth are the same knob, and it is `LEN_MAX`.** The
-flush trim cuts the clamps with one horizontal plane, so it always costs
-`profile height × tan 27° = 19.3 mm` of variation: the clamp's narrow side lands
-at `LEN_MAX − 19.3`, and the web can only be as deep as what remains of the
-clamp's inboard back. That back is bounded from below by the aft face, a plane
-normal to the tilted bore axis, so `WEB_T_MAX` falls one-for-one with `LEN_MAX`:
+**Both ends of the clamp are cut by horizontal planes, so the band is
+constant.** Trimming only the forward end left a wedge: the C-tips ran the full
+`LEN_MAX` as long thin prongs while the arm root was starved to `LEN_MAX −
+19.3`. Cutting the aft end with a second horizontal plane removes the prongs and,
+because both planes are horizontal and the clamp is a prism along the tilted
+bore, **the wedge cancels exactly** — every point of the profile spans the same
+`CLAMP_W` along the neck.
 
-| `LEN_MAX` | Clamp width | `WEB_T_MAX` |
-| --- | --- | --- |
-| 42 mm | 22.7 – 42 mm | 20.3 mm |
-| 34 mm | 14.7 – 34 mm | 13.1 mm |
-| **28 mm** | **8.7 – 28 mm** | **7.8 mm** |
+Two things fall out of that:
 
-At 28 mm the web is 7.5 mm, so the arms are roughly **16× less stiff** than at
-19 mm — wind deflection at the clamp goes from about 0.07° to 1.1°, still small
-against a 50° beam but no longer negligible. Insertion force drops with the
-arm root too, from ~51 N to about **20 N**. `assembly.py` computes `WEB_T_MAX`
-and refuses to build if `WEB_T` exceeds it, so the coupling cannot be missed.
+- **The whole clamp now lies between the two planes**, so the web can reach its
+  back over the full band. `WEB_T_MAX` jumps from 7.8 mm to `CLAMP_W × cos 27° =
+  24.9 mm`, and the web goes back to 19 mm — roughly **16× stiffer** arms than
+  the single-trim version allowed.
+- **The clamp needs more neck**, not less. Its band is 28 mm but it still walks
+  19.3 mm along the neck as it wraps, so it occupies **47.3 mm** end to end.
+  `NECK_SPAN = CLAMP_W + profile height × tan 27°` is reported every run.
+
+Insertion force rises with the band: uniformly 28 mm of arm width gives about
+**63 N**, against 51 N when the root was 22.7 mm. `CLAMP_W` is the knob for both
+that and the neck length.
 
 **One horizontal cut makes it printable.** All four clamps' forward ends and the
 web's top face lie in a single plane. Flipped onto that plane, every surface is

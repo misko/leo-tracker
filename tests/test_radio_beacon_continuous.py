@@ -8,6 +8,7 @@ from leo_tracker.radio.beacon.artifact import capture_beacon_iq
 from leo_tracker.radio.beacon.continuous import (
     TRACK_SCHEMA, _candidate_seeds, _reacquisition_span, _sample_utc_ns,
     measure_full_frame_window, track_capture)
+import leo_tracker.radio.beacon.continuous as continuous_module
 from leo_tracker.radio.beacon.pilots import edge_pilot_frame
 from leo_tracker.radio.paired import PairedSampleBlock
 
@@ -266,6 +267,43 @@ def test_empty_followup_writes_valid_zero_track_full_coverage_result(tmp_path):
     assert report["configuration"]["measurement_source"] == "periodic_epoch"
     assert report["summary"]["seed_count"] == 0
     assert report["summary"]["track_count"] == 0
+
+
+def test_ungrouped_conditioned_frames_write_nonfatal_zero_track_result(
+        tmp_path, monkeypatch):
+    duration = .02
+    zeros = np.zeros(round(duration * RATE), np.complex64)
+    capture = tmp_path / "capture"
+    capture_beacon_iq([PairedSampleBlock(
+        zeros, zeros, 0, 1_800_000_000_000_000_000,
+        read_duration_ns=round(duration * 1e9))], capture,
+        sample_rate_hz=RATE, center_frequency_hz=1_709_687_500,
+        bandwidth_hz=2_500_000, duration_s=duration,
+        lnb_lo_hz=9_750_000_000, chunk_s=1,
+        metadata={"region": "lower-edge", "channel_number": 4,
+                  "nominal_rf_hz": 11_459_687_500})
+    followup = tmp_path / "followup.json"
+    followup.write_text(json.dumps({"capture": str(capture.resolve()),
+                                     "checks": [{"candidate": True}]}))
+    frame_track = tmp_path / "frame-track.json"
+    frame_track.write_text("{}\n")
+    monkeypatch.setattr(
+        continuous_module, "_tracks_from_conditioned_frames",
+        lambda *args, **kwargs: [])
+
+    output = tmp_path / "track.json"
+    report = track_capture(
+        capture, followup, output, measurement_source="conditioned_frames",
+        frame_track_path=frame_track)
+
+    assert report["configuration"]["requested_measurement_source"] == \
+        "conditioned_frames"
+    assert report["configuration"]["measurement_source"] == "conditioned_frames"
+    assert report["summary"]["seed_count"] == 0
+    assert report["summary"]["track_count"] == 0
+    assert report["summary"]["no_track_reason"] == \
+        "no_grouped_dual_rx_observations"
+    assert json.loads(output.read_text())["summary"]["track_count"] == 0
 
 
 def test_dense_followup_epochs_become_calibrated_10_hz_track(tmp_path):

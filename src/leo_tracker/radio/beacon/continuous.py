@@ -745,21 +745,29 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
             "dense_followup", "periodic_epoch") else [])
     if measurement_source == "conditioned_frames" and frame_track_path is None:
         raise ValueError("conditioned frame measurements require --frame-track")
-    if measurement_source == "conditioned_frames" and not frame_tracks:
-        raise ValueError("frame track contains no grouped dual-RX observations")
     dense_tracks = (_tracks_from_dense_followup(followup, manifest,
         maximum_gap_s=maximum_gap_s, maximum_drift_hz_s=maximum_drift_hz_s)
-        if not frame_tracks and measurement_source != "periodic_epoch" else [])
+        if not frame_tracks and measurement_source in ("auto", "dense_followup") else [])
     if measurement_source == "dense_followup" and not dense_tracks:
         raise ValueError("follow-up contains no group of dense dual-RX measurements")
     selected_source = ("conditioned_frames" if frame_tracks else
                        "dense_followup" if dense_tracks else "periodic_epoch")
+    no_track_reason = None
+    if measurement_source == "conditioned_frames" and not frame_tracks:
+        # A frame report may contain valid simultaneous receiver measurements
+        # while still lacking two compatible navigation epochs.  This is a
+        # scientifically meaningful negative result, not a corrupt artifact or
+        # a failed analysis job.  Preserve an empty track artifact so orbit
+        # association, evidence archival and validation can all complete.
+        selected_source = "conditioned_frames"
+        no_track_reason = "no_grouped_dual_rx_observations"
     direct_tracks = frame_tracks or dense_tracks
     seedable = any(
         len(check.get("receivers", [])) == 2 and
         (check.get("candidate") or any(check.get("receiver_candidates", [])))
         for check in checks if isinstance(check, dict))
-    seeds = ([] if direct_tracks or not seedable else
+    seeds = ([] if direct_tracks or not seedable or
+             measurement_source == "conditioned_frames" else
              _candidate_seeds(followup, rate, maximum_gap_s=maximum_gap_s))
     interval = 1 / output_rate_hz
     tracks = list(direct_tracks)
@@ -838,6 +846,7 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
                        "nominal_rf_hz", manifest["rf_center_hz"])},
         "configuration": {"output_rate_hz": output_rate_hz,
             "measurement_source": selected_source,
+            "requested_measurement_source": measurement_source,
             "search_span_hz": search_span_hz, "search_step_hz": search_step_hz,
             "maximum_reacquisition_span_hz": maximum_reacquisition_span_hz,
             "minimum_exact_control_margin": minimum_margin,
@@ -848,6 +857,7 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
         "tracks": tracks,
         "summary": {"seed_count": len(tracks) if direct_tracks else len(seeds),
                     "track_count": len(tracks),
+                    "no_track_reason": no_track_reason,
                     "longest_valid_duration_s": max(
                         (item["summary"]["valid_duration_s"] for item in tracks), default=0.0),
                     "longest_dual_valid_duration_s": max(

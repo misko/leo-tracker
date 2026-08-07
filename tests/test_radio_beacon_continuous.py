@@ -242,6 +242,32 @@ def test_continuous_tracker_writes_10_hz_dual_receiver_observations(tmp_path):
     assert json.loads(output.read_text())["schema"] == TRACK_SCHEMA
 
 
+def test_empty_followup_writes_valid_zero_track_full_coverage_result(tmp_path):
+    duration = .02
+    zeros = np.zeros(round(duration * RATE), np.complex64)
+    capture = tmp_path / "capture"
+    capture_beacon_iq([PairedSampleBlock(
+        zeros, zeros, 0, 1_800_000_000_000_000_000,
+        read_duration_ns=round(duration * 1e9))], capture,
+        sample_rate_hz=RATE, center_frequency_hz=1_709_687_500,
+        bandwidth_hz=2_500_000, duration_s=duration,
+        lnb_lo_hz=9_750_000_000, chunk_s=1,
+        metadata={"region": "lower-edge", "channel_number": 4,
+                  "nominal_rf_hz": 11_459_687_500})
+    followup = tmp_path / "followup.json"
+    followup.write_text(json.dumps({"capture": str(capture.resolve()),
+                                     "checks": []}))
+
+    report = track_capture(
+        capture, followup, tmp_path / "track.json",
+        measurement_source="periodic_epoch")
+
+    assert report["schema"] == TRACK_SCHEMA
+    assert report["configuration"]["measurement_source"] == "periodic_epoch"
+    assert report["summary"]["seed_count"] == 0
+    assert report["summary"]["track_count"] == 0
+
+
 def test_dense_followup_epochs_become_calibrated_10_hz_track(tmp_path):
     duration = .8
     zeros = np.zeros(round(duration * RATE), np.complex64)

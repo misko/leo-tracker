@@ -731,8 +731,11 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
     region = manifest.get("metadata", {}).get("region", "")
     if region not in ("lower-edge", "upper-edge"):
         raise ValueError("continuous tracking requires a fixed edge-band capture")
-    exact_rate = float(followup.get("checks", [{}])[0].get("receivers", [{}])[0]
-                       .get("acquisition", {}).get("subband_rate_hz", rate))
+    checks = followup.get("checks", [])
+    exact_rate = rate
+    if checks and checks[0].get("receivers"):
+        exact_rate = float(checks[0]["receivers"][0].get(
+            "acquisition", {}).get("subband_rate_hz", rate))
     if abs(exact_rate - rate) > 1e-6:
         raise ValueError("digitally offset/downsampled wide acquisitions are not trackable yet")
     frame_tracks = (_tracks_from_conditioned_frames(frame_track_path, capture_path,
@@ -752,7 +755,11 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
     selected_source = ("conditioned_frames" if frame_tracks else
                        "dense_followup" if dense_tracks else "periodic_epoch")
     direct_tracks = frame_tracks or dense_tracks
-    seeds = ([] if direct_tracks else
+    seedable = any(
+        len(check.get("receivers", [])) == 2 and
+        (check.get("candidate") or any(check.get("receiver_candidates", [])))
+        for check in checks if isinstance(check, dict))
+    seeds = ([] if direct_tracks or not seedable else
              _candidate_seeds(followup, rate, maximum_gap_s=maximum_gap_s))
     interval = 1 / output_rate_hz
     tracks = list(direct_tracks)

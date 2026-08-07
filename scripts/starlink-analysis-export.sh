@@ -102,13 +102,14 @@ export_one() {
     return 1
   fi
   destination="${shared_root}/captures/${name}"
-  partial="${incoming}/${name}.partial.$$"
+  # Stable partial names let rsync resume the same immutable capture after an
+  # exporter or network restart. The singleton exporter lock prevents writers
+  # from sharing this directory concurrently.
+  partial="${incoming}/${name}.partial"
   mkdir -p "${shared_root}/captures"
   if [[ ! -d "${destination}" ]]; then
-    rm -rf -- "${partial}"
     mkdir -p "${partial}"
     if ! rsync -rt --partial --bwlimit="${bwlimit_kbps}" -- "${capture}/" "${partial}/"; then
-      rm -rf -- "${partial}"
       mv "${claim}" "${claim%%.exporting.*}.job"
       return 1
     fi

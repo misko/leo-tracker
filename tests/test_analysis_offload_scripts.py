@@ -123,6 +123,7 @@ def test_exporter_moves_complete_bundle_then_queues_it(tmp_path):
     fields = job.read_text().rstrip().split("\t")
     assert fields[:3] == ["capture-one", "captures/capture-one", "narrow"]
     assert fields[3].startswith("context/bundles/")
+    assert not list((shared / "staging/incoming").glob("*.partial"))
 
 
 def test_exporter_refuses_incomplete_capture(tmp_path):

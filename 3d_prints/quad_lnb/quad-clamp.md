@@ -17,13 +17,13 @@ needs support.
 | Tilt | 27° from zenith, boresight 63° elevation |
 | Arm radius | 105 mm, centre to bore axis in the flush plane |
 | Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
-| Cross web | 24 mm wide × 19 mm deep (ceiling 20.2 mm) |
-| Pedestal | Ø50 solid, 180 mm tall, flaring to a Ø160 foot |
-| Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
+| Cross web | 24 mm wide × 7.5 mm deep (ceiling 7.8 mm at LEN_MAX 28) |
+| Pedestal | Ø50 solid, 167 mm tall, flaring to a Ø160 foot |
+| Clamp width | 8.7 mm at the arm root to 28 mm at the mouth side |
 | Envelope | 237 × 237 × 180 mm (197 mm bed rotated 45°) |
 | Ground clearance | 90 mm under the LNBF tails |
 | Tip angle | 27.6° |
-| Print | 180 mm tall, 948 cm³ solid — ~200 g at 15% infill, 18–25 h |
+| Print | 167 mm tall, 845 cm³ solid — ~181 g at 15% infill, 16–23 h |
 
 `assembly.py` writes both printable files: `quad-clamp-print.stl`, oriented on
 its flush face, and `clamp-fit-test.stl`, a 12 mm slice of one clamp for

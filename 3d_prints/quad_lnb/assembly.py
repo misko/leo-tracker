@@ -33,7 +33,11 @@ TIGHTEN  = 0.5       # diametral, taken off the as-tested coupon bore. The
 R_BORE   = 20.2 - TIGHTEN / 2
 T_ROOT   = 6.0       # wall at bottom dead centre
 T_TIP    = 3.5       # wall at the tips
-LEN_MAX  = 42.0      # longest grip. MUST be <= usable neck length
+LEN_MAX  = 28.0      # clamp width along the neck, at its longest. MUST be <=
+                     # usable neck length. The flush trim always costs
+                     # (profile height * tan TILT) = 19.3 mm of variation, so
+                     # the narrow side lands at LEN_MAX - 19.3, and WEB_T_MAX
+                     # falls with it -- see the note in quad-clamp.md.
 LAND_OFF = 17.2 - TIGHTEN / 2   # neck is 37.2 mm flat-to-opposite-arc, so
                                 # its flat sits 17.2 mm off the axis
 LAND_AT  = -55.0     # clock angle of the land, and so of the neck's flat and
@@ -54,9 +58,9 @@ HORN_D   = 66.0      # feedhorn diameter (render only)
 # ---- assembly --------------------------------------------------------
 R_ARM    = 105.0     # centre to bore axis, in the flush plane
 WEB_W    = 24.0      # cross width = half the clamp's 48.7 mm width
-WEB_T    = 19.0      # cross thickness below the flush face. Deep enough to
-                     # meet the clamp over the whole of its inboard back --
-                     # see WEB_T_MAX below, which is the hard ceiling.
+WEB_T    =  7.5      # cross thickness below the flush face. Capped by
+                     # WEB_T_MAX, which is what LEN_MAX leaves of the clamp's
+                     # inboard back. At LEN_MAX 28 that ceiling is 7.8 mm.
 PED_D    = 50.0      # pedestal outside diameter (solid - set density with
                      # the slicer's infill, not by hollowing the model)
 FOOT_CLR = 90.0      # LNBF tail to ground: room for an F connector and boot
@@ -136,7 +140,7 @@ print(f"bore Ø{2*R_BORE:.2f} on a Ø{NECK_D:.1f} neck "
 print(f"  capture {(NECK_D-mouth)/2:.2f} mm per side = how far each arm flexes")
 print(f"grip {min(zi.min(), zo.min()):.1f} to {max(zi.max(), zo.max()):.1f} mm, "
       f"flush plane z={H:.1f}, bore-axis spacing {R_ARM*math.sqrt(2):.0f} mm")
-print(f"web {WEB_T:.0f} mm deep of a possible {WEB_T_MAX:.1f} mm "
+print(f"web {WEB_T:.1f} mm deep of a possible {WEB_T_MAX:.1f} mm "
       f"({100*WEB_T/WEB_T_MAX:.0f}% of the clamp's inboard back)")
 bearing = LAND_AT - 90.0                           # land relative to outboard
 print(f"land/connector {abs(bearing):.0f}° from outboard, "

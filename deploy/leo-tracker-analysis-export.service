@@ -1,0 +1,19 @@
+[Unit]
+Description=LEO tracker copy-only analysis export
+After=network-online.target mnt-leo\x2dnvme.mount
+Wants=network-online.target
+Requires=mnt-leo\x2dnvme.mount
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=LEO_OFFLOAD_SOURCE_POLICY=retain
+Environment=LEO_OFFLOAD_BWLIMIT_KBPS=80000
+ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -21,6 +21,11 @@ incoming="${shared_root}/staging/incoming"
 context="${shared_root}/context"
 bwlimit_kbps="${LEO_OFFLOAD_BWLIMIT_KBPS:-20000}"
 poll_s="${LEO_OFFLOAD_POLL_S:-5}"
+source_policy="${LEO_OFFLOAD_SOURCE_POLICY:-retain}"
+if [[ "${source_policy}" != "delete" && "${source_policy}" != "retain" ]]; then
+  echo "LEO_OFFLOAD_SOURCE_POLICY must be delete or retain" >&2
+  exit 2
+fi
 context_refresh_s="${LEO_OFFLOAD_CONTEXT_REFRESH_S:-600}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 tle_catalog="${LEO_BEACON_TLE_CATALOG:-/mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history/latest.json}"
@@ -131,11 +136,13 @@ export_one() {
   printf '%s\t%s\t%s\t%s\n' "${name}" "captures/${name}" "${mode}" \
     "${context_bundle#${shared_root}/}" > "${remote_marker}.next.$$"
   mv "${remote_marker}.next.$$" "${remote_marker}"
-  # This is a move, not a cache: remote verification and durable queueing both
-  # complete before the acquisition copy is removed.
-  rm -rf -- "${capture_real}"
+  # Evidence-archive development uses retain: QNAP receives a verified work
+  # copy while the NVMe capture remains an immutable source of truth.
+  if [[ "${source_policy}" == "delete" ]]; then
+    rm -rf -- "${capture_real}"
+  fi
   rm -f -- "${claim}"
-  echo "offloaded ${name} (${mode})"
+  echo "offloaded ${name} (${mode}) source_policy=${source_policy}"
 }
 
 sync_context 1

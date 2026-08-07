@@ -1,0 +1,31 @@
+[Unit]
+Description=LEO tracker full-coverage Kalman analysis
+After=network-online.target remote-fs.target
+Wants=network-online.target
+RequiresMountsFor=/mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
+
+[Service]
+Type=simple
+User=mouse9911
+Group=mouse9911
+WorkingDirectory=/home/mouse9911/gits/leo-tracker
+Environment=LEO_ANALYSIS_WORKERS=16
+Environment=LEO_ANALYSIS_PIPELINE_ID=kalman-full-v1
+Environment=LEO_ANALYSIS_FULL_COVERAGE=1
+Environment=LEO_ANALYSIS_ARCHIVE_MODE=shadow
+Environment=LEO_ANALYSIS_ARCHIVE_ROOT=/mnt/qnap01/mouse9911/leo-cropped
+Environment=LEO_ANALYSIS_RETENTION_MODE=disabled
+Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1
+Environment=LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S=2
+Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=12000000
+Environment=LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ=2000000
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+ExecStart=/home/mouse9911/gits/leo-tracker/scripts/starlink-analysis-server.sh --workers 16 /mnt/qnap01/mouse9911/leo
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=1800
+
+[Install]
+WantedBy=multi-user.target

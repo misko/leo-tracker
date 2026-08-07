@@ -23,6 +23,27 @@ The package is split along the experiment boundary:
 Hardware tests must be marked `hardware`; the default suite is offline and
 deterministic.
 
+## Storage and preservation
+
+Full Pluto IQ on `/mnt/leo-nvme/leo-tracker` is currently an immutable source
+archive. The QNAP cropped-evidence archive contains exact dual-receiver time
+clips, analysis products, and read-back verification receipts; it is not a
+replacement for the local source yet. No cleanup decision should be made from
+an analysis receipt alone. See [docs/STORAGE.md](docs/STORAGE.md) for the
+authoritative directory map, preservation invariants, archive commands,
+capacity guardrails, and recovery procedure.
+
+Kalman full-coverage analysis, its 16-worker service, shadow-to-required archive
+promotion, graceful draining, and historical backfill are documented in
+[docs/KALMAN_MIGRATION.md](docs/KALMAN_MIGRATION.md).
+
+Build and verify one cropped archive record without modifying its source:
+
+```bash
+scripts/starlink-evidence-archive.sh --recording RECORDING_ID \
+  /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo-cropped
+```
+
 Orbit and radio remain separate Python modules with independent CLIs. They may
 import one another directly; intermediate JSON files are durable experiment
 artifacts, not an inter-process architecture requirement.

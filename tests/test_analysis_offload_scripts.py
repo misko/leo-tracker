@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import subprocess
+import time
 
 
 ROOT = Path(__file__).parents[1]
@@ -92,6 +93,46 @@ def test_server_worker_stops_pipeline_and_marks_failed_when_analysis_fails(tmp_p
     assert "starlink-beacon-followup" not in invoked
     assert list((queue / "failed").glob("*.job"))
     assert not list((queue / "done").glob("*.job"))
+
+
+def test_server_drain_finishes_claimed_job_without_claiming_next(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/sample"
+    queue.mkdir(parents=True); capture.mkdir(parents=True)
+    for index in range(2):
+        (queue / f"000{index}.job").write_text(
+            f"sample-{index}\t{capture}\tnarrow\n")
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "[[ \"$*\" != *starlink-beacon-analyze* ]] || sleep 1\n"
+        "exit 0\n")
+    uv_stub.chmod(0o755)
+    env = os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+                        "LEO_ANALYSIS_HEARTBEAT_S": "1"}
+    server = subprocess.Popen(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"),
+         "--workers", "1", str(tmp_path)], env=env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    deadline = time.monotonic() + 5
+    while not list(queue.glob("*.running.*")) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert list(queue.glob("*.running.*"))
+
+    drained = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"),
+         "--drain", str(tmp_path)], env=env, text=True,
+        capture_output=True, timeout=5)
+    stdout, stderr = server.communicate(timeout=10)
+
+    assert drained.returncode == 0
+    assert "drain requested" in drained.stdout
+    assert server.returncode == 0, stderr
+    assert "worker_drained worker=0" in stdout
+    assert "drain_complete" in stdout
+    assert len(list((queue / "done").glob("*.job"))) == 1
+    assert len(list(queue.glob("*.job"))) == 1
+    assert not list(queue.glob("*.running.*"))
 
 
 def test_exporter_moves_complete_bundle_then_queues_it(tmp_path):

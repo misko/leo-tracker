@@ -4,13 +4,16 @@ set -euo pipefail
 
 usage() {
   echo "usage: $0 [--once] [--workers N] [SHARED_ROOT]" >&2
+  echo "       $0 --drain [SHARED_ROOT]" >&2
 }
 
 once=0
+action="run"
 workers="${LEO_ANALYSIS_WORKERS:-1}"
 while (( $# )); do
   case "$1" in
     --once) once=1; shift ;;
+    --drain) action="drain"; shift ;;
     --workers) workers="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --*) usage; exit 2 ;;
@@ -26,8 +29,21 @@ venv="${repo_dir}/.venv"
 queue="${root}/staging/analysis-queue"
 reports="${root}/reports"
 context="${root}/context"
+claim_lock="${queue}/claim.lock"
+drain_request="${queue}/drain.request"
 poll_s="${LEO_ANALYSIS_POLL_S:-3}"
 heartbeat_s="${LEO_ANALYSIS_HEARTBEAT_S:-30}"
+if [[ "${action}" == "drain" ]]; then
+  mkdir -p "${queue}"
+  exec 7>"${claim_lock}"
+  flock 7
+  temporary="${drain_request}.next.$$"
+  printf 'requested_utc=%s requested_by_pid=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" > "${temporary}"
+  mv "${temporary}" "${drain_request}"
+  echo "drain requested: workers will finish their current jobs and exit"
+  exit 0
+fi
 if [[ -z "${uv_bin}" || ! -x "${venv}/bin/python" ]]; then
   echo "uv and an existing ${venv} are required" >&2
   exit 2
@@ -46,6 +62,7 @@ if ! flock -n 8; then
   echo "another analysis server already owns ${queue}" >&2
   exit 2
 fi
+rm -f -- "${drain_request}"
 cd "${repo_dir}"
 
 radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
@@ -171,15 +188,27 @@ process_job() {
 
 worker() {
   local worker_id="$1" marker claim name capture mode job_context log done failed
-  local started elapsed metric temporary
+  local started elapsed metric temporary claim_fd
+  exec {claim_fd}>"${claim_lock}"
   while true; do
+    flock "${claim_fd}"
+    if [[ -f "${drain_request}" ]]; then
+      flock -u "${claim_fd}"
+      emit "worker_drained worker=${worker_id}"
+      return 0
+    fi
     marker="$(find "${queue}" -maxdepth 1 -type f -name '*.job' -print -quit)"
     if [[ -z "${marker}" ]]; then
+      flock -u "${claim_fd}"
       (( once == 1 )) && return 0
       sleep "${poll_s}"; continue
     fi
     claim="${marker%.job}.running.${worker_id}.$$"
-    mv "${marker}" "${claim}" 2>/dev/null || continue
+    if ! mv "${marker}" "${claim}" 2>/dev/null; then
+      flock -u "${claim_fd}"
+      continue
+    fi
+    flock -u "${claim_fd}"
     IFS=$'\t' read -r name capture mode job_context < "${claim}"
     job_context="${job_context:-${default_context}}"
     [[ "${capture}" == /* ]] || capture="${root}/${capture}"
@@ -259,5 +288,9 @@ wait "${monitor_pid}" 2>/dev/null || true
 monitor_pid=""
 pids=()
 print_progress shutdown
+if [[ -f "${drain_request}" ]]; then
+  rm -f -- "${drain_request}"
+  emit "drain_complete"
+fi
 emit "server_stop status=${status}"
 exit "${status}"

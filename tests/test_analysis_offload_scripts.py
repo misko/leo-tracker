@@ -24,6 +24,8 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert "Environment=LEO_ANALYSIS_RETENTION_MODE=disabled" in unit
     assert "Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1" in unit
     assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=12000000" in unit
+    assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
+    assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit
     assert "Environment=OMP_NUM_THREADS=1" in unit
     assert "Environment=OPENBLAS_NUM_THREADS=1" in unit
     assert "Environment=MKL_NUM_THREADS=1" in unit

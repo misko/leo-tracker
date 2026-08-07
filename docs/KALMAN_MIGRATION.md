@@ -51,6 +51,8 @@ sudo systemctl enable --now leo-tracker-analysis-server.service
 ```
 
 The existing `.venv` is required and every invocation uses `uv --active`.
+The service uses `/home/mouse9911/.local/bin/uv` explicitly because systemd
+does not inherit the interactive shell's user-local `PATH`.
 
 Graceful updates:
 

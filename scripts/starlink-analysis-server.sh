@@ -9,7 +9,7 @@ usage() {
 
 once=0
 action="run"
-workers="${LEO_ANALYSIS_WORKERS:-1}"
+workers="${LEO_ANALYSIS_WORKERS:-16}"
 while (( $# )); do
   case "$1" in
     --once) once=1; shift ;;
@@ -33,6 +33,15 @@ claim_lock="${queue}/claim.lock"
 drain_request="${queue}/drain.request"
 poll_s="${LEO_ANALYSIS_POLL_S:-3}"
 heartbeat_s="${LEO_ANALYSIS_HEARTBEAT_S:-30}"
+pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
+full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
+archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
+archive_root="${LEO_ANALYSIS_ARCHIVE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
+retention_mode="${LEO_ANALYSIS_RETENTION_MODE:-disabled}"
+full_exact_interval_s="${LEO_ANALYSIS_FULL_EXACT_INTERVAL_S:-1}"
+wide_exact_interval_s="${LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S:-2}"
+wide_acquisition_span_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ:-12000000}"
+wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
 if [[ "${action}" == "drain" ]]; then
   mkdir -p "${queue}"
   exec 7>"${claim_lock}"
@@ -52,6 +61,27 @@ if ! [[ "${heartbeat_s}" =~ ^[1-9][0-9]*$ ]]; then
   echo "LEO_ANALYSIS_HEARTBEAT_S must be a positive integer" >&2
   exit 2
 fi
+if [[ "${full_coverage}" != "0" && "${full_coverage}" != "1" ]]; then
+  echo "LEO_ANALYSIS_FULL_COVERAGE must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${archive_mode}" != "off" && "${archive_mode}" != "shadow" &&
+      "${archive_mode}" != "required" ]]; then
+  echo "LEO_ANALYSIS_ARCHIVE_MODE must be off, shadow, or required" >&2
+  exit 2
+fi
+if [[ "${retention_mode}" != "disabled" && "${retention_mode}" != "verified" ]]; then
+  echo "LEO_ANALYSIS_RETENTION_MODE must be disabled or verified" >&2
+  exit 2
+fi
+if [[ ! "${pipeline_id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "LEO_ANALYSIS_PIPELINE_ID contains unsafe characters" >&2
+  exit 2
+fi
+# Sixteen process workers must not each create a second BLAS thread pool.
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
 metrics="${queue}/metrics"
 progress_log="${reports}/analysis-server.log"
 progress_lock="${queue}/progress.lock"
@@ -137,6 +167,9 @@ print_progress() {
     eta="estimating"; average="estimating"
   fi
   emit "progress reason=${reason} complete=${finished}/${total} percent=${percent}% ready=${ready} running=${running} succeeded=${completed} failed=${failed} workers=${workers} average_job=${average} eta=${eta}"
+  protocol status "${root}" --workers "${workers}" --pipeline-id "${pipeline_id}" \
+    --archive-root "${archive_root}" --write "${reports}/analysis-server-status.json" \
+    >/dev/null || emit "status_write_failed"
 }
 
 run_stage() {
@@ -162,14 +195,15 @@ process_job() {
   local decoded="${reports}/decoded/${name}.json" symbols="${reports}/decoded/${name}.npz"
   local decoded_plot="${reports}/decoded/${name}.png" track="${reports}/tracks/${name}.json"
   local association="${reports}/associations/${name}.json"
+  local has_checks=0 archived=0
   local -a analysis_args template_args frame_args track_args passes_args
   analysis_args=(--exact-window-s .01)
   template_args=(); frame_args=(); passes_args=()
   case "${mode}" in
-    wide) analysis_args+=(--exact-interval-s 10 --acquisition-span-hz 3500000 --acquisition-step-hz 500000 --exact-subband-rate-hz 2500000) ;;
-    oversample) analysis_args+=(--exact-interval-s 6 --exact-subband-rate-hz 5000000) ;;
+    wide) analysis_args+=(--exact-interval-s "${wide_exact_interval_s}" --acquisition-span-hz "${wide_acquisition_span_hz}" --acquisition-step-hz "${wide_acquisition_step_hz}" --exact-subband-rate-hz 2500000) ;;
+    oversample) analysis_args+=(--exact-interval-s "${full_exact_interval_s}" --exact-subband-rate-hz 5000000) ;;
     hop) analysis_args+=(--exact-interval-s .7 --exact-window-s .02) ;;
-    *) analysis_args+=(--exact-interval-s 6) ;;
+    *) analysis_args+=(--exact-interval-s "${full_exact_interval_s}") ;;
   esac
   if [[ ("${mode}" == narrow || "${mode}" == hop) && -f "${job_context}/learned-beacon.json" ]]; then
     template_args=(--beacon-template "${job_context}/learned-beacon.json")
@@ -181,31 +215,52 @@ process_job() {
   run_stage "${worker_id}" "${name}" followup radio starlink-beacon-followup "${capture}" "${report}" "${followup}" \
     --radius-s .5 --interval-s .1 --window-s .01 "${passes_args[@]}" \
     --confirmation-marker "${confirmed}" || return 1
-  if [[ ! -f "${confirmed}" ]]; then
-    emit "signal_result worker=${worker_id} job=${name} confirmed=false derived_report=${report}"
-    return 0
-  fi
-  emit "signal_result worker=${worker_id} job=${name} confirmed=true followup=${followup}"
-  frame_args=("${template_args[@]}")
-  if run_stage "${worker_id}" "${name}" frame_track radio starlink-beacon-frame-track "${capture}" "${followup}" "${frame}" \
-      --samples "${samples}" "${frame_args[@]}" && \
-      grep -Eq '"dual_valid_frame_count": [1-9]' "${frame}"; then
-    track_args=(--measurement-source conditioned_frames --frame-track "${frame}")
+  if [[ -f "${confirmed}" ]]; then
+    emit "signal_result worker=${worker_id} job=${name} confirmed=true followup=${followup}"
   else
-    track_args=(--measurement-source dense_followup)
+    emit "signal_result worker=${worker_id} job=${name} confirmed=false derived_report=${report}"
   fi
-  if [[ "${mode}" != wide && "${mode}" != hop ]]; then
-    run_stage "${worker_id}" "${name}" decode radio starlink-beacon-decode "${capture}" "${followup}" "${decoded}" \
-      --plot "${decoded_plot}" --symbols "${symbols}" || return 1
+  if protocol inspect-followup "${followup}" >/dev/null; then has_checks=1; fi
+  if (( has_checks == 1 )); then
+    frame_args=("${template_args[@]}")
+    if run_stage "${worker_id}" "${name}" frame_track radio starlink-beacon-frame-track "${capture}" "${followup}" "${frame}" \
+        --samples "${samples}" "${frame_args[@]}" && \
+        grep -Eq '"dual_valid_frame_count": [1-9]' "${frame}"; then
+      track_args=(--measurement-source conditioned_frames --frame-track "${frame}")
+    else
+      track_args=(--measurement-source auto)
+    fi
+    if [[ "${mode}" != wide && "${mode}" != hop ]]; then
+      run_stage "${worker_id}" "${name}" decode radio starlink-beacon-decode "${capture}" "${followup}" "${decoded}" \
+        --plot "${decoded_plot}" --symbols "${symbols}" || return 1
+    fi
+  else
+    track_args=(--measurement-source periodic_epoch)
+    emit "stage_skipped worker=${worker_id} job=${name} stage=decode reason=no_candidate_checks"
   fi
-  run_stage "${worker_id}" "${name}" doppler_track radio starlink-beacon-track "${capture}" "${followup}" "${track}" \
-    --maximum-gap-s 5 --maximum-reacquisition-span-hz 5000 "${track_args[@]}" || return 1
-  if [[ -f "${job_context}/tle-catalog.json" ]]; then
+  if [[ "${mode}" != wide ]]; then
+    run_stage "${worker_id}" "${name}" doppler_track radio starlink-beacon-track "${capture}" "${followup}" "${track}" \
+      --maximum-gap-s 5 --maximum-reacquisition-span-hz 5000 "${track_args[@]}" || return 1
+  else
+    emit "stage_skipped worker=${worker_id} job=${name} stage=doppler_track reason=wide_analysis_contains_full_coverage_windows"
+  fi
+  if [[ "${mode}" != wide && -f "${job_context}/tle-catalog.json" ]]; then
     run_stage "${worker_id}" "${name}" tle_association orbit associate --observations "${track}" --catalog "${job_context}/tle-catalog.json" \
       --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
       --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
       --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" --output "${association}" || return 1
   fi
+  if [[ "${archive_mode}" != off ]]; then
+    if run_stage "${worker_id}" "${name}" evidence_archive radio starlink-evidence-archive \
+        "${capture}" "${reports}" "${archive_root}"; then
+      archived=1
+    elif [[ "${archive_mode}" == required ]]; then
+      return 1
+    else
+      emit "archive_deferred worker=${worker_id} job=${name} mode=shadow"
+    fi
+  fi
+  emit "coverage_result worker=${worker_id} job=${name} full_coverage=${full_coverage} has_checks=${has_checks} archived=${archived}"
 }
 
 worker() {
@@ -238,17 +293,25 @@ worker() {
     log="${reports}/${name}.worker.log"
     started="$(date +%s)"
     emit "job_start worker=${worker_id} job=${name} mode=${mode} capture=${capture} context=${job_context} log=${log}"
+    validation_args=("${root}" "${name}" "${mode}" --context "${job_context}"
+      --elapsed-s "$(( $(date +%s) - started ))" --pipeline-id "${pipeline_id}" --write)
+    [[ "${full_coverage}" == 1 ]] && validation_args+=(--full-coverage)
+    [[ "${archive_mode}" == required ]] && validation_args+=(--archive-root "${archive_root}")
     if process_job "${worker_id}" "${name}" "${capture}" "${mode}" "${job_context}" > >(tee -a "${log}") 2>&1 &&
        run_stage "${worker_id}" "${name}" validate_outputs protocol validate \
-         "${root}" "${name}" "${mode}" --context "${job_context}" \
-         --elapsed-s "$(( $(date +%s) - started ))" --write > >(tee -a "${log}") 2>&1; then
+         "${validation_args[@]}" > >(tee -a "${log}") 2>&1; then
       done="${queue}/done/$(basename "${marker}")"
       mv "${claim}" "${done}"
       elapsed=$(( $(date +%s) - started ))
       metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
       printf 'success\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
-      run_retention "${worker_id}"
+      if [[ "${retention_mode}" == verified &&
+            -f "${archive_root}/catalog/receipts/${name}.json" ]]; then
+        run_retention "${worker_id}"
+      else
+        emit "retention_skipped worker=${worker_id} job=${name} mode=${retention_mode} archive_required=true"
+      fi
       emit "job_done worker=${worker_id} job=${name} mode=${mode} elapsed=$(human_duration "${elapsed}") report=${reports}/${name}.json"
       print_progress "job_done"
     else
@@ -279,7 +342,16 @@ stop_children() {
   [[ -z "${monitor_pid}" ]] || terminate_process_tree "${monitor_pid}"
   for pid in "${pids[@]}"; do terminate_process_tree "${pid}"; done
 }
-trap stop_children INT TERM EXIT
+request_local_drain() {
+  local temporary
+  temporary="${drain_request}.next.$$"
+  printf 'requested_utc=%s requested_by_pid=%s signal=TERM\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" > "${temporary}"
+  mv "${temporary}" "${drain_request}"
+  emit "drain_requested reason=signal workers_finish_claimed_jobs=true"
+}
+trap stop_children INT EXIT
+trap request_local_drain TERM
 if [[ -f "${context}/current.json" ]]; then
   default_context="$(protocol current "${context}")"
 else
@@ -293,11 +365,14 @@ for interrupted in "${queue}"/*.running.*; do
 done
 shopt -u nullglob
 audit_result="$(protocol audit "${root}" --context "${default_context}")"
-emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} python=$(${venv}/bin/python --version 2>&1)"
+emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
 emit "recovery ${audit_result}"
 print_progress startup
 for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
 (
+  # This helper must terminate immediately when the parent tears it down; it
+  # must not inherit the server's graceful-drain TERM handler.
+  trap - TERM INT EXIT
   while true; do
     sleep "${heartbeat_s}"
     print_progress heartbeat
@@ -305,7 +380,15 @@ for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); do
 ) &
 monitor_pid="$!"
 status=0
-for pid in "${pids[@]}"; do wait "${pid}" || status=$?; done
+for pid in "${pids[@]}"; do
+  # A handled TERM interrupts bash's wait without terminating the child. Keep
+  # waiting until the worker has observed drain.request and genuinely exited.
+  while kill -0 "${pid}" 2>/dev/null; do
+    wait "${pid}" && break
+    child_status=$?
+    kill -0 "${pid}" 2>/dev/null || { status="${child_status}"; break; }
+  done
+done
 terminate_process_tree "${monitor_pid}"
 wait "${monitor_pid}" 2>/dev/null || true
 monitor_pid=""
@@ -314,6 +397,7 @@ print_progress shutdown
 if [[ -f "${drain_request}" ]]; then
   rm -f -- "${drain_request}"
   emit "drain_complete"
+  status=0
 fi
 emit "server_stop status=${status}"
 exit "${status}"

@@ -6,11 +6,15 @@ import numpy as np
 
 from leo_tracker.radio.beacon.offload import (
     RECEIPT_SCHEMA,
+    analysis_status,
     audit_completed,
     create_context_bundle,
     current_context,
+    enqueue_analysis_backfill,
+    followup_has_checks,
     validate_context_bundle,
     validate_outputs,
+    write_receipt,
 )
 from leo_tracker.radio.beacon.template_learning import load_learned_beacon
 
@@ -80,6 +84,104 @@ def test_output_validation_requires_analysis_and_followup(tmp_path):
 
     assert receipt["schema"] == RECEIPT_SCHEMA
     assert not receipt["confirmed"]
+    assert receipt["outputs"]["analysis"]["sha256"]
+
+
+def test_followup_check_inspection_distinguishes_empty_and_candidate_sets(tmp_path):
+    followup = tmp_path / "followup.json"
+    followup.write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-followup/v1", "checks": []}))
+    assert not followup_has_checks(followup)
+    followup.write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-followup/v1",
+        "checks": [{"candidate": False}]}))
+    assert followup_has_checks(followup)
+
+
+def test_full_coverage_receipt_requires_track_archive_and_versioned_output(tmp_path):
+    reports = tmp_path / "reports"
+    (reports / "followups").mkdir(parents=True)
+    (reports / "tracks").mkdir()
+    (reports / "sample.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-analysis/v1"}))
+    (reports / "followups/sample.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-followup/v1", "checks": [],
+        "confirmation": {"confirmed": False}}))
+    (reports / "tracks/sample.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-continuous-track/v1"}))
+    receipt_path = tmp_path / "archive/catalog/receipts/sample.json"
+    receipt_path.parent.mkdir(parents=True)
+    receipt_path.write_text(json.dumps({
+        "schema": "leo-tracker.evidence-archive-receipt/v1",
+        "recording_id": "sample", "status": "verified",
+        "source_verified": True}))
+
+    receipt = validate_outputs(
+        tmp_path, "sample", "narrow", context=None, full_coverage=True,
+        pipeline_id="kalman-full-test", archive_root=tmp_path / "archive")
+    write_receipt(tmp_path, receipt)
+
+    assert receipt["full_coverage"]
+    assert receipt["archive_receipt"]["source_verified"]
+    assert receipt["outputs"]["track"]["bytes"] > 0
+    versioned = reports / "runs/kalman-full-test/sample/completion.json"
+    versioned_receipt = json.loads(versioned.read_text())
+    assert versioned_receipt["pipeline_id"] == "kalman-full-test"
+    preserved = reports / "runs/kalman-full-test/sample/outputs/track.json"
+    assert preserved.read_bytes() == (reports / "tracks/sample.json").read_bytes()
+    assert versioned_receipt["versioned_outputs"]["track"]["sha256"]
+
+
+def test_analysis_status_reports_queue_age_versioned_runs_and_archives(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    (queue / "done").mkdir(parents=True)
+    (queue / "failed").mkdir()
+    ready = queue / "one.job"; ready.write_text("job")
+    (queue / "two.running.0").write_text("job")
+    (queue / "done/three.job").write_text("job")
+    completion = tmp_path / "reports/runs/kalman-test/three/completion.json"
+    completion.parent.mkdir(parents=True); completion.write_text("{}")
+    archived = tmp_path / "archive/catalog/receipts/three.json"
+    archived.parent.mkdir(parents=True); archived.write_text("{}")
+
+    report = analysis_status(
+        tmp_path, workers=16, pipeline_id="kalman-test",
+        archive_root=tmp_path / "archive",
+        output=tmp_path / "reports/status.json")
+
+    assert report["queue"]["ready"] == 1
+    assert report["queue"]["running"] == 1
+    assert report["queue"]["succeeded"] == 1
+    assert report["queue"]["oldest_ready_age_s"] >= 0
+    assert report["versioned_completion_count"] == 1
+    assert report["verified_archive_count"] == 1
+    assert json.loads((tmp_path / "reports/status.json").read_text()) == report
+
+
+def test_backfill_is_versioned_bounded_atomic_and_idempotent(tmp_path):
+    create_context_bundle(tmp_path / "context")
+    captures = tmp_path / "captures"; captures.mkdir()
+    for name, mode in (("one", "narrow"), ("two", "oversample"),
+                       ("three", "wide")):
+        capture = captures / name; capture.mkdir()
+        (capture / "manifest.json").write_text(json.dumps({
+            "state": "complete", "metadata": {"observation_mode": mode}}))
+    completed = tmp_path / "reports/runs/kalman-v1/one/completion.json"
+    completed.parent.mkdir(parents=True); completed.write_text("{}")
+
+    preview = enqueue_analysis_backfill(
+        tmp_path, pipeline_id="kalman-v1", limit=1, dry_run=True)
+    assert preview["queued"] == ["two"]
+    assert not list((tmp_path / "staging/analysis-queue").glob("*.job"))
+
+    first = enqueue_analysis_backfill(tmp_path, pipeline_id="kalman-v1", limit=1)
+    second = enqueue_analysis_backfill(tmp_path, pipeline_id="kalman-v1", limit=1)
+
+    assert first["queued"] == ["two"]
+    assert second["queued"] == ["three"]
+    jobs = sorted((tmp_path / "staging/analysis-queue").glob("*.job"))
+    assert len(jobs) == 2
+    assert jobs[0].read_text().split("\t")[3].startswith("context/bundles/")
 
 
 def test_audit_requeues_false_done_but_accepts_valid_negative(tmp_path):

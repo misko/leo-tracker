@@ -33,6 +33,10 @@ an analysis receipt alone. See [docs/STORAGE.md](docs/STORAGE.md) for the
 authoritative directory map, preservation invariants, archive commands,
 capacity guardrails, and recovery procedure.
 
+Kalman full-coverage analysis, its 16-worker service, shadow-to-required archive
+promotion, graceful draining, and historical backfill are documented in
+[docs/KALMAN_MIGRATION.md](docs/KALMAN_MIGRATION.md).
+
 Build and verify one cropped archive record without modifying its source:
 
 ```bash

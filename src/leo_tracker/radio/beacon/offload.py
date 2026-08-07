@@ -45,6 +45,14 @@ def _atomic_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
+def _safe_identity(value: str, label: str) -> str:
+    if not value or any(character not in
+                        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+                        for character in value):
+        raise ValueError(f"invalid {label}: {value!r}")
+    return value
+
+
 def create_context_bundle(context_root: Path, *, learned: Path | None = None,
                           passes: Path | None = None,
                           tle_catalog: Path | None = None) -> Path:
@@ -153,8 +161,18 @@ def current_context(context_root: Path) -> Path:
     return bundle
 
 
+def followup_has_checks(path: Path) -> bool:
+    """Return whether a follow-up contains any windows worth fine analysis."""
+    report = _read_json(Path(path))
+    if report.get("schema") != OUTPUT_SCHEMAS["followup"]:
+        raise ValueError(f"unexpected follow-up schema: {path}")
+    return any(isinstance(item, dict) for item in report.get("checks", []))
+
+
 def validate_outputs(root: Path, name: str, mode: str, *, context: Path | None,
-                     elapsed_s: int | None = None) -> dict:
+                     elapsed_s: int | None = None, full_coverage: bool = False,
+                     pipeline_id: str = "legacy-v1",
+                     archive_root: Path | None = None) -> dict:
     """Validate the complete required output set and build its receipt."""
     root = Path(root).resolve(); reports = root / "reports"
     output_paths = {
@@ -166,32 +184,84 @@ def validate_outputs(root: Path, name: str, mode: str, *, context: Path | None,
         if value.get("schema") != OUTPUT_SCHEMAS[key]:
             raise ValueError(f"unexpected {key} schema for {name}")
     confirmed = bool(values["followup"].get("confirmation", {}).get("confirmed"))
-    if confirmed:
+    has_checks = followup_has_checks(output_paths["followup"])
+    if confirmed or full_coverage:
         output_paths["track"] = reports / "tracks" / f"{name}.json"
-        if mode not in {"wide", "hop"}:
+        if has_checks and mode not in {"wide", "hop"}:
             output_paths["decoded"] = reports / "decoded" / f"{name}.json"
-        if context is not None and (Path(context) / "tle-catalog.json").is_file():
+        if (mode != "wide" and context is not None and
+                (Path(context) / "tle-catalog.json").is_file()):
             output_paths["association"] = reports / "associations" / f"{name}.json"
         for key in set(output_paths) - set(values):
             values[key] = _read_json(output_paths[key])
             if values[key].get("schema") != OUTPUT_SCHEMAS[key]:
                 raise ValueError(f"unexpected {key} schema for {name}")
+    pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
+    archive_receipt = None
+    if archive_root is not None:
+        archive_receipt_path = (Path(archive_root) / "catalog" / "receipts" /
+                                f"{name}.json")
+        archive_receipt = _read_json(archive_receipt_path)
+        if (archive_receipt.get("schema") !=
+                "leo-tracker.evidence-archive-receipt/v1" or
+                archive_receipt.get("recording_id") != name or
+                archive_receipt.get("status") != "verified" or
+                not archive_receipt.get("source_verified")):
+            raise ValueError(f"unverified evidence archive for {name}")
     return {
         "schema": RECEIPT_SCHEMA,
         "job": name,
         "mode": mode,
         "status": "success",
         "confirmed": confirmed,
+        "full_coverage": full_coverage,
+        "pipeline_id": pipeline_id,
         "completed_utc": datetime.now(timezone.utc).isoformat(),
         "elapsed_s": elapsed_s,
         "context": str(Path(context).resolve()) if context is not None else None,
-        "outputs": {key: str(path) for key, path in output_paths.items()},
+        "outputs": {key: {"path": str(path), "bytes": path.stat().st_size,
+                          "sha256": _sha256(path)}
+                    for key, path in output_paths.items()},
+        "archive_receipt": archive_receipt,
     }
 
 
 def write_receipt(root: Path, receipt: dict) -> Path:
+    pipeline_id = _safe_identity(str(receipt.get("pipeline_id", "legacy-v1")),
+                                 "pipeline identity")
+    run_root = Path(root) / "reports" / "runs" / pipeline_id / receipt["job"]
+    versioned_outputs = {}
+    for key, artifact in receipt.get("outputs", {}).items():
+        source = Path(artifact["path"])
+        destination = run_root / "outputs" / f"{key}{source.suffix}"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            if _sha256(destination) != artifact["sha256"]:
+                raise ValueError(
+                    f"pipeline output collision for {pipeline_id}/{receipt['job']}/{key}")
+        else:
+            temporary = destination.with_name(
+                f".{destination.name}.next.{os.getpid()}.{uuid.uuid4().hex}")
+            shutil.copyfile(source, temporary)
+            if _sha256(temporary) != artifact["sha256"]:
+                temporary.unlink(missing_ok=True)
+                raise ValueError(f"versioned output copy failed verification: {source}")
+            os.replace(temporary, destination)
+        versioned_outputs[key] = {
+            "path": str(destination), "bytes": destination.stat().st_size,
+            "sha256": artifact["sha256"]}
+    versioned_receipt = dict(receipt)
+    versioned_receipt["versioned_outputs"] = versioned_outputs
+    versioned = run_root / "completion.json"
+    if versioned.exists():
+        existing = _read_json(versioned)
+        if existing.get("versioned_outputs") != versioned_outputs:
+            raise ValueError(
+                f"pipeline completion collision for {pipeline_id}/{receipt['job']}")
+    else:
+        _atomic_json(versioned, versioned_receipt)
     path = Path(root) / "reports" / "receipts" / f"{receipt['job']}.json"
-    _atomic_json(path, receipt)
+    _atomic_json(path, versioned_receipt)
     return path
 
 
@@ -228,6 +298,101 @@ def audit_completed(root: Path, *, default_context: Path | None = None) -> dict:
     return {"accepted": accepted, "requeued": requeued, "errors": errors}
 
 
+def analysis_status(root: Path, *, workers: int, pipeline_id: str,
+                    archive_root: Path | None = None,
+                    output: Path | None = None) -> dict:
+    """Build a cheap operational snapshot for dashboards and alerting."""
+    root = Path(root).resolve(); pipeline_id = _safe_identity(
+        pipeline_id, "pipeline identity")
+    if workers < 1:
+        raise ValueError("worker count must be positive")
+    queue = root / "staging" / "analysis-queue"
+    ready_paths = list(queue.glob("*.job"))
+    now = datetime.now(timezone.utc)
+    oldest_age = (max(0.0, now.timestamp() - min(
+        path.stat().st_mtime for path in ready_paths)) if ready_paths else 0.0)
+    receipt_root = root / "reports" / "runs" / pipeline_id
+    archived = (len(list((Path(archive_root) / "catalog" / "receipts").glob(
+        "*.json"))) if archive_root is not None else None)
+    report = {
+        "schema": "leo-tracker.kalman-analysis-status/v1",
+        "created_utc": now.isoformat(),
+        "root": str(root),
+        "pipeline_id": pipeline_id,
+        "workers": workers,
+        "queue": {
+            "ready": len(ready_paths),
+            "running": len(list(queue.glob("*.running.*"))),
+            "succeeded": len(list((queue / "done").glob("*.job"))),
+            "failed": len(list((queue / "failed").glob("*.job"))),
+            "oldest_ready_age_s": oldest_age,
+        },
+        "versioned_completion_count": len(list(receipt_root.glob(
+            "*/completion.json"))),
+        "verified_archive_count": archived,
+    }
+    if output is not None:
+        _atomic_json(Path(output), report)
+    return report
+
+
+def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
+                              limit: int | None = None,
+                              dry_run: bool = False) -> dict:
+    """Queue complete shared captures lacking this pipeline's receipt."""
+    root = Path(root).resolve(); pipeline_id = _safe_identity(
+        pipeline_id, "pipeline identity")
+    if limit is not None and limit < 1:
+        raise ValueError("backfill limit must be positive")
+    queue = root / "staging" / "analysis-queue"
+    queue.mkdir(parents=True, exist_ok=True)
+    context = current_context(root / "context")
+    active_names: set[str] = set()
+    for pattern in ("*.job", "*.running.*"):
+        for marker in queue.glob(pattern):
+            try:
+                active_names.add(parse_job(marker)[0])
+            except (OSError, ValueError):
+                continue
+    queued, skipped, errors = [], [], []
+    captures_root = root / "captures"
+    captures = (sorted(captures_root.iterdir(), key=lambda path: path.stat().st_mtime)
+                if captures_root.is_dir() else [])
+    for capture in captures:
+        if not capture.is_dir():
+            continue
+        name = capture.name
+        completion = (root / "reports" / "runs" / pipeline_id / name /
+                      "completion.json")
+        if completion.is_file() or name in active_names:
+            skipped.append(name); continue
+        try:
+            manifest = _read_json(capture / "manifest.json")
+            if manifest.get("state") != "complete":
+                skipped.append(name); continue
+            metadata = manifest.get("metadata", {})
+            mode = str(metadata.get("observation_mode") or
+                       ("oversample" if "oversample" in name else
+                        "wide" if "wide" in name else
+                        "hop" if name.startswith("hop-") else "narrow"))
+            if mode not in {"narrow", "wide", "oversample", "hop"}:
+                raise ValueError(f"unknown observation mode {mode!r}")
+            marker = queue / f"backfill-{pipeline_id}-{name}.job"
+            payload = (f"{name}\tcaptures/{name}\t{mode}\t"
+                       f"{context.relative_to(root)}\n")
+            if not dry_run:
+                temporary = marker.with_name(f".{marker.name}.next.{os.getpid()}")
+                temporary.write_text(payload); os.replace(temporary, marker)
+            queued.append(name); active_names.add(name)
+            if limit is not None and len(queued) >= limit:
+                break
+        except Exception as exc:
+            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+    return {"schema": "leo-tracker.analysis-backfill/v1",
+            "pipeline_id": pipeline_id, "queued": queued,
+            "skipped": skipped, "errors": errors, "dry_run": dry_run}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -240,6 +405,22 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("root", type=Path); validate.add_argument("name")
     validate.add_argument("mode"); validate.add_argument("--context", type=Path)
     validate.add_argument("--elapsed-s", type=int); validate.add_argument("--write", action="store_true")
+    validate.add_argument("--full-coverage", action="store_true")
+    validate.add_argument("--pipeline-id", default="legacy-v1")
+    validate.add_argument("--archive-root", type=Path)
+    inspect_followup = commands.add_parser("inspect-followup")
+    inspect_followup.add_argument("followup", type=Path)
+    status = commands.add_parser("status")
+    status.add_argument("root", type=Path)
+    status.add_argument("--workers", type=int, required=True)
+    status.add_argument("--pipeline-id", required=True)
+    status.add_argument("--archive-root", type=Path)
+    status.add_argument("--write", type=Path)
+    enqueue = commands.add_parser("enqueue-backfill")
+    enqueue.add_argument("root", type=Path)
+    enqueue.add_argument("--pipeline-id", required=True)
+    enqueue.add_argument("--limit", type=int)
+    enqueue.add_argument("--dry-run", action="store_true")
     audit = commands.add_parser("audit")
     audit.add_argument("root", type=Path); audit.add_argument("--context", type=Path)
     current = commands.add_parser("current")
@@ -250,9 +431,27 @@ def main(argv: list[str] | None = None) -> int:
               passes=args.passes, tle_catalog=args.tle_catalog))
     elif args.command == "validate":
         receipt = validate_outputs(args.root, args.name, args.mode,
-                                   context=args.context, elapsed_s=args.elapsed_s)
+                                   context=args.context, elapsed_s=args.elapsed_s,
+                                   full_coverage=args.full_coverage,
+                                   pipeline_id=args.pipeline_id,
+                                   archive_root=args.archive_root)
         if args.write: write_receipt(args.root, receipt)
         print(json.dumps(receipt, sort_keys=True))
+    elif args.command == "inspect-followup":
+        has_checks = followup_has_checks(args.followup)
+        print(json.dumps({"followup": str(args.followup),
+                          "has_checks": has_checks}, sort_keys=True))
+        return 0 if has_checks else 1
+    elif args.command == "status":
+        print(json.dumps(analysis_status(
+            args.root, workers=args.workers, pipeline_id=args.pipeline_id,
+            archive_root=args.archive_root, output=args.write), sort_keys=True))
+    elif args.command == "enqueue-backfill":
+        report = enqueue_analysis_backfill(
+            args.root, pipeline_id=args.pipeline_id, limit=args.limit,
+            dry_run=args.dry_run)
+        print(json.dumps(report, sort_keys=True))
+        return 1 if report["errors"] else 0
     elif args.command == "audit":
         print(json.dumps(audit_completed(args.root, default_context=args.context), sort_keys=True))
     else:

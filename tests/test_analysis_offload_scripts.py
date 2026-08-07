@@ -16,6 +16,20 @@ def test_analysis_export_unit_is_persistent_and_copy_only():
     assert "WantedBy=multi-user.target" in unit
 
 
+def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
+    unit = (ROOT / "deploy/leo-tracker-analysis-server.service").read_text()
+    assert "Environment=LEO_ANALYSIS_WORKERS=16" in unit
+    assert "Environment=LEO_ANALYSIS_FULL_COVERAGE=1" in unit
+    assert "Environment=LEO_ANALYSIS_ARCHIVE_MODE=shadow" in unit
+    assert "Environment=LEO_ANALYSIS_RETENTION_MODE=disabled" in unit
+    assert "Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1" in unit
+    assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=12000000" in unit
+    assert "Environment=OMP_NUM_THREADS=1" in unit
+    assert "Environment=OPENBLAS_NUM_THREADS=1" in unit
+    assert "Environment=MKL_NUM_THREADS=1" in unit
+    assert "TimeoutStopSec=1800" in unit
+
+
 def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     source = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
     assert 'mv "${marker}" "${claim}"' in source
@@ -34,6 +48,22 @@ def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     assert "run_retention" in source
     assert "starlink-beacon-retain" in source
     assert 'flock -n 10' in source
+    assert 'workers="${LEO_ANALYSIS_WORKERS:-16}"' in source
+    assert "starlink-evidence-archive" in source
+    assert "inspect-followup" in source
+    assert "retention_skipped" in source
+    assert "analysis-server-status.json" in source
+    assert source.index("starlink-evidence-archive") < source.index(
+        'run_retention "${worker_id}"')
+    assert 'trap request_local_drain TERM' in source
+
+
+def test_backfill_wrapper_uses_uv_existing_venv_and_versioned_enqueue():
+    source = (ROOT / "scripts/starlink-analysis-backfill.sh").read_text()
+    assert "uv and the existing ${repo_dir}/.venv are required" in source
+    assert "run --active --no-sync" in source
+    assert "enqueue-backfill" in source
+    assert "LEO_ANALYSIS_PIPELINE_ID" in source
 
 
 def test_server_worker_exits_cleanly_when_once_queue_is_empty(tmp_path):
@@ -68,6 +98,10 @@ def test_server_worker_reports_job_stage_progress_and_eta(tmp_path):
     assert "job_start worker=0 job=sample-one mode=narrow" in result.stdout
     assert "stage_start worker=0 job=sample-one stage=acquire" in result.stdout
     assert "stage_done worker=0 job=sample-one stage=followup" in result.stdout
+    assert "stage_done worker=0 job=sample-one stage=decode" in result.stdout
+    assert "stage_done worker=0 job=sample-one stage=doppler_track" in result.stdout
+    assert "stage_done worker=0 job=sample-one stage=evidence_archive" in result.stdout
+    assert "retention_skipped worker=0 job=sample-one mode=disabled" in result.stdout
     assert "signal_result worker=0 job=sample-one confirmed=false" in result.stdout
     assert "job_done worker=0 job=sample-one" in result.stdout
     assert "complete=1/1 percent=100.0%" in result.stdout
@@ -141,6 +175,41 @@ def test_server_drain_finishes_claimed_job_without_claiming_next(tmp_path):
     assert "drain requested" in drained.stdout
     assert server.returncode == 0, stderr
     assert "worker_drained worker=0" in stdout
+    assert "drain_complete" in stdout
+    assert len(list((queue / "done").glob("*.job"))) == 1
+    assert len(list(queue.glob("*.job"))) == 1
+    assert not list(queue.glob("*.running.*"))
+
+
+def test_server_sigterm_gracefully_finishes_claimed_job(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/sample"
+    queue.mkdir(parents=True); capture.mkdir(parents=True)
+    for index in range(2):
+        (queue / f"000{index}.job").write_text(
+            f"sample-{index}\t{capture}\tnarrow\n")
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "[[ \"$*\" != *starlink-beacon-analyze* ]] || sleep 1\n"
+        "exit 0\n")
+    uv_stub.chmod(0o755)
+    env = os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+                        "LEO_ANALYSIS_HEARTBEAT_S": "1"}
+    server = subprocess.Popen(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"),
+         "--workers", "1", str(tmp_path)], env=env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    deadline = time.monotonic() + 5
+    while not list(queue.glob("*.running.*")) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert list(queue.glob("*.running.*"))
+
+    server.terminate()
+    stdout, stderr = server.communicate(timeout=15)
+
+    assert server.returncode == 0, stderr
+    assert "drain_requested reason=signal" in stdout
     assert "drain_complete" in stdout
     assert len(list((queue / "done").glob("*.job"))) == 1
     assert len(list(queue.glob("*.job"))) == 1

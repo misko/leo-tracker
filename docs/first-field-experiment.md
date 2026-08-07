@@ -6,6 +6,12 @@ Demonstrate that a blindly extracted RF frequency track follows the geometric
 Doppler shape of a predicted LEO pass. This experiment does **not** claim a
 position solution.
 
+Status: the production edge-beacon pipeline has produced one held-out,
+stability-tested Starlink TLE association. This original field runbook remains
+the acceptance template for independent repetitions; its three-capture gate is
+not replaced by that single result. Current acquisition and storage operations
+are documented in `starlink_beacon_receiver.md` and `STORAGE.md`.
+
 ## Prerequisites
 
 - Surveyed receiver latitude, longitude, altitude, and uncertainty.

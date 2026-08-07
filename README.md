@@ -25,17 +25,26 @@ deterministic.
 
 ## Storage and preservation
 
-Full Pluto IQ on `/mnt/leo-nvme/leo-tracker` is currently an immutable source
-archive. The QNAP cropped-evidence archive contains exact dual-receiver time
-clips, analysis products, and read-back verification receipts; it is not a
-replacement for the local source yet. No cleanup decision should be made from
-an analysis receipt alone. See [docs/STORAGE.md](docs/STORAGE.md) for the
-authoritative directory map, preservation invariants, archive commands,
-capacity guardrails, and recovery procedure.
+Full Pluto IQ on `/mnt/leo-nvme/leo-tracker` and the current QNAP analysis
+working set are immutable sources during archive migration. The separate
+`/mnt/qnap01/mouse9911/leo-cropped` archive contains exact dual-receiver time
+clips, analysis products, read-back verification reports, and transaction
+receipts. It is operational but must not be assumed complete merely because
+live jobs publish successfully. No cleanup decision should be made from an
+analysis completion receipt or an unverified evidence directory. See
+[docs/STORAGE.md](docs/STORAGE.md) for the authoritative directory map,
+completeness audit, preservation invariants, archive commands, capacity
+guardrails, and recovery procedure.
 
 Kalman full-coverage analysis, its 16-worker service, shadow-to-required archive
 promotion, graceful draining, and historical backfill are documented in
 [docs/KALMAN_MIGRATION.md](docs/KALMAN_MIGRATION.md).
+
+The live deployment currently uses archive `shadow` mode and retention
+`disabled`: new jobs attempt cropped publication, but raw sources are retained
+and a crop failure does not falsely mark the source disposable. Historical
+reports below `reports/` are dated experiment records and are not rewritten to
+match later production settings.
 
 Build and verify one cropped archive record without modifying its source:
 
@@ -276,11 +285,12 @@ track waterfall below `plots/`, and promoted Doppler records below
 `detections/`. Repeating the command with the same output directory continues
 chunk numbering and preserves existing records.
 
-### Tracker ensemble and live pipeline
+### Tracker ensemble and legacy hybrid pipeline
 
-The production pipeline combines a gap-free 30.72 MS/s survey with a long 2.5
-or 4 MS/s dwell, captures both Pluto+ receivers, and analyzes bounded event
-windows with independent Doppler methods:
+The waveform-agnostic tracker ensemble and older hybrid orchestration remain
+available for controlled comparison. The hybrid workflow combines a gap-free
+30.72 MS/s survey with a long 2.5 or 4 MS/s dwell, captures both Pluto+
+receivers, and analyzes bounded event windows with independent Doppler methods:
 
 ```bash
 scripts/starlink_hybrid_watch.sh artifacts/starlink_hybrid_watch
@@ -302,14 +312,22 @@ dashboard at `http://localhost:8765/`. See
 [docs/doppler-trackers.md](docs/doppler-trackers.md) for method references,
 tests, schemas, and operational commands.
 
+The deployed continuous sky collector is the edge-beacon service documented in
+[docs/starlink_beacon_receiver.md](docs/starlink_beacon_receiver.md); the hybrid
+watcher is not the authority for current capture cadence or retention.
+
 ## Current milestone
 
-1. Freeze a TLE and predict a high-elevation pass at the surveyed site.
-2. Record before, during, and after the pass with the Pluto+ RF chain.
-3. Extract a frequency ridge without orbital assistance.
-4. Fit only constant frequency offset and linear oscillator drift.
-5. Require the correct satellite curve to outperform wrong-satellite,
-   time-shifted, and off-pass controls.
+The pipeline has progressed from blind edge-beacon acquisition through
+dual-receiver carrier tracking and one held-out, stability-tested Starlink TLE
+association. That result is field evidence for the method, not yet a navigation
+solution. The current milestone is to repeat robust identities across many
+passes and spacecraft, retain enough simultaneous or overlapping tracks to
+separate receiver/LNB and satellite clock terms, and then estimate receiver
+position with held-out truth and wrong-satellite/time-shift controls. Cropped
+archive backfill and replay equivalence are part of this milestone because a
+position result must remain reproducible after raw retention is eventually
+bounded.
 
 See [docs/first-field-experiment.md](docs/first-field-experiment.md) for the
 field runbook.

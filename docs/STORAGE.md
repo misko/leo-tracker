@@ -30,7 +30,7 @@ instruction to delete or relocate their source.
 | `/mnt/leo-nvme/leo-tracker/reports` | SATPI01 | Detector, decode, track and association outputs | Regenerable but retained |
 | `/home/satpi01/leo-tracker/artifacts` | SATPI01 | Legacy surveys and waterfall experiments | Historical source |
 | `/mnt/qnap01/mouse9911/leo` | SATPI01/Kalman | Existing full-IQ analysis exchange | Operational; do not bulk-delete |
-| `/mnt/qnap01/mouse9911/leo-cropped` | Evidence archiver | Cropped archive described below | New verified archive |
+| `/mnt/qnap01/mouse9911/leo-cropped` | Kalman evidence archiver | Cropped archive described below | Verified primary archive; not a second backup |
 
 The QNAP NFS client is mounted with `soft` semantics. A successful copy command
 is therefore insufficient evidence of durability. The archive verifier opens
@@ -61,6 +61,18 @@ and calibration evidence even when the current detector reports nothing.
 
 The first archive revision performs lossless time cropping only. It does not
 filter, downconvert, resample or compress IQ.
+
+Cropping reduces storage only when selected intervals plus guards cover less
+than the source. A short two- or five-second hop child can legitimately retain
+100% of its IQ because the default ten-second evidence guard covers the whole
+recording. This is not an archive failure. Longer negative and sparse-event
+captures provide most of the measured reduction.
+
+The live Kalman service currently uses `LEO_ANALYSIS_ARCHIVE_MODE=shadow` and
+`LEO_ANALYSIS_RETENTION_MODE=disabled`. It attempts one archive transaction per
+job, but an archive failure does not fail analysis and no source is reclaimed.
+Until the migration gates in [`KALMAN_MIGRATION.md`](KALMAN_MIGRATION.md) pass,
+the cropped archive is operational but incomplete.
 
 ## Preservation mode
 
@@ -138,6 +150,33 @@ processing, `--limit N` bounds a development run, and `--recording ID` selects
 one reviewed recording. It skips active captures, recordings without both
 analysis and follow-up artifacts, and captures younger than ten minutes unless
 explicitly selected.
+
+## Completeness audit
+
+Archive completeness is defined by verified receipts, not by directory count,
+analysis queue depth, or aggregate bytes. For every recording in scope:
+
+1. `catalog/receipts/<id>.json` exists;
+2. it has `status: verified` and `source_verified: true`;
+3. `evidence/<id>/verification.json` has `valid: true`;
+4. no `<id>.partial` directory remains;
+5. all source identifiers from both NVMe and the QNAP working set have been
+   reconciled, including quarantine and intentionally excluded records.
+
+Use the cross-store identifier comparison in
+[`KALMAN_MIGRATION.md`](KALMAN_MIGRATION.md), then validate published bytes:
+
+```bash
+uv run --active --no-sync leo-radio starlink-evidence-audit \
+  /mnt/leo-nvme/leo-tracker \
+  /mnt/qnap01/mouse9911/leo-cropped/evidence \
+  --output /mnt/qnap01/mouse9911/leo-cropped/catalog/audit.json
+```
+
+That command can verify only sources visible below the supplied source root.
+Run an equivalent audit from the QNAP analysis root for recordings whose
+authoritative source is there, or restore/materialize the source before calling
+the archive globally complete.
 
 ## Artifact authority
 

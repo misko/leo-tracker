@@ -75,17 +75,20 @@ assuming that the two LNB frequency biases agree. A rate-compatible pass is
 recorded separately from a specific identification; a satellite name is
 promoted only if its confidence decisively exceeds every overlapping pass.
 
-The production watcher and dashboard unit definitions live in
+The experimental hybrid watcher and dashboard unit definitions live in
 `deploy/systemd/leo-tracker-hybrid-watch.service` and
 `deploy/systemd/leo-tracker-dashboard.service`. Both use only the existing
 virtual environment through `uv run --active --no-sync`, restart after process
-failure, and are enabled for the user session's default target.
+failure, and can be enabled for the user session's default target. The deployed
+continuous sky collector is `leo-tracker-beacon-watch.service`; see
+[`starlink_beacon_receiver.md`](starlink_beacon_receiver.md).
 
-Completed artifacts remain local for twelve hours so the live dashboard never
-depends on Wi-Fi storage. `leo-tracker-radio-archive.timer` then copies them at
-idle I/O/CPU priority to the NFS archive and removes a local source only after
-`rsync` reports a successful transfer. The age gate prevents partial or active
-captures from being touched.
+The hybrid workflow's legacy `leo-tracker-radio-archive.timer` can copy aged
+artifacts at idle I/O/CPU priority, but it is not the current preservation
+contract. The deployed beacon pipeline uses
+`LEO_BEACON_PRESERVE_RAW=1`, exports copies atomically, and does not remove a
+local source. Cropped evidence and any future retention are governed by
+[`STORAGE.md`](STORAGE.md), not by this ensemble runbook.
 
 ## Required interpretation controls
 

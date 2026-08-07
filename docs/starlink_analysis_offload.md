@@ -19,8 +19,11 @@ has four atomic boundaries:
    blocking other work.
 
 Thus neither a network loss, process crash, nor server reboot can expose a
-partial capture as ready or a partial analysis as complete. The Pi raw copy is
-removed only after remote verification and durable queue publication.
+partial capture as ready or a partial analysis as complete. Source handling is
+controlled by `LEO_OFFLOAD_SOURCE_POLICY`. The deployed `retain` policy leaves
+the Pi raw directory untouched after remote verification and durable queue
+publication. The legacy `delete` policy is explicit and must not be used during
+the preservation evaluation.
 
 The acquisition-side exporter is:
 
@@ -34,34 +37,41 @@ does not monopolize Wi-Fi. It uses atomic `.job -> .exporting` claims and can
 run alongside the local ordinary and hop workers without analyzing a capture
 twice.
 
-On an analysis server, clone this repository and create its `.venv` with UV.
+On the analysis server, use the repository's existing `.venv` exclusively.
 Only the base dependencies are required for production analysis; the `radio`
 extra is for direct SDR/storage integrations and is not needed by this worker.
 
 ```bash
 cd /path/to/leo-tracker
-uv venv .venv
-uv sync --frozen
+test -x .venv/bin/python
+uv run --active --no-sync python --version
 ```
 
-Use `uv sync --frozen --extra dev` instead when the server will also run the
-test suite. Then point the worker at the server's local path for the shared
-directory:
+Dependency changes are installed deliberately with `uv sync --active --frozen`
+from the checkout; normal service launches use `--no-sync`. Point the worker at
+the server's local path for the shared directory:
 
 ```bash
 cd /path/to/leo-tracker
 LEO_TRACKER_REPO="$PWD" \
-  scripts/starlink-analysis-server.sh --workers 2 /path/to/mouse9911/leo
+  scripts/starlink-analysis-server.sh --workers 16 /mnt/qnap01/mouse9911/leo
 ```
 
-Choose the worker count from the server's resources. Each DSP process can use
-multiple CPU cores and roughly 0.8 GB of RAM, so two is a conservative default
-for an eight-core host. `--once` drains the current queue and exits; without it,
-the script monitors continuously. Outputs and per-job logs appear under
-`leo/reports`; successful and failed queue records are retained under
+Choose the worker count from the server's resources. Kalman is deployed with 16
+workers and BLAS thread counts pinned to one. `--once` drains the current queue
+and exits; without it, the script monitors continuously. Outputs and per-job
+logs appear under `leo/reports`; successful and failed queue records are retained under
 `leo/staging/analysis-queue/{done,failed}` for audit and retry.
 
 Each worker performs sparse beacon acquisition and plotting, dense follow-up,
 conditioned frame tracking, symbol decoding for applicable captures, continuous
-Doppler tracking, and TLE association. The exporter snapshots the current TLE
-catalog, pass predictions, and learned beacon into `leo/context`.
+Doppler tracking, TLE association, and cropped evidence publication. A valid
+conditioned-frame artifact that yields no compatible dual-RX group produces an
+explicit zero-track result rather than failing the job. The exporter snapshots
+the current TLE catalog, pass predictions, learned beacon JSON, and its NPZ
+dependency into `leo/context`.
+
+Archive `shadow` mode is not a completeness guarantee. Use the receipt and
+cross-store audits in [`STORAGE.md`](STORAGE.md) and
+[`KALMAN_MIGRATION.md`](KALMAN_MIGRATION.md) before describing the historical
+archive as complete or enabling retention.

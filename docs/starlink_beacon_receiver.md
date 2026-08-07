@@ -259,11 +259,11 @@ channels inside the installed universal LNB's 9.75 GHz low-band mode; channels
 5--8 require the LNB's 22 kHz high-band selection and a 10.6 GHz LO model. Each
 retune discards two complete IIO buffers and publishes a hop-session manifest
 plus ordinary, independently checksummed child capture artifacts. Queue depth
-is observable on disk and no
-capture is discarded merely because processing falls behind. All candidate
-captures are preserved.
-Only the newest twelve negative captures are kept. Interrupted captures are
-moved to `quarantine` rather than deleted.
+is observable on disk and no capture is discarded merely because processing
+falls behind. All candidate captures are preserved in the deployed
+`LEO_BEACON_PRESERVE_RAW=1` mode. The code contains a bounded negative-control
+ring for a future verified-retention deployment, but that policy is currently
+disabled. Interrupted captures are moved to `quarantine` rather than deleted.
 At startup, disk-only recovery runs in the analysis worker while the first new
 radio dwell begins immediately. It idempotently analyzes every complete
 artifact lacking a report before consuming queued work. Thus a reboot between
@@ -480,15 +480,18 @@ fitted LNB offset and a -7.7 Hz/s nuisance drift. The older capture publishes
 retain every refill midpoint and therefore use the finer
 `iio_read_midpoint_interpolation` mapping automatically.
 
-Raw IQ retention is intentionally bounded. All reports, decoded symbols,
-learned templates, frame observations, 10 Hz tracks, and associations remain;
-only fully derived raw directories advance out of a ring. Pending captures and
-learned-template sources remain protected. The ordinary rings retain the newest
-eight confirmed captures and six negative controls; separate rings retain two
-wide captures, four oversampled captures, and six complete channel-hop sessions.
-Interrupted captures move to quarantine but are never automatically destroyed.
+The retention implementation supports bounded rings after a source has been
+fully derived and independently archived. Its policy sizes are eight confirmed
+captures, six negative controls, two wide captures, four oversampled captures,
+and six complete channel-hop sessions; pending captures, learned-template
+sources, and pinned scientific sources remain protected. However, the deployed
+migration configuration sets `LEO_BEACON_PRESERVE_RAW=1` on SATPI01 and
+`LEO_ANALYSIS_RETENTION_MODE=disabled` on Kalman. Those rings are therefore a
+tested future policy, not the current deletion behavior. Interrupted captures
+move to quarantine and no automatic procedure deletes NVMe source IQ.
 
-Every qualified base, channel-linked, or rolling TLE association is followed
+If verified retention is later enabled, every qualified base, channel-linked,
+or rolling TLE association is followed
 back through its observation and source-track artifacts to the contributing raw
 capture directories. Those paths are written atomically to
 `reports/retention/qualified-capture-pins.json` before any pruning occurs. The

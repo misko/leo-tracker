@@ -21,6 +21,7 @@ incoming="${shared_root}/staging/incoming"
 context="${shared_root}/context"
 bwlimit_kbps="${LEO_OFFLOAD_BWLIMIT_KBPS:-20000}"
 poll_s="${LEO_OFFLOAD_POLL_S:-5}"
+context_refresh_s="${LEO_OFFLOAD_CONTEXT_REFRESH_S:-600}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 tle_catalog="${LEO_BEACON_TLE_CATALOG:-/mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history/latest.json}"
 passes="${repo_dir}/artifacts/starlink_hybrid_watch/passes.json"
@@ -40,19 +41,24 @@ for abandoned in "${queue}"/*.exporting.*; do
 done
 shopt -u nullglob
 
+context_bundle=""
+context_synced_at=0
 sync_context() {
-  local source destination temporary
-  for source in "${tle_catalog}" "${passes}" "${learned}"; do
-    [[ -f "${source}" ]] || continue
-    case "${source}" in
-      "${tle_catalog}") destination="${context}/tle-catalog.json" ;;
-      "${passes}") destination="${context}/passes.json" ;;
-      *) destination="${context}/learned-beacon.json" ;;
-    esac
-    temporary="${destination}.next.$$"
-    rsync -rtL -- "${source}" "${temporary}"
-    mv "${temporary}" "${destination}"
-  done
+  local force="${1:-0}" now
+  local -a args
+  now="$(date +%s)"
+  if (( force == 0 && now - context_synced_at < context_refresh_s )) &&
+     [[ -d "${context_bundle}" ]]; then
+    return
+  fi
+  args=("${repo_dir}/.venv/bin/python" -m leo_tracker.radio.beacon.offload
+    bundle "${context}")
+  [[ -f "${learned}" ]] && args+=(--learned "${learned}")
+  [[ -f "${passes}" ]] && args+=(--passes "${passes}")
+  [[ -f "${tle_catalog}" ]] && args+=(--tle-catalog "${tle_catalog}")
+  context_bundle="$("${args[@]}")"
+  context_synced_at="${now}"
+  echo "published analysis context ${context_bundle}"
 }
 
 verify_copy() {
@@ -119,7 +125,10 @@ export_one() {
     fi
   fi
   remote_marker="${remote_queue}/$(basename "${claim%%.exporting.*}").job"
-  printf '%s\t%s\t%s\n' "${name}" "${destination}" "${mode}" > "${remote_marker}.next.$$"
+  # Paths in a v2 job are share-root relative, so the acquisition and analysis
+  # hosts may mount the same QNAP export at different absolute paths.
+  printf '%s\t%s\t%s\t%s\n' "${name}" "captures/${name}" "${mode}" \
+    "${context_bundle#${shared_root}/}" > "${remote_marker}.next.$$"
   mv "${remote_marker}.next.$$" "${remote_marker}"
   # This is a move, not a cache: remote verification and durable queueing both
   # complete before the acquisition copy is removed.
@@ -128,7 +137,7 @@ export_one() {
   echo "offloaded ${name} (${mode})"
 }
 
-sync_context
+sync_context 1
 while true; do
   shopt -s nullglob
   jobs=("${queue}"/*.job)

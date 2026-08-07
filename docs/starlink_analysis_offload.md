@@ -1,11 +1,26 @@
 # Starlink analysis offload
 
-Acquisition and historical analysis use separate durable queues. The Pi moves
-only captures whose manifests say `complete`. A capture is copied into
-`staging/incoming`, checked against all manifest byte sizes, atomically renamed
-into `captures`, and only then queued for the analysis server. The Pi copy is
-removed after those steps. Set `LEO_OFFLOAD_VERIFY_SHA256=1` to additionally
-recompute every chunk checksum across NFS.
+Acquisition and historical analysis use separate durable queues. The protocol
+has four atomic boundaries:
+
+1. The Pi copies a completed capture into `staging/incoming/*.partial`, checks
+   every manifest byte size, atomically renames it into `captures`, and only
+   then publishes its `.job` marker. Set `LEO_OFFLOAD_VERIFY_SHA256=1` to also
+   recompute every IQ chunk checksum across NFS.
+2. TLEs, passes, and the learned-beacon JSON **and NPZ dependency** are copied
+   into an immutable, checksummed `context/bundles/<id>` directory. Job paths
+   are share-root relative, allowing different mount points on the two hosts.
+3. One server process owns `server.lock`; its workers claim disjoint jobs using
+   atomic `.job -> .running.<worker>` renames. On restart, interrupted claims
+   return to the ready queue.
+4. A job moves to `done` only after every required output exists, parses, has
+   the expected schema, and an atomic receipt is written. Startup audit requeues
+   legacy or partial `done` entries. Persistent errors move to `failed` without
+   blocking other work.
+
+Thus neither a network loss, process crash, nor server reboot can expose a
+partial capture as ready or a partial analysis as complete. The Pi raw copy is
+removed only after remote verification and durable queue publication.
 
 The acquisition-side exporter is:
 

@@ -41,10 +41,16 @@ progress_log="${reports}/analysis-server.log"
 progress_lock="${queue}/progress.lock"
 mkdir -p "${queue}/done" "${queue}/failed" "${metrics}" \
   "${reports}"/{plots,followups,decoded,frame-tracks,tracks,associations,fingerprints}
+exec 8>"${queue}/server.lock"
+if ! flock -n 8; then
+  echo "another analysis server already owns ${queue}" >&2
+  exit 2
+fi
 cd "${repo_dir}"
 
 radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
 orbit() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-orbit "$@"; }
+protocol() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python -m leo_tracker.radio.beacon.offload "$@"; }
 
 emit() {
   local line
@@ -110,7 +116,7 @@ run_stage() {
 }
 
 process_job() {
-  local worker_id="$1" name="$2" capture="$3" mode="$4"
+  local worker_id="$1" name="$2" capture="$3" mode="$4" job_context="$5"
   local report="${reports}/${name}.json" plot="${reports}/plots/${name}.png"
   local followup="${reports}/followups/${name}.json" confirmed="${root}/staging/${name}.confirmed"
   local frame="${reports}/frame-tracks/${name}.json" samples="${reports}/frame-tracks/${name}.npz"
@@ -126,16 +132,16 @@ process_job() {
     hop) analysis_args+=(--exact-interval-s .7 --exact-window-s .02) ;;
     *) analysis_args+=(--exact-interval-s 6) ;;
   esac
-  if [[ ("${mode}" == narrow || "${mode}" == hop) && -f "${context}/learned-beacon.json" ]]; then
-    template_args=(--beacon-template "${context}/learned-beacon.json")
+  if [[ ("${mode}" == narrow || "${mode}" == hop) && -f "${job_context}/learned-beacon.json" ]]; then
+    template_args=(--beacon-template "${job_context}/learned-beacon.json")
   fi
-  [[ -f "${context}/passes.json" ]] && passes_args=(--passes "${context}/passes.json")
+  [[ -f "${job_context}/passes.json" ]] && passes_args=(--passes "${job_context}/passes.json")
   run_stage "${worker_id}" "${name}" acquire radio starlink-beacon-analyze "${capture}" "${report}" --window-s 1 \
     --maximum-analysis-rate-hz 50000 --exact-acquisition-method pilot_symbolwise_v3 \
-    "${analysis_args[@]}" "${template_args[@]}" --plot "${plot}"
+    "${analysis_args[@]}" "${template_args[@]}" --plot "${plot}" || return 1
   run_stage "${worker_id}" "${name}" followup radio starlink-beacon-followup "${capture}" "${report}" "${followup}" \
     --radius-s .5 --interval-s .1 --window-s .01 "${passes_args[@]}" \
-    --confirmation-marker "${confirmed}"
+    --confirmation-marker "${confirmed}" || return 1
   if [[ ! -f "${confirmed}" ]]; then
     emit "signal_result worker=${worker_id} job=${name} confirmed=false derived_report=${report}"
     return 0
@@ -151,20 +157,20 @@ process_job() {
   fi
   if [[ "${mode}" != wide && "${mode}" != hop ]]; then
     run_stage "${worker_id}" "${name}" decode radio starlink-beacon-decode "${capture}" "${followup}" "${decoded}" \
-      --plot "${decoded_plot}" --symbols "${symbols}"
+      --plot "${decoded_plot}" --symbols "${symbols}" || return 1
   fi
   run_stage "${worker_id}" "${name}" doppler_track radio starlink-beacon-track "${capture}" "${followup}" "${track}" \
-    --maximum-gap-s 5 --maximum-reacquisition-span-hz 5000 "${track_args[@]}"
-  if [[ -f "${context}/tle-catalog.json" ]]; then
-    run_stage "${worker_id}" "${name}" tle_association orbit associate --observations "${track}" --catalog "${context}/tle-catalog.json" \
+    --maximum-gap-s 5 --maximum-reacquisition-span-hz 5000 "${track_args[@]}" || return 1
+  if [[ -f "${job_context}/tle-catalog.json" ]]; then
+    run_stage "${worker_id}" "${name}" tle_association orbit associate --observations "${track}" --catalog "${job_context}/tle-catalog.json" \
       --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
       --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
-      --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" --output "${association}"
+      --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" --output "${association}" || return 1
   fi
 }
 
 worker() {
-  local worker_id="$1" marker claim name capture mode log done failed
+  local worker_id="$1" marker claim name capture mode job_context log done failed
   local started elapsed metric temporary
   while true; do
     marker="$(find "${queue}" -maxdepth 1 -type f -name '*.job' -print -quit)"
@@ -174,11 +180,17 @@ worker() {
     fi
     claim="${marker%.job}.running.${worker_id}.$$"
     mv "${marker}" "${claim}" 2>/dev/null || continue
-    IFS=$'\t' read -r name capture mode < "${claim}"
+    IFS=$'\t' read -r name capture mode job_context < "${claim}"
+    job_context="${job_context:-${default_context}}"
+    [[ "${capture}" == /* ]] || capture="${root}/${capture}"
+    [[ "${job_context}" == /* ]] || job_context="${root}/${job_context}"
     log="${reports}/${name}.worker.log"
     started="$(date +%s)"
-    emit "job_start worker=${worker_id} job=${name} mode=${mode} capture=${capture} log=${log}"
-    if process_job "${worker_id}" "${name}" "${capture}" "${mode}" > >(tee -a "${log}") 2>&1; then
+    emit "job_start worker=${worker_id} job=${name} mode=${mode} capture=${capture} context=${job_context} log=${log}"
+    if process_job "${worker_id}" "${name}" "${capture}" "${mode}" "${job_context}" > >(tee -a "${log}") 2>&1 &&
+       run_stage "${worker_id}" "${name}" validate_outputs protocol validate \
+         "${root}" "${name}" "${mode}" --context "${job_context}" \
+         --elapsed-s "$(( $(date +%s) - started ))" --write > >(tee -a "${log}") 2>&1; then
       done="${queue}/done/$(basename "${marker}")"
       mv "${claim}" "${done}"
       elapsed=$(( $(date +%s) - started ))
@@ -216,7 +228,21 @@ stop_children() {
   for pid in "${pids[@]}"; do terminate_process_tree "${pid}"; done
 }
 trap stop_children INT TERM EXIT
+if [[ -f "${context}/current.json" ]]; then
+  default_context="$(protocol current "${context}")"
+else
+  default_context="${context}"
+fi
+shopt -s nullglob
+for interrupted in "${queue}"/*.running.*; do
+  restored="${interrupted%%.running.*}.job"
+  [[ ! -e "${restored}" ]] || restored="${queue}/recovered-$(date +%s%N)-$(basename "${restored}")"
+  mv "${interrupted}" "${restored}"
+done
+shopt -u nullglob
+audit_result="$(protocol audit "${root}" --context "${default_context}")"
 emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} python=$(${venv}/bin/python --version 2>&1)"
+emit "recovery ${audit_result}"
 print_progress startup
 for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
 (

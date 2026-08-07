@@ -276,6 +276,10 @@ def load_learned_beacon(path: Path) -> tuple[dict, dict[str, np.ndarray]]:
     if report.get("schema") != LEARNED_BEACON_SCHEMA:
         raise ValueError("unsupported learned beacon schema")
     samples = Path(report["samples"])
+    # Offloaded analysis bundles are mount-point independent: keep the sample
+    # dependency beside the report and resolve its relative path there.
+    if not samples.is_absolute():
+        samples = Path(path).resolve().parent / samples
     if hashlib.sha256(samples.read_bytes()).hexdigest() != report["samples_sha256"]:
         raise ValueError("learned beacon sample checksum mismatch")
     with np.load(samples, allow_pickle=False) as source:

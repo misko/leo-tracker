@@ -64,6 +64,36 @@ def test_server_worker_reports_job_stage_progress_and_eta(tmp_path):
     assert list((queue / "metrics").glob("*.tsv"))
 
 
+def test_server_worker_stops_pipeline_and_marks_failed_when_analysis_fails(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/sample-bad"
+    queue.mkdir(parents=True); capture.mkdir(parents=True)
+    (queue / "0001.job").write_text(f"sample-bad\t{capture}\tnarrow\n")
+    calls = tmp_path / "calls.log"
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$*\" >> \"$UV_STUB_LOG\"\n"
+        "[[ \"$*\" != *starlink-beacon-analyze* ]]\n")
+    uv_stub.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",
+         "--workers", "1", str(tmp_path)],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+                          "UV_STUB_LOG": str(calls)},
+        text=True, capture_output=True, timeout=10)
+
+    assert result.returncode == 0
+    assert "stage_failed worker=0 job=sample-bad stage=acquire" in result.stdout
+    assert "job_failed worker=0 job=sample-bad" in result.stdout
+    invoked = calls.read_text()
+    assert "starlink-beacon-analyze" in invoked
+    assert "starlink-beacon-followup" not in invoked
+    assert list((queue / "failed").glob("*.job"))
+    assert not list((queue / "done").glob("*.job"))
+
+
 def test_exporter_moves_complete_bundle_then_queues_it(tmp_path):
     source = tmp_path / "source"
     shared = tmp_path / "shared"
@@ -90,8 +120,9 @@ def test_exporter_moves_complete_bundle_then_queues_it(tmp_path):
     assert not capture.exists()
     assert (shared / "captures/capture-one/chunk-000000.ci16").read_bytes() == payload
     job = next((shared / "staging/analysis-queue").glob("*.job"))
-    assert job.read_text().split("\t") == [
-        "capture-one", str(shared / "captures/capture-one"), "narrow\n"]
+    fields = job.read_text().rstrip().split("\t")
+    assert fields[:3] == ["capture-one", "captures/capture-one", "narrow"]
+    assert fields[3].startswith("context/bundles/")
 
 
 def test_exporter_refuses_incomplete_capture(tmp_path):

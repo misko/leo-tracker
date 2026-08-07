@@ -2,7 +2,7 @@
 
 Four of the [C-clips](lnbf-clamp.md) at 90°, each tilted 27° outward with its
 mouth facing outward, unioned by a cross web whose top face is coplanar with all
-four trimmed clamp faces. The centre drops into a hollow pedestal that reaches
+four trimmed clamp faces. The centre drops into a solid pedestal that reaches
 below the LNBF tails and flares into a foot, so the whole thing stands on itself
 with the LNBFs off the ground. One flat plane on top; printed on it, nothing
 needs support.
@@ -13,17 +13,17 @@ needs support.
 
 | Feature | Value |
 | --- | --- |
-| Clamps | 4 × C-clip, Ø40.4 bore, 37 mm mouth, 241° wrap |
+| Clamps | 4 × C-clip, Ø39.9 bore, 36.6 mm mouth, 241° wrap |
 | Tilt | 27° from zenith, boresight 63° elevation |
 | Arm radius | 105 mm, centre to bore axis in the flush plane |
 | Bore-axis spacing | 148 mm adjacent, 210 mm opposite |
-| Cross web | 24 mm wide × 12 mm thick |
-| Pedestal | Ø50 × 5 mm wall, 180 mm tall, flaring to a Ø160 foot |
+| Cross web | 24 mm wide × 19 mm deep (ceiling 20.2 mm) |
+| Pedestal | Ø50 solid, 180 mm tall, flaring to a Ø160 foot |
 | Grip length | 22.5 mm at the arm root to 42 mm at the mouth side |
 | Envelope | 237 × 237 × 180 mm (197 mm bed rotated 45°) |
 | Ground clearance | 90 mm under the LNBF tails |
 | Tip angle | 27.6° |
-| Print | 180 mm tall, ~180–240 g, 18–24 h |
+| Print | 180 mm tall, 948 cm³ solid — ~200 g at 15% infill, 18–25 h |
 
 `assembly.py` writes both printable files: `quad-clamp-print.stl`, oriented on
 its flush face, and `clamp-fit-test.stl`, a 12 mm slice of one clamp for
@@ -40,7 +40,7 @@ place for the load to enter. It also means each LNBF is seated from outside the
 array with nothing in the way.
 
 This flips the single-clamp convention, where the mouth went uphill so gravity
-would push the neck away from the opening. That was worth 0.8 N against ~45 N of
+would push the neck away from the opening. That was worth 0.8 N against ~51 N of
 ejection resistance and does not survive contact with a real constraint.
 
 ## The cradle
@@ -57,6 +57,24 @@ a flat face against a curve. Two consequences:
 - The interface carries load in bearing across a curved patch rather than on a
   line contact, which is what you want at the one joint that sees the LNBF's
   full cantilever.
+
+## Where the connectors point
+
+The neck's moulded flat seats on the land, and the connector is on the flat
+side, so the land's clock angle *is* the connector's. `LAND_AT` sets it:
+−90° aims every connector straight at the mast, and each degree added swings
+them away. Shipping value is **−55°, or 35° off inboard**.
+
+Only the land moves. Rolling the whole clamp would take the mouth with it, and
+because the web arm always arrives from the centre it would stop meeting the
+clamp's stiff back and instead grip a flexing arm partway out — at 70° of roll,
+70° along a 121° arm, leaving 50° free and making that arm about **13× stiffer**.
+Insertion force and strain would both jump. With the land moved on its own, the
+mouth stays outboard and the joint stays on the back.
+
+The land does end up on an arm rather than at the root, which costs a little
+roll stiffness — but a roll torque loads the land tangentially, along the arc,
+which is the arm's stiff direction, so the effect is small.
 
 ## The arm length is set by the LNBFs, not the clamps
 
@@ -79,18 +97,44 @@ numbers come straight from `BODY_D` and `BODY_L` at the top of `assembly.py`,
 which are **assumptions about your LNBF** — measure them and re-run before
 printing, because they move `R_ARM` directly.
 
+## How deep the web can go
+
+The web joins each clamp on its inboard back, and that back does not run the
+clamp's whole height. It is cut off from below by the aft face — a plane normal
+to the tilted bore axis — so the back exists only between `z = 11.4` and the
+flush plane at `z = 32`. Below 11.4 the clamp is all aft-face wedge, with no
+inboard surface facing the centre at all.
+
+That makes **20.2 mm** a hard ceiling on web depth, not a preference. A deeper
+web would reach past the clamp and hang in air. `assembly.py` computes
+`WEB_T_MAX` from the profile and refuses to build if `WEB_T` exceeds it.
+
+The web is 19 mm, or 94% of what is available. At the original 12 mm the joint
+covered only the top half of the back and the clamps stood proud of a thin slab;
+at 19 mm the junction is filled to the geometry's limit. The arms also come out
+about **4× stiffer**, since bending stiffness goes as the cube of section depth.
+
+The clamp still extends 37 mm below the flush plane, so roughly 18 mm of it —
+the aft-face wedge — has nothing joining it to the centre. That is not a defect
+and cannot be filled: there is no inboard face there to fill against, and the
+wedge is solid with the clamp above it, so the part remains a single connected
+body.
+
 ## Standing on the pedestal
 
-The centre drops 180 mm to a hollow Ø50 column with a Ø160 flared foot,
+The centre drops 180 mm to a solid Ø50 column with a Ø160 flared foot,
 reaching 90 mm below the lowest LNBF. Three details make it work:
 
 - **The top face stays flat all the way across.** The cross does not slope down
   to the centre — it keeps a flush top and gets *deeper*. Sloping arms would put
   their upper surfaces in overhang once the part is flipped for printing; a flat
   top with a deeper centre prints as a slab with a column rising out of it.
-- **The column is hollow and open at the bottom**, so it drains, saves ~90 cm³
-  of material, and its bore prints as a plain vertical hole with the web slab as
-  its floor.
+- **The column is solid.** Density belongs to the slicer's infill setting, not
+  to the geometry — a walled model forces one particular hollowness on everyone,
+  and anyone wanting it lighter or heavier has to edit the CAD. Solid also leaves
+  no internal cavity to trap water. At 15% infill it is ~200 g, and that mass
+  sits low: the loaded CG drops from 153 to 134 mm above the foot, lifting the
+  tip angle from 27.6° to 30.8°.
 - **The foot flare sits entirely below the LNBF tails**, at 38.7° from
   vertical. Below the tails there is nothing to hit, so the foot can spread;
   above them it could not.
@@ -130,7 +174,7 @@ highest — and flipping the mouth outward flips which side that is:
 Arm stiffness is set at the root. In the single clamp the root was the *long*
 side, so the wall had to come down to 5 mm to keep insertion force near 50 N.
 Here the root is the *short* side, so the 6 mm wall goes back in and insertion
-lands at ~45 N. Same target force, opposite adjustment — driven entirely by
+lands at ~51 N. Same target force, opposite adjustment — driven entirely by
 which way the mouth points.
 
 ## Printing

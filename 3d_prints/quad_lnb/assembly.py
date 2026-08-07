@@ -8,24 +8,39 @@ TILT deg of vertical -> no supports.
 The web's outer ends are trimmed to the clamps' actual outer surfaces (found by
 ray marching), so each arm cradles its clamp instead of stabbing into it.
 
-The centre drops into a hollow pedestal that reaches below the LNBF tails and
-flares into a foot, so the assembly stands on itself. Because the boresights
+The centre drops into a solid pedestal that reaches below the LNBF tails and
+flares into a foot, so the assembly stands on itself. The pedestal is modelled
+solid rather than walled: how dense it actually prints is the slicer's infill
+setting, not something baked into the geometry. Because the boresights
 tilt outward, the LNBF bodies lean *inward* going down and converge on the
 centre -- that convergence, not the clamps, is what sets the arm length.
 """
-import math, struct
+import math
 import numpy as np
+import trimesh
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 # ---- clamp (see clamp.py / lnbf-clamp.md) ----------------------------
-R_BORE   = 20.2      # bore radius, for a 40.0 neck
+NECK_D   = 40.0      # measured neck diameter
+TIGHTEN  = 0.5       # diametral, taken off the as-tested coupon bore. The
+                     # whole internal profile shrinks together, so the mouth
+                     # follows -- which is right if the coupon was loose
+                     # because of printer offset, since that offset applies to
+                     # the bore and the mouth alike.
+R_BORE   = 20.2 - TIGHTEN / 2
 T_ROOT   = 6.0       # wall at bottom dead centre
 T_TIP    = 3.5       # wall at the tips
 LEN_MAX  = 42.0      # longest grip. MUST be <= usable neck length
-LAND_Y   = -17.2     # flat land matching the neck's moulded flat
+LAND_OFF = 17.2 - TIGHTEN / 2   # neck is 37.2 mm flat-to-opposite-arc, so
+                                # its flat sits 17.2 mm off the axis
+LAND_AT  = -55.0     # clock angle of the land, and so of the neck's flat and
+                     # its connector. -90 puts the connector straight inboard;
+                     # every degree added swings it 1 deg away from the mast.
+                     # Moves the land ONLY -- the mouth stays outboard so the
+                     # web keeps landing on the clamp's stiff back.
 PHI_CON  = 23.7
 CHAM_DEG = 7.0
 CHAM_R   = 2.5
@@ -39,9 +54,11 @@ HORN_D   = 66.0      # feedhorn diameter (render only)
 # ---- assembly --------------------------------------------------------
 R_ARM    = 105.0     # centre to bore axis, in the flush plane
 WEB_W    = 24.0      # cross width = half the clamp's 48.7 mm width
-WEB_T    = 12.0      # cross thickness below the flush face
-PED_D    = 50.0      # pedestal outside diameter
-PED_WALL = 5.0       # pedestal wall
+WEB_T    = 19.0      # cross thickness below the flush face. Deep enough to
+                     # meet the clamp over the whole of its inboard back --
+                     # see WEB_T_MAX below, which is the hard ceiling.
+PED_D    = 50.0      # pedestal outside diameter (solid - set density with
+                     # the slicer's infill, not by hollowing the model)
 FOOT_CLR = 90.0      # LNBF tail to ground: room for an F connector and boot
                      # (~40 mm) plus a drip loop (~50 mm)
 FLARE_H  = 60.0      # flare height. Kept separate from FOOT_CLR so the column
@@ -71,13 +88,12 @@ def ry(d):
 
 
 def profile(phi_deg):
-    p = math.radians(phi_deg)
     s = abs(phi_deg + 90.0)
     t = T_ROOT - (T_ROOT - T_TIP) * min(s / abs(phi_a + 90.0), 1.0)
     r_in = R_BORE
-    sp = math.sin(p)
-    if sp < -1e-9:
-        r_in = min(r_in, LAND_Y / sp)
+    c = math.cos(math.radians(phi_deg - LAND_AT))
+    if c > 1e-9:                                   # flat land, facing LAND_AT
+        r_in = min(r_in, LAND_OFF / c)
     a = min(abs(phi_deg - phi_a), abs(phi_deg - phi_b))
     if a < CHAM_DEG:
         r_in += CHAM_R * (1.0 - a / CHAM_DEG)
@@ -98,6 +114,14 @@ zf = lambda y: (H + y * ST) / CT
 zi, zo = zf(inner[:, 1]), zf(outer[:, 1])
 OFF0 = np.array([R_ARM - H * math.tan(tr), 0.0, 0.0])
 
+# The clamp's inboard back is bounded below by its aft face, a plane normal to
+# the tilted bore axis. Below that world height the back simply does not exist,
+# so the web has nothing to reach: this is the deepest the joint can ever be.
+WEB_T_MAX = H + outer[:, 1].min() * ST
+if WEB_T > WEB_T_MAX:
+    raise SystemExit(f"WEB_T {WEB_T} exceeds {WEB_T_MAX:.1f} mm - the web would "
+                     f"hang past the clamp's back and float")
+
 r_aft = R_ARM - H * math.tan(tr)                   # bore axis at the clamp aft
 r_tail = r_aft - BODY_L * ST                       # ... and at the LNBF tail
 z_tail = -BODY_L * CT
@@ -106,20 +130,26 @@ FLARE = math.degrees(math.atan2((FOOT_D - PED_D) / 2, FLARE_H))
 
 gap_adj = r_tail * math.sqrt(2) - BODY_D
 gap_ped = r_tail - BODY_D / 2 - PED_D / 2
+mouth = 2 * min(profile(f)[0] * math.cos(math.radians(f)) for f in phis if f > 0)
+print(f"bore Ø{2*R_BORE:.2f} on a Ø{NECK_D:.1f} neck "
+      f"({2*R_BORE-NECK_D:+.2f} mm diametral), mouth {mouth:.2f} mm")
+print(f"  capture {(NECK_D-mouth)/2:.2f} mm per side = how far each arm flexes")
 print(f"grip {min(zi.min(), zo.min()):.1f} to {max(zi.max(), zo.max()):.1f} mm, "
       f"flush plane z={H:.1f}, bore-axis spacing {R_ARM*math.sqrt(2):.0f} mm")
+print(f"web {WEB_T:.0f} mm deep of a possible {WEB_T_MAX:.1f} mm "
+      f"({100*WEB_T/WEB_T_MAX:.0f}% of the clamp's inboard back)")
+bearing = LAND_AT - 90.0                           # land relative to outboard
+print(f"land/connector {abs(bearing):.0f}° from outboard, "
+      f"{180-abs(bearing):.0f}° from inboard (LAND_AT={LAND_AT:.0f})")
 print(f"LNBF tail at r={r_tail:.1f} z={z_tail:.1f}")
 print(f"  clearance LNBF to LNBF (adjacent) {gap_adj:+.1f} mm")
 print(f"  clearance LNBF to pedestal       {gap_ped:+.1f} mm")
 if min(gap_adj, gap_ped) < 5.0:
     print("  *** TIGHT - raise R_ARM or shrink PED_D ***")
-cg = (LEN_MAX + 34 - BODY_L) / 2 * CT - Z_BASE     # loaded CG above the foot
 print(f"pedestal {H - Z_BASE:.0f} mm tall, foot Ø{FOOT_D:.0f} at z={Z_BASE:.1f}, "
       f"{FOOT_CLR:.0f} mm under the tails")
 print(f"  foot flare {FLARE:.1f}° from vertical over {FLARE_H:.0f} mm"
       + ("  *** OVER 45° - NEEDS SUPPORTS ***" if FLARE > 45 else "  (supportless)"))
-print(f"  tip angle {math.degrees(math.atan2(FOOT_D/2, cg)):.1f}° "
-      f"(CG {cg:.0f} mm above the foot, LNBFs only - the mount sits lower)")
 
 
 def q(a, b, c, d):
@@ -215,35 +245,48 @@ def web_arm(az, M, o):
             e = q(P(0, vs[i], ws[j]), P(U[i, j], vs[i], ws[j]),
                   P(U[i+1, j], vs[i+1], ws[j]), P(0, vs[i+1], ws[j]))
             f.append(e if sgn > 0 else e[::-1])
-    f.append(q(P(0, vs[0], ws[0]), P(0, vs[-1], ws[0]),
-               P(0, vs[-1], ws[-1]), P(0, vs[0], ws[-1])))
+    for i in range(NV - 1):                       # inner end cap, subdivided to
+        for j in range(NW - 1):                   # match the walls exactly --
+            f.append(q(P(0, vs[i], ws[j]),        # a single quad here leaves
+                       P(0, vs[i], ws[j+1]),      # T-junctions and the shell
+                       P(0, vs[i+1], ws[j+1]),    # never closes
+                       P(0, vs[i+1], ws[j])))
     return [np.array(x) for x in f]
 
 
-def revolve(rz_pairs, n=72, flip=False):
-    """Surface of revolution through a list of (r, z), as quads."""
+def revolve_closed(loop, n=72):
+    """Revolve a closed (r, z) polygon into one closed shell.
+
+    Segments lying on the axis are skipped and segments touching it emit
+    triangles, so no zero-area faces are produced.
+    """
     f = []
-    for k in range(len(rz_pairs) - 1):
-        (r0, za), (r1, zb) = rz_pairs[k], rz_pairs[k + 1]
+    for k in range(len(loop)):
+        (r0, za), (r1, zb) = loop[k], loop[(k + 1) % len(loop)]
+        if r0 < 1e-9 and r1 < 1e-9:
+            continue
         for i in range(n):
             a0, a1 = 2*math.pi*i/n, 2*math.pi*(i+1)/n
-            p = [(r0*math.cos(a0), r0*math.sin(a0), za),
-                 (r0*math.cos(a1), r0*math.sin(a1), za),
-                 (r1*math.cos(a1), r1*math.sin(a1), zb),
-                 (r1*math.cos(a0), r1*math.sin(a0), zb)]
-            f.append(np.array(p[::-1] if flip else p))
+            p00 = (r0*math.cos(a0), r0*math.sin(a0), za)
+            p01 = (r0*math.cos(a1), r0*math.sin(a1), za)
+            p11 = (r1*math.cos(a1), r1*math.sin(a1), zb)
+            p10 = (r1*math.cos(a0), r1*math.sin(a0), zb)
+            if r0 < 1e-9:
+                f.append(np.array([p00, p11, p10, p00]))
+            elif r1 < 1e-9:
+                f.append(np.array([p00, p01, p11, p00]))
+            else:
+                f.append(np.array([p00, p01, p11, p10]))
     return f
 
 
-ri_ped, ri_foot = PED_D / 2 - PED_WALL, FOOT_D / 2 - PED_WALL
-pedestal = (
-    revolve([(PED_D/2, H), (PED_D/2, Z_BASE + FLARE_H), (FOOT_D/2, Z_BASE)]) +
-    revolve([(ri_foot, Z_BASE), (ri_ped, Z_BASE + FLARE_H),
-             (ri_ped, H - WEB_T)], flip=True) +
-    revolve([(ri_foot, Z_BASE), (FOOT_D/2, Z_BASE)], flip=True) +
-    revolve([(0.0, H), (PED_D/2, H)], flip=True) +
-    revolve([(0.0, H - WEB_T), (ri_ped, H - WEB_T)])
-)
+pedestal = revolve_closed([
+    (0.0,        H),                       # top face, flush with the cross
+    (PED_D / 2,  H),
+    (PED_D / 2,  Z_BASE + FLARE_H),        # straight column
+    (FOOT_D / 2, Z_BASE),                  # flare out to the foot
+    (0.0,        Z_BASE),                  # foot underside, solid across
+])
 
 arms = [web_arm(a, M, o) for a, (M, o) in zip(AZ, XF)]
 allf = [f for c in clamps for f in c] + [x for a in arms for x in a] + pedestal
@@ -256,42 +299,72 @@ print(f"envelope {ap[:,0].max()-ap[:,0].min():.0f} x {ap[:,1].max()-ap[:,1].min(
       f"({max(a45[:,0].max()-a45[:,0].min(), a45[:,1].max()-a45[:,1].min()):.0f} mm "
       f"bed if rotated 45°)")
 
-FLIP = np.diag([1.0, -1.0, -1.0])
-printo = [f @ FLIP.T for f in allf]
-dz = min(f[:, 2].min() for f in printo)
-printo = [f - np.array([0, 0, dz]) for f in printo]
-print(f"print height {max(f[:,2].max() for f in printo):.0f} mm")
 
-ring = np.vstack([outer, inner[::-1]])
-area = 0.5 * abs(np.dot(ring[:, 0], np.roll(ring[:, 1], -1)) -
-                 np.dot(ring[:, 1], np.roll(ring[:, 0], -1)))
-vol = (4 * area * float(np.mean(np.concatenate([zi, zo])))
-       + (2 * WEB_W * 2 * R_ARM - WEB_W ** 2) * WEB_T
-       + math.pi * ((PED_D/2)**2 - ri_ped**2) * (H - WEB_T - Z_BASE)) / 1000.0
-print(f"solid volume ~{vol:.0f} cm3; expect ~{vol*1.24*0.5:.0f}-{vol*1.24*0.65:.0f} g "
-      f"and 14-20 h at 40% infill")
+def shell(quads, name):
+    """Quad soup -> one closed, outward-wound solid.
 
-
-def write_stl(name, polys):
-    tris = []
-    for f in polys:
-        tris.append((f[0], f[1], f[2])); tris.append((f[0], f[2], f[3]))
-    with open(name, "wb") as fh:
-        fh.write(b"\0" * 80)
-        fh.write(struct.pack("<I", len(tris)))
-        for a, b, c in tris:
-            n = np.cross(b - a, c - a); ln = np.linalg.norm(n)
-            n = n / ln if ln > 1e-12 else np.zeros(3)
-            fh.write(struct.pack("<12fH", *n, *a, *b, *c, 0))
-    print(f"wrote {name} ({len(tris)} triangles)")
+    fix_normals() is what makes this safe: winding by hand is easy to get
+    backwards, and an inverted shell renders identically but slices as a void.
+    """
+    v, f = [], []
+    for qd in quads:
+        i = len(v)
+        v.extend([tuple(x) for x in qd])
+        f += [[i, i + 1, i + 2], [i, i + 2, i + 3]]
+    m = trimesh.Trimesh(vertices=np.array(v, float), faces=np.array(f), process=True)
+    m.update_faces(m.area_faces > 1e-8)          # drop zero-area triangles
+    m.remove_unreferenced_vertices()
+    m.fix_normals()
+    if not m.is_watertight:
+        raise SystemExit(f"{name}: shell is not closed, cannot union")
+    if m.volume <= 0:
+        raise SystemExit(f"{name}: still inside-out after fix_normals")
+    return m
 
 
-write_stl("quad-clamp-print.stl", printo)
+SHELLS = ([shell(c, f"clamp{i}") for i, c in enumerate(clamps)]
+          + [shell(a, f"arm{i}") for i, a in enumerate(arms)]
+          + [shell(pedestal, "pedestal")])
+print(f"unioning {len(SHELLS)} shells "
+      f"(sum {sum(m.volume for m in SHELLS)/1000:.0f} cm3 before overlaps merge)")
+solid = trimesh.boolean.union(SHELLS, engine="manifold")
+solid.fix_normals()
+print(f"  -> 1 body={solid.body_count == 1}, watertight={solid.is_watertight}, "
+      f"volume {solid.volume/1000:.0f} cm3")
+if not (solid.is_watertight and solid.body_count == 1 and solid.volume > 0):
+    raise SystemExit("union did not produce a single closed solid")
+
+T = np.eye(4)
+T[:3, :3] = np.diag([1.0, -1.0, -1.0])           # flush face down onto the bed
+printed = solid.copy()
+printed.apply_transform(T)
+printed.apply_translation([0, 0, -printed.bounds[0][2]])
+printed.export("quad-clamp-print.stl")
+print(f"wrote quad-clamp-print.stl ({len(printed.faces)} triangles), "
+      f"print height {printed.bounds[1][2]:.0f} mm")
+
+vol = solid.volume / 1000.0
+# The model is solid, so density is a slicer setting rather than geometry.
+# grams ~ volume * infill * PLA density, +15% for perimeters and solid layers.
+print(f"volume {vol:.0f} cm3 (modelled solid - set weight with infill):")
+for pct in (10, 15, 25, 40):
+    g = vol * pct / 100 * 1.24 * 1.15
+    print(f"    {pct:2d}% infill -> {g:4.0f} g, roughly {g/11:.0f}-{g/8:.0f} h")
+
+# Tip stability, now that the mount's own mass is worth counting. A solid base
+# puts most of that mass low down, which drags the loaded CG toward the foot.
+LNBF_G = 180.0
+z_lnbf = (LEN_MAX + 34 - BODY_L) / 2 * CT
+for pct in (15, 25):
+    m_mount = vol * pct / 100 * 1.24 * 1.15
+    m_lnbf = 4 * LNBF_G
+    cg_z = (m_mount * solid.center_mass[2] + m_lnbf * z_lnbf) / (m_mount + m_lnbf)
+    tip = math.degrees(math.atan2(FOOT_D / 2, cg_z - Z_BASE))
+    print(f"  at {pct}% infill: mount {m_mount:.0f} g + LNBFs {m_lnbf:.0f} g, "
+          f"CG {cg_z - Z_BASE:.0f} mm above the foot, tip angle {tip:.1f}°")
+
 
 # ---- fit-test coupon: a short straight slice of one clamp ------------
-# Same profile and the same walls as the shipped part, so insertion feel is
-# representative. Prints flat on the bed, bore axis vertical -- the same layer
-# orientation the real clamp arms get.
 def coupon_faces(depth):
     f = []
     for k in range(N - 1):
@@ -309,13 +382,34 @@ def coupon_faces(depth):
     return [np.array(x) for x in f]
 
 
-write_stl("clamp-fit-test.stl", coupon_faces(TEST_D))
+coupon = shell(coupon_faces(TEST_D), "coupon")
+coupon.export("clamp-fit-test.stl")
 root = min(zi.min(), zo.min())
-print(f"coupon {TEST_D:.0f} mm deep, {area*TEST_D/1000*1.24*0.9:.0f} g, ~15 min")
+print(f"wrote clamp-fit-test.stl, {TEST_D:.0f} mm deep, "
+      f"{coupon.volume/1000*1.24*0.9:.0f} g, ~15 min")
 print(f"  arms are {TEST_D:.0f} mm wide vs {root:.1f} mm at the real root, so the "
       f"full clamp needs about {root/TEST_D:.1f}x the push you feel")
 
+printo = [f @ np.diag([1.0, -1.0, -1.0]).T for f in allf]
+dz = min(f[:, 2].min() for f in printo)
+printo = [f - np.array([0, 0, dz]) for f in printo]
+
 # ---- render ----------------------------------------------------------
+def revolve(rz_pairs, n=72, flip=False):
+    """Open surface of revolution. Render only -- never goes into an STL."""
+    f = []
+    for k in range(len(rz_pairs) - 1):
+        (r0, za), (r1, zb) = rz_pairs[k], rz_pairs[k + 1]
+        for i in range(n):
+            a0, a1 = 2*math.pi*i/n, 2*math.pi*(i+1)/n
+            p = [(r0*math.cos(a0), r0*math.sin(a0), za),
+                 (r0*math.cos(a1), r0*math.sin(a1), za),
+                 (r1*math.cos(a1), r1*math.sin(a1), zb),
+                 (r1*math.cos(a0), r1*math.sin(a0), zb)]
+            f.append(np.array(p[::-1] if flip else p))
+    return f
+
+
 BASE = np.array([0.560, 0.530, 0.900])
 TEAL = np.array([0.114, 0.620, 0.459])
 LIGHT = np.array([0.45, -0.55, 0.70]); LIGHT /= np.linalg.norm(LIGHT)
@@ -338,6 +432,11 @@ def lnbf(M, o):
          revolve([(20.0, -2.0), (20.0, LEN_MAX + 4)]) +
          revolve([(HORN_D/2, LEN_MAX + 4), (HORN_D/2, LEN_MAX + 34)]) +
          revolve([(0, LEN_MAX + 34), (HORN_D/2, LEN_MAX + 34)]))
+    off = np.array([BODY_D / 4 * math.cos(math.radians(LAND_AT)),
+                    BODY_D / 4 * math.sin(math.radians(LAND_AT)), 0.0])
+    f += [x + off for x in                        # F connector, on the flat side
+          revolve([(7.0, -BODY_L - 18), (7.0, -BODY_L)]) +
+          revolve([(0.0, -BODY_L - 18), (7.0, -BODY_L - 18)])]
     return [x @ M.T + o for x in f]
 
 

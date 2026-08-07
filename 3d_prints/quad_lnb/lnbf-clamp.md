@@ -11,8 +11,8 @@ off the bed already at its installed angle.
 
 | Feature | Value |
 | --- | --- |
-| Bore | Ø40.4 (for a Ø40.0 neck) |
-| Mouth opening | 37 mm between tip inner faces |
+| Bore | Ø39.9 (for a Ø40.0 neck) |
+| Mouth opening | 36.6 mm between tip inner faces |
 | Entry flare | 39 mm at the tips, funnelling down to the 37 mm constriction |
 | Wall | 5 mm at bottom dead centre, tapering to 3 mm at the tips |
 | Wrap | 241° (tips at ±59° from top) |
@@ -28,18 +28,18 @@ from `assembly.py`, so the fit-test coupon cannot drift from the shipped part.
 
 ## The four numbers that matter
 
-**Mouth 37 mm against a Ø40 neck.** The 1.5 mm of overhang each side is what
-holds the LNBF in. Each arm flexes 1.5 mm on insertion — about 0.29% strain,
-comfortably inside what PLA takes repeatedly. Expect roughly 45–55 N to push in
-with PLA, 25–30 N with ASA. Check it on a test print; the analytic models bracket
+**Mouth 36.6 mm against a Ø40 neck.** The 1.7 mm of overhang each side is what
+holds the LNBF in. Each arm flexes 1.7 mm on insertion — about 0.33% strain,
+comfortably inside what PLA takes repeatedly. Expect roughly 50–60 N to push in
+with PLA, 28–34 N with ASA. Check it on a test print; the analytic models bracket
 this rather than pin it.
 
 **The wall came down from 6 mm to 5 mm when the clamp was lengthened.** This is
 the consequence of extending it that is easy to miss: the flexing arms are now up
 to 42 mm wide axially instead of 28, and bending stiffness scales with that
 width, so the same wall would have needed ~80 N to open. Thinning the root from
-6 to 5 mm cuts stiffness by (5/6)³ and brings it back to ~48 N. It also drops
-peak strain from 0.35% to 0.29%, which matters more in PLA than in ASA.
+6 to 5 mm cuts stiffness by (5/6)³ and brings it back to ~54 N. It also drops
+peak strain by a sixth, which matters more in PLA than in ASA.
 
 **The chamfer sits outboard of the constriction, not on it.** A lead-in chamfer
 cut into the tips of a 227° wrap eats the bore right where it is narrowest: it
@@ -82,7 +82,7 @@ clamp and emits no STL.
 
 The single part is rotated so the **mouth goes uphill and the land downhill**. Gravity's
 in-plane component then pushes the neck away from the opening and onto the roll
-key rather than toward the mouth — only 0.8 N against ~48 N of ejection
+key rather than toward the mouth — only 0.8 N against ~54 N of ejection
 resistance, so it is not what holds the LNBF in, but it is free. The land and its
 weep groove end up at the low point and drain, and the connector points 27° off
 straight down.
@@ -96,10 +96,10 @@ matters: too long and the clamp will not fit between them at all.
 
 ## Optional but cheap
 
-- **Flat land at the bottom of the bore**, 17.2 mm off the axis and 20.4 mm
-  wide, matching the flat on the LNBF neck. Stops the LNBF rotating. It sits on
-  the long side of the trim, so it keeps close to the full 42 mm of key length.
-  Leave it rib-free and rigid.
+- **Flat land**, 17.2 mm off the axis and 20.4 mm wide, matching the flat on the
+  LNBF neck. Stops the LNBF rotating. Its clock angle (`LAND_AT`) also decides
+  where the coax comes out, since the connector sits on the flat side — see
+  [quad-clamp.md](quad-clamp.md). Leave it rib-free and rigid.
 - **Four axial ribs 0.5 mm proud** elsewhere in the bore, to take up print
   tolerance and stop the LNBF rattling. Not on the land.
 - **6 × 2 mm weep groove** down the centre of the land if it will sit outdoors.

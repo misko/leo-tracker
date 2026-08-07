@@ -15,11 +15,19 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 # ---- parameters (mm) -------------------------------------------------
-R_BORE   = 20.2      # bore radius, for a 40.0 neck
+NECK_D   = 40.0      # measured neck diameter
+TIGHTEN  = 0.5       # diametral, taken off the as-tested coupon bore. The
+                     # whole internal profile shrinks together, so the mouth
+                     # follows -- which is right if the coupon was loose
+                     # because of printer offset, since that offset applies to
+                     # the bore and the mouth alike.
+R_BORE   = 20.2 - TIGHTEN / 2
 T_ROOT   = 5.0       # wall at bottom dead centre
 T_TIP    = 3.0       # wall at the tips
 LEN_MAX  = 42.0      # longest grip, at the land side. MUST be <= usable neck
-LAND_Y   = -17.2     # flat land, matching the neck's moulded flat
+LAND_OFF = 17.2 - TIGHTEN / 2   # flat land offset from the bore axis
+LAND_AT  = -55.0     # clock angle of the land (= of the neck's flat and its
+                     # connector). See assembly.py -- this is the shipped value.
 PHI_CON  = 23.7      # constriction: gap here is 37.0 mm
 CHAM_DEG = 7.0       # chamfer angular span
 CHAM_R   = 2.5       # chamfer radial rise
@@ -43,9 +51,9 @@ def profile(phi_deg):
     arm = abs(phi_a + 90.0)
     t = T_ROOT - (T_ROOT - T_TIP) * min(s / arm, 1.0)
     r_in = R_BORE
-    sp = math.sin(p)
-    if sp < -1e-9:                                # flat land at the bottom
-        r_in = min(r_in, LAND_Y / sp)
+    c = math.cos(math.radians(phi_deg - LAND_AT))
+    if c > 1e-9:                                  # flat land, facing LAND_AT
+        r_in = min(r_in, LAND_OFF / c)
     a = min(abs(phi_deg - phi_a), abs(phi_deg - phi_b))
     if a < CHAM_DEG:                              # lead-in chamfer at the tips
         r_in += CHAM_R * (1.0 - a / CHAM_DEG)

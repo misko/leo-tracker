@@ -80,6 +80,18 @@ receipt for the selected pipeline. Publication of each job marker is atomic,
 and rerunning the command is safe. Live jobs and backfill use the same queue;
 enqueue backfill in bounded batches so new observations retain priority.
 
+After Kalman shadow processing is healthy, SATPI01 can queue preserved captures
+that are no longer present in the QNAP working set:
+
+```bash
+./scripts/starlink-export-backfill.sh --dry-run --limit 10
+./scripts/starlink-export-backfill.sh --limit 10
+```
+
+The normal copy-only exporter performs the transfer and leaves the NVMe source
+untouched. Use small batches until queue age and QNAP capacity demonstrate that
+live capture is unaffected.
+
 ## Promotion gates
 
 Promote `shadow` to `required` only after all of these hold:

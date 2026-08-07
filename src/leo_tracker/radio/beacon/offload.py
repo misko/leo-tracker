@@ -393,6 +393,63 @@ def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
             "skipped": skipped, "errors": errors, "dry_run": dry_run}
 
 
+def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
+                            pipeline_id: str, limit: int | None = None,
+                            dry_run: bool = False) -> dict:
+    """Queue preserved acquisition captures absent from the shared pipeline."""
+    source_root = Path(source_root).resolve(); shared_root = Path(shared_root).resolve()
+    pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
+    if limit is not None and limit < 1:
+        raise ValueError("backfill limit must be positive")
+    queue = source_root / "staging" / "analysis-queue"
+    queue.mkdir(parents=True, exist_ok=True)
+    active_names: set[str] = set()
+    for pattern in ("*.job", "*.exporting.*"):
+        for marker in queue.glob(pattern):
+            try:
+                active_names.add(parse_job(marker)[0])
+            except (OSError, ValueError):
+                continue
+    queued, skipped, errors = [], [], []
+    captures_root = source_root / "captures"
+    captures = (sorted(captures_root.iterdir(), key=lambda path: path.stat().st_mtime)
+                if captures_root.is_dir() else [])
+    for capture in captures:
+        if not capture.is_dir():
+            continue
+        name = capture.name
+        completion = (shared_root / "reports" / "runs" / pipeline_id / name /
+                      "completion.json")
+        shared_capture = shared_root / "captures" / name
+        if (completion.is_file() or shared_capture.is_dir() or
+                name in active_names):
+            skipped.append(name); continue
+        try:
+            manifest = _read_json(capture / "manifest.json")
+            if manifest.get("state") != "complete":
+                skipped.append(name); continue
+            metadata = manifest.get("metadata", {})
+            mode = str(metadata.get("observation_mode") or
+                       ("oversample" if "oversample" in name else
+                        "wide" if "wide" in name else
+                        "hop" if name.startswith("hop-") else "narrow"))
+            if mode not in {"narrow", "wide", "oversample", "hop"}:
+                raise ValueError(f"unknown observation mode {mode!r}")
+            marker = queue / f"backfill-export-{pipeline_id}-{name}.job"
+            payload = f"{name}\t{capture}\t{mode}\n"
+            if not dry_run:
+                temporary = marker.with_name(f".{marker.name}.next.{os.getpid()}")
+                temporary.write_text(payload); os.replace(temporary, marker)
+            queued.append(name); active_names.add(name)
+            if limit is not None and len(queued) >= limit:
+                break
+        except Exception as exc:
+            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+    return {"schema": "leo-tracker.export-backfill/v1",
+            "pipeline_id": pipeline_id, "queued": queued,
+            "skipped": skipped, "errors": errors, "dry_run": dry_run}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -421,6 +478,12 @@ def main(argv: list[str] | None = None) -> int:
     enqueue.add_argument("--pipeline-id", required=True)
     enqueue.add_argument("--limit", type=int)
     enqueue.add_argument("--dry-run", action="store_true")
+    enqueue_export = commands.add_parser("enqueue-export-backfill")
+    enqueue_export.add_argument("source_root", type=Path)
+    enqueue_export.add_argument("shared_root", type=Path)
+    enqueue_export.add_argument("--pipeline-id", required=True)
+    enqueue_export.add_argument("--limit", type=int)
+    enqueue_export.add_argument("--dry-run", action="store_true")
     audit = commands.add_parser("audit")
     audit.add_argument("root", type=Path); audit.add_argument("--context", type=Path)
     current = commands.add_parser("current")
@@ -450,6 +513,12 @@ def main(argv: list[str] | None = None) -> int:
         report = enqueue_analysis_backfill(
             args.root, pipeline_id=args.pipeline_id, limit=args.limit,
             dry_run=args.dry_run)
+        print(json.dumps(report, sort_keys=True))
+        return 1 if report["errors"] else 0
+    elif args.command == "enqueue-export-backfill":
+        report = enqueue_export_backfill(
+            args.source_root, args.shared_root, pipeline_id=args.pipeline_id,
+            limit=args.limit, dry_run=args.dry_run)
         print(json.dumps(report, sort_keys=True))
         return 1 if report["errors"] else 0
     elif args.command == "audit":

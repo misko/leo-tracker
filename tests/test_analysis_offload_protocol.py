@@ -11,6 +11,7 @@ from leo_tracker.radio.beacon.offload import (
     create_context_bundle,
     current_context,
     enqueue_analysis_backfill,
+    enqueue_export_backfill,
     followup_has_checks,
     validate_context_bundle,
     validate_outputs,
@@ -182,6 +183,32 @@ def test_backfill_is_versioned_bounded_atomic_and_idempotent(tmp_path):
     jobs = sorted((tmp_path / "staging/analysis-queue").glob("*.job"))
     assert len(jobs) == 2
     assert jobs[0].read_text().split("\t")[3].startswith("context/bundles/")
+
+
+def test_export_backfill_queues_only_missing_preserved_sources(tmp_path):
+    source = tmp_path / "source"; shared = tmp_path / "shared"
+    captures = source / "captures"; captures.mkdir(parents=True)
+    for name in ("one", "two", "three"):
+        capture = captures / name; capture.mkdir()
+        (capture / "manifest.json").write_text(json.dumps({
+            "state": "complete", "metadata": {"observation_mode": "narrow"}}))
+    (shared / "captures/two").mkdir(parents=True)
+    completed = shared / "reports/runs/kalman-v1/one/completion.json"
+    completed.parent.mkdir(parents=True); completed.write_text("{}")
+
+    preview = enqueue_export_backfill(
+        source, shared, pipeline_id="kalman-v1", dry_run=True)
+    result = enqueue_export_backfill(
+        source, shared, pipeline_id="kalman-v1", limit=1)
+    repeated = enqueue_export_backfill(
+        source, shared, pipeline_id="kalman-v1", limit=1)
+
+    assert preview["queued"] == ["three"]
+    assert result["queued"] == ["three"]
+    assert repeated["queued"] == []
+    job = next((source / "staging/analysis-queue").glob("*.job"))
+    fields = job.read_text().rstrip().split("\t")
+    assert fields == ["three", str(captures / "three"), "narrow"]
 
 
 def test_audit_requeues_false_done_but_accepts_valid_negative(tmp_path):

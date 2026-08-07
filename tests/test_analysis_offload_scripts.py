@@ -66,6 +66,15 @@ def test_backfill_wrapper_uses_uv_existing_venv_and_versioned_enqueue():
     assert "LEO_ANALYSIS_PIPELINE_ID" in source
 
 
+def test_source_export_backfill_wrapper_is_bounded_copy_only_uv_workflow():
+    source = (ROOT / "scripts/starlink-export-backfill.sh").read_text()
+    assert "run --active --no-sync" in source
+    assert "enqueue-export-backfill" in source
+    assert "LEO_BEACON_STORAGE" in source
+    assert "LEO_OFFLOAD_ROOT" in source
+    assert "LEO_ANALYSIS_PIPELINE_ID" in source
+
+
 def test_server_worker_exits_cleanly_when_once_queue_is_empty(tmp_path):
     result = subprocess.run(
         ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",

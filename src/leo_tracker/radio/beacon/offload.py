@@ -225,7 +225,11 @@ def validate_outputs(root: Path, name: str, mode: str, *, context: Path | None,
     confirmed = bool(values["followup"].get("confirmation", {}).get("confirmed"))
     has_checks = followup_has_checks(output_paths["followup"])
     if confirmed or full_coverage:
-        output_paths["track"] = reports / "tracks" / f"{name}.json"
+        # Wide analysis already carries its full-coverage Doppler windows, so
+        # the server skips the continuous tracker for it. Requiring a track
+        # artifact the pipeline never produces fails every wide recording.
+        if mode != "wide":
+            output_paths["track"] = reports / "tracks" / f"{name}.json"
         if has_checks and mode not in {"wide", "hop"}:
             output_paths["decoded"] = reports / "decoded" / f"{name}.json"
         if (mode != "wide" and context is not None and

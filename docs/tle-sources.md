@@ -20,14 +20,38 @@ propagation.
 
 ## Rate discipline
 
-The archive timer queries four times a day. That is far inside Space-Track's
-published limits and already faster than the catalog changes — the previous
-source published 1.09 new catalogs per day across a measured week, with gaps
-between 11.8 and 39.8 hours. Each invocation performs exactly one login, one
-query, and one logout.
+Space-Track's published rules, retrieved 2026-08-08:
+
+- fewer than 30 requests per minute and 300 per hour overall;
+- **GP class: at most one query per hour**, with query timing randomized and
+  the query filtered to propagable objects;
+- do not issue hundreds of per-object queries; combine them into one;
+- accounts are suspended for querying too often or for queries that degrade the
+  site, and repeat offenders are suspended permanently;
+- using multiple accounts to work around the limits is prohibited.
+
+The archive timer queries four times a day with `RandomizedDelaySec=15m`, which
+satisfies the hourly GP limit and the randomization request, and is already
+faster than the catalog changes — the previous source published 1.09 new
+catalogs per day across a measured week, with gaps between 11.8 and 39.8 hours.
+Each invocation performs exactly one login, one query, and one logout.
 
 Do not shorten the timer, and do not add ad-hoc fetch loops. This host is
 already blocked by Celestrak; losing the authoritative source would be worse.
+
+## Redistribution and citation
+
+USSPACECOM grants blanket approval to redistribute basic SSA data — TLEs, OMMs,
+SATCAT and decay data — "conditioned on appropriate citation", and states that
+"publications of analysis based on USSPACECOM data also require appropriate
+citations". Archiving catalogs here and carrying them in evidence bundles is
+therefore permitted, but any published report or artifact derived from them
+must cite Space-Track.org as the source.
+
+Accounts are personal: the agreement forbids sharing or transferring a username
+or password, and requires a separate account per individual or entity. The
+credentials file is root-owned and readable only by systemd, which reads it
+before dropping to the service user.
 
 ## Credentials
 

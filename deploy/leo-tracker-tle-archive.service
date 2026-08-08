@@ -13,8 +13,10 @@ Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
 # Credentials live outside the repository in a 0600 file so they reach neither
 # git nor a process listing. See docs/tle-sources.md.
 EnvironmentFile=/etc/leo-tracker/space-track.env
+# decay_date/null-val keeps the query to propagable objects, which Space-Track
+# asks for explicitly, and one catalog query replaces per-object requests.
 ExecStart=/home/satpi01/.local/bin/uv run --active --no-sync leo-orbit archive \
-  --url "https://www.space-track.org/basicspacedata/query/class/gp/OBJECT_NAME/~~STARLINK/orderby/NORAD_CAT_ID/format/tle" \
+  --url "https://www.space-track.org/basicspacedata/query/class/gp/OBJECT_NAME/~~STARLINK/decay_date/null-val/orderby/NORAD_CAT_ID/format/3le" \
   --archive-dir /mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history \
   --label starlink-current
 

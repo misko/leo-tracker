@@ -270,7 +270,8 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
                                   block_size=args.block_size, start_utc_ns=args.fake_start_utc_ns)
     else:
         source = PairedPlutoSource(config, uri=args.uri, block_size=args.block_size,
-                                   transport="iio", serial=args.serial)
+                                   transport="iio", serial=args.serial,
+                                   sample_format=args.sample_format)
     identity = dict(source.identity)
     if not args.fake and args.gain_mode != "manual" and args.agc_settle_s > 0:
         time.sleep(args.agc_settle_s)
@@ -324,7 +325,8 @@ def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
                                   start_utc_ns=args.fake_start_utc_ns)
     else:
         source = PairedPlutoSource(config, uri=args.uri, block_size=args.block_size,
-                                   transport="iio", serial=args.serial)
+                                   transport="iio", serial=args.serial,
+                                   sample_format=args.sample_format)
     if not args.fake and args.gain_mode != "manual" and args.agc_settle_s > 0:
         time.sleep(args.agc_settle_s)
     report = capture_hop_session(source, args.output, channels=channels,
@@ -1592,6 +1594,8 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_capture.add_argument("--chunk-s", type=float, default=5)
     beacon_capture.add_argument("--queue-blocks", type=int, default=16,
         help="bounded lossless reader queue overlapping Pluto refills with NVMe writes")
+    beacon_capture.add_argument("--sample-format", choices=("native-ci16", "complex64"),
+        default="native-ci16", help="native CI16 avoids pyadi's costly complex64 round trip")
     beacon_capture.add_argument("--uri", default="pluto://ip:192.168.2.1")
     beacon_capture.add_argument("--serial")
     beacon_capture.add_argument("--host-temperature-c", type=float)
@@ -1618,6 +1622,8 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_hop.add_argument("--agc-settle-s", type=float, default=2.0)
     beacon_hop.add_argument("--settle-buffers", type=int, default=2,
         help="discard this many complete IIO refills after every LO retune")
+    beacon_hop.add_argument("--sample-format", choices=("native-ci16", "complex64"),
+        default="native-ci16", help="native CI16 avoids pyadi's costly complex64 round trip")
     beacon_hop.add_argument("--block-size", type=int, default=262_144)
     beacon_hop.add_argument("--chunk-s", type=float, default=1.0)
     beacon_hop.add_argument("--uri", default="pluto://ip:192.168.2.1")

@@ -118,9 +118,11 @@ between RX0 and RX1. A stationary signal, tuner-center spur, or one-channel
 event therefore remains diagnostic rather than becoming a Doppler claim.
 
 The field-tested dual-RX ceiling is 30.72 MS/s in the current 2RX/2TX firmware
-configuration. Use that rate for short discovery snapshots, not continuous IQ:
-the IP/IIO plus complex64 storage path cannot sustain two channels at that
-rate. A complete universal-LNBF low-band monitor run is:
+configuration. Use that rate for short discovery snapshots, not continuous IQ.
+Raw beacon recording now preserves pyadi's native CI16 components and avoids a
+complex64 round trip; this reduced a 2.5 MS/s 120-second capture's wall-time
+excess from 4.625% to 0.159%. Continuous operation at higher rates still needs
+separate hardware acceptance. A complete universal-LNBF low-band monitor run is:
 
 ```bash
 /home/satpi01/.local/bin/uv run --active --no-sync leo-radio monitor OUTPUT \

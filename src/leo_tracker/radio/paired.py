@@ -37,6 +37,40 @@ class PairedSampleBlock:
             raise ValueError("paired channel samples must be complex")
 
 
+@dataclass(frozen=True)
+class PairedCI16Block:
+    """Native dual-RX I/Q components without a complex64 round trip.
+
+    Components are ordered I0, Q0, I1, Q1 and retain the libiio-owned buffers
+    until the consumer has copied them into the durable CI16 layout.
+    """
+    components: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    sample_index: int
+    utc_ns: int
+    dropped_samples: int = 0
+    read_duration_ns: int | None = None
+    gain_db: tuple[float, float] | None = None
+
+    def __post_init__(self) -> None:
+        values = tuple(np.asarray(item) for item in self.components)
+        if len(values) != 4 or any(item.ndim != 1 for item in values):
+            raise ValueError("native paired blocks require four one-dimensional components")
+        if len({item.size for item in values}) != 1:
+            raise ValueError("native paired block components differ in length")
+        if any(item.dtype.kind != "i" or item.dtype.itemsize != 2 for item in values):
+            raise ValueError("native paired block components must be signed int16")
+        object.__setattr__(self, "components", values)
+
+    @property
+    def sample_count(self) -> int:
+        return int(self.components[0].size)
+
+
+def paired_sample_count(block: PairedSampleBlock | PairedCI16Block) -> int:
+    return (block.sample_count if isinstance(block, PairedCI16Block)
+            else int(block.rx0.size))
+
+
 class PairedRadioSource(Protocol):
     @property
     def configs(self) -> tuple[RadioConfig, RadioConfig]: ...

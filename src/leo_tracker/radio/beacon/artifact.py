@@ -13,13 +13,14 @@ from typing import Iterable, Iterator
 
 import numpy as np
 
-from ..paired import PairedSampleBlock
+from ..paired import PairedCI16Block, PairedSampleBlock, paired_sample_count
 
 SCHEMA = "leo-tracker.beacon-iq/v1"
 LAYOUT = "sample,receiver,component; receivers=rx0,rx1; components=i,q"
 
 
-def queued_paired_blocks(source, *, queue_blocks: int = 16) -> Iterator[PairedSampleBlock]:
+def queued_paired_blocks(source, *, queue_blocks: int = 16
+                         ) -> Iterator[PairedSampleBlock | PairedCI16Block]:
     """Overlap blocking radio refills with conversion, hashing, and NVMe writes."""
     if queue_blocks < 1:
         raise ValueError("queue-blocks must be at least one")
@@ -97,7 +98,26 @@ def _complex_to_ci16(rx0: np.ndarray, rx1: np.ndarray) -> np.ndarray:
     return output
 
 
-def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
+def _components(block: PairedSampleBlock | PairedCI16Block, count: int
+                ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if isinstance(block, PairedCI16Block):
+        return tuple(item[:count] for item in block.components)
+    return (block.rx0[:count].real, block.rx0[:count].imag,
+            block.rx1[:count].real, block.rx1[:count].imag)
+
+
+def _block_to_ci16(block: PairedSampleBlock | PairedCI16Block, count: int) -> np.ndarray:
+    if not isinstance(block, PairedCI16Block):
+        return _complex_to_ci16(block.rx0[:count], block.rx1[:count])
+    output = np.empty((count, 2, 2), dtype="<i2")
+    i0, q0, i1, q1 = _components(block, count)
+    output[:, 0, 0], output[:, 0, 1] = i0, q0
+    output[:, 1, 0], output[:, 1, 1] = i1, q1
+    return output
+
+
+def capture_beacon_iq(blocks: Iterable[PairedSampleBlock | PairedCI16Block],
+                      destination: Path, *,
                       sample_rate_hz: float, center_frequency_hz: float,
                       bandwidth_hz: float, duration_s: float,
                       lnb_lo_hz: float | None = None, chunk_s: float = 5.0,
@@ -130,7 +150,7 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
     _atomic_json(manifest_path, manifest)
     pending: list[np.ndarray] = []
     pending_count = total = 0
-    pending_reads: list[PairedSampleBlock] = []
+    pending_reads: list[PairedSampleBlock | PairedCI16Block] = []
     chunk_index = committed_samples = 0
     expected_source_index: int | None = None
     read_count = total_read_duration_ns = maximum_read_duration_ns = 0
@@ -205,7 +225,8 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
                     f"non-contiguous radio stream: expected sample {expected_source_index}, "
                     f"received {block.sample_index}, dropped={block.dropped_samples}"
                 )
-            expected_source_index += block.rx0.size
+            block_samples = paired_sample_count(block)
+            expected_source_index += block_samples
             read_count += 1
             if block.read_duration_ns is not None:
                 duration_ns = int(block.read_duration_ns)
@@ -220,7 +241,7 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
                 previous_read_stop_ns = read_stop_ns
                 total_read_duration_ns += duration_ns
                 maximum_read_duration_ns = max(maximum_read_duration_ns, duration_ns)
-            available = min(block.rx0.size, requested_samples - total)
+            available = min(block_samples, requested_samples - total)
             if available <= 0:
                 break
             if block.read_duration_ns is not None:
@@ -233,16 +254,20 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock], destination: Path, *,
                 manifest["gain_telemetry"]["entries"].append({
                     "sample_index": int(total), "utc_ns": int(block.utc_ns),
                     "rx_gain_db": gains})
-            for receiver, values in enumerate((block.rx0[:available], block.rx1[:available])):
-                values = np.asarray(values)
-                power_sum[receiver] += float(np.sum(
-                    values.real * values.real + values.imag * values.imag,
-                    dtype=np.float64))
-                components = np.maximum(np.abs(values.real), np.abs(values.imag))
+            raw_components = _components(block, available)
+            for receiver, (i_values, q_values) in enumerate(
+                    ((raw_components[0], raw_components[1]),
+                     (raw_components[2], raw_components[3]))):
+                i_values = np.asarray(i_values); q_values = np.asarray(q_values)
+                power_sum[receiver] += float(
+                    np.sum(np.square(i_values, dtype=np.float64)) +
+                    np.sum(np.square(q_values, dtype=np.float64)))
+                components = np.maximum(np.abs(i_values.astype(np.int32)),
+                                        np.abs(q_values.astype(np.int32)))
                 peak_abs_component[receiver] = max(
                     peak_abs_component[receiver], float(np.max(components, initial=0)))
                 near_adc_full_scale_count[receiver] += int(np.count_nonzero(components >= 2040))
-            pending.append(_complex_to_ci16(block.rx0[:available], block.rx1[:available]))
+            pending.append(_block_to_ci16(block, available))
             pending_reads.append(block); pending_count += available; total += available
             while pending_count >= chunk_samples:
                 commit(chunk_samples)

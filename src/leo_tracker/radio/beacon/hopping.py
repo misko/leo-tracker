@@ -8,6 +8,7 @@ from pathlib import Path
 import time
 from typing import Iterable
 
+from ..paired import paired_sample_count
 from .artifact import capture_beacon_iq
 from .channels import starlink_edge_pilot_if_hz
 
@@ -78,7 +79,7 @@ def capture_hop_session(source, destination: Path, *,
             discarded_first_utc_ns = discarded_last_utc_ns = None
             for _ in range(settle_buffers):
                 block = next(blocks)
-                discarded_samples += int(block.rx0.size)
+                discarded_samples += paired_sample_count(block)
                 if discarded_first_utc_ns is None:
                     discarded_first_utc_ns = int(block.utc_ns)
                 discarded_last_utc_ns = int(block.utc_ns)

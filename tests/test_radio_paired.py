@@ -2,7 +2,8 @@ import json
 import numpy as np
 import pytest
 
-from leo_tracker.radio import FakePairedSource, RadioConfig, capture_pair_to_artifacts
+from leo_tracker.radio import (FakePairedSource, PairedCI16Block, RadioConfig,
+                               capture_pair_to_artifacts)
 from leo_tracker.radio.artifact import CaptureArtifact
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.pluto import PairedPlutoSource
@@ -59,6 +60,46 @@ def test_injected_paired_pluto_reads_hardware_once_per_block(monkeypatch):
     assert block.read_duration_ns == 400
     assert "host UTC bracket" in source.identity["timestamp_semantics"]
     source.close(); assert device.closed
+
+
+def test_injected_paired_pluto_native_ci16_skips_complex_rx(monkeypatch):
+    class Device:
+        complex_calls = 0
+        native_calls = 0
+        def rx(self):
+            self.complex_calls += 1
+            raise AssertionError("complex conversion path was used")
+        def rx_ci16(self):
+            self.native_calls += 1
+            return tuple(np.arange(8, dtype=np.int16) + offset
+                         for offset in (0, 100, 200, 300))
+        def close(self): pass
+    device = Device()
+    clock = iter((1_000, 1_400))
+    monkeypatch.setattr("leo_tracker.radio.pluto.time.time_ns", lambda: next(clock))
+    source = PairedPlutoSource(
+        RadioConfig(1e9, 10_000, 8_000), uri="pluto://test", block_size=8,
+        sample_format="native-ci16", device_factory=lambda **kwargs: device)
+    block = next(source.blocks())
+    assert isinstance(block, PairedCI16Block)
+    assert block.sample_count == 8
+    assert block.components[2][3] == 203
+    assert block.utc_ns == 1_200 and block.read_duration_ns == 400
+    assert device.native_calls == 1 and device.complex_calls == 0
+    assert source.identity["sample_format"] == "native-ci16"
+
+
+def test_native_backend_validates_component_contract():
+    from leo_tracker.radio.pluto import _PyadiPairedRx
+    backend = object.__new__(_PyadiPairedRx)
+    class SDR:
+        def _rx_buffered_data(self):
+            return [np.ones(8, dtype=np.int16) for _ in range(4)]
+    backend.sdr = SDR()
+    assert len(backend.rx_ci16()) == 4
+    backend.sdr._rx_buffered_data = lambda: [np.ones(8, dtype=np.int16)] * 3
+    with pytest.raises(RuntimeError, match="four components"):
+        backend.rx_ci16()
 
 
 def test_injected_paired_pluto_can_retune_both_receivers():

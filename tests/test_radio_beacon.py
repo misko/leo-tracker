@@ -38,7 +38,7 @@ from leo_tracker.radio.beacon.calibration import build_calibration
 from leo_tracker.radio.beacon.null_replay import replay_null_calibration
 from leo_tracker.radio.dashboard import DashboardModel, make_handler
 from leo_tracker.radio.beacon.plot import plot_beacon_followup, plot_beacon_report
-from leo_tracker.radio.paired import PairedSampleBlock
+from leo_tracker.radio.paired import PairedCI16Block, PairedSampleBlock
 from leo_tracker.radio.paired import FakePairedSource
 from leo_tracker.radio.source import RadioConfig
 
@@ -427,6 +427,31 @@ def test_chunked_beacon_capture_round_trip_and_checksums(tmp_path):
             report["stream_timing"]["clock_samples"]] == sorted(
                 item["first_sample_index"] for item in
                 report["stream_timing"]["clock_samples"])
+
+
+def test_native_ci16_capture_is_byte_equivalent_to_complex_path(tmp_path):
+    count, rate = 4096, 4096.0
+    i0 = (np.arange(count, dtype=np.int16) % 2000) - 1000
+    q0 = -i0
+    i1 = i0 // 2
+    q1 = -i1
+    native = PairedCI16Block((i0, q0, i1, q1), 0, 1_000,
+                             read_duration_ns=500)
+    complex_block = PairedSampleBlock(
+        i0.astype(np.float32) + 1j*q0.astype(np.float32),
+        i1.astype(np.float32) + 1j*q1.astype(np.float32), 0, 1_000,
+        read_duration_ns=500)
+    settings = dict(sample_rate_hz=rate, center_frequency_hz=1.5e9,
+                    bandwidth_hz=rate, duration_s=1, chunk_s=1)
+    native_report = capture_beacon_iq([native], tmp_path / "native", **settings)
+    complex_report = capture_beacon_iq(
+        [complex_block], tmp_path / "complex", **settings)
+    assert ((tmp_path / "native" / "chunk-000000.ci16").read_bytes() ==
+            (tmp_path / "complex" / "chunk-000000.ci16").read_bytes())
+    assert native_report["sample_statistics"] == complex_report["sample_statistics"]
+    replay = BeaconCapture.open(tmp_path / "native", verify=True).read_window(0, count)
+    np.testing.assert_array_equal(replay[:, 0].real, i0)
+    np.testing.assert_array_equal(replay[:, 0].imag, q0)
 
 
 def test_beacon_capture_records_hardware_gain_and_adc_utilization(tmp_path):

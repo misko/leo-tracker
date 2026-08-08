@@ -224,8 +224,15 @@ would let nuisance terms absorb the orbital curvature needed for identity.
 
 The 10 MS/s path is intentionally described as periodic, not continuous. A
 hardware trial needed 121.4 seconds of wall time to return 30 seconds of dual-RX
-IQ, while the 2.5 MS/s path runs approximately in real time. The NVMe is not the
-bottleneck; this is the observed Pluto transport ceiling.
+IQ. Investigation showed that pyadi constructed complex64 arrays from native
+I/Q int16 components and the recorder immediately converted them back to CI16.
+The beacon and hop recorders now request native CI16 components while FFT and
+monitor paths retain complex64. In a field A/B test, a 120-second, dual-RX,
+2.5 MS/s narrow capture improved from 125.550 seconds wall time (4.625% excess)
+to 120.191 seconds (0.159% excess), with all 300 million samples per receiver
+committed to the same 2.4 GB artifact format. This removes the measured
+throughput deficit for future narrow captures without rewriting historical IQ.
+Higher-rate continuous performance remains an empirical hardware question.
 
 Before each dwell, the service applies a host thermal guard: capture pauses at
 75 °C and resumes below 70 °C. This protects continuity and artifact integrity
@@ -233,7 +240,10 @@ without conflating thermal throttling with RF absence. Both host and Pluto
 temperatures remain recorded in each capture manifest.
 
 A bounded reader thread continuously refills the Pluto while a consumer thread
-converts, hashes, and writes CI16 chunks. Manifests include host-side read
+packs native components, hashes, and writes CI16 chunks.
+`--sample-format=complex64` remains an explicit diagnostic fallback;
+`native-ci16` is the
+production default for raw beacon and channel-hop recording. Manifests include host-side read
 duration, positive inter-read gaps, and host-read duty. These diagnose writer
 stalls but are explicitly not treated as RF hardware timestamps; the current
 Pluto/IIO path cannot independently prove an overrun that firmware does not

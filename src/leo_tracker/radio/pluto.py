@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 from .source import RadioConfig, SampleBlock
-from .paired import PairedSampleBlock
+from .paired import PairedCI16Block, PairedSampleBlock
 
 
 class PlutoSource:
@@ -109,12 +109,16 @@ class PairedPlutoSource:
     """One hardware read yielding synchronous AD9361 RX0 and RX1 blocks."""
     def __init__(self, config: RadioConfig, *, uri: str, block_size: int = 65536,
                  transport: str = "iio", serial: str | None = None,
+                 sample_format: str = "complex64",
                  device_factory: Callable[..., object] | None = None):
         from dataclasses import replace
         self._configs = (replace(config, channel=0), replace(config, channel=1))
         self._closed = False
         self._gain_snapshot_interval_samples = max(1, round(config.sample_rate_hz))
         self._next_gain_snapshot_sample = 0
+        if sample_format not in ("complex64", "native-ci16"):
+            raise ValueError("sample_format must be complex64 or native-ci16")
+        self._sample_format = sample_format
         if device_factory is not None:
             self._device = device_factory(config=config, uri=uri, block_size=block_size,
                                           transport=transport, serial=serial)
@@ -126,6 +130,7 @@ class PairedPlutoSource:
                           "transport": transport, "implementation": implementation,
                           "enabled_channels": [0, 1],
                           "timestamp_semantics": "midpoint of host UTC bracket around blocking IIO read",
+                          "sample_format": sample_format,
                           "gain_mode": config.gain_mode or ("manual" if config.gain_db is not None else "slow_attack"),
                           "configured_gain_db": config.gain_db}
         mode_reader = getattr(self._device, "gain_mode_snapshot", None)
@@ -138,19 +143,31 @@ class PairedPlutoSource:
     def blocks(self):
         index = 0
         while not self._closed:
-            before_ns = time.time_ns(); values = np.asarray(self._device.rx()); after_ns = time.time_ns()
-            if values.ndim != 2 or values.shape[0] != 2:
-                raise RuntimeError(f"paired Pluto read must return 2xN, got {values.shape}")
+            before_ns = time.time_ns()
+            if self._sample_format == "native-ci16":
+                reader = getattr(self._device, "rx_ci16", None)
+                if reader is None:
+                    raise RuntimeError("paired Pluto backend does not support native CI16")
+                components = tuple(np.asarray(item) for item in reader())
+                count = components[0].size if components else 0
+            else:
+                values = np.asarray(self._device.rx())
+                if values.ndim != 2 or values.shape[0] != 2:
+                    raise RuntimeError(f"paired Pluto read must return 2xN, got {values.shape}")
+                count = values.shape[1]
+            after_ns = time.time_ns()
             gain_db = None
             if index >= self._next_gain_snapshot_sample:
                 gain_db = self.gain_snapshot()
                 self._next_gain_snapshot_sample = index + self._gain_snapshot_interval_samples
-            yield PairedSampleBlock(np.asarray(values[0], np.complex64),
-                                    np.asarray(values[1], np.complex64), index,
-                                    (before_ns+after_ns)//2,
-                                    read_duration_ns=after_ns-before_ns,
-                                    gain_db=gain_db)
-            index += values.shape[1]
+            common = {"sample_index": index, "utc_ns": (before_ns+after_ns)//2,
+                      "read_duration_ns": after_ns-before_ns, "gain_db": gain_db}
+            if self._sample_format == "native-ci16":
+                yield PairedCI16Block(components=components, **common)
+            else:
+                yield PairedSampleBlock(np.asarray(values[0], np.complex64),
+                                        np.asarray(values[1], np.complex64), **common)
+            index += count
     def close(self):
         if not self._closed:
             self._closed = True
@@ -189,6 +206,18 @@ class _PyadiPairedRx:
                 setattr(self.sdr, f"gain_control_mode_{channel}", "manual")
                 setattr(self.sdr, f"rx_hardwaregain_{channel}", config.gain_db)
     def rx(self): return self.sdr.rx()
+    def rx_ci16(self):
+        """Read I0/Q0/I1/Q1 before pyadi constructs complex64 arrays."""
+        values = tuple(np.asarray(item) for item in self.sdr._rx_buffered_data())
+        if len(values) != 4:
+            raise RuntimeError(
+                f"paired native Pluto read must return four components, got {len(values)}")
+        if any(item.ndim != 1 or item.dtype.kind != "i" or item.dtype.itemsize != 2
+               for item in values):
+            raise RuntimeError("paired native Pluto components are not one-dimensional int16")
+        if len({item.size for item in values}) != 1:
+            raise RuntimeError("paired native Pluto components differ in length")
+        return values
     def retune(self, center_frequency_hz: float):
         self.sdr.rx_lo = round(center_frequency_hz)
     def close(self): self.sdr.rx_destroy_buffer()

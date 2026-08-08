@@ -211,6 +211,54 @@ def test_export_backfill_queues_only_missing_preserved_sources(tmp_path):
     assert fields == ["three", str(captures / "three"), "narrow"]
 
 
+def test_hop_children_are_backfillable_under_their_session_identity(tmp_path):
+    """Hop recordings were unreachable: wrong mode name, and never enumerated.
+
+    A hop child's manifest says `channel-hop` while the pipeline mode is `hop`,
+    and its directory lives one level below `hop-sessions/`. Backfill rejected
+    the first and never saw the second, so no hop capture could be archived.
+    """
+    source = tmp_path / "source"; shared = tmp_path / "shared"
+    (source / "captures").mkdir(parents=True)
+    segment = source / "hop-sessions/hop-lower-edge-20260807T201908Z-b00/03-ch4-lower-edge"
+    segment.mkdir(parents=True)
+    (segment / "manifest.json").write_text(json.dumps({
+        "state": "complete", "metadata": {"observation_mode": "channel-hop"}}))
+    interrupted = source / "hop-sessions/hop-lower-edge-20260807T201908Z-b01/00-ch1-lower-edge"
+    interrupted.mkdir(parents=True)
+    (interrupted / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "metadata": {"observation_mode": "channel-hop"}}))
+    # Quarantine holds interrupted IQ reconciled by review, never by the pipeline.
+    quarantined = source / "quarantine/ch3-lower-edge-20260805T035326Z"
+    quarantined.mkdir(parents=True)
+    (quarantined / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "metadata": {"observation_mode": "narrow"}}))
+
+    result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
+
+    name = "hop-lower-edge-20260807T201908Z-b00-03-ch4-lower-edge"
+    assert result["queued"] == [name]
+    assert result["errors"] == []
+    job = next((source / "staging/analysis-queue").glob("*.job"))
+    assert job.read_text().rstrip().split("\t") == [name, str(segment), "hop"]
+
+
+def test_analysis_backfill_accepts_the_capture_side_hop_mode_name(tmp_path):
+    create_context_bundle(tmp_path / "context")
+    captures = tmp_path / "captures"; captures.mkdir()
+    capture = captures / "hop-lower-edge-20260807T201908Z-b00-03-ch4-lower-edge"
+    capture.mkdir()
+    (capture / "manifest.json").write_text(json.dumps({
+        "state": "complete", "metadata": {"observation_mode": "channel-hop"}}))
+
+    result = enqueue_analysis_backfill(tmp_path, pipeline_id="kalman-v1")
+
+    assert result["errors"] == []
+    assert result["queued"] == [capture.name]
+    job = next((tmp_path / "staging/analysis-queue").glob("*.job"))
+    assert job.read_text().split("\t")[2] == "hop"
+
+
 def test_audit_requeues_false_done_but_accepts_valid_negative(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     done = queue / "done"; done.mkdir(parents=True)

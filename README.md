@@ -20,6 +20,9 @@ The package is split along the experiment boundary:
 - `leo_tracker.fusion`: deliberately small Doppler nuisance models.
 - `leo_tracker.contracts`: UTC/provenance contracts shared by all stages.
 
+The multi-source historical TLE daemon, on-disk API, Kalman service setup, and
+operational commands are documented in [docs/tle-sources.md](docs/tle-sources.md).
+
 Hardware tests must be marked `hardware`; the default suite is offline and
 deterministic.
 

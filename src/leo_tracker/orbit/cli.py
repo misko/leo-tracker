@@ -8,10 +8,6 @@ import json
 import math
 from pathlib import Path
 import sys
-import os
-from http.cookiejar import CookieJar
-from urllib.parse import urlencode, urlsplit
-from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 import numpy as np
 from sgp4.api import Satrec, SatrecArray, jday
@@ -19,6 +15,9 @@ from sgp4.api import Satrec, SatrecArray, jday
 from .artifacts import PASSES_SCHEMA, TLECatalogArtifact, parse_catalog, parse_utc, utc_iso
 from .archive import archive_catalog
 from .association import associate_tracks
+from .catalog_sources import _space_track_bytes, fetch_bytes
+from .catalog_store import CatalogStore
+from .catalog_watch import load_config, run_watch, store_status
 from .doppler import predicted_doppler_hz
 from .topocentric import Observer
 from leo_tracker.passes import predict_passes, sample_track
@@ -69,55 +68,6 @@ def _visibility_candidates(tles, observer: Observer, start: datetime, end: datet
     if limit is not None:
         candidates = candidates[:limit]
     return [tle for _, tle in candidates]
-
-
-USER_AGENT = "leo-tracker/0.1"
-SPACE_TRACK_SUFFIX = "space-track.org"
-
-
-def _space_track_bytes(url: str, identity: str, password: str) -> bytes:
-    """Authenticate, run exactly one query, then release the session.
-
-    Space-Track rate-limits aggressively and bans for abuse, so a caller gets
-    one login and one query per invocation and the session is always closed,
-    even on failure. Credentials come from the environment rather than argv so
-    they never reach a process listing or a service log.
-    """
-    origin = urlsplit(url)
-    base = f"{origin.scheme}://{origin.netloc}"
-    opener = build_opener(HTTPCookieProcessor(CookieJar()))
-    login = Request(f"{base}/ajaxauth/login",
-                    data=urlencode({"identity": identity,
-                                    "password": password}).encode(),
-                    headers={"User-Agent": USER_AGENT})
-    with opener.open(login, timeout=60) as response:
-        response.read()
-    try:
-        query = Request(url, headers={"User-Agent": USER_AGENT})
-        with opener.open(query, timeout=180) as response:
-            return response.read()
-    finally:
-        try:
-            with opener.open(Request(f"{base}/ajaxauth/logout",
-                                     headers={"User-Agent": USER_AGENT}),
-                             timeout=30) as response:
-                response.read()
-        except OSError:
-            pass
-
-
-def fetch_bytes(url: str) -> bytes:
-    if (urlsplit(url).hostname or "").endswith(SPACE_TRACK_SUFFIX):
-        identity = os.environ.get("LEO_SPACETRACK_IDENTITY", "")
-        password = os.environ.get("LEO_SPACETRACK_PASSWORD", "")
-        if not identity or not password:
-            raise RuntimeError(
-                "space-track needs LEO_SPACETRACK_IDENTITY and "
-                "LEO_SPACETRACK_PASSWORD in the environment")
-        return _space_track_bytes(url, identity, password)
-    request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=30) as response:
-        return response.read()
 
 
 def fetch_catalog(url: str, *, now: datetime | None = None) -> TLECatalogArtifact:
@@ -185,6 +135,29 @@ def _parser() -> argparse.ArgumentParser:
     source.add_argument("--url", help="fetch and archive a new catalog")
     archive.add_argument("--archive-dir", type=Path, required=True)
     archive.add_argument("--label", default="starlink")
+    watch = commands.add_parser(
+        "catalog-watch", help="run the durable multi-source catalog scheduler")
+    watch.add_argument("--config", type=Path, required=True)
+    watch.add_argument("--root", type=Path, required=True)
+    watch.add_argument("--once", action="store_true",
+                       help="process currently due profiles and exit")
+    watch.add_argument("--check", action="store_true",
+                       help="validate configuration without accessing the network")
+    watch.add_argument("--heartbeat-s", type=int, default=900)
+    status = commands.add_parser(
+        "catalog-status", help="show catalog scheduler state as JSON")
+    status.add_argument("--root", type=Path, required=True)
+    latest = commands.add_parser(
+        "catalog-latest", help="resolve a verified latest catalog from disk")
+    latest.add_argument("--root", type=Path, required=True)
+    latest.add_argument("--source", required=True)
+    latest.add_argument("--scope", required=True)
+    latest.add_argument("--maximum-age-s", type=float)
+    history = commands.add_parser(
+        "catalog-history", help="list immutable catalog history from disk")
+    history.add_argument("--root", type=Path, required=True)
+    history.add_argument("--source", required=True)
+    history.add_argument("--scope", required=True)
     associate = commands.add_parser("associate",
         help="rank archived TLEs against a continuous 10 Hz Starlink Doppler track")
     associate.add_argument("--observations", type=Path, required=True)
@@ -240,6 +213,35 @@ def main(argv: list[str] | None = None) -> int:
                     fetch_catalog(args.url))
         result = archive_catalog(artifact, args.archive_dir, label=args.label)
         print(json.dumps(result, sort_keys=True))
+        return 0
+    if args.command == "catalog-watch":
+        profiles = load_config(args.config)
+        if args.check:
+            print(json.dumps({"config": str(args.config), "profiles": [
+                {"id": item.id, "source": item.source, "scope": item.scope}
+                for item in profiles]}, sort_keys=True))
+            return 0
+        if args.heartbeat_s <= 0:
+            raise ValueError("heartbeat must be positive")
+        return run_watch(args.config, args.root, once=args.once,
+                         heartbeat_s=args.heartbeat_s)
+    if args.command == "catalog-status":
+        print(json.dumps(store_status(args.root), sort_keys=True))
+        return 0
+    if args.command in {"catalog-latest", "catalog-history"}:
+        store = CatalogStore.open(args.root)
+        snapshots = ([store.latest(source=args.source, scope=args.scope,
+                                   maximum_age_s=args.maximum_age_s)]
+                     if args.command == "catalog-latest" else
+                     store.history(source=args.source, scope=args.scope))
+        print(json.dumps([{
+            "source": item.source, "scope": item.scope,
+            "retrieved_at": utc_iso(item.retrieved_at), "sha256": item.sha256,
+            "satellite_count": item.satellite_count,
+            "tle_epoch_min": utc_iso(item.epoch_min),
+            "tle_epoch_max": utc_iso(item.epoch_max),
+            "catalog": str(item.normalized_artifact),
+        } for item in snapshots], sort_keys=True))
         return 0
     if args.command == "associate":
         if args.candidate_limit < 0:

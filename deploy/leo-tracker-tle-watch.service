@@ -1,0 +1,21 @@
+[Unit]
+Description=LEO tracker multi-source historical orbit catalog
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/mnt/qnap01/mouse9911/tle
+
+[Service]
+Type=simple
+User=mouse9911
+Group=mouse9911
+WorkingDirectory=/home/mouse9911/gits/leo-tracker
+Environment=VIRTUAL_ENV=/home/mouse9911/gits/leo-tracker/.venv
+EnvironmentFile=-/etc/leo-tracker/space-track.env
+ExecStart=/home/mouse9911/.local/bin/uv run --active --no-sync leo-orbit catalog-watch --config /home/mouse9911/gits/leo-tracker/deploy/tle-sources.json --root /mnt/qnap01/mouse9911/tle
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

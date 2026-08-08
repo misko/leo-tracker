@@ -1,0 +1,28 @@
+{
+  "schema": "leo-tracker.catalog-watch-config/v1",
+  "profiles": [
+    {
+      "id": "space-track-starlink",
+      "source": "space-track",
+      "scope": "starlink",
+      "url": "https://www.space-track.org/basicspacedata/query/class/gp/OBJECT_NAME/~~STARLINK/decay_date/null-val/epoch/%3Enow-10/orderby/NORAD_CAT_ID/format/3le",
+      "interval_s": 3600,
+      "minimum_request_interval_s": 3600,
+      "scheduled_minute": 37,
+      "minimum_satellite_count": 1000,
+      "maximum_satellite_count": 20000,
+      "maximum_epoch_age_s": 864000
+    },
+    {
+      "id": "huggingface-starlink",
+      "source": "huggingface",
+      "scope": "starlink",
+      "url": "https://huggingface.co/datasets/juliensimon/starlink-tle-latest/resolve/main/data/starlink.tle",
+      "interval_s": 21600,
+      "minimum_request_interval_s": 21600,
+      "minimum_satellite_count": 1000,
+      "maximum_satellite_count": 20000,
+      "maximum_epoch_age_s": 864000
+    }
+  ]
+}

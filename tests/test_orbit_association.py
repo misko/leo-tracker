@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
 import numpy as np
@@ -275,6 +275,39 @@ def test_association_rejects_single_receiver_track_before_tle_ranking(tmp_path):
 
     assert not report["associations"][0]["qualified"]
     assert "dual-receiver" in report["associations"][0]["reason"]
+
+
+def test_association_records_unusable_temporal_holdout_as_unqualified(tmp_path):
+    catalog_path = tmp_path / "catalog.json"
+    TLECatalogArtifact.create("fixture", datetime(2000, 6, 27, tzinfo=timezone.utc),
+                              (VANGUARD + "\n").encode()).write(catalog_path)
+    start = datetime(2000, 6, 27, 19, tzinfo=timezone.utc)
+    offsets = [index / 10 for index in range(44)] + [20.1]
+    observations = []
+    for index, offset in enumerate(offsets):
+        observations.append({
+            "utc": (start + timedelta(seconds=offset)).isoformat(),
+            "receivers": [
+                {"receiver": 0, "valid": True, "frequency_offset_hz": index,
+                 "formal_sigma_hz": 50},
+                {"receiver": 1, "valid": True, "frequency_offset_hz": index,
+                 "formal_sigma_hz": 50}],
+            "consensus": {"valid": True, "receiver_referenced_cfo_hz": index,
+                          "frequency_sigma_hz": 50}})
+    tracks = tmp_path / "tracks.json"
+    tracks.write_text(json.dumps({
+        "schema": "leo-tracker.starlink-continuous-track/v1",
+        "signal": {"nominal_rf_hz": 11_459_687_500.0},
+        "configuration": {"output_rate_hz": 10},
+        "tracks": [{"track_id": "track-000", "observations": observations}]}))
+
+    report = associate_tracks(tracks, catalog_path, tmp_path / "association.json",
+                              observer=Observer(37.8, -122.4), horizon_deg=-90)
+
+    result = report["associations"][0]
+    assert not result["qualified"]
+    assert result["reason"].startswith("held-out validation unavailable")
+    assert result["dual_epoch_count"] == 45
 
 
 def test_association_rejects_sparse_epochs_across_long_wall_clock_span(tmp_path):

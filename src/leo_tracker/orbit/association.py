@@ -347,6 +347,13 @@ def _ranking_gate(ranked: list[dict], *, maximum_holdout_rms_hz: float,
                 best["epoch_at_search_boundary"] if best else None)}
 
 
+def _is_unusable_temporal_split(error: ValueError) -> bool:
+    return str(error) in {
+        "each nuisance group requires training and holdout observations",
+        "temporal split leaves too few training or held-out observations",
+    }
+
+
 def associate_tracks(observations_path: Path, catalog_path: Path, output: Path, *,
                      observer: Observer, horizon_deg: float = 5.0,
                      candidate_limit: int = 256, minimum_duration_s: float = 20.0,
@@ -419,11 +426,21 @@ def associate_tracks(observations_path: Path, catalog_path: Path, output: Path, 
         # observation by its actual channel RF. This is essential after a
         # Starlink transmitter changes 250 MHz channels.
         predicted, _, _ = catalog_doppler(candidates, observer, grid, 1.0)
-        ranked = rank_doppler_track(rows, candidates, grid, predicted,
-            epoch_search_s=epoch_search_s, epoch_step_s=epoch_step_s,
-            epoch_coarse_step_s=epoch_coarse_step_s,
-            maximum_nuisance_drift_hz_s=maximum_nuisance_drift_hz_s,
-            predicted_is_fractional=True)
+        try:
+            ranked = rank_doppler_track(rows, candidates, grid, predicted,
+                epoch_search_s=epoch_search_s, epoch_step_s=epoch_step_s,
+                epoch_coarse_step_s=epoch_coarse_step_s,
+                maximum_nuisance_drift_hz_s=maximum_nuisance_drift_hz_s,
+                predicted_is_fractional=True)
+        except ValueError as error:
+            if not _is_unusable_temporal_split(error):
+                raise
+            associations.append({"track_id": track["track_id"], "qualified": False,
+                "reason": f"held-out validation unavailable: {error}",
+                "duration_s": duration, "dual_epoch_count": epoch_count,
+                "coverage_fraction": coverage_fraction,
+                "visible_candidate_count": len(candidates), "candidates": []})
+            continue
         best = ranked[0] if ranked else None
         primary_gate = _ranking_gate(ranked,
             maximum_holdout_rms_hz=maximum_holdout_rms_hz,
@@ -433,16 +450,23 @@ def associate_tracks(observations_path: Path, catalog_path: Path, output: Path, 
                  for fraction in stability_train_fractions if abs(fraction - .6) > 1e-9]
         cases.append((.6, maximum_nuisance_drift_hz_s * sensitivity_drift_fraction))
         for train_fraction, drift_bound in cases:
-            sensitivity_ranked = rank_doppler_track(
-                rows, candidates, grid, predicted, epoch_search_s=epoch_search_s,
-                epoch_step_s=epoch_step_s,
-                epoch_coarse_step_s=epoch_coarse_step_s,
-                train_fraction=train_fraction,
-                maximum_nuisance_drift_hz_s=drift_bound,
-                predicted_is_fractional=True)
-            gate = _ranking_gate(sensitivity_ranked,
-                maximum_holdout_rms_hz=maximum_holdout_rms_hz,
-                minimum_margin_hz=minimum_margin_hz)
+            try:
+                sensitivity_ranked = rank_doppler_track(
+                    rows, candidates, grid, predicted, epoch_search_s=epoch_search_s,
+                    epoch_step_s=epoch_step_s,
+                    epoch_coarse_step_s=epoch_coarse_step_s,
+                    train_fraction=train_fraction,
+                    maximum_nuisance_drift_hz_s=drift_bound,
+                    predicted_is_fractional=True)
+                gate = _ranking_gate(sensitivity_ranked,
+                    maximum_holdout_rms_hz=maximum_holdout_rms_hz,
+                    minimum_margin_hz=minimum_margin_hz)
+            except ValueError as error:
+                if not _is_unusable_temporal_split(error):
+                    raise
+                gate = {**_ranking_gate([], maximum_holdout_rms_hz=
+                           maximum_holdout_rms_hz, minimum_margin_hz=minimum_margin_hz),
+                        "reason": f"held-out validation unavailable: {error}"}
             stability.append({"train_fraction": train_fraction,
                               "maximum_nuisance_drift_hz_s": drift_bound, **gate})
         stable_identity = bool(primary_gate["best_norad_id"] is not None and

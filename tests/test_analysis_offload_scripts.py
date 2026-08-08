@@ -309,6 +309,43 @@ def test_exporter_retain_policy_copies_without_removing_source(tmp_path):
     assert "source_policy=retain" in result.stdout
 
 
+def test_exporter_carries_a_quarantined_prefix(tmp_path):
+    """Quarantined captures stop early but hold verified chunks worth analysing.
+
+    verify_copy independently required state == complete, so widening the path
+    allow-list alone would still have failed every quarantine export.
+    """
+    source = tmp_path / "source"
+    shared = tmp_path / "shared"
+    capture = source / "quarantine" / "ch4-lower-edge-narrow-20260805T154051Z"
+    queue = source / "staging" / "analysis-queue"
+    capture.mkdir(parents=True)
+    queue.mkdir(parents=True)
+    payload = b"abcdefgh"
+    (capture / "chunk-000000.ci16").write_bytes(payload)
+    (capture / "manifest.json").write_text(
+        '{"state":"interrupted","captured_samples_per_receiver":99,'
+        '"chunks":[{"path":"chunk-000000.ci16",'
+        '"bytes":8,"sha256":"9c56cc51b374c3ba189210d5b6d4bf57790d351c'
+        '96c47c02190ecf1e430635ab"}]}'
+    )
+    (queue / "0001.job").write_text(f"{capture.name}\t{capture}\tnarrow\n")
+    env = os.environ | {"LEO_TRACKER_REPO": str(ROOT),
+                        "LEO_OFFLOAD_BWLIMIT_KBPS": "0"}
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-export.sh"), "--once",
+         str(source), str(shared)], env=env, text=True, capture_output=True)
+
+    assert result.returncode == 0, result.stderr
+    assert capture.exists(), "retain policy must leave the quarantined source"
+    assert (shared / "captures" / capture.name /
+            "chunk-000000.ci16").read_bytes() == payload
+    job = next((shared / "staging/analysis-queue").glob("*.job"))
+    assert job.read_text().rstrip().split("\t")[:3] == [
+        capture.name, f"captures/{capture.name}", "narrow"]
+
+
 def test_exporter_refuses_incomplete_capture(tmp_path):
     source = tmp_path / "source"
     shared = tmp_path / "shared"

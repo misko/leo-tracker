@@ -462,6 +462,52 @@ def test_capture_leaves_a_recoverable_interrupted_manifest(tmp_path):
     assert report["captured_samples_per_receiver"] == len(rx)
 
 
+def test_interrupted_capture_opens_at_the_extent_it_durably_wrote(tmp_path):
+    """A kill mid-write can leave the declared total ahead of the chunks on disk.
+
+    All 30 quarantined field recordings were unreadable for this reason alone,
+    though every chunk's checksum was valid. The prefix is still usable, and the
+    source manifest must not be rewritten to say so.
+    """
+    rx = np.ones(4_096, np.complex64)
+    root = tmp_path / "short"
+    with pytest.raises(RuntimeError, match="radio ended"):
+        capture_beacon_iq(_blocks(rx, rx), root, sample_rate_hz=10_000,
+            center_frequency_hz=1.575e9, bandwidth_hz=9_000, duration_s=1,
+            chunk_s=.2)
+    manifest_path = root / "manifest.json"
+    stored = json.loads(manifest_path.read_text())
+    written = sum(item["sample_count"] for item in stored["chunks"])
+    # Simulate the field case: samples were read from the radio but the tail
+    # chunk never reached disk, so the manifest claims more than it holds.
+    stored["captured_samples_per_receiver"] = written + 12_500_000
+    manifest_path.write_text(json.dumps(stored))
+
+    capture = BeaconCapture.open(root, verify=True)
+
+    assert capture.manifest["captured_samples_per_receiver"] == written
+    assert capture.manifest["declared_samples_per_receiver"] == written + 12_500_000
+    # The source on disk is evidence and stays exactly as the capture left it.
+    assert json.loads(manifest_path.read_text())[
+        "captured_samples_per_receiver"] == written + 12_500_000
+
+
+def test_complete_capture_still_requires_an_exact_sample_total(tmp_path):
+    rx = np.ones(4_096, np.complex64)
+    root = tmp_path / "complete"
+    capture_beacon_iq(_blocks(rx, rx), root, sample_rate_hz=10_000,
+        center_frequency_hz=1.575e9, bandwidth_hz=9_000,
+        duration_s=len(rx) / 10_000, chunk_s=.2)
+    manifest_path = root / "manifest.json"
+    stored = json.loads(manifest_path.read_text())
+    assert stored["state"] == "complete"
+    stored["captured_samples_per_receiver"] += 1_000
+    manifest_path.write_text(json.dumps(stored))
+
+    with pytest.raises(ValueError, match="sample total is inconsistent"):
+        BeaconCapture.open(root, verify=True)
+
+
 def test_capture_rejects_a_non_contiguous_radio_stream(tmp_path):
     rx = np.ones(100, np.complex64)
     blocks = [PairedSampleBlock(rx, rx, 0, 100), PairedSampleBlock(rx, rx, 101, 200)]

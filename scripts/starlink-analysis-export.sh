@@ -76,8 +76,12 @@ import hashlib, json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 verify_hash = sys.argv[2] == "1"
 manifest = json.loads((root / "manifest.json").read_text())
-if manifest.get("state") != "complete":
+# An interrupted capture stopped early but wrote a checksummed contiguous
+# prefix, so verify the chunks it does have. One with no chunks carries nothing.
+if manifest.get("state") not in ("complete", "interrupted"):
     raise SystemExit("capture manifest is not complete")
+if not manifest.get("chunks"):
+    raise SystemExit("capture manifest has no chunks")
 for chunk in manifest.get("chunks", []):
     path = root / chunk["path"]
     if path.stat().st_size != int(chunk["bytes"]):
@@ -101,7 +105,8 @@ export_one() {
   capture_real="$(realpath -e "${capture}" 2>/dev/null || true)"
   if [[ ! "${name}" =~ ^[A-Za-z0-9._-]+$ || -z "${mode}" ||
         ("${capture_real}" != "${source_real}/captures/"* &&
-         "${capture_real}" != "${source_real}/hop-sessions/"*) ]]; then
+         "${capture_real}" != "${source_real}/hop-sessions/"* &&
+         "${capture_real}" != "${source_real}/quarantine/"*) ]]; then
     mv "${claim}" "${claim%%.exporting.*}.failed"
     echo "invalid offload job: ${claim}" >&2
     return 1

@@ -45,13 +45,15 @@ def preserved_recordings(source_root: Path) -> list[tuple[str, Path]]:
     Hop children live one level deeper than plain captures and carry their
     session prefix in the pipeline identity, which is how the analysis queue,
     the shared working set, and the cropped receipts all name them. Quarantine
-    is deliberately excluded: those recordings are interrupted and are
-    reconciled by review, not by the automatic pipeline.
+    is included: those recordings stop early, but the chunks they wrote are a
+    checksummed contiguous prefix, so they carry ordinary observations rather
+    than damage.
     """
     found: list[tuple[str, Path]] = []
-    captures_root = Path(source_root) / "captures"
-    if captures_root.is_dir():
-        found += [(item.name, item) for item in captures_root.iterdir() if item.is_dir()]
+    for store in ("captures", "quarantine"):
+        root = Path(source_root) / store
+        if root.is_dir():
+            found += [(item.name, item) for item in root.iterdir() if item.is_dir()]
     sessions_root = Path(source_root) / "hop-sessions"
     if sessions_root.is_dir():
         for session in sessions_root.iterdir():
@@ -457,7 +459,14 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
             skipped.append(name); continue
         try:
             manifest = _read_json(capture / "manifest.json")
-            if manifest.get("state") != "complete":
+            # An interrupted capture stopped early but wrote a checksummed
+            # contiguous prefix, so it holds ordinary observations. One with no
+            # chunks at all holds nothing and is not worth moving.
+            state = manifest.get("state")
+            if state == "interrupted":
+                if not manifest.get("chunks"):
+                    skipped.append(name); continue
+            elif state != "complete":
                 skipped.append(name); continue
             mode = observation_mode(name, manifest.get("metadata", {}))
             marker = queue / f"backfill-export-{pipeline_id}-{name}.job"

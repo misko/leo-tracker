@@ -257,12 +257,6 @@ def test_hop_children_are_backfillable_under_their_session_identity(tmp_path):
     interrupted.mkdir(parents=True)
     (interrupted / "manifest.json").write_text(json.dumps({
         "state": "interrupted", "metadata": {"observation_mode": "channel-hop"}}))
-    # Quarantine holds interrupted IQ reconciled by review, never by the pipeline.
-    quarantined = source / "quarantine/ch3-lower-edge-20260805T035326Z"
-    quarantined.mkdir(parents=True)
-    (quarantined / "manifest.json").write_text(json.dumps({
-        "state": "interrupted", "metadata": {"observation_mode": "narrow"}}))
-
     result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
 
     name = "hop-lower-edge-20260807T201908Z-b00-03-ch4-lower-edge"
@@ -270,6 +264,33 @@ def test_hop_children_are_backfillable_under_their_session_identity(tmp_path):
     assert result["errors"] == []
     job = next((source / "staging/analysis-queue").glob("*.job"))
     assert job.read_text().rstrip().split("\t") == [name, str(segment), "hop"]
+
+
+def test_quarantined_prefixes_are_queued_but_empty_ones_are_not(tmp_path):
+    """Interrupted captures hold a checksummed prefix, not damage.
+
+    All 30 quarantined field recordings verified chunk-for-chunk; they were
+    unreachable only because the pipeline required state == complete. Six wrote
+    no chunks at all and carry nothing to analyse.
+    """
+    source = tmp_path / "source"; shared = tmp_path / "shared"
+    (source / "captures").mkdir(parents=True)
+    partial = source / "quarantine/ch4-lower-edge-narrow-20260805T154051Z"
+    partial.mkdir(parents=True)
+    (partial / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "metadata": {"observation_mode": "narrow"},
+        "chunks": [{"path": "chunk-000000.ci16", "sample_count": 12_500_000}]}))
+    empty = source / "quarantine/ch4-lower-edge-20260805T035929Z"
+    empty.mkdir(parents=True)
+    (empty / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "metadata": {"observation_mode": "narrow"},
+        "chunks": []}))
+
+    result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
+
+    assert result["queued"] == [partial.name]
+    assert empty.name in result["skipped"]
+    assert result["errors"] == []
 
 
 def test_analysis_backfill_accepts_the_capture_side_hop_mode_name(tmp_path):

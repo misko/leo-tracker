@@ -117,6 +117,7 @@ def test_conditioned_frame_artifact_dual_rx_e2e(tmp_path, capsys):
     cli_result = json.loads(capsys.readouterr().out)
     report = json.loads(output.read_text())
     assert report["schema"] == FRAME_TRACK_SCHEMA
+    assert report["configuration"]["maximum_extension_s"] == 60
     assert cli_result["dual_valid_frame_count"] > 140
     assert report["samples"]["sha256"] == hashlib.sha256(samples.read_bytes()).hexdigest()
     with np.load(samples, allow_pickle=False) as arrays:

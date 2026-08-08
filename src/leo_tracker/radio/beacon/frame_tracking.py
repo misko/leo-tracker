@@ -325,7 +325,7 @@ def track_conditioned_frames(capture_path: Path, followup_path: Path, output: Pa
                              minimum_margin: float = .005,
                              maximum_relative_error_hz: float = 500.0,
                              beacon_template_path: Path | None = None,
-                             maximum_extension_s: float = 30.0,
+                             maximum_extension_s: float = 60.0,
                              maximum_missed_windows: int = 3,
                              minimum_extension_window_margin: float = .02,
                              minimum_sparse_frame_margin: float = .05) -> dict:

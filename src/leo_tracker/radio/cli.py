@@ -1752,7 +1752,7 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_frame_track.add_argument("--window-s", type=float, default=.1)
     beacon_frame_track.add_argument("--minimum-margin", type=float, default=.005)
     beacon_frame_track.add_argument("--maximum-relative-error-hz", type=float, default=500)
-    beacon_frame_track.add_argument("--maximum-extension-s", type=float, default=30,
+    beacon_frame_track.add_argument("--maximum-extension-s", type=float, default=60,
         help="propagate each acquired lock through this much unsearched IQ")
     beacon_frame_track.add_argument("--maximum-missed-windows", type=int, default=3,
         help="coast through this many consecutive invalid 100-ms windows")

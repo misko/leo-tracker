@@ -50,6 +50,7 @@ wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
 # rejected unrelated trajectories.
 track_maximum_gap_s="${LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S:-15}"
 track_maximum_reacquisition_span_hz="${LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"
+frame_maximum_extension_s="${LEO_ANALYSIS_FRAME_MAXIMUM_EXTENSION_S:-60}"
 if [[ "${action}" == "drain" ]]; then
   mkdir -p "${queue}"
   exec 7>"${claim_lock}"
@@ -232,7 +233,8 @@ process_job() {
   if (( has_checks == 1 )); then
     frame_args=("${template_args[@]}")
     if run_stage "${worker_id}" "${name}" frame_track radio starlink-beacon-frame-track "${capture}" "${followup}" "${frame}" \
-        --samples "${samples}" "${frame_args[@]}" && \
+        --samples "${samples}" --maximum-extension-s "${frame_maximum_extension_s}" \
+        "${frame_args[@]}" && \
         grep -Eq '"dual_valid_frame_count": [1-9]' "${frame}"; then
       track_args=(--measurement-source conditioned_frames --frame-track "${frame}")
     else

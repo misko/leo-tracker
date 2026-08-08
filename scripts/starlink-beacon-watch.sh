@@ -87,6 +87,7 @@ wide_exact_interval_s="${LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10}"
 # orbit residual, margin, interior-epoch, or temporal-stability gates.
 track_maximum_gap_s="${LEO_BEACON_TRACK_MAXIMUM_GAP_S:-15}"
 track_maximum_reacquisition_span_hz="${LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"
+frame_maximum_extension_s="${LEO_BEACON_FRAME_MAXIMUM_EXTENSION_S:-60}"
 rolling_association_interval_s="${LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600}"
 observer_lat="${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}"
 observer_lon="${LEO_BEACON_OBSERVER_LON:--122.48567658142287}"
@@ -381,7 +382,8 @@ process_capture() {
       fi
       if env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
         starlink-beacon-frame-track "${capture}" "${followup}" "${frame_track}" \
-        --samples "${frame_samples}" "${frame_track_args[@]}"; then
+        --samples "${frame_samples}" --maximum-extension-s "${frame_maximum_extension_s}" \
+        "${frame_track_args[@]}"; then
         if grep -Eq '"dual_valid_frame_count": [1-9]' "${frame_track}"; then
           track_args=(--measurement-source conditioned_frames --frame-track "${frame_track}")
         else

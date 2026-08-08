@@ -1202,6 +1202,7 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert 'LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10' in script
     assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-15' in script
     assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000' in script
+    assert 'LEO_BEACON_FRAME_MAXIMUM_EXTENSION_S:-60' in script
     assert 'LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600' in script
     assert 'LEO_BEACON_PRESERVE_RAW:-0' in script
     assert 'LEO_BEACON_MINIMUM_FREE_GB:-150' in script
@@ -1220,6 +1221,7 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "starlink-beacon-fingerprint" in script
     assert "starlink-beacon-track" in script
     assert "starlink-beacon-frame-track" in script
+    assert '--maximum-extension-s "${frame_maximum_extension_s}"' in script
     assert "starlink-beacon-channel-link" in script
     assert "refresh_capture_links" in script
     capture_link_function = script.split("refresh_capture_links() {", 1)[1].split(

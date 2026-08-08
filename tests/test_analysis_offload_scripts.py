@@ -109,10 +109,13 @@ def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     assert 'flock -n 10' in source
     assert 'workers="${LEO_ANALYSIS_WORKERS:-16}"' in source
     assert 'track_maximum_gap_s="${LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S:-15}"' in source
+    assert ('frame_maximum_extension_s=' +
+            '"${LEO_ANALYSIS_FRAME_MAXIMUM_EXTENSION_S:-60}"') in source
     assert ('track_maximum_reacquisition_span_hz=' +
             '"${LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"') in source
     assert '--maximum-gap-s "${track_maximum_gap_s}"' in source
     assert '--maximum-reacquisition-span-hz "${track_maximum_reacquisition_span_hz}"' in source
+    assert '--maximum-extension-s "${frame_maximum_extension_s}"' in source
     assert "starlink-evidence-archive" in source
     assert "inspect-followup" in source
     assert "retention_skipped" in source

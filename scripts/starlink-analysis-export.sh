@@ -101,7 +101,8 @@ export_one() {
   capture_real="$(realpath -e "${capture}" 2>/dev/null || true)"
   if [[ ! "${name}" =~ ^[A-Za-z0-9._-]+$ || -z "${mode}" ||
         ("${capture_real}" != "${source_real}/captures/"* &&
-         "${capture_real}" != "${source_real}/hop-sessions/"*) ]]; then
+         "${capture_real}" != "${source_real}/hop-sessions/"* &&
+         "${capture_real}" != "${source_real}/quarantine/"*) ]]; then
     mv "${claim}" "${claim%%.exporting.*}.failed"
     echo "invalid offload job: ${claim}" >&2
     return 1

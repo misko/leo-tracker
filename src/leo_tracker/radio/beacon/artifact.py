@@ -278,8 +278,27 @@ class BeaconCapture:
         if manifest.get("schema") != SCHEMA:
             raise ValueError("unsupported beacon capture schema")
         capture = cls(root, manifest)
+        capture._reconcile_interrupted_total()
         if verify: capture.verify()
         return capture
+
+    def _reconcile_interrupted_total(self) -> None:
+        """Report an interrupted capture's real extent, without touching its source.
+
+        A capture killed mid-write can count more samples read from the radio
+        than it durably wrote, leaving the declared total ahead of the chunks on
+        disk. Those chunks are still a contiguous, checksummed prefix, so expose
+        what is actually present and keep the declared target for provenance.
+        A complete capture must still match exactly.
+        """
+        if self.manifest.get("state") != "interrupted":
+            return
+        written = sum(int(item["sample_count"])
+                      for item in self.manifest.get("chunks", ()))
+        declared = int(self.manifest.get("captured_samples_per_receiver", 0))
+        if 0 < written < declared:
+            self.manifest["declared_samples_per_receiver"] = declared
+            self.manifest["captured_samples_per_receiver"] = written
 
     def verify(self) -> None:
         total = expected_index = 0

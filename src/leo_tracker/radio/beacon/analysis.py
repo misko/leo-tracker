@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .artifact import BeaconCapture
-from .acquisition import acquire_exact_receiver
+from .acquisition import acquire_exact_receiver, usable_acquisition_span_hz
 from .frame_tracking import conditioned_frame_observations
 from .structure import analyze_frame_period
 from .template_learning import load_learned_beacon
@@ -296,7 +296,9 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
         "analysis": {"window_s": window_s, "decimation": decimation,
                      "analysis_rate_hz": analysis_rate, "exact_interval_s": exact_interval_s,
                      "exact_window_s": exact_window_s, "exact_edge": edge,
-                     "acquisition_span_hz": acquisition_span_hz,
+                     "acquisition_span_hz": min(acquisition_span_hz,
+                         usable_acquisition_span_hz(source_rate, exact_subband_rate_hz)),
+                     "requested_acquisition_span_hz": acquisition_span_hz,
                      "acquisition_step_hz": acquisition_step_hz,
                      "exact_subband_rate_hz": min(source_rate, exact_subband_rate_hz),
                      "exact_acquisition_method": exact_acquisition_method,

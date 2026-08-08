@@ -18,7 +18,7 @@ from leo_tracker.radio.beacon.analysis import (analyze_capture, analyze_exact_wi
                                                detection_gates,
                                                summarize_doppler_track)
 from leo_tracker.radio.beacon.acquisition import (acquire_exact_receiver,
-    acquisition_centers, extract_complex_subband)
+    acquisition_centers, extract_complex_subband, usable_acquisition_span_hz)
 from leo_tracker.radio.beacon.artifact import (BeaconCapture, capture_beacon_iq,
                                                queued_paired_blocks)
 from leo_tracker.radio.beacon.channels import (starlink_channel_center_hz,
@@ -203,6 +203,35 @@ def test_acquisition_bank_is_symmetric_and_rejects_out_of_band_requests():
     with pytest.raises(ValueError, match="beyond"):
         extract_complex_subband(np.ones(100, np.complex64), 10_000_000,
                                 4_000_000, 2_500_000)
+
+
+def test_usable_span_is_bounded_by_the_sampled_bandwidth():
+    assert usable_acquisition_span_hz(10_000_000, 2_500_000) == 3_750_000
+    assert usable_acquisition_span_hz(10_000_000, 5_000_000) == 2_500_000
+    # An analysis rate above the recording rate is already clamped to it, which
+    # leaves no room to tune away from DC.
+    assert usable_acquisition_span_hz(2_500_000, 2_500_000) == 0
+    assert usable_acquisition_span_hz(2_500_000, 10_000_000) == 0
+
+
+def test_oversized_acquisition_span_is_clamped_and_recorded_not_fatal():
+    """A wide capture must stay analyzable when asked for more search than it sampled."""
+    source_rate, subband_rate = 10_000_000.0, 2_500_000.0
+    rng = np.random.default_rng(3)
+    noise = (rng.normal(size=80_000) + 1j * rng.normal(size=80_000)).astype(np.complex64)
+    found = acquire_exact_receiver(noise, source_rate, edge="lower",
+        acquisition_span_hz=12_000_000, acquisition_step_hz=2_000_000,
+        subband_rate_hz=subband_rate)
+    acquisition = found["acquisition"]
+    assert acquisition["span_hz"] == 3_750_000
+    assert acquisition["requested_span_hz"] == 12_000_000
+    assert acquisition["span_clamped_to_sampled_bandwidth"] is True
+    assert abs(acquisition["selected_center_offset_hz"]) <= 3_750_000
+    within = acquire_exact_receiver(noise, source_rate, edge="lower",
+        acquisition_span_hz=3_500_000, acquisition_step_hz=2_000_000,
+        subband_rate_hz=subband_rate)
+    assert within["acquisition"]["span_hz"] == 3_500_000
+    assert within["acquisition"]["span_clamped_to_sampled_bandwidth"] is False
 
 
 def test_wide_acquisition_recovers_large_lnb_offset_and_exact_pilots():

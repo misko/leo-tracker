@@ -23,13 +23,34 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert "Environment=LEO_ANALYSIS_ARCHIVE_MODE=shadow" in unit
     assert "Environment=LEO_ANALYSIS_RETENTION_MODE=disabled" in unit
     assert "Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1" in unit
-    assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=12000000" in unit
+    assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=3500000" in unit
     assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit
     assert "Environment=OMP_NUM_THREADS=1" in unit
     assert "Environment=OPENBLAS_NUM_THREADS=1" in unit
     assert "Environment=MKL_NUM_THREADS=1" in unit
     assert "TimeoutStopSec=1800" in unit
+
+
+def test_wide_acquisition_span_fits_the_recorded_wide_capture_bandwidth():
+    """The deployed span must be resolvable by the captures the watcher actually writes.
+
+    A 12 MHz span against 10 MS/s wide recordings failed every wide job in the
+    `acquire` stage before the library clamped out-of-band tuning requests.
+    """
+    from leo_tracker.radio.beacon.acquisition import usable_acquisition_span_hz
+
+    watcher = (ROOT / "scripts/starlink-beacon-watch.sh").read_text()
+    assert "--sample-rate-hz 10000000" in watcher
+    unit = (ROOT / "deploy/leo-tracker-analysis-server.service").read_text()
+    server = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
+    usable = usable_acquisition_span_hz(10_000_000, 2_500_000)
+    deployed = int([line.split("=")[-1] for line in unit.splitlines()
+                    if "LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ" in line][0])
+    fallback = int([line.split(":-")[-1].split("}")[0] for line in server.splitlines()
+                    if line.startswith("wide_acquisition_span_hz=")][0])
+    assert 0 < deployed <= usable
+    assert 0 < fallback <= usable
 
 
 def test_server_worker_uses_atomic_claims_uv_and_existing_venv():

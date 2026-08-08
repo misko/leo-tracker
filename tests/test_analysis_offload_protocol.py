@@ -211,6 +211,35 @@ def test_export_backfill_queues_only_missing_preserved_sources(tmp_path):
     assert fields == ["three", str(captures / "three"), "narrow"]
 
 
+def test_full_coverage_wide_receipt_does_not_require_a_skipped_track(tmp_path):
+    """The server skips doppler_track for wide, so requiring it fails every wide job.
+
+    Wide recordings used to die earlier, in acquire, which hid this: once they
+    got that far they could never produce a receipt.
+    """
+    reports = tmp_path / "reports"
+    (reports / "followups").mkdir(parents=True)
+    (reports / "sample.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-analysis/v1"}))
+    (reports / "followups/sample.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-followup/v1", "checks": [],
+        "confirmation": {"confirmed": False}}))
+
+    receipt = validate_outputs(tmp_path, "sample", "wide", context=None,
+                               full_coverage=True, pipeline_id="kalman-full-test")
+
+    assert receipt["status"] == "success"
+    assert "track" not in receipt["outputs"]
+    # Every other mode still must produce one.
+    (reports / "tracks").mkdir()
+    (reports / "tracks/sample.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-continuous-track/v1"}))
+    for mode in ("narrow", "oversample", "hop"):
+        assert "track" in validate_outputs(
+            tmp_path, "sample", mode, context=None, full_coverage=True,
+            pipeline_id="kalman-full-test")["outputs"]
+
+
 def test_hop_children_are_backfillable_under_their_session_identity(tmp_path):
     """Hop recordings were unreachable: wrong mode name, and never enumerated.
 

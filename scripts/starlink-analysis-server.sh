@@ -366,7 +366,7 @@ for interrupted in "${queue}"/*.running.*; do
   mv "${interrupted}" "${restored}"
 done
 shopt -u nullglob
-audit_result="$(protocol audit "${root}" --context "${default_context}")"
+audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"
 emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
 emit "recovery ${audit_result}"
 print_progress startup

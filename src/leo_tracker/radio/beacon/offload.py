@@ -317,12 +317,23 @@ def parse_job(path: Path) -> tuple[str, Path, str, Path | None]:
     return fields[0], Path(fields[1]), fields[2], (Path(fields[3]) if len(fields) == 4 else None)
 
 
-def audit_completed(root: Path, *, default_context: Path | None = None) -> dict:
+def audit_completed(root: Path, *, default_context: Path | None = None,
+                    pipeline_id: str = "legacy-v1") -> dict:
     """Requeue legacy/partial successes that lack a valid output receipt."""
     root = Path(root).resolve(); queue = root / "staging" / "analysis-queue"
+    pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
     requeued, accepted, errors = [], [], []
     for marker in sorted((queue / "done").glob("*.job")):
         name = marker.stem
+        # A completion record for this pipeline is the authoritative statement
+        # that the recording is done. Revalidating it rewrites versioned
+        # outputs, which collides once a rerun has changed the derived bytes,
+        # and a collision is a healthy refusal to overwrite scientific history
+        # rather than evidence the job needs redoing. Requeueing on it sends
+        # work to a source whose archived working copy may be long reclaimed.
+        if (root / "reports" / "runs" / pipeline_id / name /
+                "completion.json").is_file():
+            accepted.append(name); continue
         try:
             name, _capture, mode, job_context = parse_job(marker)
             context = job_context or default_context
@@ -520,6 +531,7 @@ def main(argv: list[str] | None = None) -> int:
     enqueue_export.add_argument("--dry-run", action="store_true")
     audit = commands.add_parser("audit")
     audit.add_argument("root", type=Path); audit.add_argument("--context", type=Path)
+    audit.add_argument("--pipeline-id", default="legacy-v1")
     current = commands.add_parser("current")
     current.add_argument("context_root", type=Path)
     args = parser.parse_args(argv)
@@ -556,7 +568,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 1 if report["errors"] else 0
     elif args.command == "audit":
-        print(json.dumps(audit_completed(args.root, default_context=args.context), sort_keys=True))
+        print(json.dumps(audit_completed(args.root, default_context=args.context,
+                                 pipeline_id=args.pipeline_id), sort_keys=True))
     else:
         print(current_context(args.context_root))
     return 0

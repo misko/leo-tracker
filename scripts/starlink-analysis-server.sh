@@ -44,6 +44,12 @@ wide_exact_interval_s="${LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S:-2}"
 # +-3.75 MHz before leaving the sampled band.  Match the acquisition watcher.
 wide_acquisition_span_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ:-3500000}"
 wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
+# Conditioned dual-RX frames remain separated unless both CFO trajectories and
+# their relative receiver offset extrapolate across the outage. Fifteen seconds
+# recovered a field-verified 29.6 s arc while the TLE stability gates still
+# rejected unrelated trajectories.
+track_maximum_gap_s="${LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S:-15}"
+track_maximum_reacquisition_span_hz="${LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"
 if [[ "${action}" == "drain" ]]; then
   mkdir -p "${queue}"
   exec 7>"${claim_lock}"
@@ -242,7 +248,9 @@ process_job() {
   fi
   if [[ "${mode}" != wide ]]; then
     run_stage "${worker_id}" "${name}" doppler_track radio starlink-beacon-track "${capture}" "${followup}" "${track}" \
-      --maximum-gap-s 5 --maximum-reacquisition-span-hz 5000 "${track_args[@]}" || return 1
+      --maximum-gap-s "${track_maximum_gap_s}" \
+      --maximum-reacquisition-span-hz "${track_maximum_reacquisition_span_hz}" \
+      "${track_args[@]}" || return 1
   else
     emit "stage_skipped worker=${worker_id} job=${name} stage=doppler_track reason=wide_analysis_contains_full_coverage_windows"
   fi

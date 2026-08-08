@@ -490,6 +490,18 @@ fitted LNB offset and a -7.7 Hz/s nuisance drift. The older capture publishes
 retain every refill midpoint and therefore use the finer
 `iio_read_midpoint_interpolation` mapping automatically.
 
+The first native-CI16 capture also supplied a controlled continuity test.
+With the old five-second gap bound its 195 dual-valid observations fragmented
+into three tracks no longer than 9.67 seconds, so none reached association.
+Changing only the gap bound to 15 seconds (with reacquisition capped at 15 kHz)
+formed a 29.57-second, 133-epoch track and qualified STARLINK-36035 (NORAD
+67082). Held-out RMS was 83.8 Hz, margin to second place was 297.8 Hz, coverage
+was 44.8%, and the fitted epoch correction was an interior -0.35 seconds. The
+same NORAD passed all 50/50, 60/40, 70/30 and tighter-drift stability cases.
+Those bounds are therefore production defaults. The grouping stage still
+requires both receiver CFO trajectories and their differential offset to
+extrapolate across an outage; the final orbit gates are unchanged.
+
 The retention implementation supports bounded rings after a source has been
 fully derived and independently archived. Its policy sizes are eight confirmed
 captures, six negative controls, two wide captures, four oversampled captures,

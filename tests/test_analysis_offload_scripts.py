@@ -24,6 +24,8 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert "Environment=LEO_ANALYSIS_RETENTION_MODE=disabled" in unit
     assert "Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1" in unit
     assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=3500000" in unit
+    assert "Environment=LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S=15" in unit
+    assert "Environment=LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ=15000" in unit
     assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit
     assert "Environment=OMP_NUM_THREADS=1" in unit
@@ -72,6 +74,11 @@ def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     assert "starlink-beacon-retain" in source
     assert 'flock -n 10' in source
     assert 'workers="${LEO_ANALYSIS_WORKERS:-16}"' in source
+    assert 'track_maximum_gap_s="${LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S:-15}"' in source
+    assert ('track_maximum_reacquisition_span_hz=' +
+            '"${LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"') in source
+    assert '--maximum-gap-s "${track_maximum_gap_s}"' in source
+    assert '--maximum-reacquisition-span-hz "${track_maximum_reacquisition_span_hz}"' in source
     assert "starlink-evidence-archive" in source
     assert "inspect-followup" in source
     assert "retention_skipped" in source

@@ -1235,6 +1235,8 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "--minimum-dual-epochs 30 --minimum-coverage-fraction .1" in script
     assert "reports/frame-tracks" in script
     assert '--maximum-gap-s "${track_maximum_gap_s}"' in script
+    assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-15' in script
+    assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000' in script
     assert '--measurement-source conditioned_frames' in script
     assert '--measurement-source dense_followup' in script
     assert '("${mode}" == "narrow" || "${mode}" == "hop")' in script

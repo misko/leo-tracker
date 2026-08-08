@@ -76,11 +76,12 @@ gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-a
 # dense 100 ms follow-up around a beacon hit.
 narrow_exact_interval_s="${LEO_BEACON_NARROW_EXACT_INTERVAL_S:-6}"
 wide_exact_interval_s="${LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10}"
-# Dense follow-up supplies independent measured epochs.  Keep outage joining
-# shorter than Starlink's observed 15-second channel-hop cadence so separate
-# emitters at one fixed tuning cannot be merged into an artificial long arc.
-track_maximum_gap_s="${LEO_BEACON_TRACK_MAXIMUM_GAP_S:-5}"
-track_maximum_reacquisition_span_hz="${LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-5000}"
+# Conditioned dual-RX frames are joined only when both CFO trajectories and
+# their relative receiver offset extrapolate across the outage. The 15-second
+# bound recovered a field-verified 29.6-second arc without relaxing the final
+# orbit residual, margin, interior-epoch, or temporal-stability gates.
+track_maximum_gap_s="${LEO_BEACON_TRACK_MAXIMUM_GAP_S:-15}"
+track_maximum_reacquisition_span_hz="${LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"
 rolling_association_interval_s="${LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600}"
 observer_lat="${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}"
 observer_lon="${LEO_BEACON_OBSERVER_LON:--122.48567658142287}"

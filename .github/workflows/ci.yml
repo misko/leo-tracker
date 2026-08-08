@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: offline suite (python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lower bound this package claims, and the version deployed on the
+        # acquisition and analysis hosts.
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Verify the lock file matches pyproject
+        run: uv lock --check
+
+      - name: Create the environment
+        run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
+
+      # The default suite must stay offline and deterministic: no radio, no
+      # mounted archive, no network.  Hardware tests are excluded by marker and
+      # `recorded` tests skip themselves when the frozen artifacts are absent.
+      - name: Run tests
+        run: uv run --no-sync pytest -q -m "not hardware" --durations=10
+
+  shellcheck:
+    name: operational scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check script syntax
+        run: |
+          status=0
+          for script in scripts/*.sh; do
+            bash -n "$script" || status=1
+          done
+          exit $status
+
+      - name: Shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./scripts
+          severity: error

@@ -110,6 +110,9 @@ The exporter is installed as the persistent
 network are available, resumes stable `.partial` transfers, and restarts after
 host reboots. Do not replace it with a transient `systemd-run` unit: transient
 units are not enabled across boots.
+It also reconciles complete/interrupted NVMe recordings against QNAP every ten
+minutes, so a capture committed immediately before a crash cannot remain
+stranded merely because its queue marker was never published.
 
 ## Evidence CLI
 

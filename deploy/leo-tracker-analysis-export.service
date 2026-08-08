@@ -11,6 +11,8 @@ Group=satpi01
 WorkingDirectory=/home/satpi01/leo-tracker
 Environment=LEO_OFFLOAD_SOURCE_POLICY=retain
 Environment=LEO_OFFLOAD_BWLIMIT_KBPS=80000
+Environment=LEO_OFFLOAD_RECONCILE_S=600
+Environment=LEO_ANALYSIS_PIPELINE_ID=kalman-full-v1
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo
 Restart=always
 RestartSec=10

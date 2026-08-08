@@ -27,7 +27,14 @@ if [[ "${source_policy}" != "delete" && "${source_policy}" != "retain" ]]; then
   exit 2
 fi
 context_refresh_s="${LEO_OFFLOAD_CONTEXT_REFRESH_S:-600}"
+reconcile_s="${LEO_OFFLOAD_RECONCILE_S:-600}"
+pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+uv_bin="${UV_BIN:-$(command -v uv || true)}"
+if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
+  echo "uv and the existing ${repo_dir}/.venv are required" >&2
+  exit 2
+fi
 tle_catalog="${LEO_BEACON_TLE_CATALOG:-/mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history/latest.json}"
 passes="${repo_dir}/artifacts/starlink_hybrid_watch/passes.json"
 learned="${source_root}/reports/learned-beacons/active.json"
@@ -48,6 +55,7 @@ shopt -u nullglob
 
 context_bundle=""
 context_synced_at=0
+reconciled_at=0
 sync_context() {
   local force="${1:-0}" now
   local -a args
@@ -64,6 +72,18 @@ sync_context() {
   context_bundle="$("${args[@]}")"
   context_synced_at="${now}"
   echo "published analysis context ${context_bundle}"
+}
+
+reconcile_exports() {
+  local force="${1:-0}" now
+  now="$(date +%s)"
+  if (( force == 0 && now - reconciled_at < reconcile_s )); then
+    return
+  fi
+  env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
+    python -m leo_tracker.radio.beacon.offload enqueue-export-backfill \
+    "${source_root}" "${shared_root}" --pipeline-id "${pipeline_id}" --summary-only
+  reconciled_at="${now}"
 }
 
 verify_copy() {
@@ -151,6 +171,7 @@ export_one() {
 }
 
 sync_context 1
+reconcile_exports 1
 while true; do
   shopt -s nullglob
   jobs=("${queue}"/*.job)
@@ -158,6 +179,7 @@ while true; do
   if (( ${#jobs[@]} == 0 )); then
     (( once == 1 )) && break
     sync_context
+    reconcile_exports
     sleep "${poll_s}"
     continue
   fi

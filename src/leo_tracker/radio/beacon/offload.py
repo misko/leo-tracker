@@ -454,7 +454,7 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
     queue = source_root / "staging" / "analysis-queue"
     queue.mkdir(parents=True, exist_ok=True)
     active_names: set[str] = set()
-    for pattern in ("*.job", "*.exporting.*"):
+    for pattern in ("*.job", "*.exporting.*", "*.running.*"):
         for marker in queue.glob(pattern):
             try:
                 active_names.add(parse_job(marker)[0])
@@ -529,6 +529,7 @@ def main(argv: list[str] | None = None) -> int:
     enqueue_export.add_argument("--pipeline-id", required=True)
     enqueue_export.add_argument("--limit", type=int)
     enqueue_export.add_argument("--dry-run", action="store_true")
+    enqueue_export.add_argument("--summary-only", action="store_true")
     audit = commands.add_parser("audit")
     audit.add_argument("root", type=Path); audit.add_argument("--context", type=Path)
     audit.add_argument("--pipeline-id", default="legacy-v1")
@@ -565,6 +566,12 @@ def main(argv: list[str] | None = None) -> int:
         report = enqueue_export_backfill(
             args.source_root, args.shared_root, pipeline_id=args.pipeline_id,
             limit=args.limit, dry_run=args.dry_run)
+        if args.summary_only:
+            report = {"schema": report["schema"], "pipeline_id": report["pipeline_id"],
+                      "queued_count": len(report["queued"]),
+                      "skipped_count": len(report["skipped"]),
+                      "error_count": len(report["errors"]),
+                      "errors": report["errors"][:20], "dry_run": report["dry_run"]}
         print(json.dumps(report, sort_keys=True))
         return 1 if report["errors"] else 0
     elif args.command == "audit":

@@ -13,6 +13,8 @@ def test_analysis_export_unit_is_persistent_and_copy_only():
     unit = (ROOT / "deploy/leo-tracker-analysis-export.service").read_text()
     assert "Requires=mnt-leo\\x2dnvme.mount" in unit
     assert "Environment=LEO_OFFLOAD_SOURCE_POLICY=retain" in unit
+    assert "Environment=LEO_OFFLOAD_RECONCILE_S=600" in unit
+    assert "Environment=LEO_ANALYSIS_PIPELINE_ID=kalman-full-v1" in unit
     assert "ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh" in unit
     assert "Restart=always" in unit
     assert "WantedBy=multi-user.target" in unit
@@ -381,6 +383,38 @@ def test_exporter_retain_policy_copies_without_removing_source(tmp_path):
     assert (capture / "chunk-000000.ci16").read_bytes() == payload
     assert (shared / "captures/capture-retained/chunk-000000.ci16").read_bytes() == payload
     assert "source_policy=retain" in result.stdout
+
+
+def test_exporter_reconciles_complete_capture_missing_its_queue_marker(tmp_path):
+    source = tmp_path / "source"
+    shared = tmp_path / "shared"
+    capture = source / "captures" / "capture-stranded"
+    capture.mkdir(parents=True)
+    payload = b"abcdefgh"
+    (capture / "chunk-000000.ci16").write_bytes(payload)
+    (capture / "manifest.json").write_text(
+        '{"state":"complete","metadata":{"observation_mode":"narrow"},'
+        '"chunks":[{"path":"chunk-000000.ci16","bytes":8,'
+        '"sha256":"9c56cc51b374c3ba189210d5b6d4bf57790d351c'
+        '96c47c02190ecf1e430635ab"}]}'
+    )
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-export.sh"), "--once",
+         str(source), str(shared)],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT),
+                          "LEO_OFFLOAD_SOURCE_POLICY": "retain",
+                          "LEO_OFFLOAD_BWLIMIT_KBPS": "0"},
+        text=True, capture_output=True, timeout=30)
+
+    assert result.returncode == 0, result.stderr
+    assert '"queued_count": 1' in result.stdout
+    assert capture.is_dir()
+    assert (shared / "captures/capture-stranded/chunk-000000.ci16").read_bytes() == payload
+    remote = list((shared / "staging/analysis-queue").glob("*.job"))
+    assert len(remote) == 1
+    assert remote[0].read_text().split("\t")[:3] == [
+        "capture-stranded", "captures/capture-stranded", "narrow"]
 
 
 def test_exporter_carries_a_quarantined_prefix(tmp_path):

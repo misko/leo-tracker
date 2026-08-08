@@ -31,6 +31,12 @@ frame tracking, decoding, Doppler tracking, or TLE association runs on the Pi.
 `local` remains an explicit offline fallback, but local workers and the exporter
 must never consume the same queue concurrently.
 
+The exporter reconciles preserved NVMe recordings against `kalman-full-v1` at
+startup and every ten minutes. This closes the small crash window between an
+atomic capture commit and its queue-marker rename, and also recovers recordings
+previously consumed by the retired local workers. Existing QNAP captures,
+active claims, and completed Kalman receipts are skipped idempotently.
+
 Install or refresh both Pi units after changing this contract:
 
 ```bash

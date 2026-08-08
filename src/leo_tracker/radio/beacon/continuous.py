@@ -18,7 +18,7 @@ import numpy as np
 
 from leo_tracker.orbit.artifacts import utc_iso
 
-from .artifact import BeaconCapture
+from .artifact import BeaconCapture, SCHEMA as BEACON_SCHEMA
 from .frame_tracking import FRAME_TRACK_SCHEMA, LEGACY_FRAME_TRACK_SCHEMAS
 from .pilots import edge_pilot_frame
 from .structure import STARLINK_FRAME_DURATION_S
@@ -710,7 +710,8 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
                   maximum_gap_s: float = 5.0,
                   maximum_drift_hz_s: float = 15_000,
                   measurement_source: str = "auto",
-                  frame_track_path: Path | None = None) -> dict:
+                  frame_track_path: Path | None = None,
+                  capture_manifest: dict | None = None) -> dict:
     """Track every independent acquired event in a frozen narrow capture."""
     if min(output_rate_hz, search_span_hz, maximum_reacquisition_span_hz,
            search_step_hz, maximum_relative_error_hz,
@@ -722,7 +723,14 @@ def track_capture(capture_path: Path, followup_path: Path, output: Path, *,
     if measurement_source not in ("auto", "conditioned_frames", "dense_followup",
                                   "periodic_epoch"):
         raise ValueError("unknown tracking measurement source")
-    capture = BeaconCapture.open(capture_path)
+    if capture_manifest is None:
+        capture = BeaconCapture.open(capture_path)
+    else:
+        if measurement_source != "conditioned_frames" or frame_track_path is None:
+            raise ValueError("an embedded capture manifest is safe only for conditioned frames")
+        if capture_manifest.get("schema") != BEACON_SCHEMA:
+            raise ValueError("embedded capture manifest has an unknown schema")
+        capture = BeaconCapture(Path(capture_path), dict(capture_manifest))
     manifest = capture.manifest
     rate = float(manifest["sample_rate_hz"])
     followup = json.loads(Path(followup_path).read_text())

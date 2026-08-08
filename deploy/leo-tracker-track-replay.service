@@ -1,0 +1,18 @@
+[Unit]
+Description=LEO tracker historical continuity and TLE replay
+After=network-online.target remote-fs.target leo-tracker-analysis-server.service
+Wants=network-online.target remote-fs.target
+
+[Service]
+Type=oneshot
+User=mouse9911
+WorkingDirectory=/home/mouse9911/gits/leo-tracker
+Environment=LEO_TRACKER_REPO=/home/mouse9911/gits/leo-tracker
+ExecStart=/home/mouse9911/gits/leo-tracker/scripts/starlink-track-replay.sh --workers 4 /mnt/qnap01/mouse9911/leo
+Nice=10
+CPUWeight=20
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

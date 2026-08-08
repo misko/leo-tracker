@@ -20,6 +20,7 @@ leo-orbit = "leo_tracker.orbit.cli:main"
 leo-radio = "leo_tracker.radio.cli:main"
 leo-report = "leo_tracker.report:main"
 leo-gps = "leo_tracker.gps.cli:main"
+leo-replay = "leo_tracker.replay_cli:main"
 
 [project.optional-dependencies]
 dev = [

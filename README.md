@@ -22,6 +22,8 @@ The package is split along the experiment boundary:
 
 The multi-source historical TLE daemon, on-disk API, Kalman service setup, and
 operational commands are documented in [docs/tle-sources.md](docs/tle-sources.md).
+Historical Doppler continuity experiments use the immutable, resumable workflow
+in [docs/historical-track-replay.md](docs/historical-track-replay.md).
 
 Hardware tests must be marked `hardware`; the default suite is offline and
 deterministic.

@@ -1200,8 +1200,8 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert 'LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3' in script
     assert 'LEO_BEACON_NARROW_EXACT_INTERVAL_S:-6' in script
     assert 'LEO_BEACON_WIDE_EXACT_INTERVAL_S:-10' in script
-    assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-5' in script
-    assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-5000' in script
+    assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-15' in script
+    assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000' in script
     assert 'LEO_BEACON_ROLLING_ASSOCIATION_INTERVAL_S:-600' in script
     assert 'LEO_BEACON_PRESERVE_RAW:-0' in script
     assert 'LEO_BEACON_MINIMUM_FREE_GB:-150' in script
@@ -1235,8 +1235,6 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "--minimum-dual-epochs 30 --minimum-coverage-fraction .1" in script
     assert "reports/frame-tracks" in script
     assert '--maximum-gap-s "${track_maximum_gap_s}"' in script
-    assert 'LEO_BEACON_TRACK_MAXIMUM_GAP_S:-15' in script
-    assert 'LEO_BEACON_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000' in script
     assert '--measurement-source conditioned_frames' in script
     assert '--measurement-source dense_followup' in script
     assert '("${mode}" == "narrow" || "${mode}" == "hop")' in script
@@ -1255,6 +1253,14 @@ def test_production_beacon_watch_combines_narrow_lock_and_periodic_wide_acquisit
     assert "starlink-beacon-dashboard-index" in script
     assert '[[ "${mode}" != "hop" ]]' in script
     assert '[[ "${mode}" != "hop" || -f "${confirmation_marker}" ]]' in script
+
+
+def test_beacon_watch_service_drains_foreground_capture_before_killing_children():
+    unit = (Path(__file__).parents[1] /
+            "deploy/systemd/leo-tracker-beacon-watch.service").read_text()
+    assert "KillSignal=SIGINT" in unit
+    assert "KillMode=mixed" in unit
+    assert "TimeoutStopSec=300" in unit
 
 
 def test_beacon_watch_fake_e2e_drains_bounded_analysis_pipeline(tmp_path):

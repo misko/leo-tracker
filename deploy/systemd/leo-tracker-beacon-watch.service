@@ -13,7 +13,11 @@ Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-beacon-watch.sh
 Restart=always
 RestartSec=10
-TimeoutStopSec=30
+# Signal only the watcher first. Bash defers its trap while a foreground radio
+# capture runs, so the checksummed capture can finish before descendants are
+# terminated. The longest current 10 MS/s trial takes about 122 seconds.
+KillMode=mixed
+TimeoutStopSec=300
 KillSignal=SIGINT
 
 [Install]

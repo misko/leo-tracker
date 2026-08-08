@@ -280,6 +280,12 @@ artifact lacking a report before consuming queued work. Thus a reboot between
 atomic capture completion and analysis cannot strand or silently discard an
 observation, and recovery does not leave the receiver off-sky.
 
+The systemd unit uses `KillMode=mixed` and a five-minute stop timeout. A normal
+restart signals the watcher process first; Bash defers its shutdown trap until
+the foreground checksummed capture finishes, then stops analysis children.
+Only a capture that fails to drain within the bounded timeout is interrupted,
+and its committed prefix remains recoverable through `quarantine`.
+
 Data live under `/mnt/leo-nvme/leo-tracker`:
 
 - `captures/<session>/manifest.json`: versioned parameters, timing, chunk hashes, and state.

@@ -77,6 +77,17 @@ workers. On the present history this can take several minutes; the held
 `staging/analysis-queue/server.lock` distinguishes an audit in progress from a
 dead service.
 
+## Wide acquisition span
+
+`LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ` is bounded by the recording, not by the
+LNB uncertainty one would like to search. Wide captures are taken at 10 MS/s and
+analyzed in 2.5 MHz subbands, so digital tuning cannot exceed +-3.75 MHz without
+leaving the sampled band; the deployed value is 3.5 MHz, matching the
+acquisition watcher. An over-wide request is now clamped to the usable span and
+recorded as `requested_span_hz` plus `span_clamped_to_sampled_bandwidth` in the
+acquisition block, rather than failing the `acquire` stage. Raising the capture
+sample rate is the only way to genuinely widen this search.
+
 The continuous tracker treats a valid frame artifact with no compatible pair
 of dual-receiver navigation epochs as a successful negative result. Its track
 artifact has `track_count: 0` and

@@ -37,6 +37,18 @@ def acquisition_centers(span_hz: float, step_hz: float) -> tuple[float, ...]:
     return tuple(float(value) for value in np.linspace(-span_hz, span_hz, 2 * count + 1))
 
 
+def usable_acquisition_span_hz(source_rate_hz: float, subband_rate_hz: float) -> float:
+    """Widest symmetric digital tuning that keeps every subband inside the sampled band.
+
+    A subband centered `offset` away from DC occupies `offset ± output_rate/2`, so
+    the sampled bandwidth bounds the LNB error a capture can physically resolve.
+    A caller may request more search than the recording supports; that request is
+    clamped rather than refused, and the effective span is recorded.
+    """
+    output_rate = min(float(source_rate_hz), float(subband_rate_hz))
+    return max(0.0, (float(source_rate_hz) - output_rate) / 2)
+
+
 def extract_complex_subband(samples: np.ndarray, source_rate_hz: float,
                             center_offset_hz: float, output_rate_hz: float) -> np.ndarray:
     """Digitally tune and anti-alias one complex subband."""
@@ -74,7 +86,9 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
                       "pilot_symbolwise_v3"):
         raise ValueError("unknown exact acquisition method")
     output_rate = min(float(source_rate_hz), float(subband_rate_hz))
-    centers = acquisition_centers(acquisition_span_hz, acquisition_step_hz)
+    requested_span = float(acquisition_span_hz)
+    span = min(requested_span, usable_acquisition_span_hz(source_rate_hz, output_rate))
+    centers = acquisition_centers(span, acquisition_step_hz)
     frequency_offsets = tuple(np.arange(-350_000, 350_001, 25_000, dtype=float))
     banks = []
     for center in centers:
@@ -163,7 +177,9 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
             "source_rate_hz": float(source_rate_hz),
             "method": method,
             "subband_rate_hz": output_rate,
-            "span_hz": float(acquisition_span_hz),
+            "span_hz": span,
+            "requested_span_hz": requested_span,
+            "span_clamped_to_sampled_bandwidth": span < requested_span,
             "step_hz": float(acquisition_step_hz),
             "selected_center_offset_hz": best["center_offset_hz"],
             "selected_epoch_sample": matched_epoch,

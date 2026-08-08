@@ -40,7 +40,9 @@ archive_root="${LEO_ANALYSIS_ARCHIVE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
 retention_mode="${LEO_ANALYSIS_RETENTION_MODE:-disabled}"
 full_exact_interval_s="${LEO_ANALYSIS_FULL_EXACT_INTERVAL_S:-1}"
 wide_exact_interval_s="${LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S:-2}"
-wide_acquisition_span_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ:-12000000}"
+# Wide captures are recorded at 10 MS/s, so 2.5 MHz subbands can only be tuned
+# +-3.75 MHz before leaving the sampled band.  Match the acquisition watcher.
+wide_acquisition_span_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ:-3500000}"
 wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
 if [[ "${action}" == "drain" ]]; then
   mkdir -p "${queue}"

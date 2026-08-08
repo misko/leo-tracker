@@ -137,12 +137,20 @@ preservation has a verified cropped receipt and the archive audit reports no
 invalid or partial bundle. Compare recording identifiers across both current
 source stores because the QNAP working set is not the entire NVMe history:
 
+A hop child's own directory is only `03-ch4-lower-edge`; its recording identity
+is `<session>-<segment>`, which is how the queue, the shared working set, and
+the receipts all name it. Taking the bare basename collapses every hop
+recording onto four names and badly understates the gap.
+
 ```bash
-find /mnt/leo-nvme/leo-tracker/captures \
-     /mnt/leo-nvme/leo-tracker/hop-sessions \
-     /mnt/leo-nvme/leo-tracker/quarantine \
-     -type f -name manifest.json -printf '%h\n' |
-  xargs -r -n1 basename | sort -u > /tmp/leo-nvme-recordings
+{ find /mnt/leo-nvme/leo-tracker/captures \
+       /mnt/leo-nvme/leo-tracker/quarantine \
+       -mindepth 2 -maxdepth 2 -name manifest.json -printf '%h\n' |
+    xargs -r -n1 basename
+  find /mnt/leo-nvme/leo-tracker/hop-sessions \
+       -mindepth 3 -maxdepth 3 -name manifest.json -printf '%h\n' |
+    sed 's#.*/hop-sessions/##; s#/#-#'
+} | sort -u > /tmp/leo-nvme-recordings
 find /mnt/qnap01/mouse9911/leo/captures -mindepth 1 -maxdepth 1 -type d \
   -printf '%f\n' | sort -u > /tmp/leo-qnap-recordings
 sort -u /tmp/leo-nvme-recordings /tmp/leo-qnap-recordings \

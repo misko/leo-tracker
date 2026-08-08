@@ -21,6 +21,45 @@ OUTPUT_SCHEMAS = {
     "decoded": "leo-tracker.starlink-edge-decode/v1",
     "association": "leo-tracker.starlink-tle-association/v2",
 }
+OBSERVATION_MODES = frozenset({"narrow", "wide", "oversample", "hop"})
+# Hop children record the capture-side name for the same pipeline mode. The
+# live watcher passes `hop` explicitly, so only backfill saw the mismatch.
+OBSERVATION_MODE_ALIASES = {"channel-hop": "hop"}
+
+
+def observation_mode(name: str, metadata: dict) -> str:
+    """Resolve a capture's pipeline mode from its manifest, falling back to its name."""
+    mode = str(metadata.get("observation_mode") or
+               ("oversample" if "oversample" in name else
+                "wide" if "wide" in name else
+                "hop" if name.startswith("hop-") else "narrow"))
+    mode = OBSERVATION_MODE_ALIASES.get(mode, mode)
+    if mode not in OBSERVATION_MODES:
+        raise ValueError(f"unknown observation mode {mode!r}")
+    return mode
+
+
+def preserved_recordings(source_root: Path) -> list[tuple[str, Path]]:
+    """Every exportable acquisition recording, oldest first.
+
+    Hop children live one level deeper than plain captures and carry their
+    session prefix in the pipeline identity, which is how the analysis queue,
+    the shared working set, and the cropped receipts all name them. Quarantine
+    is deliberately excluded: those recordings are interrupted and are
+    reconciled by review, not by the automatic pipeline.
+    """
+    found: list[tuple[str, Path]] = []
+    captures_root = Path(source_root) / "captures"
+    if captures_root.is_dir():
+        found += [(item.name, item) for item in captures_root.iterdir() if item.is_dir()]
+    sessions_root = Path(source_root) / "hop-sessions"
+    if sessions_root.is_dir():
+        for session in sessions_root.iterdir():
+            if not session.is_dir():
+                continue
+            found += [(f"{session.name}-{item.name}", item)
+                      for item in session.iterdir() if item.is_dir()]
+    return sorted(found, key=lambda item: item[1].stat().st_mtime)
 
 
 def _sha256(path: Path) -> str:
@@ -370,13 +409,7 @@ def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
             manifest = _read_json(capture / "manifest.json")
             if manifest.get("state") != "complete":
                 skipped.append(name); continue
-            metadata = manifest.get("metadata", {})
-            mode = str(metadata.get("observation_mode") or
-                       ("oversample" if "oversample" in name else
-                        "wide" if "wide" in name else
-                        "hop" if name.startswith("hop-") else "narrow"))
-            if mode not in {"narrow", "wide", "oversample", "hop"}:
-                raise ValueError(f"unknown observation mode {mode!r}")
+            mode = observation_mode(name, manifest.get("metadata", {}))
             marker = queue / f"backfill-{pipeline_id}-{name}.job"
             payload = (f"{name}\tcaptures/{name}\t{mode}\t"
                        f"{context.relative_to(root)}\n")
@@ -411,13 +444,7 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
             except (OSError, ValueError):
                 continue
     queued, skipped, errors = [], [], []
-    captures_root = source_root / "captures"
-    captures = (sorted(captures_root.iterdir(), key=lambda path: path.stat().st_mtime)
-                if captures_root.is_dir() else [])
-    for capture in captures:
-        if not capture.is_dir():
-            continue
-        name = capture.name
+    for name, capture in preserved_recordings(source_root):
         completion = (shared_root / "reports" / "runs" / pipeline_id / name /
                       "completion.json")
         shared_capture = shared_root / "captures" / name
@@ -428,13 +455,7 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
             manifest = _read_json(capture / "manifest.json")
             if manifest.get("state") != "complete":
                 skipped.append(name); continue
-            metadata = manifest.get("metadata", {})
-            mode = str(metadata.get("observation_mode") or
-                       ("oversample" if "oversample" in name else
-                        "wide" if "wide" in name else
-                        "hop" if name.startswith("hop-") else "narrow"))
-            if mode not in {"narrow", "wide", "oversample", "hop"}:
-                raise ValueError(f"unknown observation mode {mode!r}")
+            mode = observation_mode(name, manifest.get("metadata", {}))
             marker = queue / f"backfill-export-{pipeline_id}-{name}.job"
             payload = f"{name}\t{capture}\t{mode}\n"
             if not dry_run:

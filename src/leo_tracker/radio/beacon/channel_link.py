@@ -175,6 +175,9 @@ def link_channel_tracks(track_paths: list[Path], output: Path, *,
         observations.sort(key=lambda item: parse_utc(item["utc"]))
         start = parse_utc(observations[0]["utc"]).timestamp()
         stop = parse_utc(observations[-1]["utc"]).timestamp()
+        measured_segment_duration = sum(
+            item["stop_s"] - item["start_s"] for item in hypothesis)
+        outage_duration = max(0.0, stop - start - measured_segment_duration)
         tracks.append({"track_id": f"channel-hypothesis-{index:03d}",
             "seed": {"source": "cross_channel_rate_link"},
             "observations": observations, "source_segments": sources,
@@ -184,6 +187,8 @@ def link_channel_tracks(track_paths: list[Path], output: Path, *,
                 "valid_observation_count": len(observations),
                 "dual_valid_observation_count": len(observations),
                 "valid_duration_s": stop-start, "dual_valid_duration_s": stop-start,
+                "measured_segment_duration_s": measured_segment_duration,
+                "outage_duration_s": outage_duration,
                 "source_segment_count": len(hypothesis),
                 "channel_numbers": sorted(set(item["channel_number"]
                                               for item in hypothesis))}})

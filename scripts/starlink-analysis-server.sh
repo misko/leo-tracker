@@ -51,6 +51,7 @@ wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
 track_maximum_gap_s="${LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S:-15}"
 track_maximum_reacquisition_span_hz="${LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ:-15000}"
 frame_maximum_extension_s="${LEO_ANALYSIS_FRAME_MAXIMUM_EXTENSION_S:-60}"
+fragment_maximum_gap_s="${LEO_ANALYSIS_FRAGMENT_MAXIMUM_GAP_S:-30}"
 if [[ "${action}" == "drain" ]]; then
   mkdir -p "${queue}"
   exec 7>"${claim_lock}"
@@ -101,7 +102,7 @@ keep_wide="${LEO_ANALYSIS_KEEP_WIDE:-2}"
 keep_oversample="${LEO_ANALYSIS_KEEP_OVERSAMPLE:-4}"
 keep_hop_sessions="${LEO_ANALYSIS_KEEP_HOP_SESSIONS:-6}"
 mkdir -p "${queue}/done" "${queue}/failed" "${metrics}" \
-  "${reports}"/{plots,followups,decoded,frame-tracks,tracks,associations,fingerprints}
+  "${reports}"/{plots,followups,decoded,frame-tracks,tracks,channel-links,associations,fingerprints}
 exec 8>"${queue}/server.lock"
 if ! flock -n 8; then
   echo "another analysis server already owns ${queue}" >&2
@@ -204,6 +205,8 @@ process_job() {
   local decoded="${reports}/decoded/${name}.json" symbols="${reports}/decoded/${name}.npz"
   local decoded_plot="${reports}/decoded/${name}.png" track="${reports}/tracks/${name}.json"
   local association="${reports}/associations/${name}.json"
+  local linked="${reports}/channel-links/${name}.json"
+  local linked_association="${reports}/associations/${name}-channel-link.json"
   local has_checks=0 archived=0
   local -a analysis_args template_args frame_args track_args passes_args
   analysis_args=(--exact-window-s .01)
@@ -261,6 +264,33 @@ process_job() {
       --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
       --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
       --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" --output "${association}" || return 1
+  fi
+  # Fixed-tuning beacon traffic can disappear for seconds while the same
+  # spacecraft remains visible. Preserve those outages, conservatively link
+  # only smooth dual-RX CFO continuations, and ask the independent held-out
+  # TLE stage to accept or reject the resulting hypothesis.
+  if [[ "${mode}" == narrow || "${mode}" == oversample ]]; then
+    if run_stage "${worker_id}" "${name}" fragment_link radio \
+        starlink-beacon-channel-link "${linked}" "${track}" \
+        --maximum-gap-s "${fragment_maximum_gap_s}" \
+        --maximum-acceleration-difference-m-s2 35 \
+        --maximum-same-tuning-quadratic-rms-hz 2000; then
+      if grep -Eq '"multi_segment_hypothesis_count": [1-9]' "${linked}"; then
+        if [[ -f "${job_context}/tle-catalog.json" ]]; then
+          run_stage "${worker_id}" "${name}" fragment_tle_association orbit associate \
+            --observations "${linked}" --catalog "${job_context}/tle-catalog.json" \
+            --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
+            --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
+            --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" \
+            --minimum-dual-epochs 30 --minimum-coverage-fraction .1 \
+            --output "${linked_association}" || return 1
+        fi
+      else
+        emit "stage_skipped worker=${worker_id} job=${name} stage=fragment_tle_association reason=no_multi_fragment_hypothesis"
+      fi
+    else
+      emit "stage_skipped worker=${worker_id} job=${name} stage=fragment_tle_association reason=no_usable_fragments"
+    fi
   fi
   if [[ "${archive_mode}" != off ]]; then
     if run_stage "${worker_id}" "${name}" evidence_archive radio starlink-evidence-archive \

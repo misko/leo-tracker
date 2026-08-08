@@ -98,6 +98,8 @@ def test_channel_link_preserves_outage_but_links_smooth_same_tuning_fragments(tm
     assert report["summary"]["multi_segment_hypothesis_count"] == 1
     linked = report["tracks"][0]
     assert linked["summary"]["dual_valid_duration_s"] == 28
+    assert linked["summary"]["measured_segment_duration_s"] == 8
+    assert linked["summary"]["outage_duration_s"] == 20
     assert linked["summary"]["source_segment_count"] == 2
     assert len(linked["observations"]) == 82
     assert not any(1_700_000_004 < datetime.fromisoformat(
@@ -162,6 +164,47 @@ def test_channel_link_requires_quadratic_continuity_across_capture_boundary(tmp_
     assert accepted["summary"]["multi_segment_hypothesis_count"] == 1
     assert accepted["tracks"][0]["summary"]["dual_valid_duration_s"] == 20
     assert accepted["link_decisions"][1]["same_tuning"] is True
+
+
+def test_fragment_linker_makes_two_subthreshold_arcs_associable_without_filling_gap(
+        tmp_path):
+    """Two <20 s detections may jointly expose enough Doppler curvature for TLE work."""
+    path = tmp_path / "fragments.json"; continuation_path = tmp_path / "later.json"
+    _report(path, 4, 1_700_000_000, 1_700_000_012, 100)
+    _report(continuation_path, 4, 1_700_000_028, 1_700_000_040, 108)
+    report = json.loads(path.read_text())
+    continuation = json.loads(continuation_path.read_text())["tracks"][0]
+    continuation["track_id"] = "track-001"
+    prior = report["tracks"][0]["observations"][-1]["consensus"][
+        "receiver_referenced_cfo_hz"]
+    rf = report["signal"]["nominal_rf_hz"]
+    slope = -108 * rf / 299_792_458.0
+    for item in continuation["observations"]:
+        elapsed = (datetime.fromisoformat(item["utc"].replace("Z", "+00:00"))
+                   .timestamp() - 1_700_000_012)
+        cfo = prior + slope * elapsed
+        item["consensus"]["receiver_referenced_cfo_hz"] = cfo
+        for receiver in item["receivers"]:
+            receiver["frequency_offset_hz"] = cfo + 500 * receiver["receiver"]
+    report["tracks"].append(continuation)
+    path.write_text(json.dumps(report))
+
+    linked = link_channel_tracks([path], tmp_path / "linked.json")
+
+    source_durations = [(datetime.fromisoformat(
+        track["observations"][-1]["utc"].replace("Z", "+00:00")) -
+        datetime.fromisoformat(track["observations"][0]["utc"].replace(
+            "Z", "+00:00"))).total_seconds() for track in report["tracks"]]
+    assert source_durations == [12, 12]
+    assert linked["summary"]["multi_segment_hypothesis_count"] == 1
+    hypothesis = linked["tracks"][0]
+    assert hypothesis["summary"]["dual_valid_duration_s"] == 40
+    assert hypothesis["summary"]["measured_segment_duration_s"] == 24
+    assert hypothesis["summary"]["outage_duration_s"] == 16
+    assert hypothesis["summary"]["source_segment_count"] == 2
+    assert not any(1_700_000_012 < datetime.fromisoformat(
+        item["utc"].replace("Z", "+00:00")).timestamp() < 1_700_000_028
+        for item in hypothesis["observations"])
 
 
 def test_channel_link_excludes_tiny_fragment_from_long_wall_clock_hypothesis(tmp_path):

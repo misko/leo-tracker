@@ -47,6 +47,23 @@ uv_cache="${UV_CACHE_DIR:-${repo_dir}/.uv-cache}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
 maximum_pi_temp_millic="${LEO_BEACON_MAX_PI_TEMP_MILLIC:-75000}"
 resume_pi_temp_millic="${LEO_BEACON_RESUME_PI_TEMP_MILLIC:-70000}"
+host_thermal_zone="${LEO_BEACON_THERMAL_ZONE:-/sys/class/thermal/thermal_zone0/temp}"
+
+# Thermal backoff protects the Pi, so a sensor that exists but reads unusably
+# is a hard error rather than a silently skipped safety check. Only a host with
+# no such zone at all degrades to running without thermal management, which is
+# what lets this script run off the Pi. Sets host_temperature_millic_value and
+# must be called outside any subshell so a bad read can still abort the run.
+host_temperature_millic_value=""
+read_host_temperature() {
+  host_temperature_millic_value=""
+  [[ -e "${host_thermal_zone}" ]] || return 1
+  if ! read -r host_temperature_millic_value < "${host_thermal_zone}" ||
+     [[ ! "${host_temperature_millic_value}" =~ ^-?[0-9]+$ ]]; then
+    echo "unreadable thermal zone ${host_thermal_zone}" >&2
+    exit 3
+  fi
+}
 target_spec="${LEO_BEACON_TARGETS:-4:lower-edge}"
 maximum_cycles="${LEO_BEACON_MAX_CYCLES:-0}"
 fake_source="${LEO_BEACON_FAKE:-0}"
@@ -124,23 +141,28 @@ capture_target() {
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     name="ch${channel}-${region}-${mode}-${stamp}"
     capture="${storage_root}/captures/${name}"
-    while read -r pi_temp_millic < /sys/class/thermal/thermal_zone0/temp &&
-          (( pi_temp_millic >= maximum_pi_temp_millic )); do
+    while read_host_temperature &&
+          (( host_temperature_millic_value >= maximum_pi_temp_millic )); do
       printf '{"thermal_backoff":true,"pi_temperature_c":%.3f,"resume_below_c":%.3f}\n' \
-        "$(awk -v value="${pi_temp_millic}" 'BEGIN {print value/1000}')" \
+        "$(awk -v value="${host_temperature_millic_value}" 'BEGIN {print value/1000}')" \
         "$(awk -v value="${resume_pi_temp_millic}" 'BEGIN {print value/1000}')"
       sleep 15
-      if read -r pi_temp_millic < /sys/class/thermal/thermal_zone0/temp &&
-         (( pi_temp_millic < resume_pi_temp_millic )); then
+      if read_host_temperature &&
+         (( host_temperature_millic_value < resume_pi_temp_millic )); then
         break
       fi
     done
-    pi_temp="$(awk '{printf "%.3f", $1/1000}' /sys/class/thermal/thermal_zone0/temp)"
+    pi_temp=""
+    if read_host_temperature; then
+      pi_temp_millic="${host_temperature_millic_value}"
+      pi_temp="$(awk -v value="${pi_temp_millic}" 'BEGIN {printf "%.3f", value/1000}')"
+    fi
     radio_temp_millic=""
     if [[ "${fake_source}" != "1" ]]; then
       radio_temp_millic="$(iio_attr -u ip:192.168.2.1 -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
     fi
-    temperature_args=(--host-temperature-c "${pi_temp}")
+    temperature_args=()
+    [[ -n "${pi_temp}" ]] && temperature_args=(--host-temperature-c "${pi_temp}")
     if [[ -n "${radio_temp_millic}" ]]; then
       radio_temp="$(awk -v value="${radio_temp_millic}" 'BEGIN {printf "%.3f", value/1000}')"
       temperature_args+=(--radio-temperature-c "${radio_temp}")

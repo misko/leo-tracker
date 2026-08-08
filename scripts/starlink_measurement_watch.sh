@@ -6,6 +6,14 @@ set -u -o pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 watch_root="${1:-$repo_dir/artifacts/starlink_measurement_watch}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
+# systemd does not inherit the interactive shell's user-local PATH, so the
+# absolute acquisition-host path stays authoritative. Fall back to PATH only
+# when it is absent, which is what lets this run off the Pi.
+[[ -x "$uv_bin" ]] || uv_bin="$(command -v uv || true)"
+if [[ ! -x "$uv_bin" ]]; then
+  echo "uv is required: set UV_BIN or put uv on PATH" >&2
+  exit 2
+fi
 run=("$uv_bin" run --active --no-sync)
 uri="${PLUTO_URI:-ip:192.168.2.1}"
 snapshots="${SNAPSHOTS:-900}"

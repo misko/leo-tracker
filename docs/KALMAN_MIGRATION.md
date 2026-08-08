@@ -36,6 +36,8 @@ startup and every ten minutes. This closes the small crash window between an
 atomic capture commit and its queue-marker rename, and also recovers recordings
 previously consumed by the retired local workers. Existing QNAP captures,
 active claims, and completed Kalman receipts are skipped idempotently.
+The Pi-hosted dashboard is read-only and uses the shared QNAP root, so new rows
+appear from Kalman's authoritative reports rather than from retired local DSP.
 
 Install or refresh both Pi units after changing this contract:
 

@@ -32,6 +32,13 @@ def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():
     assert '(( host_temperature_millic_value >= resume_pi_temp_millic ))' in watcher
 
 
+def test_pi_dashboard_reads_authoritative_kalman_results():
+    unit = (ROOT / "deploy/systemd/leo-tracker-dashboard.service").read_text()
+    assert "RequiresMountsFor=/mnt/qnap01/mouse9911/leo" in unit
+    assert "--beacon-root /mnt/qnap01/mouse9911/leo" in unit
+    assert "--beacon-root /mnt/leo-nvme/leo-tracker" not in unit
+
+
 def test_watcher_rejects_ambiguous_analysis_mode(tmp_path):
     result = subprocess.run(
         ["bash", str(ROOT / "scripts/starlink-beacon-watch.sh")],

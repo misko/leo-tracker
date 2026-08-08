@@ -147,17 +147,16 @@ capture_target() {
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     name="ch${channel}-${region}-${mode}-${stamp}"
     capture="${storage_root}/captures/${name}"
-    while read_host_temperature &&
-          (( host_temperature_millic_value >= maximum_pi_temp_millic )); do
-      printf '{"thermal_backoff":true,"pi_temperature_c":%.3f,"resume_below_c":%.3f}\n' \
-        "$(awk -v value="${host_temperature_millic_value}" 'BEGIN {print value/1000}')" \
-        "$(awk -v value="${resume_pi_temp_millic}" 'BEGIN {print value/1000}')"
-      sleep 15
-      if read_host_temperature &&
-         (( host_temperature_millic_value < resume_pi_temp_millic )); then
-        break
-      fi
-    done
+    if read_host_temperature &&
+       (( host_temperature_millic_value >= maximum_pi_temp_millic )); then
+      while (( host_temperature_millic_value >= resume_pi_temp_millic )); do
+        printf '{"thermal_backoff":true,"pi_temperature_c":%.3f,"resume_below_c":%.3f}\n' \
+          "$(awk -v value="${host_temperature_millic_value}" 'BEGIN {print value/1000}')" \
+          "$(awk -v value="${resume_pi_temp_millic}" 'BEGIN {print value/1000}')"
+        sleep 15
+        read_host_temperature || break
+      done
+    fi
     pi_temp=""
     if read_host_temperature; then
       pi_temp_millic="${host_temperature_millic_value}"

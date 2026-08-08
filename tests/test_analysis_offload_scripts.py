@@ -26,6 +26,7 @@ def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():
     assert 'if [[ "${analysis_mode}" == "local" ]]' in watcher
     assert '"local_analysis_workers":0' in watcher
     assert '"queue_owner":"starlink-analysis-export"' in watcher
+    assert '(( host_temperature_millic_value >= resume_pi_temp_millic ))' in watcher
 
 
 def test_watcher_rejects_ambiguous_analysis_mode(tmp_path):

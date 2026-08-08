@@ -309,6 +309,34 @@ def test_analysis_backfill_accepts_the_capture_side_hop_mode_name(tmp_path):
     assert job.read_text().split("\t")[2] == "hop"
 
 
+def test_audit_accepts_a_recording_this_pipeline_already_completed(tmp_path):
+    """A completion record is authoritative; revalidating it requeues real work.
+
+    The audit rewrote versioned outputs under the default identity, which
+    collides once a rerun has changed the derived bytes. That collision is a
+    healthy refusal to overwrite scientific history, but the audit read any
+    exception as "redo this", sending jobs at captures whose archived working
+    copies had been reclaimed. One restart requeued 472 such jobs.
+    """
+    queue = tmp_path / "staging/analysis-queue"
+    (queue / "done").mkdir(parents=True)
+    (queue / "done/sample.job").write_text("sample\tcaptures/sample\tnarrow\n")
+    completion = tmp_path / "reports/runs/kalman-full-v1/sample/completion.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({"pipeline_id": "kalman-full-v1"}))
+    # Deliberately absent: the analysis and follow-up artifacts validate_outputs
+    # would need. The completion record alone must settle it.
+
+    report = audit_completed(tmp_path, pipeline_id="kalman-full-v1")
+
+    assert report["accepted"] == ["sample"]
+    assert report["requeued"] == []
+    assert not list(queue.glob("*.job"))
+    # A different pipeline identity has made no such claim, so it still audits.
+    other = audit_completed(tmp_path, pipeline_id="legacy-v1")
+    assert other["requeued"] == ["sample.job"]
+
+
 def test_audit_requeues_false_done_but_accepts_valid_negative(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     done = queue / "done"; done.mkdir(parents=True)

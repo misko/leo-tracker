@@ -1,0 +1,22 @@
+[Unit]
+Description=Fetch and archive immutable Starlink TLE catalog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=satpi01
+Group=users
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
+# Space-Track is the authoritative origin; Celestrak already blocks this host.
+# Credentials live outside the repository in a 0600 file so they reach neither
+# git nor a process listing. See docs/tle-sources.md.
+EnvironmentFile=/etc/leo-tracker/space-track.env
+ExecStart=/home/satpi01/.local/bin/uv run --active --no-sync leo-orbit archive \
+  --url "https://www.space-track.org/basicspacedata/query/class/gp/OBJECT_NAME/~~STARLINK/orderby/NORAD_CAT_ID/format/tle" \
+  --archive-dir /mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history \
+  --label starlink-current
+
+[Install]
+WantedBy=multi-user.target

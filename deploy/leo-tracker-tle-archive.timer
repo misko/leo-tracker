@@ -1,0 +1,16 @@
+[Unit]
+Description=Archive Starlink TLEs every six hours
+
+[Timer]
+# Four catalog queries a day sits far inside Space-Track's published limits and
+# is already faster than the catalog actually changes: the previous source
+# published 1.09 new catalogs per day over the measured week. Do not shorten
+# this. Celestrak blocked this host for hammering, and the authoritative source
+# is the more costly one to lose.
+OnCalendar=*-*-* 00/6:00:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=leo-tracker-tle-archive.service
+
+[Install]
+WantedBy=timers.target

@@ -8,7 +8,10 @@ import json
 import math
 from pathlib import Path
 import sys
-from urllib.request import Request, urlopen
+import os
+from http.cookiejar import CookieJar
+from urllib.parse import urlencode, urlsplit
+from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 import numpy as np
 from sgp4.api import Satrec, SatrecArray, jday
@@ -68,8 +71,51 @@ def _visibility_candidates(tles, observer: Observer, start: datetime, end: datet
     return [tle for _, tle in candidates]
 
 
+USER_AGENT = "leo-tracker/0.1"
+SPACE_TRACK_SUFFIX = "space-track.org"
+
+
+def _space_track_bytes(url: str, identity: str, password: str) -> bytes:
+    """Authenticate, run exactly one query, then release the session.
+
+    Space-Track rate-limits aggressively and bans for abuse, so a caller gets
+    one login and one query per invocation and the session is always closed,
+    even on failure. Credentials come from the environment rather than argv so
+    they never reach a process listing or a service log.
+    """
+    origin = urlsplit(url)
+    base = f"{origin.scheme}://{origin.netloc}"
+    opener = build_opener(HTTPCookieProcessor(CookieJar()))
+    login = Request(f"{base}/ajaxauth/login",
+                    data=urlencode({"identity": identity,
+                                    "password": password}).encode(),
+                    headers={"User-Agent": USER_AGENT})
+    with opener.open(login, timeout=60) as response:
+        response.read()
+    try:
+        query = Request(url, headers={"User-Agent": USER_AGENT})
+        with opener.open(query, timeout=180) as response:
+            return response.read()
+    finally:
+        try:
+            with opener.open(Request(f"{base}/ajaxauth/logout",
+                                     headers={"User-Agent": USER_AGENT}),
+                             timeout=30) as response:
+                response.read()
+        except OSError:
+            pass
+
+
 def fetch_bytes(url: str) -> bytes:
-    request = Request(url, headers={"User-Agent": "leo-tracker/0.1"})
+    if (urlsplit(url).hostname or "").endswith(SPACE_TRACK_SUFFIX):
+        identity = os.environ.get("LEO_SPACETRACK_IDENTITY", "")
+        password = os.environ.get("LEO_SPACETRACK_PASSWORD", "")
+        if not identity or not password:
+            raise RuntimeError(
+                "space-track needs LEO_SPACETRACK_IDENTITY and "
+                "LEO_SPACETRACK_PASSWORD in the environment")
+        return _space_track_bytes(url, identity, password)
+    request = Request(url, headers={"User-Agent": USER_AGENT})
     with urlopen(request, timeout=30) as response:
         return response.read()
 

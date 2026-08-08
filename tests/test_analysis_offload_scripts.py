@@ -15,6 +15,7 @@ def test_analysis_export_unit_is_persistent_and_copy_only():
     assert "Environment=LEO_OFFLOAD_SOURCE_POLICY=retain" in unit
     assert "Environment=LEO_OFFLOAD_RECONCILE_S=600" in unit
     assert "Environment=LEO_ANALYSIS_PIPELINE_ID=kalman-full-v1" in unit
+    assert "Environment=UV_BIN=/home/satpi01/.local/bin/uv" in unit
     assert "ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh" in unit
     assert "Restart=always" in unit
     assert "WantedBy=multi-user.target" in unit

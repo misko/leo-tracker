@@ -82,6 +82,7 @@ The acquisition service uses this systemd drop-in:
 [Service]
 Environment=LEO_BEACON_PRESERVE_RAW=1
 Environment=LEO_BEACON_MINIMUM_FREE_GB=150
+Environment=LEO_BEACON_ANALYSIS_MODE=offload
 ```
 
 In this mode the local retention command is skipped. Capture waits when free
@@ -94,6 +95,8 @@ LEO_OFFLOAD_SOURCE_POLICY=retain
 `retain` is the safe default: it verifies and queues the QNAP work copy but
 leaves the NVMe directory unchanged. `delete` is the legacy move behavior and
 must be explicitly selected; it must not be used during this evaluation.
+In `offload` mode the exporter is the only local analysis-queue consumer;
+SATPI01 must not run the legacy local DSP workers alongside it.
 
 Inspect the live settings:
 

@@ -23,6 +23,26 @@ reports/runs/<pipeline-id>/<recording-id>/completion.json
 Receipts contain hashes for every required output. Different pipeline
 identities therefore coexist without silently replacing scientific history.
 
+SATPI01 production uses `LEO_BEACON_ANALYSIS_MODE=offload`. The capture watcher
+only records checksummed IQ and publishes a durable local queue marker. The
+copy-only exporter is the sole consumer of that queue: it atomically publishes
+the capture and a relative-path job marker on QNAP. No acquisition, follow-up,
+frame tracking, decoding, Doppler tracking, or TLE association runs on the Pi.
+`local` remains an explicit offline fallback, but local workers and the exporter
+must never consume the same queue concurrently.
+
+Install or refresh both Pi units after changing this contract:
+
+```bash
+sudo cp deploy/systemd/leo-tracker-beacon-watch.service \
+  /etc/systemd/system/leo-tracker-beacon-watch.service
+sudo cp deploy/leo-tracker-analysis-export.service \
+  /etc/systemd/system/leo-tracker-analysis-export.service
+sudo systemctl daemon-reload
+sudo systemctl restart leo-tracker-beacon-watch.service
+sudo systemctl restart leo-tracker-analysis-export.service
+```
+
 ## Safety modes
 
 `LEO_ANALYSIS_ARCHIVE_MODE` supports:

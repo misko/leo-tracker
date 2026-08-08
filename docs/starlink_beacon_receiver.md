@@ -259,12 +259,14 @@ materially longer than nominal RF sample time.
 
 The production service is `leo-tracker-beacon-watch.service`. By default it
 captures consecutive two-minute channel-4 lower-edge dwells and adds periodic
-oversampled and wide LNB-offset comparisons on that same edge. Capture and
-analysis are independent: completed IQ is atomically placed on a durable NVMe
-queue, while exactly one worker serializes all report and index writers. The
-radio therefore begins the next dwell even when the prior capture is still
-being analyzed. Every fifth cycle it also keeps one Pluto stream open
-for settled 1.5-second lower-edge dwells on channels 1--4. Those are the four
+oversampled and wide LNB-offset comparisons on that same edge. In deployed
+`offload` mode, completed IQ is atomically placed on a durable NVMe queue and
+`leo-tracker-analysis-export.service` is its sole consumer. The exporter copies
+each immutable recording into QNAP through a resumable partial directory and
+then publishes the Kalman job marker atomically. All DSP runs on Kalman; the Pi
+does not compete for CPU or queue ownership. Every fifth cycle it also keeps
+one Pluto stream open for settled 1.5-second lower-edge dwells on channels
+1--4. Those are the four
 channels inside the installed universal LNB's 9.75 GHz low-band mode; channels
 5--8 require the LNB's 22 kHz high-band selection and a 10.6 GHz LO model. Each
 retune discards two complete IIO buffers and publishes a hop-session manifest
@@ -274,11 +276,11 @@ falls behind. All candidate captures are preserved in the deployed
 `LEO_BEACON_PRESERVE_RAW=1` mode. The code contains a bounded negative-control
 ring for a future verified-retention deployment, but that policy is currently
 disabled. Interrupted captures are moved to `quarantine` rather than deleted.
-At startup, disk-only recovery runs in the analysis worker while the first new
-radio dwell begins immediately. It idempotently analyzes every complete
-artifact lacking a report before consuming queued work. Thus a reboot between
-atomic capture completion and analysis cannot strand or silently discard an
-observation, and recovery does not leave the receiver off-sky.
+At startup, offload mode restores any `.running.<pid>` claim left by an older
+local-mode worker back to `.job`; the persistent exporter then resumes it. Thus
+a reboot or mode change between atomic capture completion and export cannot
+strand or silently discard an observation. `LEO_BEACON_ANALYSIS_MODE=local`
+retains the former two-worker analysis path only for an explicit offline test.
 
 The systemd unit uses `KillMode=mixed` and a five-minute stop timeout. A normal
 restart signals the watcher process first; Bash defers its shutdown trap until
@@ -317,11 +319,10 @@ Data live under `/mnt/leo-nvme/leo-tracker`:
   measured pieces. Every observation retains its actual Ku-band RF, outages
   remain empty, and each channel has a separate oscillator nuisance group.
   These require held-out TLE association and are never identities by themselves.
-- `staging/analysis-queue/*.job`: atomic pending-analysis work; a `.failed`
-  sibling preserves the job identity if a processing stage exits unexpectedly.
-  Ordinary two-minute captures and lightweight channel-hop children are claimed
-  by separate workers through atomic `.running.<pid>` renames. Interrupted
-  claims return to the queue on service restart.
+- `staging/analysis-queue/*.job`: atomic pending-export work. In production the
+  copy-only exporter claims it as `.exporting.<pid>`, verifies the destination,
+  and only then publishes the QNAP analysis job. `.running.<pid>` is a legacy
+  local-analysis claim and is restored to `.job` when offload mode starts.
 - `quarantine/`: recoverable interrupted sessions.
 
 Useful commands:

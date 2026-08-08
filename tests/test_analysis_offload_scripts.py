@@ -1,5 +1,7 @@
 from pathlib import Path
+import json
 import os
+import shutil
 import subprocess
 import time
 
@@ -14,6 +16,27 @@ def test_analysis_export_unit_is_persistent_and_copy_only():
     assert "ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh" in unit
     assert "Restart=always" in unit
     assert "WantedBy=multi-user.target" in unit
+
+
+def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():
+    unit = (ROOT / "deploy/systemd/leo-tracker-beacon-watch.service").read_text()
+    watcher = (ROOT / "scripts/starlink-beacon-watch.sh").read_text()
+    assert "Environment=LEO_BEACON_ANALYSIS_MODE=offload" in unit
+    assert 'analysis_mode="${LEO_BEACON_ANALYSIS_MODE:-local}"' in watcher
+    assert 'if [[ "${analysis_mode}" == "local" ]]' in watcher
+    assert '"local_analysis_workers":0' in watcher
+    assert '"queue_owner":"starlink-analysis-export"' in watcher
+
+
+def test_watcher_rejects_ambiguous_analysis_mode(tmp_path):
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-beacon-watch.sh")],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT),
+                          "LEO_BEACON_STORAGE": str(tmp_path),
+                          "LEO_BEACON_ANALYSIS_MODE": "both"},
+        text=True, capture_output=True, timeout=5)
+    assert result.returncode == 2
+    assert "must be local or offload" in result.stderr
 
 
 def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
@@ -286,6 +309,49 @@ def test_exporter_moves_complete_bundle_then_queues_it(tmp_path):
     assert fields[:3] == ["capture-one", "captures/capture-one", "narrow"]
     assert fields[3].startswith("context/bundles/")
     assert not list((shared / "staging/incoming").glob("*.partial"))
+
+
+def test_offload_only_watcher_delivers_every_capture_without_local_dsp(tmp_path):
+    source = tmp_path / "source"
+    shared = tmp_path / "shared"
+    environment = os.environ | {
+        "LEO_TRACKER_REPO": str(ROOT), "LEO_BEACON_STORAGE": str(source),
+        "LEO_BEACON_ANALYSIS_MODE": "offload", "LEO_BEACON_DWELL_S": ".04",
+        "LEO_BEACON_OVERSAMPLE_ON_STARTUP": "0",
+        "LEO_BEACON_OVERSAMPLE_EVERY_CYCLES": "0",
+        "LEO_BEACON_WIDE_EVERY_CYCLES": "0", "LEO_BEACON_HOP_EVERY_CYCLES": "0",
+        "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
+        "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
+        "UV_CACHE_DIR": str(ROOT / ".uv-cache"), "UV_BIN": shutil.which("uv") or "uv"}
+
+    watched = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-beacon-watch.sh")], cwd=ROOT,
+        env=environment, text=True, capture_output=True, timeout=30)
+
+    assert watched.returncode == 0, watched.stderr
+    assert '"analysis_mode":"offload"' in watched.stdout
+    assert not list((source / "reports").glob("*.json"))
+    local_jobs = list((source / "staging/analysis-queue").glob("*.job"))
+    assert len(local_jobs) == 1
+    name, capture_value, mode = local_jobs[0].read_text().rstrip().split("\t")
+    assert mode == "narrow"
+    assert json.loads((Path(capture_value) / "manifest.json").read_text())["state"] == \
+        "complete"
+
+    exported = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-export.sh"), "--once",
+         str(source), str(shared)],
+        env=environment | {"LEO_OFFLOAD_SOURCE_POLICY": "retain",
+                           "LEO_OFFLOAD_BWLIMIT_KBPS": "0"},
+        text=True, capture_output=True, timeout=30)
+
+    assert exported.returncode == 0, exported.stderr
+    assert not list((source / "staging/analysis-queue").glob("*.job"))
+    assert (source / "captures" / name).is_dir()
+    assert (shared / "captures" / name / "manifest.json").is_file()
+    remote = list((shared / "staging/analysis-queue").glob("*.job"))
+    assert len(remote) == 1
+    assert remote[0].read_text().split("\t")[:3] == [name, f"captures/{name}", "narrow"]
 
 
 def test_exporter_retain_policy_copies_without_removing_source(tmp_path):

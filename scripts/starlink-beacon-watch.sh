@@ -43,6 +43,11 @@ keep_oversample="${LEO_BEACON_KEEP_OVERSAMPLE:-4}"
 keep_hop_sessions="${LEO_BEACON_KEEP_HOP_SESSIONS:-6}"
 preserve_raw="${LEO_BEACON_PRESERVE_RAW:-0}"
 minimum_free_gb="${LEO_BEACON_MINIMUM_FREE_GB:-150}"
+analysis_mode="${LEO_BEACON_ANALYSIS_MODE:-local}"
+if [[ "${analysis_mode}" != "local" && "${analysis_mode}" != "offload" ]]; then
+  echo "LEO_BEACON_ANALYSIS_MODE must be local or offload" >&2
+  exit 2
+fi
 uv_cache="${UV_CACHE_DIR:-${repo_dir}/.uv-cache}"
 uv_bin="${UV_BIN:-/home/satpi01/.local/bin/uv}"
 maximum_pi_temp_millic="${LEO_BEACON_MAX_PI_TEMP_MILLIC:-75000}"
@@ -509,6 +514,10 @@ recover_startup() {
     fi
     mv "${running}" "${restored}"
   done
+  if [[ "${analysis_mode}" == "offload" ]]; then
+    printf '{"analysis_mode":"offload","local_analysis_workers":0,"queue_owner":"starlink-analysis-export"}\n'
+    return
+  fi
   shopt -s nullglob
   queued_jobs=("${analysis_queue}"/*.job)
   shopt -u nullglob
@@ -626,17 +635,21 @@ analysis_worker() {
   done
 }
 
-# Captures never wait for analysis. The durable queue absorbs short oversample
-# and wide comparison dwells. Recovery completes before two disjoint workers
-# start: one preserves ordinary-capture ordering, while the lightweight hop
-# worker prevents short channel surveys from delaying full-frame tracking by
-# hours. Atomic .job -> .running claims make every capture exactly-once across
-# both workers and recover safely after a service restart.
+# In production offload mode the exporter is the sole queue consumer and
+# Kalman performs every DSP stage. Local mode remains an explicit offline
+# fallback. Never start local workers in offload mode: competing consumers can
+# strand a capture on the Pi instead of delivering it to Kalman.
 rm -f "${analysis_ready}"
-analysis_worker ordinary &
-analysis_pids+=("$!")
-analysis_worker hop &
-analysis_pids+=("$!")
+if [[ "${analysis_mode}" == "local" ]]; then
+  analysis_worker ordinary &
+  analysis_pids+=("$!")
+  analysis_worker hop &
+  analysis_pids+=("$!")
+else
+  # No worker will call recovery in offload mode. Restore any claims left by
+  # the previous local-mode process before recording more work for export.
+  recover_startup
+fi
 
 cycle=0
 while true; do
@@ -665,13 +678,15 @@ while true; do
     done
   fi
   if (( maximum_cycles > 0 && cycle >= maximum_cycles )); then
-    while [[ ! -e "${analysis_ready}" ]]; do sleep .1; done
-    while compgen -G "${analysis_queue}/*.job" > /dev/null ||
-          compgen -G "${analysis_queue}/*.running.*" > /dev/null; do
-      sleep .1
-    done
-    stop_analysis
-    analysis_pids=()
+    if [[ "${analysis_mode}" == "local" ]]; then
+      while [[ ! -e "${analysis_ready}" ]]; do sleep .1; done
+      while compgen -G "${analysis_queue}/*.job" > /dev/null ||
+            compgen -G "${analysis_queue}/*.running.*" > /dev/null; do
+        sleep .1
+      done
+      stop_analysis
+      analysis_pids=()
+    fi
     break
   fi
 done

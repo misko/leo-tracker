@@ -1,5 +1,5 @@
 [Unit]
-Description=Continuous Starlink edge-pilot dual-RX capture and analysis
+Description=Continuous Starlink edge-pilot dual-RX capture and Kalman offload
 After=network-online.target mnt-leo\x2dnvme.mount
 Wants=network-online.target
 Requires=mnt-leo\x2dnvme.mount
@@ -10,6 +10,7 @@ User=satpi01
 Group=satpi01
 WorkingDirectory=/home/satpi01/leo-tracker
 Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
+Environment=LEO_BEACON_ANALYSIS_MODE=offload
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-beacon-watch.sh
 Restart=always
 RestartSec=10

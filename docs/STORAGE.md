@@ -163,6 +163,21 @@ analysis queue depth, or aggregate bytes. For every recording in scope:
 5. all source identifiers from both NVMe and the QNAP working set have been
    reconciled, including quarantine and intentionally excluded records.
 
+Three populations are permanently outside "archivable" and must be counted
+separately rather than left as an open gap:
+
+- recordings whose raw is gone from both stores with no receipt. The bounded
+  raw-IQ ring discarded them before the cropped archive existed; their derived
+  analysis, follow-up, decode and track artifacts survive, but replay against
+  raw is impossible. As of 2026-08-08 this is 3,402 recordings, 518 of them
+  confirmed detections;
+- quarantined captures that wrote no chunks at all;
+- anything a review explicitly excludes, with the reason recorded.
+
+Quarantined captures that *did* write chunks are not in this list. They stop
+early but hold a checksummed contiguous prefix, so they are ordinary
+observations and flow through the normal pipeline.
+
 Use the cross-store identifier comparison in
 [`KALMAN_MIGRATION.md`](KALMAN_MIGRATION.md), then validate published bytes:
 
@@ -192,6 +207,34 @@ the archive globally complete.
 
 Only a receipt with `status: verified` and `source_verified: true` represents a
 completed evidence transaction. It still does not authorize source deletion.
+
+## Replay equivalence and the deletion rule
+
+Measured 2026-08-08 against `ch4-lower-edge-narrow-20260807T011325Z`, by
+materializing `clip-000` and rerunning the deployed analysis:
+
+| | |
+|---|---|
+| checks recovered | 46 of 46 |
+| max abs epoch difference | 0 samples |
+| max abs match-margin difference | 7.8e-08 |
+| max abs CFO difference | 8.1e-04 Hz |
+| candidate checks | 18 original, 18 replayed |
+
+Cropping is lossless time selection over original ci16 bytes, so **fidelity
+inside a retained clip is exact** and is not the risk. **Coverage is.** A plan
+selects intervals using the detector available when it ran, and a later, better
+detector reports events in intervals that plan already discarded. Across all
+confirmed recordings, 7,382 of 7,486 high-value events fell inside a retained
+clip; the 104 that did not belong to 5 recordings whose analysis was newer than
+their crop plan.
+
+A source is therefore safe to delete only when, in addition to a verified
+receipt, every candidate or qualified check in the *current* follow-up lies
+inside a retained clip. Comparing against the plan's own view is circular: it
+cannot see events found after it ran. Re-archiving a recording whose detector
+has since improved restores coverage; deleting it first makes the loss
+permanent.
 
 ## Failure and recovery
 

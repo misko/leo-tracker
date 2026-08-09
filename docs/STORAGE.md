@@ -247,10 +247,13 @@ receipts live beneath `reports/reclamation/storage-regime-v2/`.
 
 Analysis completion records no longer copy immutable outputs beneath
 `reports/runs/.../outputs/`; they store hashes and authoritative references to
-the ordinary report tree. Historical duplicate outputs and
-`leo-cropped/derived` files are removed only when their live counterpart has the
-same recorded hash. A missing or divergent counterpart is preserved and listed
-in the migration receipt.
+the ordinary report tree. Historical `reports/runs/.../outputs/` and
+`leo-cropped/derived` files are normalized during migration: a hash-verified
+artifact is promoted into the current report tree when that authoritative path
+is missing, while an obsolete archive copy is removed when a current live
+artifact exists. Hash-invalid legacy files fail safe and are listed in the
+migration receipt. Interrupted v1 `<recording>.partial` bundles are also retired
+only after that recording's production-v2 source and replay gates pass.
 
 Inspect the live settings:
 

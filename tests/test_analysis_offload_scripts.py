@@ -36,6 +36,19 @@ def test_local_reclaimer_is_qnap_gated_and_uses_existing_uv_environment():
     assert "--output" in script
 
 
+def test_qnap_lifecycle_service_is_explicitly_disabled_and_pressure_bounded():
+    unit = (ROOT / "deploy/leo-tracker-qnap-lifecycle.service").read_text()
+    script = (ROOT / "scripts/starlink-qnap-lifecycle.sh").read_text()
+    assert "Environment=LEO_QNAP_RECLAIM_ENABLED=0" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_MAXIMUM_TIER=0" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_TRIGGER_FREE_GB=500" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_TARGET_FREE_GB=750" in unit
+    assert 'if [[ "${enabled}" == "1" ]]' in script
+    assert "--apply --confirm DELETE-QNAP-RAW-IQ" in script
+    assert "starlink-qnap-lifecycle" in script
+    assert "--maximum-tier" in script
+
+
 def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():
     unit = (ROOT / "deploy/systemd/leo-tracker-beacon-watch.service").read_text()
     watcher = (ROOT / "scripts/starlink-beacon-watch.sh").read_text()

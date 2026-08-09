@@ -79,6 +79,8 @@ from .beacon.evidence_archive import (archive_evidence, audit_evidence, extract_
                                       verify_evidence)
 from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
+from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
+                                    build_qnap_lifecycle_plan)
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -388,6 +390,22 @@ def command_starlink_storage_reconcile(args: argparse.Namespace) -> int:
         if not args.watch:
             return 0
         time.sleep(args.interval_s)
+
+
+def command_starlink_qnap_lifecycle(args: argparse.Namespace) -> int:
+    plan = build_qnap_lifecycle_plan(args.shared_root, args.archive_root,
+        minimum_age_hours=args.minimum_age_hours,
+        maximum_tier=args.maximum_tier)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    result = (apply_qnap_lifecycle_plan(plan, confirmation=args.confirm,
+        trigger_free_gb=args.trigger_free_gb, target_free_gb=args.target_free_gb,
+        limit=args.limit) if args.apply else {"dry_run": True, **plan["summary"]})
+    print(json.dumps(result, sort_keys=True))
+    return 0
 
 
 def command_starlink_evidence_plan(args: argparse.Namespace) -> int:
@@ -1711,6 +1729,23 @@ def build_parser() -> argparse.ArgumentParser:
     reconcile.add_argument("--watch", action="store_true")
     reconcile.add_argument("--interval-s", type=float, default=60)
     reconcile.set_defaults(handler=command_starlink_storage_reconcile)
+    qnap = commands.add_parser("starlink-qnap-lifecycle",
+        help="rank QNAP raw IQ for pressure-based retention; dry-run by default")
+    qnap.add_argument("shared_root", type=Path)
+    qnap.add_argument("archive_root", type=Path)
+    qnap.add_argument("--minimum-age-hours", type=float, default=24)
+    qnap.add_argument("--maximum-tier", type=int, choices=range(4), default=0,
+        help="highest deletable evidence tier: 0 negative, 1 weak, 2 tracked, 3 beacon")
+    qnap.add_argument("--trigger-free-gb", type=float, default=500,
+        help="apply only below this QNAP free-space level")
+    qnap.add_argument("--target-free-gb", type=float, default=750,
+        help="stop after recovering this much QNAP free space")
+    qnap.add_argument("--limit", type=int)
+    qnap.add_argument("--output", type=Path)
+    qnap.add_argument("--apply", action="store_true")
+    qnap.add_argument("--confirm", default="",
+        help="required literal DELETE-QNAP-RAW-IQ when --apply is used")
+    qnap.set_defaults(handler=command_starlink_qnap_lifecycle)
     evidence_plan = commands.add_parser("starlink-evidence-plan",
         help="plan conservative signal and control clips from one immutable capture")
     evidence_plan.add_argument("capture", type=Path)

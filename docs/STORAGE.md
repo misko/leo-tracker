@@ -138,13 +138,74 @@ verification falls behind.
 
 ## Future QNAP lifecycle (shadow only)
 
-QNAP raw deletion is not enabled. A future simulator will classify recordings
-into pinned raw, lossless evidence, near-threshold development data, stratified
-controls and ordinary negatives. Before promotion, a time-travel replay must
-apply an old policy using only the analysis available at that time and prove
-that newer detectors' qualified/high-value events remain covered. Qualified
-TLE identities, novel fingerprints, calibration sources and manual pins must
-never be expired by an ordinary age rule.
+QNAP raw deletion is not enabled. `leo-radio starlink-qnap-lifecycle` now
+publishes a complete shadow inventory with this evidence order:
+
+| Tier | Name | Evidence | Default deletion status |
+|---:|---|---|---|
+| 0 | `strict_negative` | No exact/single-RX candidate, trigger, confirmed beacon, or track | Eligible after all safety gates |
+| 1 | `weak_candidate` | Candidate or trigger without confirmed temporal evidence | Protected unless explicitly escalated |
+| 2 | `tracked_signal` | Qualified detector track, ≥5-second track, or ≥20 dual-RX epochs | Protected unless explicitly escalated |
+| 3 | `confirmed_beacon` | Temporally confirmed beacon | Protected unless explicitly escalated |
+| 4 | `qualified_identity` | Qualified held-out TLE association | Never deletable by this policy |
+| 5 | `manual_pin` | Operator pin | Never deletable by this policy |
+
+Tier is evaluated from the current authoritative reports every time a plan is
+built and immediately before deletion. Creating
+`reports/retention/pins/<recording-id>.json` promotes any recording to tier 5.
+Pinning is fail-safe and does not require a special schema; the JSON should
+record the operator, timestamp and reason for auditability.
+
+Raw deletion eligibility additionally requires:
+
+1. a complete/interrupted manifest with checksummed chunks;
+2. a successful Kalman completion receipt;
+3. a current evidence-archive receipt with `status: verified` and
+   `source_verified: true`;
+4. exact agreement between the current QNAP manifest hash and the archive's
+   source-manifest hash;
+5. a valid, hashed evidence-bundle manifest;
+6. the configured minimum raw age; and
+7. an exact, non-symlink capture directory below the QNAP capture root.
+
+The default shadow plan is conservative:
+
+```bash
+uv run --active --no-sync leo-radio starlink-qnap-lifecycle \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-hours 24 --maximum-tier 0 \
+  --output /mnt/qnap01/mouse9911/leo/reports/retention/qnap-lifecycle.latest.json
+```
+
+Even with `--apply`, deletion occurs only when free space is below the pressure
+trigger and stops at the target high-water mark. It also requires the literal
+confirmation token:
+
+```bash
+# Example only. QNAP DELETION IS NOT CURRENTLY ENABLED.
+uv run --active --no-sync leo-radio starlink-qnap-lifecycle \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --maximum-tier 0 --trigger-free-gb 500 --target-free-gb 750 \
+  --apply --confirm DELETE-QNAP-RAW-IQ
+```
+
+Application deletes only `captures/<recording-id>` raw IQ. Evidence clips,
+analysis reports, plots, decoded symbols, TLE context, completion receipts and
+fingerprints remain. A prepared/removed transaction receipt is written beneath
+`reports/reclamation/qnap/`. The global QNAP reclaimer lock prevents concurrent
+applications.
+
+[`leo-tracker-qnap-lifecycle.service`](../deploy/leo-tracker-qnap-lifecycle.service)
+is checked in with `LEO_QNAP_RECLAIM_ENABLED=0`, a one-hour planning cadence,
+tier 0 maximum, a 500 GB trigger and a 750 GB target. It is intentionally not
+installed or enabled. Changing only the tier cannot activate deletion; both the
+service enable gate and the CLI confirmation token are required.
+
+Before any future promotion, a time-travel replay must apply an old policy using
+only the analysis available at that time and prove that newer detectors'
+qualified/high-value events remain covered. Start with tier 0 only. Tier 1–3
+promotion requires a separate written review of event recall and projected
+storage recovery; tiers 4–5 remain prohibited.
 
 Inspect the live settings:
 

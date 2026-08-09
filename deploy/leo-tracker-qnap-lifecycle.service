@@ -1,5 +1,5 @@
 [Unit]
-Description=LEO tracker verified tier-0 QNAP raw-IQ reclaimer
+Description=LEO tracker six-hour verified-v2 QNAP raw-IQ reclaimer
 After=network-online.target mnt-qnap01.mount
 Wants=network-online.target
 Requires=mnt-qnap01.mount
@@ -12,8 +12,9 @@ WorkingDirectory=/home/satpi01/leo-tracker
 Environment=UV_BIN=/home/satpi01/.local/bin/uv
 Environment=LEO_QNAP_RECLAIM_ENABLED=1
 Environment=LEO_QNAP_RECLAIM_INTERVAL_S=60
-Environment=LEO_QNAP_RECLAIM_MAXIMUM_TIER=0
-Environment=LEO_QNAP_RECLAIM_MINIMUM_AGE_HOURS=0
+Environment=LEO_QNAP_RECLAIM_MAXIMUM_TIER=4
+Environment=LEO_QNAP_RECLAIM_MINIMUM_AGE_HOURS=6
+Environment=LEO_QNAP_RECLAIM_IGNORE_PRESSURE=1
 Environment=LEO_QNAP_RECLAIM_TRIGGER_FREE_GB=500
 Environment=LEO_QNAP_RECLAIM_TARGET_FREE_GB=750
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-qnap-lifecycle.sh /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped

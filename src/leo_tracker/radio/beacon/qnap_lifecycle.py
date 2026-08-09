@@ -23,7 +23,7 @@ TIERS = {
     4: "qualified_identity",
     5: "manual_pin",
 }
-DELETABLE_TIERS = {0, 1, 2, 3}
+DELETABLE_TIERS = {0, 1, 2, 3, 4}
 _NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -143,10 +143,12 @@ def _analysis_gate(shared_root: Path, name: str) -> tuple[bool, str]:
 
 def _archive_gate(shared_root: Path, archive_root: Path, name: str,
                   manifest_sha: str) -> tuple[bool, str, dict]:
-    receipt = _json(archive_root / "catalog" / "receipts" / f"{name}.json")
-    if (receipt.get("schema") != "leo-tracker.evidence-archive-receipt/v1" or
-            receipt.get("status") != "verified" or not receipt.get("source_verified")):
-        return False, "evidence_archive_unverified", receipt
+    receipt = _json(archive_root / "catalog" / "v2" / "receipts" / f"{name}.json")
+    if (receipt.get("schema") != "leo-tracker.evidence-archive-receipt/v2" or
+            receipt.get("status") != "verified" or not receipt.get("source_verified") or
+            not receipt.get("required_event_replay_valid") or
+            receipt.get("policy") != "tiered-v2"):
+        return False, "evidence_v2_unverified", receipt
     if receipt.get("source_manifest_sha256") != manifest_sha:
         return False, "evidence_archive_stale", receipt
     bundle = archive_root / str(receipt.get("bundle", ""))
@@ -162,7 +164,7 @@ def build_qnap_lifecycle_plan(shared_root: Path, archive_root: Path, *,
                               maximum_tier: int = 0) -> dict:
     """Classify all complete QNAP raw recordings without removing anything."""
     if minimum_age_hours < 0 or maximum_tier not in DELETABLE_TIERS:
-        raise ValueError("minimum age must be non-negative and maximum tier 0..3")
+        raise ValueError("minimum age must be non-negative and maximum tier 0..4")
     shared_root = Path(shared_root).resolve(); archive_root = Path(archive_root).resolve()
     now = time.time(); entries = []
     for capture in sorted((shared_root / "captures").iterdir() if
@@ -217,7 +219,8 @@ def build_qnap_lifecycle_plan(shared_root: Path, archive_root: Path, *,
 
 def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
                               trigger_free_gb: float, target_free_gb: float,
-                              limit: int | None = None) -> dict:
+                              limit: int | None = None,
+                              pressure_required: bool = True) -> dict:
     """Remove planned QNAP raw only under an explicit pressure and token gate."""
     if plan.get("schema") != PLAN_SCHEMA:
         raise ValueError("unsupported QNAP lifecycle plan schema")
@@ -239,7 +242,7 @@ def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
         raise RuntimeError("another QNAP reclaimer is active") from exc
     free_bytes = shutil.disk_usage(shared_root).free
     trigger = int(trigger_free_gb * 1e9); target = int(target_free_gb * 1e9)
-    if free_bytes >= trigger:
+    if pressure_required and free_bytes >= trigger:
         return {"schema": "leo-tracker.qnap-reclamation-result/v1",
             "enabled": True, "pressure_triggered": False,
             "removed_count": 0, "removed_bytes": 0,
@@ -247,7 +250,8 @@ def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
     removed = []; candidates = [item for item in plan.get("entries", [])
                                  if item.get("status") == "eligible"]
     for item in candidates:
-        if free_bytes >= target or (limit is not None and len(removed) >= limit):
+        if ((pressure_required and free_bytes >= target) or
+                (limit is not None and len(removed) >= limit)):
             break
         name = item["recording_id"]; capture = Path(item["capture_path"])
         if not capture.exists():
@@ -280,7 +284,7 @@ def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
         _atomic_json(receipt_path, completed); removed.append(completed)
         free_bytes = shutil.disk_usage(shared_root).free
     return {"schema": "leo-tracker.qnap-reclamation-result/v1",
-        "enabled": True, "pressure_triggered": True,
+        "enabled": True, "pressure_triggered": free_bytes < trigger,
         "removed_count": len(removed),
         "removed_bytes": sum(item["source_bytes"] for item in removed),
         "free_bytes_after": free_bytes,

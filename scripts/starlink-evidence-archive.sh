@@ -28,15 +28,12 @@ uv_bin="${UV_BIN:-$(command -v uv || true)}"
 poll_s="${LEO_EVIDENCE_POLL_S:-30}"
 minimum_age_s="${LEO_EVIDENCE_MINIMUM_AGE_S:-600}"
 minimum_qnap_free_gb="${LEO_EVIDENCE_MINIMUM_QNAP_FREE_GB:-100}"
-guard_s="${LEO_EVIDENCE_GUARD_S:-10}"
-control_duration_s="${LEO_EVIDENCE_CONTROL_DURATION_S:-1}"
-control_count="${LEO_EVIDENCE_CONTROL_COUNT:-3}"
 
 if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
   echo "uv and the existing ${repo_dir}/.venv are required" >&2
   exit 2
 fi
-mkdir -p "${qnap_root}/staging" "${qnap_root}/catalog/receipts"
+mkdir -p "${qnap_root}/staging" "${qnap_root}/catalog/v2/receipts"
 exec 9>"${qnap_root}/staging/evidence-archive.lock"
 if ! flock -n 9; then
   echo "another evidence archiver owns ${qnap_root}" >&2
@@ -54,7 +51,7 @@ while true; do
     capture="$(dirname "${manifest}")"
     name="$(basename "${capture}")"
     [[ -z "${recording}" || "${name}" == "${recording}" ]] || continue
-    [[ ! -f "${qnap_root}/catalog/receipts/${name}.json" ]] || continue
+    [[ ! -f "${qnap_root}/catalog/v2/receipts/${name}.json" ]] || continue
     [[ -f "${source_root}/reports/${name}.json" &&
        -f "${source_root}/reports/followups/${name}.json" ]] || continue
     state="$(${repo_dir}/.venv/bin/python -c \
@@ -70,9 +67,7 @@ while true; do
     found=1
     started="$(date +%s)"
     echo "evidence_start recording=${name} source=${capture} qnap=${qnap_root}"
-    radio starlink-evidence-archive "${capture}" "${source_root}/reports" "${qnap_root}" \
-      --guard-s "${guard_s}" --control-duration-s "${control_duration_s}" \
-      --control-count "${control_count}"
+    radio starlink-evidence-archive-v2 "${capture}" "${source_root}/reports" "${qnap_root}"
     elapsed=$(( $(date +%s) - started )); processed=$((processed + 1))
     echo "evidence_done recording=${name} elapsed_s=${elapsed} processed=${processed}"
     if (( limit > 0 && processed >= limit )); then exit 0; fi

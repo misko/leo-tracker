@@ -12,9 +12,8 @@ WorkingDirectory=/home/mouse9911/gits/leo-tracker
 Environment=LEO_ANALYSIS_WORKERS=16
 Environment=LEO_ANALYSIS_PIPELINE_ID=kalman-full-v1
 Environment=LEO_ANALYSIS_FULL_COVERAGE=1
-Environment=LEO_ANALYSIS_ARCHIVE_MODE=shadow
+Environment=LEO_ANALYSIS_ARCHIVE_MODE=required
 Environment=LEO_ANALYSIS_ARCHIVE_ROOT=/mnt/qnap01/mouse9911/leo-cropped
-Environment=LEO_ANALYSIS_EVIDENCE_V2_SHADOW=1
 Environment=LEO_ANALYSIS_RETENTION_MODE=disabled
 Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1
 Environment=LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S=2

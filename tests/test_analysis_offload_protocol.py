@@ -99,7 +99,7 @@ def test_followup_check_inspection_distinguishes_empty_and_candidate_sets(tmp_pa
     assert followup_has_checks(followup)
 
 
-def test_full_coverage_receipt_requires_track_archive_and_versioned_output(tmp_path):
+def test_full_coverage_receipt_references_authoritative_output_without_duplicate(tmp_path):
     reports = tmp_path / "reports"
     (reports / "followups").mkdir(parents=True)
     (reports / "tracks").mkdir()
@@ -110,10 +110,10 @@ def test_full_coverage_receipt_requires_track_archive_and_versioned_output(tmp_p
         "confirmation": {"confirmed": False}}))
     (reports / "tracks/sample.json").write_text(json.dumps({
         "schema": "leo-tracker.starlink-continuous-track/v1"}))
-    receipt_path = tmp_path / "archive/catalog/receipts/sample.json"
+    receipt_path = tmp_path / "archive/catalog/v2/receipts/sample.json"
     receipt_path.parent.mkdir(parents=True)
     receipt_path.write_text(json.dumps({
-        "schema": "leo-tracker.evidence-archive-receipt/v1",
+        "schema": "leo-tracker.evidence-archive-receipt/v2",
         "recording_id": "sample", "status": "verified",
         "source_verified": True}))
 
@@ -129,7 +129,11 @@ def test_full_coverage_receipt_requires_track_archive_and_versioned_output(tmp_p
     versioned_receipt = json.loads(versioned.read_text())
     assert versioned_receipt["pipeline_id"] == "kalman-full-test"
     preserved = reports / "runs/kalman-full-test/sample/outputs/track.json"
-    assert preserved.read_bytes() == (reports / "tracks/sample.json").read_bytes()
+    assert not preserved.exists()
+    assert versioned_receipt["versioned_outputs"]["track"]["path"] == \
+        str(reports / "tracks/sample.json")
+    assert versioned_receipt["versioned_outputs"]["track"]["storage"] == \
+        "authoritative-reference"
     assert versioned_receipt["versioned_outputs"]["track"]["sha256"]
 
 
@@ -142,7 +146,7 @@ def test_analysis_status_reports_queue_age_versioned_runs_and_archives(tmp_path)
     (queue / "done/three.job").write_text("job")
     completion = tmp_path / "reports/runs/kalman-test/three/completion.json"
     completion.parent.mkdir(parents=True); completion.write_text("{}")
-    archived = tmp_path / "archive/catalog/receipts/three.json"
+    archived = tmp_path / "archive/catalog/v2/receipts/three.json"
     archived.parent.mkdir(parents=True); archived.write_text("{}")
 
     report = analysis_status(

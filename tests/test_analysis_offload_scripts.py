@@ -36,13 +36,14 @@ def test_local_reclaimer_is_qnap_gated_and_uses_existing_uv_environment():
     assert "--output" in script
 
 
-def test_qnap_lifecycle_service_is_tier_zero_only_and_pressure_bounded():
+def test_qnap_lifecycle_service_is_six_hour_verified_v2_working_set():
     unit = (ROOT / "deploy/leo-tracker-qnap-lifecycle.service").read_text()
     script = (ROOT / "scripts/starlink-qnap-lifecycle.sh").read_text()
     assert "Environment=LEO_QNAP_RECLAIM_ENABLED=1" in unit
     assert "Environment=LEO_QNAP_RECLAIM_INTERVAL_S=60" in unit
-    assert "Environment=LEO_QNAP_RECLAIM_MAXIMUM_TIER=0" in unit
-    assert "Environment=LEO_QNAP_RECLAIM_MINIMUM_AGE_HOURS=0" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_MAXIMUM_TIER=4" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_MINIMUM_AGE_HOURS=6" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_IGNORE_PRESSURE=1" in unit
     assert "Environment=LEO_QNAP_RECLAIM_TRIGGER_FREE_GB=500" in unit
     assert "Environment=LEO_QNAP_RECLAIM_TARGET_FREE_GB=750" in unit
     assert 'if [[ "${enabled}" == "1" ]]' in script
@@ -50,6 +51,19 @@ def test_qnap_lifecycle_service_is_tier_zero_only_and_pressure_bounded():
     assert "--apply --confirm DELETE-QNAP-RAW-IQ" in script
     assert "starlink-qnap-lifecycle" in script
     assert "--maximum-tier" in script
+    assert "--ignore-pressure" in script
+
+
+def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
+    unit = (ROOT / "deploy/leo-tracker-storage-regime-v2.service").read_text()
+    script = (ROOT / "scripts/starlink-storage-regime-v2.sh").read_text()
+    assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
+    assert "Environment=LEO_STORAGE_REGIME_LIMIT=2" in unit
+    assert "Environment=LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS=6" in unit
+    assert "UV_BIN=/home/mouse9911/.local/bin/uv" in unit
+    assert "starlink-storage-regime-v2" in script
+    assert "--confirm MIGRATE-TO-EVIDENCE-V2" in script
+    assert '"${uv_bin}" run --active --no-sync' in script
 
 
 def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():
@@ -85,18 +99,16 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     unit = (ROOT / "deploy/leo-tracker-analysis-server.service").read_text()
     assert "Environment=LEO_ANALYSIS_WORKERS=16" in unit
     assert "Environment=LEO_ANALYSIS_FULL_COVERAGE=1" in unit
-    assert "Environment=LEO_ANALYSIS_ARCHIVE_MODE=shadow" in unit
-    assert "Environment=LEO_ANALYSIS_EVIDENCE_V2_SHADOW=1" in unit
+    assert "Environment=LEO_ANALYSIS_ARCHIVE_MODE=required" in unit
     assert "Environment=LEO_ANALYSIS_RETENTION_MODE=disabled" in unit
     assert "Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1" in unit
     assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=3500000" in unit
     assert "Environment=LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S=15" in unit
     assert "Environment=LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ=15000" in unit
     script = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
-    assert "starlink-evidence-plan" in script
-    assert "--policy tiered-v2" in script
-    assert "starlink-evidence-compare" in script
-    assert "production_affected=false" in script
+    assert "starlink-evidence-archive-v2" in script
+    assert 'catalog/v2/receipts/${name}.json' in script
+    assert "starlink-evidence-archive \"" not in script
     assert "Environment=LEO_ANALYSIS_FRAGMENT_MAXIMUM_GAP_S=30" in unit
     assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit
@@ -166,11 +178,11 @@ def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     assert '--observations "${linked}"' in source
     assert source.index('starlink-beacon-channel-link "${linked}" "${track}"') < \
         source.index('--observations "${linked}"')
-    assert "starlink-evidence-archive" in source
+    assert "starlink-evidence-archive-v2" in source
     assert "inspect-followup" in source
     assert "retention_skipped" in source
     assert "analysis-server-status.json" in source
-    assert source.index("starlink-evidence-archive") < source.index(
+    assert source.index("starlink-evidence-archive-v2") < source.index(
         'run_retention "${worker_id}"')
     assert 'trap request_local_drain TERM' in source
 

@@ -12,10 +12,14 @@ maximum_tier="${LEO_QNAP_RECLAIM_MAXIMUM_TIER:-0}"
 minimum_age_hours="${LEO_QNAP_RECLAIM_MINIMUM_AGE_HOURS:-24}"
 trigger_free_gb="${LEO_QNAP_RECLAIM_TRIGGER_FREE_GB:-500}"
 target_free_gb="${LEO_QNAP_RECLAIM_TARGET_FREE_GB:-750}"
+ignore_pressure="${LEO_QNAP_RECLAIM_IGNORE_PRESSURE:-0}"
 plan="${shared_root}/reports/retention/qnap-lifecycle.latest.json"
 
 if [[ "${enabled}" != "0" && "${enabled}" != "1" ]]; then
   echo "LEO_QNAP_RECLAIM_ENABLED must be 0 or 1" >&2; exit 2
+fi
+if [[ "${ignore_pressure}" != "0" && "${ignore_pressure}" != "1" ]]; then
+  echo "LEO_QNAP_RECLAIM_IGNORE_PRESSURE must be 0 or 1" >&2; exit 2
 fi
 if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
   echo "uv and the existing ${repo_dir}/.venv are required" >&2; exit 2
@@ -29,6 +33,7 @@ while true; do
   if [[ "${enabled}" == "1" ]]; then
     args+=(--apply --confirm DELETE-QNAP-RAW-IQ)
   fi
+  [[ "${ignore_pressure}" == "1" ]] && args+=(--ignore-pressure)
   env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
     leo-radio "${args[@]}"
   sleep "${interval_s}"

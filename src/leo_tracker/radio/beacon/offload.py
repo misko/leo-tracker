@@ -244,11 +244,11 @@ def validate_outputs(root: Path, name: str, mode: str, *, context: Path | None,
     pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
     archive_receipt = None
     if archive_root is not None:
-        archive_receipt_path = (Path(archive_root) / "catalog" / "receipts" /
+        archive_receipt_path = (Path(archive_root) / "catalog" / "v2" / "receipts" /
                                 f"{name}.json")
         archive_receipt = _read_json(archive_receipt_path)
         if (archive_receipt.get("schema") !=
-                "leo-tracker.evidence-archive-receipt/v1" or
+                "leo-tracker.evidence-archive-receipt/v2" or
                 archive_receipt.get("recording_id") != name or
                 archive_receipt.get("status") != "verified" or
                 not archive_receipt.get("source_verified")):
@@ -278,23 +278,11 @@ def write_receipt(root: Path, receipt: dict) -> Path:
     versioned_outputs = {}
     for key, artifact in receipt.get("outputs", {}).items():
         source = Path(artifact["path"])
-        destination = run_root / "outputs" / f"{key}{source.suffix}"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists():
-            if _sha256(destination) != artifact["sha256"]:
-                raise ValueError(
-                    f"pipeline output collision for {pipeline_id}/{receipt['job']}/{key}")
-        else:
-            temporary = destination.with_name(
-                f".{destination.name}.next.{os.getpid()}.{uuid.uuid4().hex}")
-            shutil.copyfile(source, temporary)
-            if _sha256(temporary) != artifact["sha256"]:
-                temporary.unlink(missing_ok=True)
-                raise ValueError(f"versioned output copy failed verification: {source}")
-            os.replace(temporary, destination)
+        if not source.is_file() or _sha256(source) != artifact["sha256"]:
+            raise ValueError(f"authoritative pipeline output changed: {source}")
         versioned_outputs[key] = {
-            "path": str(destination), "bytes": destination.stat().st_size,
-            "sha256": artifact["sha256"]}
+            "path": str(source), "bytes": source.stat().st_size,
+            "sha256": artifact["sha256"], "storage": "authoritative-reference"}
     versioned_receipt = dict(receipt)
     versioned_receipt["versioned_outputs"] = versioned_outputs
     versioned = run_root / "completion.json"
@@ -368,7 +356,7 @@ def analysis_status(root: Path, *, workers: int, pipeline_id: str,
     oldest_age = (max(0.0, now.timestamp() - min(
         path.stat().st_mtime for path in ready_paths)) if ready_paths else 0.0)
     receipt_root = root / "reports" / "runs" / pipeline_id
-    archived = (len(list((Path(archive_root) / "catalog" / "receipts").glob(
+    archived = (len(list((Path(archive_root) / "catalog" / "v2" / "receipts").glob(
         "*.json"))) if archive_root is not None else None)
     report = {
         "schema": "leo-tracker.kalman-analysis-status/v1",

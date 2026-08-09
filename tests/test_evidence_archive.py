@@ -10,7 +10,8 @@ import pytest
 from leo_tracker.radio.beacon.artifact import BeaconCapture, capture_beacon_iq
 from leo_tracker.radio.beacon.evidence_archive import (
     AUDIT_SCHEMA, BUNDLE_SCHEMA, PLAN_SCHEMA, SHADOW_SCHEMA, VERIFICATION_SCHEMA,
-    archive_evidence, audit_evidence, build_evidence_v2_shadow,
+    archive_evidence, archive_evidence_v2, archive_evidence_v2_from_v1,
+    audit_evidence, build_evidence_v2_shadow,
     extract_evidence, materialize_evidence_clip, compare_evidence_plan_coverage,
     plan_evidence, verify_evidence,
 )
@@ -282,6 +283,54 @@ def test_archive_copies_derived_artifacts_and_writes_verified_receipt(tmp_path):
         receipt["source_manifest_sha256"]
 
 
+def test_v2_archive_is_source_verified_and_does_not_duplicate_reports(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source)
+    reports = _reports(source, capture.name)
+    plot = reports / "plots" / f"{capture.name}.png"
+    plot.parent.mkdir(); plot.write_bytes(b"diagnostic plot")
+    archive = tmp_path / "archive"
+
+    receipt = archive_evidence_v2(capture, reports, archive)
+
+    assert receipt["schema"] == "leo-tracker.evidence-archive-receipt/v2"
+    assert receipt["policy"] == "tiered-v2"
+    assert receipt["source_verified"] is True
+    assert receipt["required_event_replay_valid"] is True
+    assert receipt["derived_artifacts_duplicated"] is False
+    assert (archive / "evidence-v2" / capture.name / "manifest.json").is_file()
+    assert not (archive / "derived").exists()
+    assert verify_evidence(archive / receipt["bundle"], capture_path=capture,
+                           write=False)["valid"] is True
+    assert archive_evidence_v2(capture, reports, archive) == receipt
+
+
+def test_archive_only_v2_recrop_rebuilds_its_own_interrupted_partial(tmp_path, monkeypatch):
+    source = tmp_path / "source"; capture, _ = _capture(source, "archive-resume")
+    reports = _reports(source, capture.name); archive = tmp_path / "archive"
+    archive_evidence(capture, reports, archive)
+    import shutil
+    shutil.rmtree(capture)
+    original = evidence_archive_module._copy_interval_from_bundle
+    calls = 0
+
+    def interrupted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("simulated recrop interruption")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(evidence_archive_module, "_copy_interval_from_bundle", interrupted)
+    with pytest.raises(OSError, match="simulated recrop"):
+        archive_evidence_v2_from_v1(capture.name, reports, archive)
+    assert (archive / "evidence-v2" / f"{capture.name}.partial" / "resume.json").is_file()
+
+    monkeypatch.setattr(evidence_archive_module, "_copy_interval_from_bundle", original)
+    receipt = archive_evidence_v2_from_v1(capture.name, reports, archive)
+    assert receipt["status"] == "verified"
+    assert not (archive / "evidence-v2" / f"{capture.name}.partial").exists()
+
+
 def test_materialized_clip_is_standard_replayable_capture_with_original_indexes(tmp_path):
     source = tmp_path / "source"; capture, expected = _capture(source); reports = _reports(source, capture.name)
     plan = tmp_path / "plan.json"; plan_evidence(capture, reports, plan, guard_s=.1,
@@ -316,5 +365,5 @@ def test_archive_shell_pipeline_is_end_to_end_and_source_preserving(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "evidence_done" in result.stdout
     assert _tree_hashes(source) == before
-    assert json.loads((qnap / "catalog" / "receipts" /
+    assert json.loads((qnap / "catalog" / "v2" / "receipts" /
                        f"{capture.name}.json").read_text())["status"] == "verified"

@@ -75,10 +75,14 @@ from .beacon.frame_tracking import track_conditioned_frames
 from .beacon.template_learning import learn_bandpass_beacon
 from .beacon.channel_link import link_channel_tracks
 from .beacon.evidence_archive import (archive_evidence, audit_evidence,
+                                      archive_evidence_v2,
                                       build_evidence_v2_shadow,
                                       compare_evidence_plan_coverage, extract_evidence,
                                       materialize_evidence_clip, plan_evidence,
                                       verify_evidence)
+from .beacon.storage_regime import (CONFIRMATION as STORAGE_REGIME_CONFIRMATION,
+                                    apply_storage_regime_plan,
+                                    build_storage_regime_plan)
 from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
@@ -405,7 +409,8 @@ def command_starlink_qnap_lifecycle(args: argparse.Namespace) -> int:
         temporary.replace(args.output)
     result = (apply_qnap_lifecycle_plan(plan, confirmation=args.confirm,
         trigger_free_gb=args.trigger_free_gb, target_free_gb=args.target_free_gb,
-        limit=args.limit) if args.apply else {"dry_run": True, **plan["summary"]})
+        limit=args.limit, pressure_required=not args.ignore_pressure)
+        if args.apply else {"dry_run": True, **plan["summary"]})
     print(json.dumps(result, sort_keys=True))
     return 0
 
@@ -474,6 +479,30 @@ def command_starlink_evidence_archive(args: argparse.Namespace) -> int:
                                      f"{args.capture.name}.json"),
                       **receipt["summary"]}, sort_keys=True))
     return 0
+
+
+def command_starlink_evidence_archive_v2(args: argparse.Namespace) -> int:
+    receipt = archive_evidence_v2(args.capture, args.reports, args.qnap_root)
+    print(json.dumps({"receipt": str(args.qnap_root / "catalog" / "v2" / "receipts" /
+                                     f"{args.capture.name}.json"),
+                      **receipt["summary"]}, sort_keys=True))
+    return 0
+
+
+def command_starlink_storage_regime_v2(args: argparse.Namespace) -> int:
+    plan = build_storage_regime_plan(args.shared_root, args.archive_root,
+                                     minimum_age_hours=args.minimum_age_hours,
+                                     scope=args.scope)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    result = (apply_storage_regime_plan(plan, confirmation=args.confirm,
+                                        limit=args.limit) if args.apply else
+              {"dry_run": True, **plan["summary"]})
+    print(json.dumps(result, sort_keys=True))
+    return 0 if not result.get("failure_count") else 1
 
 
 def command_starlink_evidence_materialize(args: argparse.Namespace) -> int:
@@ -1756,8 +1785,8 @@ def build_parser() -> argparse.ArgumentParser:
     qnap.add_argument("shared_root", type=Path)
     qnap.add_argument("archive_root", type=Path)
     qnap.add_argument("--minimum-age-hours", type=float, default=24)
-    qnap.add_argument("--maximum-tier", type=int, choices=range(4), default=0,
-        help="highest deletable evidence tier: 0 negative, 1 weak, 2 tracked, 3 beacon")
+    qnap.add_argument("--maximum-tier", type=int, choices=range(5), default=0,
+        help="highest deletable verified-v2 tier: 0 negative through 4 identity")
     qnap.add_argument("--trigger-free-gb", type=float, default=500,
         help="apply only below this QNAP free-space level")
     qnap.add_argument("--target-free-gb", type=float, default=750,
@@ -1765,6 +1794,8 @@ def build_parser() -> argparse.ArgumentParser:
     qnap.add_argument("--limit", type=int)
     qnap.add_argument("--output", type=Path)
     qnap.add_argument("--apply", action="store_true")
+    qnap.add_argument("--ignore-pressure", action="store_true",
+        help="remove every age-eligible verified-v2 raw capture regardless of free space")
     qnap.add_argument("--confirm", default="",
         help="required literal DELETE-QNAP-RAW-IQ when --apply is used")
     qnap.set_defaults(handler=command_starlink_qnap_lifecycle)
@@ -1819,6 +1850,25 @@ def build_parser() -> argparse.ArgumentParser:
     evidence_archive.add_argument("--control-duration-s", type=float, default=1)
     evidence_archive.add_argument("--control-count", type=int, default=3)
     evidence_archive.set_defaults(handler=command_starlink_evidence_archive)
+    evidence_archive_v2 = commands.add_parser("starlink-evidence-archive-v2",
+        help="publish production tiered evidence without duplicate report artifacts")
+    evidence_archive_v2.add_argument("capture", type=Path)
+    evidence_archive_v2.add_argument("reports", type=Path)
+    evidence_archive_v2.add_argument("qnap_root", type=Path)
+    evidence_archive_v2.set_defaults(handler=command_starlink_evidence_archive_v2)
+    storage_regime = commands.add_parser("starlink-storage-regime-v2",
+        help="transactionally replace old raw/v1 storage with verified tiered evidence")
+    storage_regime.add_argument("shared_root", type=Path)
+    storage_regime.add_argument("archive_root", type=Path)
+    storage_regime.add_argument("--minimum-age-hours", type=float, default=6)
+    storage_regime.add_argument("--scope", choices=("all", "raw", "archive"),
+                                default="all")
+    storage_regime.add_argument("--limit", type=int)
+    storage_regime.add_argument("--output", type=Path)
+    storage_regime.add_argument("--apply", action="store_true")
+    storage_regime.add_argument("--confirm", default="",
+        help=f"required literal {STORAGE_REGIME_CONFIRMATION} with --apply")
+    storage_regime.set_defaults(handler=command_starlink_storage_regime_v2)
     evidence_materialize = commands.add_parser("starlink-evidence-materialize",
         help="create a standard replayable BeaconCapture view of one exact clip")
     evidence_materialize.add_argument("bundle", type=Path)

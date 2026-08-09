@@ -41,23 +41,23 @@ and hashes the destination again.
 ```text
 leo-cropped/
 ├── README.md
-├── evidence/<recording-id>/
+├── evidence-v2/<recording-id>/
 │   ├── manifest.json             clip boundaries, radio parameters and hashes
 │   ├── source-manifest.json      byte-exact original capture manifest
 │   ├── clip-000.ci16             original dual-RX ci16 sample layout
 │   ├── ...
 │   └── verification.json         destination and source-equality checks
-├── derived/                      reports and binary sidecars, original layout
-├── catalog/plans/<id>.json       why every interval was selected
-├── catalog/receipts/<id>.json    final archive transaction receipt
+├── catalog/v2/plans/<id>.json       why every interval was selected
+├── catalog/v2/references/<id>.json  conservative replay reference
+├── catalog/v2/comparisons/<id>.json required-event coverage result
+├── catalog/v2/receipts/<id>.json    final archive transaction receipt
 └── staging/                      locks and resumable unpublished work
 ```
 
-An evidence plan includes all known exact, dense-followup, decoded,
-continuous-track and broadband/window candidates. Confirmed dense checks are
-all retained. Signal intervals receive a configurable guard on both sides and
-are merged when they overlap. Deterministic control intervals preserve noise
-and calibration evidence even when the current detector reports nothing.
+An evidence plan includes all known exact, decoded, continuous-track and
+broadband/window candidates plus interesting dense-followup checks. Signal
+intervals receive tier-sized guards and merge when they overlap. Deterministic
+controls preserve a bounded noise/calibration sample even for strict negatives.
 
 The first archive revision performs lossless time cropping only. It does not
 filter, downconvert, resample or compress IQ.
@@ -138,17 +138,18 @@ verification falls behind.
 
 ## Automatic QNAP raw-IQ lifecycle
 
-`leo-radio starlink-qnap-lifecycle` inventories raw captures and automatically
-reclaims only verified tier-0 negatives when QNAP free space is below the
-configured pressure threshold. Its evidence order is:
+`leo-radio starlink-qnap-lifecycle` inventories raw captures and removes raw IQ
+older than six hours only after a production tiered-v2 bundle is byte-verified
+against its source and passes the required-event replay gate. Raw is a bounded
+working set; the v2 clips and structured reports are the durable record.
 
 | Tier | Name | Evidence | Default deletion status |
 |---:|---|---|---|
-| 0 | `strict_negative` | No exact/single-RX candidate, trigger, confirmed beacon, or track | Eligible after all safety gates |
-| 1 | `weak_candidate` | Candidate or trigger without confirmed temporal evidence | Protected unless explicitly escalated |
-| 2 | `tracked_signal` | Qualified detector track, ≥5-second track, or ≥20 dual-RX epochs | Protected unless explicitly escalated |
-| 3 | `confirmed_beacon` | Temporally confirmed beacon | Protected unless explicitly escalated |
-| 4 | `qualified_identity` | Qualified held-out TLE association | Never deletable by this policy |
+| 0 | `strict_negative` | No exact/single-RX candidate, trigger, confirmed beacon, or track | Raw eligible after verified v2 |
+| 1 | `weak_candidate` | Candidate or trigger without confirmed temporal evidence | Raw eligible after verified v2 |
+| 2 | `tracked_signal` | Qualified detector track, ≥5-second track, or ≥20 dual-RX epochs | Raw eligible after verified v2 |
+| 3 | `confirmed_beacon` | Temporally confirmed beacon | Raw eligible after verified v2 |
+| 4 | `qualified_identity` | Qualified held-out TLE association | Raw eligible after verified v2 |
 | 5 | `manual_pin` | Operator pin | Never deletable by this policy |
 
 Tier is evaluated from the current authoritative reports every time a plan is
@@ -161,8 +162,8 @@ Raw deletion eligibility additionally requires:
 
 1. a complete/interrupted manifest with checksummed chunks;
 2. a successful Kalman completion receipt;
-3. a current evidence-archive receipt with `status: verified` and
-   `source_verified: true`;
+3. a production v2 receipt with `status: verified`, `source_verified: true`,
+   `policy: tiered-v2`, and `required_event_replay_valid: true`;
 4. exact agreement between the current QNAP manifest hash and the archive's
    source-manifest hash;
 5. a valid, hashed evidence-bundle manifest;
@@ -174,18 +175,18 @@ The equivalent dry-run plan is:
 ```bash
 uv run --active --no-sync leo-radio starlink-qnap-lifecycle \
   /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
-  --minimum-age-hours 0 --maximum-tier 0 \
+  --minimum-age-hours 6 --maximum-tier 4 \
   --output /mnt/qnap01/mouse9911/leo/reports/retention/qnap-lifecycle.latest.json
 ```
 
-Even with `--apply`, deletion occurs only when free space is below the pressure
-trigger and stops at the target high-water mark. It also requires the literal
-confirmation token:
+The production service uses `--ignore-pressure`: age-eligible verified-v2 raw
+leaves even when QNAP has free space, so the working set cannot silently grow.
+Application still requires the literal confirmation token:
 
 ```bash
 uv run --active --no-sync leo-radio starlink-qnap-lifecycle \
   /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
-  --maximum-tier 0 --trigger-free-gb 500 --target-free-gb 750 \
+  --minimum-age-hours 6 --maximum-tier 4 --ignore-pressure \
   --apply --confirm DELETE-QNAP-RAW-IQ
 ```
 
@@ -196,23 +197,15 @@ fingerprints remain. A prepared/removed transaction receipt is written beneath
 applications.
 
 [`leo-tracker-qnap-lifecycle.service`](../deploy/leo-tracker-qnap-lifecycle.service)
-is checked in with `LEO_QNAP_RECLAIM_ENABLED=1`, a one-minute post-pass delay, tier 0
-maximum, zero minimum age, a 500 GB trigger and a 750 GB target. The command
-still independently requires the service enable gate, the CLI confirmation
-token, a current verified evidence bundle and every safety gate listed above.
-Tier 1 and above remain protected.
+is checked in with a six-hour minimum age, tier 4 maximum and a one-minute
+post-pass delay. Tier 5 manual pins and unclassified, active, incomplete, stale,
+or unverified recordings remain fail-safe protected.
 
-Before any future tier promotion, a time-travel replay must apply an old policy using
-only the analysis available at that time and prove that newer detectors'
-qualified/high-value events remain covered. Start with tier 0 only. Tier 1–3
-promotion requires a separate written review of event recall and projected
-storage recovery; tiers 4–5 remain prohibited.
+## Production evidence archive v2
 
-## Evidence archive v2 shadow evaluation
-
-The production evidence archive remains the lossless conservative v1 archive.
-The tiered v2 policy is deliberately plan-only: it does not extract IQ, replace
-v1 bundles or authorize deletion. It differs from v1 in two important ways:
+Kalman now publishes only production tiered-v2 bundles for new recordings. It
+does not create a v1 bundle or a same-volume `derived/` copy of reports. The v2
+policy differs from v1 in two important ways:
 
 - non-triggering checks from a dense confirmed follow-up are not treated as
   signal spans; and
@@ -220,30 +213,44 @@ v1 bundles or authorize deletion. It differs from v1 in two important ways:
   100 ms control for a strict negative to two 500 ms controls plus two-second
   guards for tracked, confirmed, identified or pinned evidence.
 
-Every plan records detector-required event intervals. A v2 plan passes only if
+Every plan records detector-required event intervals. A v2 bundle publishes only if
 it fully contains every event in a freshly regenerated conservative reference
-plan. Older stored v1 plans are not used as the reference because they predate
-this explicit event metadata. Kalman writes the isolated shadow artifacts to:
+plan and every extracted byte matches the corresponding source sample. Kalman
+writes production artifacts to:
 
 ```text
-/mnt/qnap01/mouse9911/leo-cropped/catalog/v2-shadow/references/
-/mnt/qnap01/mouse9911/leo-cropped/catalog/v2-shadow/plans/
-/mnt/qnap01/mouse9911/leo-cropped/catalog/v2-shadow/comparisons/
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2/references/
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2/plans/
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2/comparisons/
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2/receipts/
+/mnt/qnap01/mouse9911/leo-cropped/evidence-v2/
 ```
 
-Evaluate all raw captures that still have a v1 archive receipt and publish a
-per-tier storage projection without reading or writing IQ payloads:
+Historical convergence is transactional and bounded. Each successful recording
+gets v2 evidence, a final source comparison and a prepared receipt; its obsolete
+v1 bundle and verified report duplicates are retired before raw is removed last:
 
 ```bash
-uv run --active --no-sync leo-radio starlink-evidence-v2-shadow \
-  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
+uv run --active --no-sync leo-radio starlink-storage-regime-v2 \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-hours 6 --limit 2 \
+  --apply --confirm MIGRATE-TO-EVIDENCE-V2
 ```
 
-Use `--limit N` for a bounded trial. The summary is written beneath
-`catalog/v2-shadow/summary.json`. A nonzero exit means at least one capture
-could not be planned or failed its replay gate. Promotion requires a reviewed
-shadow population, byte-exact extraction tests, detector replay against the
-new clips, and an explicit migration decision; no automatic promotion exists.
+[`leo-tracker-storage-regime-v2.service`](../deploy/leo-tracker-storage-regime-v2.service)
+runs this on Kalman in batches of two with the repository's existing uv virtual
+environment. A failure preserves raw and v1 and is retried; manual pins are
+recropped to v2 but their raw remains. Archive-only history whose raw was
+already reclaimed is recropped transitively from source-verified v1 clips; any
+gap covering a required v2 interval fails closed. Completed transaction
+receipts live beneath `reports/reclamation/storage-regime-v2/`.
+
+Analysis completion records no longer copy immutable outputs beneath
+`reports/runs/.../outputs/`; they store hashes and authoritative references to
+the ordinary report tree. Historical duplicate outputs and
+`leo-cropped/derived` files are removed only when their live counterpart has the
+same recorded hash. A missing or divergent counterpart is preserved and listed
+in the migration receipt.
 
 Inspect the live settings:
 
@@ -275,27 +282,27 @@ uv run --active --no-sync leo-radio starlink-evidence-plan \
 uv run --active --no-sync leo-radio starlink-evidence-extract \
   /mnt/leo-nvme/leo-tracker/captures/RECORDING \
   /tmp/RECORDING.plan.json \
-  /mnt/qnap01/mouse9911/leo-cropped/evidence/RECORDING
+  /mnt/qnap01/mouse9911/leo-cropped/evidence-v2/RECORDING
 
 # Prove QNAP bytes equal the original source slice.
 uv run --active --no-sync leo-radio starlink-evidence-verify \
-  /mnt/qnap01/mouse9911/leo-cropped/evidence/RECORDING \
+  /mnt/qnap01/mouse9911/leo-cropped/evidence-v2/RECORDING \
   --source /mnt/leo-nvme/leo-tracker/captures/RECORDING
 
 # Materialize one clip as an ordinary BeaconCapture for existing analyzers.
 uv run --active --no-sync leo-radio starlink-evidence-materialize \
-  /mnt/qnap01/mouse9911/leo-cropped/evidence/RECORDING clip-000 \
+  /mnt/qnap01/mouse9911/leo-cropped/evidence-v2/RECORDING clip-000 \
   /mnt/qnap01/mouse9911/leo-cropped/staging/replay-RECORDING
 
 # Plan, extract, verify, copy derivatives and write a receipt in one operation.
 scripts/starlink-evidence-archive.sh --recording RECORDING \
   /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo-cropped
 
-# Audit all published bundles against sources that are still present.
+# Audit production-v2 bundles against sources that are still present.
 uv run --active --no-sync leo-radio starlink-evidence-audit \
   /mnt/leo-nvme/leo-tracker \
-  /mnt/qnap01/mouse9911/leo-cropped/evidence \
-  --output /mnt/qnap01/mouse9911/leo-cropped/catalog/audit.json
+  /mnt/qnap01/mouse9911/leo-cropped/evidence-v2 \
+  --output /mnt/qnap01/mouse9911/leo-cropped/catalog/v2/audit.json
 ```
 
 The archive wrapper defaults to one finite scan. `--watch` enables periodic
@@ -309,9 +316,10 @@ explicitly selected.
 Archive completeness is defined by verified receipts, not by directory count,
 analysis queue depth, or aggregate bytes. For every recording in scope:
 
-1. `catalog/receipts/<id>.json` exists;
-2. it has `status: verified` and `source_verified: true`;
-3. `evidence/<id>/verification.json` has `valid: true`;
+1. `catalog/v2/receipts/<id>.json` exists;
+2. it has `status: verified`, `source_verified: true`, and
+   `required_event_replay_valid: true`;
+3. `evidence-v2/<id>/verification.json` has `valid: true`;
 4. no `<id>.partial` directory remains;
 5. all source identifiers from both NVMe and the QNAP working set have been
    reconciled, including quarantine and intentionally excluded records.
@@ -337,8 +345,8 @@ Use the cross-store identifier comparison in
 ```bash
 uv run --active --no-sync leo-radio starlink-evidence-audit \
   /mnt/leo-nvme/leo-tracker \
-  /mnt/qnap01/mouse9911/leo-cropped/evidence \
-  --output /mnt/qnap01/mouse9911/leo-cropped/catalog/audit.json
+  /mnt/qnap01/mouse9911/leo-cropped/evidence-v2 \
+  --output /mnt/qnap01/mouse9911/leo-cropped/catalog/v2/audit.json
 ```
 
 That command can verify only sources visible below the supplied source root.

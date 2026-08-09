@@ -6,6 +6,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Iterable
 
 from .artifact import BeaconCapture, SCHEMA as CAPTURE_SCHEMA
@@ -18,6 +20,7 @@ BUNDLE_SCHEMA = "leo-tracker.evidence-bundle/v1"
 VERIFICATION_SCHEMA = "leo-tracker.evidence-verification/v1"
 AUDIT_SCHEMA = "leo-tracker.evidence-audit/v1"
 SHADOW_SCHEMA = "leo-tracker.evidence-v2-shadow/v1"
+V2_RECEIPT_SCHEMA = "leo-tracker.evidence-archive-receipt/v2"
 BYTES_PER_PAIRED_SAMPLE = 8  # ci16 I/Q x two receivers
 EVIDENCE_POLICIES = ("conservative-v1", "tiered-v2")
 TIER_NAMES = {
@@ -115,10 +118,13 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
                   *, guard_s: float | None = None,
                   control_duration_s: float | None = None,
                   control_count: int | None = None,
-                  policy: str = "conservative-v1") -> dict:
+                  policy: str = "conservative-v1",
+                  evidence_tier: int | None = None) -> dict:
     """Plan conservative signal and control intervals without reading IQ payloads."""
     if policy not in EVIDENCE_POLICIES:
         raise ValueError(f"unsupported evidence policy: {policy}")
+    if evidence_tier is not None and evidence_tier not in TIER_NAMES:
+        raise ValueError("evidence tier must be 0..5")
     capture_path = Path(capture_path).resolve(); reports_root = Path(reports_root).resolve()
     storage_root = _source_root(capture_path, reports_root)
     if output is not None and storage_root is not None and _inside(Path(output), storage_root):
@@ -213,7 +219,8 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
     # Prefer the worker's final summary, which includes linked TLE association
     # stages not otherwise required by the evidence planner. Fall back to the
     # artifacts when planning isolated tests or legacy captures without a log.
-    tier = authoritative_tier if authoritative_tier is not None else inferred_tier
+    tier = (evidence_tier if evidence_tier is not None else
+            authoritative_tier if authoritative_tier is not None else inferred_tier)
     if policy == "conservative-v1":
         defaults = (10.0, 1.0, 3)
     else:
@@ -317,6 +324,33 @@ def compare_evidence_plan_coverage(reference: dict, candidate: dict) -> dict:
             "missing_required_event_count": len(missing), "missing_required_events": missing,
             "reference_coverage_fraction": reference.get("summary", {}).get("coverage_fraction"),
             "candidate_coverage_fraction": candidate.get("summary", {}).get("coverage_fraction")}
+
+
+def plan_evidence_from_manifest(source_manifest: Path, recording_id: str,
+                                reports_root: Path, output: Path, *,
+                                policy: str) -> dict:
+    """Plan evidence when raw is absent but its immutable manifest is archived."""
+    source_manifest = Path(source_manifest).resolve()
+    with tempfile.TemporaryDirectory(prefix="leo-evidence-plan-") as temporary:
+        capture = Path(temporary) / "captures" / recording_id
+        capture.mkdir(parents=True)
+        shutil.copyfile(source_manifest, capture / "manifest.json")
+        shared_root = Path(reports_root).resolve().parent
+        authoritative_tier = classify_recording(shared_root, recording_id)[0]
+        return plan_evidence(capture, reports_root, output, policy=policy,
+                             evidence_tier=authoritative_tier)
+
+
+def _existing_plan(path: Path, source_manifest_sha256: str,
+                   policy: str) -> dict | None:
+    if not path.exists():
+        return None
+    plan = _json(path)
+    if (plan is None or plan.get("schema") != PLAN_SCHEMA or
+            plan.get("source_manifest_sha256") != source_manifest_sha256 or
+            plan.get("policy", {}).get("name") != policy):
+        raise ValueError(f"existing {policy} evidence plan is stale or invalid")
+    return plan
 
 
 def build_evidence_v2_shadow(shared_root: Path, archive_root: Path, *,
@@ -553,6 +587,241 @@ def archive_evidence(capture_path: Path, reports_root: Path, qnap_root: Path, *,
                "source_verified": True, "derived_artifacts": copied,
                "summary": bundle["summary"]}
     _atomic_json(receipts / f"{name}.json", receipt)
+    return receipt
+
+
+def archive_evidence_v2(capture_path: Path, reports_root: Path,
+                        qnap_root: Path) -> dict:
+    """Publish replay-gated tiered evidence without duplicating report artifacts."""
+    capture_path = Path(capture_path).resolve(); reports_root = Path(reports_root).resolve()
+    qnap_root = Path(qnap_root).resolve(); name = capture_path.name
+    storage_root = _source_root(capture_path, reports_root)
+    if storage_root is not None and _inside(qnap_root, storage_root):
+        raise ValueError("QNAP archive root must not be inside source storage")
+    base = qnap_root / "catalog" / "v2"
+    reference_path = base / "references" / f"{name}.json"
+    plan_path = base / "plans" / f"{name}.json"
+    comparison_path = base / "comparisons" / f"{name}.json"
+    receipt_path = base / "receipts" / f"{name}.json"
+    bundle_path = qnap_root / "evidence-v2" / name
+    existing = _json(receipt_path)
+    if existing and existing.get("schema") == V2_RECEIPT_SCHEMA:
+        source_sha = _sha256_path(capture_path / "manifest.json")
+        if (existing.get("status") == "verified" and existing.get("source_verified") and
+                existing.get("source_manifest_sha256") == source_sha and
+                bundle_path.is_dir() and
+                _sha256_path(bundle_path / "manifest.json") ==
+                existing.get("bundle_manifest_sha256")):
+            verification = verify_evidence(bundle_path, capture_path=capture_path,
+                                           write=False)
+            if verification["valid"]:
+                return existing
+        raise ValueError("existing v2 receipt is stale or invalid")
+
+    source_sha = _sha256_path(capture_path / "manifest.json")
+    reference = (_existing_plan(reference_path, source_sha, "conservative-v1") or
+                 plan_evidence(capture_path, reports_root, reference_path,
+                               policy="conservative-v1"))
+    plan = (_existing_plan(plan_path, source_sha, "tiered-v2") or
+            plan_evidence(capture_path, reports_root, plan_path, policy="tiered-v2"))
+    comparison = compare_evidence_plan_coverage(reference, plan)
+    _atomic_json(comparison_path, comparison)
+    if not comparison["valid"]:
+        raise ValueError("tiered evidence failed required-event replay gate")
+    bundle = extract_evidence(capture_path, plan_path, bundle_path)
+    verification = verify_evidence(bundle_path, capture_path=capture_path)
+    if not verification["valid"] or not verification["source_verified"]:
+        raise ValueError("v2 evidence bundle failed source verification")
+    receipt = {
+        "schema": V2_RECEIPT_SCHEMA,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "recording_id": name, "status": "verified",
+        "policy": "tiered-v2", "evidence_tier": plan["evidence_tier"],
+        "evidence_tier_name": plan["evidence_tier_name"],
+        "source_manifest_sha256": plan["source_manifest_sha256"],
+        "reference": str(Path("catalog/v2/references") / reference_path.name),
+        "reference_sha256": _sha256_path(reference_path),
+        "plan": str(Path("catalog/v2/plans") / plan_path.name),
+        "plan_sha256": _sha256_path(plan_path),
+        "comparison": str(Path("catalog/v2/comparisons") / comparison_path.name),
+        "comparison_sha256": _sha256_path(comparison_path),
+        "bundle": str(Path("evidence-v2") / name),
+        "bundle_manifest_sha256": verification["bundle_manifest_sha256"],
+        "source_verified": True, "required_event_replay_valid": True,
+        "derived_artifacts_duplicated": False,
+        "source_artifacts": plan.get("source_artifacts", []),
+        "summary": bundle["summary"],
+    }
+    _atomic_json(receipt_path, receipt)
+    return receipt
+
+
+def _copy_interval_from_bundle(source_bundle: Path, source_manifest: dict,
+                               first: int, stop: int, output: Path) -> tuple[str, int]:
+    digest = hashlib.sha256(); written = 0; cursor = first
+    clips = sorted(source_manifest.get("clips", []),
+                   key=lambda item: int(item["first_sample"]))
+    with output.open("wb", buffering=0) as target:
+        for clip in clips:
+            clip_first = int(clip["first_sample"]); clip_stop = int(clip["stop_sample"])
+            if clip_stop <= cursor or clip_first >= stop:
+                continue
+            if clip_first > cursor:
+                raise ValueError("v1 evidence has a gap inside a required v2 interval")
+            local_first = cursor - clip_first
+            count = min(stop, clip_stop) - cursor
+            with (source_bundle / clip["path"]).open("rb") as source:
+                source.seek(local_first * BYTES_PER_PAIRED_SAMPLE)
+                remaining = count * BYTES_PER_PAIRED_SAMPLE
+                while remaining:
+                    block = source.read(min(8 << 20, remaining))
+                    if not block:
+                        raise ValueError("v1 evidence ended inside a required v2 interval")
+                    target.write(block); digest.update(block); written += len(block)
+                    remaining -= len(block)
+            cursor += count
+            if cursor >= stop:
+                break
+        target.flush(); os.fsync(target.fileno())
+    if cursor != stop:
+        raise ValueError("v1 evidence does not cover a required v2 interval")
+    return digest.hexdigest(), written
+
+
+def extract_evidence_from_bundle(source_bundle: Path, plan_path: Path,
+                                 destination: Path) -> dict:
+    """Atomically recrop a verified evidence bundle without access to raw IQ."""
+    source_bundle = Path(source_bundle).resolve(); destination = Path(destination).resolve()
+    source = _json(source_bundle / "manifest.json"); plan = _json(Path(plan_path))
+    if source is None or source.get("schema") != BUNDLE_SCHEMA or source.get("state") != "complete":
+        raise ValueError("source evidence bundle is not complete")
+    if plan is None or plan.get("schema") != PLAN_SCHEMA:
+        raise ValueError("unsupported evidence plan")
+    if source.get("recording_id") != plan.get("recording_id"):
+        raise ValueError("source bundle and plan recording differ")
+    if source.get("source_manifest_sha256") != plan.get("source_manifest_sha256"):
+        raise ValueError("source bundle and plan manifest differ")
+    if not verify_evidence(source_bundle, write=False)["valid"]:
+        raise ValueError("source evidence bundle failed verification")
+    if destination.exists():
+        existing = verify_evidence(destination, write=False)
+        if existing["valid"] and existing["plan_sha256"] == _sha256_path(Path(plan_path)):
+            return _json(destination / "manifest.json") or {}
+        raise FileExistsError(destination)
+    partial = destination.with_name(destination.name + ".partial")
+    if partial.exists():
+        marker = _json(partial / "resume.json")
+        if (marker is None or marker.get("plan_sha256") != _sha256_path(Path(plan_path)) or
+                marker.get("source_bundle_manifest_sha256") !=
+                _sha256_path(source_bundle / "manifest.json")):
+            raise FileExistsError(partial)
+        shutil.rmtree(partial)
+    partial.mkdir(parents=True)
+    try:
+        _atomic_json(partial / "resume.json", {
+            "schema": "leo-tracker.evidence-recrop-resume/v1",
+            "plan_sha256": _sha256_path(Path(plan_path)),
+            "source_bundle_manifest_sha256": _sha256_path(
+                source_bundle / "manifest.json")})
+        shutil.copyfile(source_bundle / "source-manifest.json",
+                        partial / "source-manifest.json")
+        clips = []
+        for interval in plan["intervals"]:
+            filename = f"{interval['interval_id']}.ci16"
+            digest, size = _copy_interval_from_bundle(
+                source_bundle, source, int(interval["first_sample"]),
+                int(interval["stop_sample"]), partial / filename)
+            clips.append({**interval, "path": filename, "bytes": size,
+                          "sha256": digest, "dtype": "ci16_le",
+                          "layout": source.get("radio_parameters", {}).get("layout"),
+                          "receiver_count": 2})
+        bundle = {"schema": BUNDLE_SCHEMA, "state": "complete",
+                  "created_utc": datetime.now(timezone.utc).isoformat(),
+                  "recording_id": plan["recording_id"],
+                  "plan_sha256": _sha256_path(Path(plan_path)),
+                  "source_manifest_sha256": plan["source_manifest_sha256"],
+                  "source": {"recording_id": plan["recording_id"],
+                             "provenance": "verified-v1-evidence"},
+                  "sample_rate_hz": plan["sample_rate_hz"],
+                  "radio_parameters": plan["radio_parameters"], "clips": clips,
+                  "summary": {"clip_count": len(clips),
+                              "stored_bytes": sum(item["bytes"] for item in clips),
+                              "source_bytes": int(source.get("summary", {}).get(
+                                  "source_bytes", 0)),
+                              "storage_fraction": (sum(item["bytes"] for item in clips) /
+                                  int(source.get("summary", {}).get("source_bytes", 1) or 1))}}
+        (partial / "resume.json").unlink()
+        _atomic_json(partial / "manifest.json", bundle)
+        os.replace(partial, destination)
+        return bundle
+    except Exception:
+        # A matching resume marker lets the next attempt safely rebuild this derived copy.
+        raise
+
+
+def archive_evidence_v2_from_v1(recording_id: str, reports_root: Path,
+                                qnap_root: Path) -> dict:
+    """Promote source-verified v1 evidence when the original raw is absent."""
+    reports_root = Path(reports_root).resolve(); qnap_root = Path(qnap_root).resolve()
+    v1_receipt = _json(qnap_root / "catalog" / "receipts" / f"{recording_id}.json")
+    if (v1_receipt is None or
+            v1_receipt.get("schema") != "leo-tracker.evidence-archive-receipt/v1" or
+            v1_receipt.get("status") != "verified" or not v1_receipt.get("source_verified")):
+        raise ValueError("source v1 archive is not source-verified")
+    source_bundle = qnap_root / str(v1_receipt.get("bundle", ""))
+    source_manifest = source_bundle / "source-manifest.json"
+    if (_sha256_path(source_bundle / "manifest.json") !=
+            v1_receipt.get("bundle_manifest_sha256") or
+            _sha256_path(source_manifest) != v1_receipt.get("source_manifest_sha256") or
+            not verify_evidence(source_bundle, write=False)["valid"]):
+        raise ValueError("source v1 archive failed transitive verification")
+    base = qnap_root / "catalog" / "v2"
+    reference_path = base / "references" / f"{recording_id}.json"
+    plan_path = base / "plans" / f"{recording_id}.json"
+    comparison_path = base / "comparisons" / f"{recording_id}.json"
+    receipt_path = base / "receipts" / f"{recording_id}.json"
+    bundle_path = qnap_root / "evidence-v2" / recording_id
+    existing = _json(receipt_path)
+    if existing and existing.get("schema") == V2_RECEIPT_SCHEMA:
+        if (existing.get("status") == "verified" and bundle_path.is_dir() and
+                _sha256_path(bundle_path / "manifest.json") ==
+                existing.get("bundle_manifest_sha256") and
+                verify_evidence(bundle_path, write=False)["valid"]):
+            return existing
+        raise ValueError("existing v2 receipt is stale or invalid")
+    source_sha = str(v1_receipt["source_manifest_sha256"])
+    reference = (_existing_plan(reference_path, source_sha, "conservative-v1") or
+        plan_evidence_from_manifest(source_manifest, recording_id, reports_root,
+                                    reference_path, policy="conservative-v1"))
+    plan = (_existing_plan(plan_path, source_sha, "tiered-v2") or
+        plan_evidence_from_manifest(source_manifest, recording_id, reports_root,
+                                    plan_path, policy="tiered-v2"))
+    comparison = compare_evidence_plan_coverage(reference, plan)
+    _atomic_json(comparison_path, comparison)
+    if not comparison["valid"]:
+        raise ValueError("tiered evidence failed required-event replay gate")
+    bundle = extract_evidence_from_bundle(source_bundle, plan_path, bundle_path)
+    verification = verify_evidence(bundle_path, write=False)
+    if not verification["valid"]:
+        raise ValueError("transitively extracted v2 bundle failed verification")
+    receipt = {"schema": V2_RECEIPT_SCHEMA,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "recording_id": recording_id, "status": "verified",
+        "policy": "tiered-v2", "evidence_tier": plan["evidence_tier"],
+        "evidence_tier_name": plan["evidence_tier_name"],
+        "source_manifest_sha256": plan["source_manifest_sha256"],
+        "reference": str(Path("catalog/v2/references") / reference_path.name),
+        "reference_sha256": _sha256_path(reference_path),
+        "plan": str(Path("catalog/v2/plans") / plan_path.name),
+        "plan_sha256": _sha256_path(plan_path),
+        "comparison": str(Path("catalog/v2/comparisons") / comparison_path.name),
+        "comparison_sha256": _sha256_path(comparison_path),
+        "bundle": str(Path("evidence-v2") / recording_id),
+        "bundle_manifest_sha256": verification["bundle_manifest_sha256"],
+        "source_verified": True, "source_verification": "transitive-v1-byte-copy",
+        "required_event_replay_valid": True, "derived_artifacts_duplicated": False,
+        "source_artifacts": plan.get("source_artifacts", []), "summary": bundle["summary"]}
+    _atomic_json(receipt_path, receipt)
     return receipt
 
 

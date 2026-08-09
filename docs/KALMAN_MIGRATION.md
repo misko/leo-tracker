@@ -183,7 +183,7 @@ find /mnt/qnap01/mouse9911/leo/captures -mindepth 1 -maxdepth 1 -type d \
   -printf '%f\n' | sort -u > /tmp/leo-qnap-recordings
 sort -u /tmp/leo-nvme-recordings /tmp/leo-qnap-recordings \
   > /tmp/leo-present-recordings
-find /mnt/qnap01/mouse9911/leo-cropped/catalog/receipts -maxdepth 1 \
+find /mnt/qnap01/mouse9911/leo-cropped/catalog/v2/receipts -maxdepth 1 \
   -type f -name '*.json' -printf '%f\n' | sed 's/\.json$//' | sort -u \
   > /tmp/leo-cropped-receipts
 comm -23 /tmp/leo-present-recordings /tmp/leo-cropped-receipts

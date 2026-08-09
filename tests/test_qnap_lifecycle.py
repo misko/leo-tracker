@@ -54,15 +54,16 @@ def _atomic_fixture(shared: Path, archive: Path, name: str, tier: int):
     if tier == 5:
         pins = reports / "retention" / "pins"; pins.mkdir(parents=True)
         (pins / f"{name}.json").write_text('{"reason":"test"}')
-    bundle = archive / "evidence" / name; bundle.mkdir(parents=True)
+    bundle = archive / "evidence-v2" / name; bundle.mkdir(parents=True)
     bundle_manifest = bundle / "manifest.json"; bundle_manifest.write_text("{}")
-    archive_receipts = archive / "catalog" / "receipts"
+    archive_receipts = archive / "catalog" / "v2" / "receipts"
     archive_receipts.mkdir(parents=True, exist_ok=True)
     (archive_receipts / f"{name}.json").write_text(json.dumps({
-        "schema": "leo-tracker.evidence-archive-receipt/v1", "status": "verified",
+        "schema": "leo-tracker.evidence-archive-receipt/v2", "status": "verified",
         "source_verified": True, "recording_id": name,
+        "required_event_replay_valid": True, "policy": "tiered-v2",
         "source_manifest_sha256": manifest_sha,
-        "bundle": f"evidence/{name}",
+        "bundle": f"evidence-v2/{name}",
         "bundle_manifest_sha256": hashlib.sha256(bundle_manifest.read_bytes()).hexdigest(),
         "summary": {"storage_fraction": .25}}))
     return capture
@@ -96,7 +97,7 @@ def test_default_policy_only_makes_strict_negatives_eligible(tmp_path):
 def test_stale_or_missing_evidence_archive_blocks_raw_deletion(tmp_path):
     shared, archive = tmp_path / "qnap", tmp_path / "cropped"
     capture = _atomic_fixture(shared, archive, "capture-0", 0)
-    receipt = archive / "catalog/receipts/capture-0.json"
+    receipt = archive / "catalog/v2/receipts/capture-0.json"
     value = json.loads(receipt.read_text()); value["source_manifest_sha256"] = "wrong"
     receipt.write_text(json.dumps(value))
     plan = build_qnap_lifecycle_plan(shared, archive, minimum_age_hours=0)
@@ -116,7 +117,7 @@ def test_apply_requires_token_and_pressure_then_preserves_evidence(tmp_path):
         trigger_free_gb=free_gb + 1, target_free_gb=free_gb + 2, limit=1)
     assert result["removed_count"] == 1
     assert not capture.exists()
-    assert (archive / "evidence/capture-0/manifest.json").is_file()
+    assert (archive / "evidence-v2/capture-0/manifest.json").is_file()
     assert (shared / "reports/capture-0.json").is_file()
     receipt = json.loads((shared / "reports/reclamation/qnap/capture-0.json").read_text())
     assert receipt["evidence_archive_preserved"] is True
@@ -131,6 +132,19 @@ def test_no_pressure_means_apply_removes_nothing(tmp_path):
         trigger_free_gb=0, target_free_gb=1)
     assert result["pressure_triggered"] is False
     assert capture.exists()
+
+
+def test_ignore_pressure_reclaims_verified_identity_but_never_manual_pin(tmp_path):
+    shared, archive = tmp_path / "qnap", tmp_path / "cropped"
+    identity = _atomic_fixture(shared, archive, "capture-4", 4)
+    pin = _atomic_fixture(shared, archive, "capture-5", 5)
+    plan = build_qnap_lifecycle_plan(shared, archive, minimum_age_hours=0,
+                                     maximum_tier=4)
+    result = apply_qnap_lifecycle_plan(plan, confirmation=CONFIRMATION,
+        trigger_free_gb=0, target_free_gb=1, pressure_required=False)
+    assert result["removed_count"] == 1
+    assert not identity.exists()
+    assert pin.exists()
 
 
 def test_qnap_reclaimer_lock_blocks_concurrent_apply(tmp_path):

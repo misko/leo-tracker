@@ -19,6 +19,10 @@ if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
   echo "uv and the existing ${repo_dir}/.venv are required" >&2; exit 2
 fi
 
+# `uv run --active` resolves the project command from the current directory.
+# Do not make the caller's working directory a hidden prerequisite.
+cd "${repo_dir}"
+
 while true; do
   args=(starlink-storage-regime-v2 "${shared_root}" "${archive_root}"
     --minimum-age-hours "${minimum_age_hours}" --limit "${limit}" --output "${plan}")

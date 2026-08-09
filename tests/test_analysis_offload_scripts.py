@@ -64,6 +64,7 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert "starlink-storage-regime-v2" in script
     assert "--confirm MIGRATE-TO-EVIDENCE-V2" in script
     assert '"${uv_bin}" run --active --no-sync' in script
+    assert 'cd "${repo_dir}"' in script
 
 
 def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():

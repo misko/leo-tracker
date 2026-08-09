@@ -83,6 +83,45 @@ def test_storage_regime_migrates_exact_v2_then_removes_raw_v1_and_duplicates(tmp
     assert receipt["v1_retired"] is True
 
 
+def test_storage_regime_promotes_missing_derived_and_discards_obsolete_copy(tmp_path):
+    shared, archive, capture = _ready(tmp_path, "derived-normalization")
+    name = capture.name
+    live_plot = shared / "reports" / "plots" / f"{name}.png"
+    archived_plot = archive / "derived" / "plots" / f"{name}.png"
+    assert archived_plot.read_bytes() == b"plot"
+    live_plot.unlink()
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+    assert result["completed_count"] == 1
+    assert live_plot.read_bytes() == b"plot"
+    assert not archived_plot.exists()
+    receipt = json.loads((shared / "reports" / "reclamation" /
+                          "storage-regime-v2" / f"{name}.json").read_text())
+    assert "derived/plots/derived-normalization.png" in receipt[
+        "promoted_derived_artifacts"]
+
+
+def test_storage_regime_keeps_current_live_derived_over_obsolete_archive(tmp_path):
+    shared, archive, capture = _ready(tmp_path, "derived-newer-live")
+    name = capture.name
+    live_plot = shared / "reports" / "plots" / f"{name}.png"
+    archived_plot = archive / "derived" / "plots" / f"{name}.png"
+    live_plot.write_bytes(b"newer authoritative plot")
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+    assert result["completed_count"] == 1
+    assert live_plot.read_bytes() == b"newer authoritative plot"
+    assert not archived_plot.exists()
+    receipt = json.loads((shared / "reports" / "reclamation" /
+                          "storage-regime-v2" / f"{name}.json").read_text())
+    assert "derived/plots/derived-newer-live.png" in receipt[
+        "discarded_obsolete_derived_artifacts"]
+
+
 def test_storage_regime_is_dry_run_by_default_and_requires_token(tmp_path):
     shared, archive, capture = _ready(tmp_path)
     plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)

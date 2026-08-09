@@ -188,18 +188,25 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
 def _remove_v1_artifacts(shared_root: Path, archive_root: Path, name: str) -> dict:
     """Remove obsolete v1 bundle and verified same-volume report duplicates."""
     receipt_path = archive_root / "catalog" / "receipts" / f"{name}.json"
-    receipt = _json(receipt_path); removed_bytes = 0; preserved_derived = []
+    receipt = _json(receipt_path); removed_bytes = 0
+    preserved_derived = []; promoted_derived = []; discarded_derived = []
     for artifact in receipt.get("derived_artifacts", []):
         relative = Path(str(artifact.get("path", "")))
         archived = archive_root / relative
-        if not archived.is_file() or relative.parts[:1] != ("derived",):
+        if (relative.is_absolute() or ".." in relative.parts or
+                relative.parts[:1] != ("derived",) or not archived.is_file()):
             continue
         live = shared_root / "reports" / Path(*relative.parts[1:])
         expected = artifact.get("sha256")
-        if live.is_file() and _sha256(live) == expected and _sha256(archived) == expected:
+        if not expected or _sha256(archived) != expected:
+            preserved_derived.append(str(relative))
+        elif live.is_file():
+            if _sha256(live) != expected:
+                discarded_derived.append(str(relative))
             removed_bytes += archived.stat().st_size; archived.unlink()
         else:
-            preserved_derived.append(str(relative))
+            live.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(archived, live); promoted_derived.append(str(relative))
     bundle = archive_root / "evidence" / name
     if bundle.is_dir() and bundle.parent == archive_root / "evidence":
         removed_bytes += sum(path.stat().st_size for path in bundle.rglob("*")
@@ -219,7 +226,7 @@ def _remove_v1_artifacts(shared_root: Path, archive_root: Path, name: str) -> di
                  archive_root / "catalog" / "v2-shadow" / "comparisons" / f"{name}.json"):
         if path.is_file():
             removed_bytes += path.stat().st_size; path.unlink()
-    reports = shared_root / "reports"
+    reports = shared_root / "reports"; preserved_outputs = []; promoted_outputs = []
     for completion in (reports / "runs").glob(f"*/{name}/completion.json"):
         value = _json(completion); references = {}
         output_dir = completion.parent / "outputs"
@@ -227,9 +234,19 @@ def _remove_v1_artifacts(shared_root: Path, archive_root: Path, name: str) -> di
             live = Path(str(artifact.get("path", "")))
             duplicate = output_dir / f"{key}{live.suffix}"
             expected = artifact.get("sha256")
-            if (live.is_file() and duplicate.is_file() and
-                    _sha256(live) == expected and _sha256(duplicate) == expected):
-                removed_bytes += duplicate.stat().st_size; duplicate.unlink()
+            try:
+                live.resolve(strict=False).relative_to(reports.resolve(strict=True))
+                live_is_safe = True
+            except (FileNotFoundError, OSError, ValueError):
+                live_is_safe = False
+            if duplicate.is_file() and live_is_safe:
+                if live.is_file():
+                    removed_bytes += duplicate.stat().st_size; duplicate.unlink()
+                elif expected and _sha256(duplicate) == expected:
+                    live.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(duplicate, live); promoted_outputs.append(str(duplicate))
+                else:
+                    preserved_outputs.append(str(duplicate))
             references[key] = {**artifact, "path": str(live),
                                "storage": "authoritative-reference"}
         if output_dir.is_dir() and not any(output_dir.iterdir()):
@@ -237,7 +254,11 @@ def _remove_v1_artifacts(shared_root: Path, archive_root: Path, name: str) -> di
         if references:
             value["versioned_outputs"] = references; _atomic_json(completion, value)
     return {"removed_bytes": removed_bytes,
-            "preserved_derived_artifacts": preserved_derived}
+            "preserved_derived_artifacts": preserved_derived,
+            "promoted_derived_artifacts": promoted_derived,
+            "discarded_obsolete_derived_artifacts": discarded_derived,
+            "promoted_versioned_outputs": promoted_outputs,
+            "preserved_versioned_outputs": preserved_outputs}
 
 
 def apply_storage_regime_plan(plan: dict, *, confirmation: str,

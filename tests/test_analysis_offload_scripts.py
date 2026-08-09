@@ -122,6 +122,10 @@ def test_server_worker_uses_atomic_claims_uv_and_existing_venv():
     assert 'starlink-beacon-channel-link "${linked}" "${track}"' in source
     assert '--maximum-gap-s "${fragment_maximum_gap_s}"' in source
     assert 'stage=fragment_tle_association' in source
+    assert 'fragment_component_association orbit associate' in source
+    assert 'fragment_diagnostic orbit' in source
+    assert 'diagnose-fragments --tracks "${track}" --links "${linked}"' in source
+    assert '--minimum-duration-s .5 --minimum-dual-epochs 5' in source
     assert '--observations "${linked}"' in source
     assert source.index('starlink-beacon-channel-link "${linked}" "${track}"') < \
         source.index('--observations "${linked}"')

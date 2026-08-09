@@ -19,6 +19,7 @@ from .catalog_sources import _space_track_bytes, fetch_bytes
 from .catalog_store import CatalogStore
 from .catalog_watch import load_config, run_watch, store_status
 from .doppler import predicted_doppler_hz
+from .fragment_diagnostics import diagnose_fragments
 from .topocentric import Observer
 from leo_tracker.passes import predict_passes, sample_track
 
@@ -182,6 +183,16 @@ def _parser() -> argparse.ArgumentParser:
     associate.add_argument("--maximum-holdout-rms-hz", type=float, default=500.0)
     associate.add_argument("--minimum-margin-hz", type=float, default=100.0)
     associate.add_argument("--output", type=Path, required=True)
+    fragment = commands.add_parser("diagnose-fragments",
+        help="compare same-satellite and satellite-switch explanations in shadow mode")
+    fragment.add_argument("--tracks", type=Path, required=True)
+    fragment.add_argument("--links", type=Path, required=True)
+    fragment.add_argument("--joint-association", type=Path, required=True)
+    fragment.add_argument("--fragment-association", type=Path, required=True)
+    fragment.add_argument("--high-separation-ratio", type=float, default=20.0)
+    fragment.add_argument("--maximum-fragment-rms-hz", type=float, default=500.0)
+    fragment.add_argument("--maximum-differential-fraction", type=float, default=.15)
+    fragment.add_argument("--output", type=Path, required=True)
     for name in ("passes", "schedule"):
         command = commands.add_parser(name, help="predict visible passes" if name == "passes" else "create a recording schedule")
         command.add_argument("--catalog", type=Path, required=True)
@@ -261,6 +272,15 @@ def main(argv: list[str] | None = None) -> int:
             minimum_margin_hz=args.minimum_margin_hz)
         print(json.dumps({"association": str(args.output), **result["summary"]},
                          sort_keys=True))
+        return 0
+    if args.command == "diagnose-fragments":
+        result = diagnose_fragments(args.tracks, args.links,
+            args.joint_association, args.fragment_association, args.output,
+            high_separation_ratio=args.high_separation_ratio,
+            maximum_fragment_rms_hz=args.maximum_fragment_rms_hz,
+            maximum_differential_fraction=args.maximum_differential_fraction)
+        print(json.dumps({"fragment_diagnostic": str(args.output),
+            **result["summary"]}, sort_keys=True))
         return 0
     catalog = TLECatalogArtifact.read(args.catalog)
     if args.candidate_limit < 0:

@@ -483,6 +483,45 @@ grid refines it, but every stability case still requires an interior epoch.
 Exploratory replays may explicitly request a wider range, and must not be treated
 as production identity evidence merely because that wider search finds a fit.
 
+### Fragment identity diagnostics
+
+Every new multi-fragment hypothesis now receives a separate, explicitly shadow
+diagnostic.  Kalman reruns association on each measured source fragment with a
+relaxed 0.5-second eligibility gate, preserves its top-five TLE ranking, and
+compares that evidence with the joint held-out association.  Across every gap it
+also extrapolates short endpoint fits independently for RX0 and RX1.  A nearly
+equal step on both receivers is common-mode RF/LO evidence; a differential step
+is evidence for a receiver-path disturbance.  Common mode alone does **not**
+prove continuity because a transmitter/channel switch can affect both receivers.
+
+The JSON artifact is written to
+`reports/fragment-diagnostics/<capture>.json` and is available from the capture
+detail page.  Its classifications are `same_continuous_supported`,
+`same_identity_discontinuity_candidate`, `satellite_switch_candidate`, and
+`indeterminate`.  They never change production qualification.  The reported BIC
+values are marked as diagnostic Gaussian proxies: catalog search, correlated
+errors, and oscillator priors mean that empirical null calibration is required
+before they can become an acceptance criterion.
+
+An initial retrospective shadow run over the five natural multi-fragment
+captures available on 2026-08-08 classified three as same-identity discontinuity
+candidates, one as a satellite-switch candidate, and one as indeterminate.  In
+all five, the gap step was predominantly common-mode across RX0/RX1.  This is
+useful evidence that independent LNB jumps are not the dominant explanation,
+but the labels remain hypotheses until repeated field data establish false-match
+and masked-positive distributions.
+
+The CLI form used by the server is:
+
+```bash
+uv run --active --no-sync leo-orbit diagnose-fragments \
+  --tracks reports/tracks/CAPTURE.json \
+  --links reports/channel-links/CAPTURE.json \
+  --joint-association reports/associations/CAPTURE-channel-link.json \
+  --fragment-association reports/fragment-associations/CAPTURE.json \
+  --output reports/fragment-diagnostics/CAPTURE.json
+```
+
 The first field acceptance artifact is
 `ch4-lower-edge-narrow-20260806T094123Z-channel-link.json`. Replaying its frozen
 IQ with piecewise host timing produced 85 calibrated dual-RX epochs over 40.751

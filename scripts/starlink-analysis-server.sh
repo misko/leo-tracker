@@ -102,7 +102,7 @@ keep_wide="${LEO_ANALYSIS_KEEP_WIDE:-2}"
 keep_oversample="${LEO_ANALYSIS_KEEP_OVERSAMPLE:-4}"
 keep_hop_sessions="${LEO_ANALYSIS_KEEP_HOP_SESSIONS:-6}"
 mkdir -p "${queue}/done" "${queue}/failed" "${metrics}" \
-  "${reports}"/{plots,followups,decoded,frame-tracks,tracks,channel-links,associations,fingerprints}
+  "${reports}"/{plots,followups,decoded,frame-tracks,tracks,channel-links,associations,fragment-associations,fragment-diagnostics,fingerprints}
 exec 8>"${queue}/server.lock"
 if ! flock -n 8; then
   echo "another analysis server already owns ${queue}" >&2
@@ -207,6 +207,8 @@ process_job() {
   local association="${reports}/associations/${name}.json"
   local linked="${reports}/channel-links/${name}.json"
   local linked_association="${reports}/associations/${name}-channel-link.json"
+  local fragment_association="${reports}/fragment-associations/${name}.json"
+  local fragment_diagnostic="${reports}/fragment-diagnostics/${name}.json"
   local has_checks=0 archived=0
   local -a analysis_args template_args frame_args track_args passes_args
   analysis_args=(--exact-window-s .01)
@@ -284,6 +286,23 @@ process_job() {
             --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" \
             --minimum-dual-epochs 30 --minimum-coverage-fraction .1 \
             --output "${linked_association}" || return 1
+          if run_stage "${worker_id}" "${name}" fragment_component_association orbit associate \
+            --observations "${track}" --catalog "${job_context}/tle-catalog.json" \
+            --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
+            --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
+            --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" \
+            --minimum-duration-s .5 --minimum-dual-epochs 5 \
+            --minimum-coverage-fraction .02 \
+            --output "${fragment_association}"; then
+            run_stage "${worker_id}" "${name}" fragment_diagnostic orbit \
+              diagnose-fragments --tracks "${track}" --links "${linked}" \
+              --joint-association "${linked_association}" \
+              --fragment-association "${fragment_association}" \
+              --output "${fragment_diagnostic}" || \
+              emit "shadow_stage_failed worker=${worker_id} job=${name} stage=fragment_diagnostic production_affected=false"
+          else
+            emit "shadow_stage_failed worker=${worker_id} job=${name} stage=fragment_component_association production_affected=false"
+          fi
         fi
       else
         emit "stage_skipped worker=${worker_id} job=${name} stage=fragment_tle_association reason=no_multi_fragment_hypothesis"

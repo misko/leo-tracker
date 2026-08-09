@@ -102,6 +102,14 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
             "associations": [{"track_id": "channel-hypothesis-000",
                 "qualified": False, "stability": {"passed": False},
                 "candidates": [{"name": "STARLINK-Y", "norad_id": 456}]}]}))
+        (root / "reports" / "fragment-diagnostics" /
+         f"{name}.json").write_text(json.dumps({
+            "schema": "leo-tracker.starlink-fragment-diagnostic/v1",
+            "summary": {"hypothesis_count": 1,
+                        "production_qualification_affected": False},
+            "hypotheses": [{"track_id": "channel-hypothesis-000",
+                "shadow_classification": "same_identity_discontinuity_candidate",
+                "production_qualification_affected": False}]}))
 
 
 def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_path,
@@ -110,7 +118,8 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     for directory in ("reports/followups", "reports/decoded", "reports/fingerprints",
                       "reports/frame-tracks",
                       "reports/tracks", "reports/channel-links",
-                      "reports/associations", "reports/plots", "captures"):
+                      "reports/associations", "reports/fragment-diagnostics",
+                      "reports/plots", "captures"):
         (root / directory).mkdir(parents=True, exist_ok=True)
     first, second = "ch4-lower-edge-narrow-first", "ch4-lower-edge-narrow-second"
     _capture(root, first, 1_700_000_000_000_000_000, confirmed=True, decoded=True)
@@ -149,6 +158,12 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
                for item in row["_artifacts"])
     assert any(item["url"] == f"/beacon-associations/{first}-channel-link.json"
                for item in row["_artifacts"])
+    assert any(item["url"] == f"/beacon-fragment-diagnostics/{first}.json"
+               for item in row["_artifacts"])
+    assert row["fragment_shadow_classification"] == (
+        "same_identity_discontinuity_candidate")
+    assert row["_statistics"]["fragment_diagnostic"]["summary"][
+        "production_qualification_affected"] is False
     assert row["fingerprint_nearest_matches"][0]["temporal_qpsk_similarity"] == .8
     assert row["_statistics"]["exact_checks"][0]["receivers"][0][
         "pilot_frequency_offset_hz"] == -30_000
@@ -187,10 +202,14 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
         "longest_hypothesis_duration_s"] == 29.4
     assert detail["statistics"]["linked_tle_association"]["summary"][
         "qualified_association_count"] == 0
+    assert detail["statistics"]["fragment_diagnostic"]["hypotheses"][0][
+        "shadow_classification"] == "same_identity_discontinuity_candidate"
     assert detail["plots"] == [f"/beacon-plots/{first}.png"]
     assert "Calibrated 10 Hz tracks" in DETAIL_HTML
     assert "Conditioned 750 Hz frames" in DETAIL_HTML
     assert "Held-out TLE association" in DETAIL_HTML
+    assert "Fragment identity evidence" in DETAIL_HTML
+    assert "production qualification" in DETAIL_HTML
 
     assert main(["starlink-beacon-dashboard-index", str(root), str(output),
                  "--capture-name", second]) == 0

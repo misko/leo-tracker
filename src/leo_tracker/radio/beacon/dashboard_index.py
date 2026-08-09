@@ -157,9 +157,11 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     channel_link_path = root / "reports" / "channel-links" / f"{name}.json"
     linked_association_path = (root / "reports" / "associations" /
                                f"{name}-channel-link.json")
+    fragment_diagnostic_path = (root / "reports" / "fragment-diagnostics" /
+                                f"{name}.json")
     paths = (report_path, followup_path, decode_path, fingerprint_path,
              fingerprint_plot_path, frame_track_path, track_path, association_path,
-             channel_link_path, linked_association_path)
+             channel_link_path, linked_association_path, fragment_diagnostic_path)
     report = _json(report_path)
     if report.get("schema") != "leo-tracker.starlink-beacon-analysis/v1":
         return None
@@ -169,6 +171,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     track_report, association = _json(track_path), _json(association_path)
     channel_link, linked_association = (_json(channel_link_path),
                                         _json(linked_association_path))
+    fragment_diagnostic = _json(fragment_diagnostic_path)
     confirmation = followup.get("confirmation", {})
     combined = decode.get("combined", {})
     pilot = (combined.get("soft_dual_rx") or {}).get("pilot") or {}
@@ -215,7 +218,9 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         ("TLE association JSON", association_path,
          f"/beacon-associations/{name}.json"),
         ("Gapped-track TLE association JSON", linked_association_path,
-         f"/beacon-associations/{name}-channel-link.json")):
+         f"/beacon-associations/{name}-channel-link.json"),
+        ("Fragment identity diagnostic JSON", fragment_diagnostic_path,
+         f"/beacon-fragment-diagnostics/{name}.json")):
         if path.is_file():
             artifacts.append({"label": label, "url": url})
     common = {"kind": "beacon", "recording_id": name, "start_utc": created_utc,
@@ -254,6 +259,10 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
             association.get("summary", {}).get("qualified_association_count", 0) +
             linked_association.get("summary", {}).get(
                 "qualified_association_count", 0)),
+        "fragment_shadow_classification": ((fragment_diagnostic.get(
+            "hypotheses") or [{}])[0].get("shadow_classification")),
+        "fragment_hypothesis_count": fragment_diagnostic.get(
+            "summary", {}).get("hypothesis_count", 0),
         "fingerprint_family": cluster_id,
         "fingerprint_family_size": cluster_sizes.get(cluster_id, 0),
         "fingerprint_plot_url": (f"/beacon-fingerprint-plots/{name}.png"
@@ -290,6 +299,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         "continuous_linking": channel_link,
         "tle_association": association,
         "linked_tle_association": linked_association,
+        "fragment_diagnostic": fragment_diagnostic,
         "fingerprint": {"cluster_id": cluster_id,
             "cluster_size": cluster_sizes.get(cluster_id, 0)}}
     return {**common, "_source_signature": _signature(paths),

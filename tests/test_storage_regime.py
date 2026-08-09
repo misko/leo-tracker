@@ -55,6 +55,9 @@ def test_storage_regime_migrates_exact_v2_then_removes_raw_v1_and_duplicates(tmp
         "path": str(live), "bytes": live.stat().st_size,
         "sha256": hashlib.sha256(live.read_bytes()).hexdigest(),
     }}, "versioned_outputs": {"analysis": {"path": str(duplicate)}}}) + "\n")
+    legacy_partial = archive / "evidence" / f"{name}.partial"
+    legacy_partial.mkdir()
+    (legacy_partial / "interrupted.ci16.next").write_bytes(b"obsolete")
     plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
 
     result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION, limit=1)
@@ -64,6 +67,7 @@ def test_storage_regime_migrates_exact_v2_then_removes_raw_v1_and_duplicates(tmp
     assert result["raw_removed_bytes"] > 0
     assert not capture.exists()
     assert not (archive / "evidence" / name).exists()
+    assert not legacy_partial.exists()
     assert not (archive / "catalog" / "receipts" / f"{name}.json").exists()
     assert not (archive / "derived" / "plots" / f"{name}.png").exists()
     assert not duplicate.exists()

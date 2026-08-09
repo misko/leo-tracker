@@ -205,6 +205,14 @@ def _remove_v1_artifacts(shared_root: Path, archive_root: Path, name: str) -> di
         removed_bytes += sum(path.stat().st_size for path in bundle.rglob("*")
                              if path.is_file())
         shutil.rmtree(bundle)
+    # Older archive writers could leave a resumable `<recording>.partial`
+    # sibling. Once production v2 has passed source comparison and replay, it
+    # is neither authoritative nor useful and must not survive convergence.
+    partial = archive_root / "evidence" / f"{name}.partial"
+    if partial.is_dir() and partial.parent == archive_root / "evidence":
+        removed_bytes += sum(path.stat().st_size for path in partial.rglob("*")
+                             if path.is_file())
+        shutil.rmtree(partial)
     for path in (archive_root / "catalog" / "plans" / f"{name}.json", receipt_path,
                  archive_root / "catalog" / "v2-shadow" / "references" / f"{name}.json",
                  archive_root / "catalog" / "v2-shadow" / "plans" / f"{name}.json",

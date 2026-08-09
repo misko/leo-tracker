@@ -36,14 +36,17 @@ def test_local_reclaimer_is_qnap_gated_and_uses_existing_uv_environment():
     assert "--output" in script
 
 
-def test_qnap_lifecycle_service_is_explicitly_disabled_and_pressure_bounded():
+def test_qnap_lifecycle_service_is_tier_zero_only_and_pressure_bounded():
     unit = (ROOT / "deploy/leo-tracker-qnap-lifecycle.service").read_text()
     script = (ROOT / "scripts/starlink-qnap-lifecycle.sh").read_text()
-    assert "Environment=LEO_QNAP_RECLAIM_ENABLED=0" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_ENABLED=1" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_INTERVAL_S=60" in unit
     assert "Environment=LEO_QNAP_RECLAIM_MAXIMUM_TIER=0" in unit
+    assert "Environment=LEO_QNAP_RECLAIM_MINIMUM_AGE_HOURS=0" in unit
     assert "Environment=LEO_QNAP_RECLAIM_TRIGGER_FREE_GB=500" in unit
     assert "Environment=LEO_QNAP_RECLAIM_TARGET_FREE_GB=750" in unit
     assert 'if [[ "${enabled}" == "1" ]]' in script
+    assert 'if [[ "${enabled}" != "0" && "${enabled}" != "1" ]]' in script
     assert "--apply --confirm DELETE-QNAP-RAW-IQ" in script
     assert "starlink-qnap-lifecycle" in script
     assert "--maximum-tier" in script
@@ -83,11 +86,17 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert "Environment=LEO_ANALYSIS_WORKERS=16" in unit
     assert "Environment=LEO_ANALYSIS_FULL_COVERAGE=1" in unit
     assert "Environment=LEO_ANALYSIS_ARCHIVE_MODE=shadow" in unit
+    assert "Environment=LEO_ANALYSIS_EVIDENCE_V2_SHADOW=1" in unit
     assert "Environment=LEO_ANALYSIS_RETENTION_MODE=disabled" in unit
     assert "Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1" in unit
     assert "Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=3500000" in unit
     assert "Environment=LEO_ANALYSIS_TRACK_MAXIMUM_GAP_S=15" in unit
     assert "Environment=LEO_ANALYSIS_TRACK_MAXIMUM_REACQUISITION_SPAN_HZ=15000" in unit
+    script = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
+    assert "starlink-evidence-plan" in script
+    assert "--policy tiered-v2" in script
+    assert "starlink-evidence-compare" in script
+    assert "production_affected=false" in script
     assert "Environment=LEO_ANALYSIS_FRAGMENT_MAXIMUM_GAP_S=30" in unit
     assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit

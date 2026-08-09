@@ -10,13 +10,20 @@ from typing import Iterable
 
 from .artifact import BeaconCapture, SCHEMA as CAPTURE_SCHEMA
 from .continuous import _sample_utc_ns
+from .qnap_lifecycle import classify_recording
 
 
 PLAN_SCHEMA = "leo-tracker.evidence-plan/v1"
 BUNDLE_SCHEMA = "leo-tracker.evidence-bundle/v1"
 VERIFICATION_SCHEMA = "leo-tracker.evidence-verification/v1"
 AUDIT_SCHEMA = "leo-tracker.evidence-audit/v1"
+SHADOW_SCHEMA = "leo-tracker.evidence-v2-shadow/v1"
 BYTES_PER_PAIRED_SAMPLE = 8  # ci16 I/Q x two receivers
+EVIDENCE_POLICIES = ("conservative-v1", "tiered-v2")
+TIER_NAMES = {
+    0: "strict_negative", 1: "weak_candidate", 2: "tracked_signal",
+    3: "confirmed_beacon", 4: "qualified_identity", 5: "manual_pin",
+}
 
 
 def _source_root(capture_path: Path, reports_root: Path | None = None) -> Path | None:
@@ -105,11 +112,13 @@ def _merge_intervals(intervals: Iterable[dict], total_samples: int) -> list[dict
 
 
 def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = None,
-                  *, guard_s: float = 10.0, control_duration_s: float = 1.0,
-                  control_count: int = 3) -> dict:
+                  *, guard_s: float | None = None,
+                  control_duration_s: float | None = None,
+                  control_count: int | None = None,
+                  policy: str = "conservative-v1") -> dict:
     """Plan conservative signal and control intervals without reading IQ payloads."""
-    if guard_s < 0 or control_duration_s <= 0 or control_count < 0:
-        raise ValueError("invalid evidence planning durations or control count")
+    if policy not in EVIDENCE_POLICIES:
+        raise ValueError(f"unsupported evidence policy: {policy}")
     capture_path = Path(capture_path).resolve(); reports_root = Path(reports_root).resolve()
     storage_root = _source_root(capture_path, reports_root)
     if output is not None and storage_root is not None and _inside(Path(output), storage_root):
@@ -123,7 +132,10 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
     duration = total / rate
     name = capture_path.name
     artifacts: list[dict] = []
-    spans: list[tuple[float, float, str]] = []
+    spans: list[tuple[float, float, str, bool]] = []
+
+    def add_span(start: float, stop: float, reason: str, *, required: bool = True) -> None:
+        spans.append((start, stop, reason, required))
 
     def load(relative: str) -> dict | None:
         item = _artifact(reports_root / relative, reports_root)
@@ -137,23 +149,28 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
         for check in analysis.get("exact_checks", []):
             if isinstance(check, dict) and _interesting_check(check):
                 start = float(check.get("start_s", 0)); width = float(check.get("duration_s", 0.01))
-                spans.append((start, start + width, "exact_candidate"))
+                add_span(start, start + width, "exact_candidate")
         for window in analysis.get("windows", []):
             if isinstance(window, dict) and any(window.get(key) for key in (
                     "candidate", "qualified", "detected", "doppler_like")):
                 start = float(window.get("start_s", 0)); width = float(window.get("duration_s", 1))
-                spans.append((start, start + width, "broadband_or_window_candidate"))
+                add_span(start, start + width, "broadband_or_window_candidate")
 
     followup = load(f"followups/{name}.json")
     confirmed = bool((followup or {}).get("confirmation", {}).get("confirmed"))
     if followup:
         checks = [item for item in followup.get("checks", []) if isinstance(item, dict)]
-        selected = checks if confirmed else [item for item in checks if _interesting_check(item)]
+        selected = (checks if confirmed and policy == "conservative-v1" else
+                    [item for item in checks if _interesting_check(item)])
         for check in selected:
             start = float(check.get("start_s", 0))
             width = float(check.get("duration_s", followup.get("settings", {}).get("window_s", .01)))
-            spans.append((start, start + width,
-                          "confirmed_dense_followup" if confirmed else "followup_candidate"))
+            interesting = _interesting_check(check)
+            add_span(start, start + width,
+                     ("confirmed_dense_followup" if policy == "conservative-v1" else
+                      "confirmed_followup_candidate" if interesting else
+                      "confirmed_dense_followup_control"),
+                     required=interesting)
 
     tracks = load(f"tracks/{name}.json")
     if tracks:
@@ -162,28 +179,68 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
             positions = [int(item["start_sample"]) for item in observations
                          if isinstance(item, dict) and item.get("start_sample") is not None]
             if positions:
-                spans.append((min(positions) / rate, (max(positions) + max(1, round(.1 * rate))) / rate,
-                              "continuous_doppler_track"))
+                add_span(min(positions) / rate,
+                         (max(positions) + max(1, round(.1 * rate))) / rate,
+                         "continuous_doppler_track")
 
     decoded = load(f"decoded/{name}.json")
     if decoded and isinstance(decoded.get("selected_observation"), dict):
         selected = decoded["selected_observation"]
         start = float(selected.get("start_s", 0)); width = float(selected.get("duration_s", .1))
-        spans.append((start, start + width, "decoded_symbols"))
+        add_span(start, start + width, "decoded_symbols")
 
     # These are scientific provenance even though they do not add intervals.
-    for relative in (f"frame-tracks/{name}.json", f"associations/{name}.json",
-                     f"channel-links/{name}.json"):
-        load(relative)
+    load(f"frame-tracks/{name}.json")
+    association = load(f"associations/{name}.json")
+    load(f"channel-links/{name}.json")
     for relative in (f"plots/{name}.png", f"decoded/{name}.png",
                      f"decoded/{name}.npz", f"frame-tracks/{name}.npz"):
         item = _artifact_file(reports_root / relative, reports_root)
         if item is not None:
             artifacts.append(item)
 
+    identity = bool(association and any(item.get("qualified") for item in
+                    association.get("associations", []) if isinstance(item, dict)))
+    pinned = bool(storage_root and
+                  (storage_root / "reports" / "retention" / "pins" /
+                   f"{name}.json").is_file())
+    has_track = bool(tracks and any(item.get("observations") for item in
+                     tracks.get("tracks", []) if isinstance(item, dict)))
+    has_candidate = any(required for _, _, _, required in spans)
+    inferred_tier = (5 if pinned else 4 if identity else 3 if confirmed else
+                     2 if has_track else 1 if has_candidate else 0)
+    authoritative_tier = classify_recording(storage_root, name)[0] if storage_root else None
+    # Prefer the worker's final summary, which includes linked TLE association
+    # stages not otherwise required by the evidence planner. Fall back to the
+    # artifacts when planning isolated tests or legacy captures without a log.
+    tier = authoritative_tier if authoritative_tier is not None else inferred_tier
+    if policy == "conservative-v1":
+        defaults = (10.0, 1.0, 3)
+    else:
+        defaults = {
+            0: (0.0, .1, 1), 1: (1.0, .25, 1), 2: (2.0, .5, 2),
+            3: (2.0, .5, 2), 4: (2.0, .5, 2), 5: (2.0, .5, 2),
+        }[tier]
+    guard_s = defaults[0] if guard_s is None else guard_s
+    control_duration_s = defaults[1] if control_duration_s is None else control_duration_s
+    control_count = defaults[2] if control_count is None else control_count
+    if guard_s < 0 or control_duration_s <= 0 or control_count < 0:
+        raise ValueError("invalid evidence planning durations or control count")
+
+    required_events = []
+    for start, stop, reason, required in spans:
+        if not required:
+            continue
+        first = max(0, min(total, round(start * rate)))
+        event_stop = max(first, min(total, round(stop * rate)))
+        if event_stop > first:
+            required_events.append({"event_id": f"event-{len(required_events):03d}",
+                                    "first_sample": first, "stop_sample": event_stop,
+                                    "reason": reason})
+
     raw: list[dict] = []
     guard_samples = round(guard_s * rate)
-    for start, stop, reason in spans:
+    for start, stop, reason, _ in spans:
         raw.append({"first_sample": round(start * rate) - guard_samples,
                     "stop_sample": round(stop * rate) + guard_samples,
                     "reasons": [reason]})
@@ -218,11 +275,16 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
             "radio_parameters": {key: manifest.get(key) for key in (
                 "center_frequency_hz", "rf_center_hz", "lnb_lo_hz", "bandwidth_hz",
                 "gain_mode", "configured_gain_db", "receiver_count", "dtype", "layout")},
-            "policy": {"guard_s": guard_s, "control_duration_s": control_duration_s,
+            "evidence_tier": tier, "evidence_tier_name": TIER_NAMES[tier],
+            "policy": {"name": policy,
+                       "guard_s": guard_s, "control_duration_s": control_duration_s,
                        "control_count": control_count,
                        "confirmed_followup": confirmed,
-                       "selection": "all known signal classes plus deterministic controls"},
-            "source_artifacts": artifacts, "intervals": intervals,
+                       "selection": ("all dense confirmed checks plus known signal classes"
+                                     if policy == "conservative-v1" else
+                                     "interesting event spans plus tier-sized controls")},
+            "source_artifacts": artifacts, "required_events": required_events,
+            "intervals": intervals,
             "summary": {"interval_count": len(intervals),
                         "signal_reason_count": len({reason for item in intervals
                             for reason in item["reasons"] if reason != "deterministic_control"}),
@@ -232,6 +294,99 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
     if output is not None:
         _atomic_json(Path(output), plan)
     return plan
+
+
+def compare_evidence_plan_coverage(reference: dict, candidate: dict) -> dict:
+    """Prove that a candidate covers every detector event required by a plan."""
+    if reference.get("schema") != PLAN_SCHEMA or candidate.get("schema") != PLAN_SCHEMA:
+        raise ValueError("unsupported evidence plan")
+    if reference.get("recording_id") != candidate.get("recording_id"):
+        raise ValueError("evidence plans belong to different recordings")
+    if "required_events" not in reference:
+        raise ValueError("reference plan predates required-event replay metadata")
+    intervals = candidate.get("intervals", [])
+    missing = []
+    for event in reference.get("required_events", []):
+        covered = any(int(interval["first_sample"]) <= int(event["first_sample"]) and
+                      int(interval["stop_sample"]) >= int(event["stop_sample"])
+                      for interval in intervals)
+        if not covered:
+            missing.append(event)
+    return {"valid": not missing,
+            "reference_required_event_count": len(reference.get("required_events", [])),
+            "missing_required_event_count": len(missing), "missing_required_events": missing,
+            "reference_coverage_fraction": reference.get("summary", {}).get("coverage_fraction"),
+            "candidate_coverage_fraction": candidate.get("summary", {}).get("coverage_fraction")}
+
+
+def build_evidence_v2_shadow(shared_root: Path, archive_root: Path, *,
+                             output: Path | None = None,
+                             limit: int | None = None) -> dict:
+    """Build replay-gated v2 plans and storage projections without extracting IQ."""
+    shared_root = Path(shared_root).resolve(); archive_root = Path(archive_root).resolve()
+    if _inside(archive_root, shared_root):
+        raise ValueError("shadow archive root must not be inside source storage")
+    if limit is not None and limit < 1:
+        raise ValueError("shadow limit must be positive")
+    shadow = archive_root / "catalog" / "v2-shadow"
+    entries = []; failures = []
+    captures = sorted(path for path in (shared_root / "captures").iterdir()
+                      if path.is_dir()) if (shared_root / "captures").is_dir() else []
+    for capture_path in captures:
+        if limit is not None and len(entries) >= limit:
+            break
+        name = capture_path.name
+        if not (archive_root / "catalog" / "receipts" / f"{name}.json").is_file():
+            continue
+        try:
+            reference_path = shadow / "references" / f"{name}.json"
+            candidate_path = shadow / "plans" / f"{name}.json"
+            comparison_path = shadow / "comparisons" / f"{name}.json"
+            reference = plan_evidence(capture_path, shared_root / "reports",
+                                      reference_path, policy="conservative-v1")
+            candidate = plan_evidence(capture_path, shared_root / "reports",
+                                      candidate_path, policy="tiered-v2")
+            comparison = compare_evidence_plan_coverage(reference, candidate)
+            _atomic_json(comparison_path, comparison)
+            if not comparison["valid"]:
+                raise ValueError("candidate failed required-event replay gate")
+            receipt = _json(archive_root / "catalog" / "receipts" / f"{name}.json") or {}
+            v1_bytes = int(receipt.get("summary", {}).get("stored_bytes", 0) or 0)
+            v2_bytes = int(candidate["summary"]["selected_samples_per_receiver"]) * \
+                BYTES_PER_PAIRED_SAMPLE
+            entries.append({"recording_id": name,
+                            "evidence_tier": candidate["evidence_tier"],
+                            "evidence_tier_name": candidate["evidence_tier_name"],
+                            "required_event_count": len(candidate["required_events"]),
+                            "v1_stored_bytes": v1_bytes,
+                            "v2_projected_bytes": v2_bytes,
+                            "projected_savings_bytes": max(0, v1_bytes - v2_bytes),
+                            "v1_coverage_fraction": reference["summary"]["coverage_fraction"],
+                            "v2_coverage_fraction": candidate["summary"]["coverage_fraction"],
+                            "replay_gate_valid": True})
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            failures.append({"recording_id": name, "error": str(exc)})
+    tiers: dict[str, dict] = {}
+    for entry in entries:
+        tier = tiers.setdefault(entry["evidence_tier_name"], {
+            "recording_count": 0, "v1_stored_bytes": 0,
+            "v2_projected_bytes": 0, "projected_savings_bytes": 0})
+        tier["recording_count"] += 1
+        for key in ("v1_stored_bytes", "v2_projected_bytes", "projected_savings_bytes"):
+            tier[key] += entry[key]
+    result = {"schema": SHADOW_SCHEMA,
+              "created_utc": datetime.now(timezone.utc).isoformat(),
+              "shared_root": str(shared_root), "archive_root": str(archive_root),
+              "summary": {"recording_count": len(entries),
+                          "failure_count": len(failures),
+                          "v1_stored_bytes": sum(item["v1_stored_bytes"] for item in entries),
+                          "v2_projected_bytes": sum(item["v2_projected_bytes"] for item in entries),
+                          "projected_savings_bytes": sum(item["projected_savings_bytes"]
+                                                         for item in entries),
+                          "tiers": tiers},
+              "entries": entries, "failures": failures}
+    _atomic_json(output or shadow / "summary.json", result)
+    return result
 
 
 def _copy_interval(capture: BeaconCapture, first: int, stop: int, output: Path) -> tuple[str, int]:

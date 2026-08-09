@@ -37,6 +37,7 @@ pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
 archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
 archive_root="${LEO_ANALYSIS_ARCHIVE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
+evidence_v2_shadow="${LEO_ANALYSIS_EVIDENCE_V2_SHADOW:-1}"
 retention_mode="${LEO_ANALYSIS_RETENTION_MODE:-disabled}"
 full_exact_interval_s="${LEO_ANALYSIS_FULL_EXACT_INTERVAL_S:-1}"
 wide_exact_interval_s="${LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S:-2}"
@@ -321,6 +322,24 @@ process_job() {
       emit "archive_deferred worker=${worker_id} job=${name} mode=shadow"
     fi
   fi
+  if [[ "${evidence_v2_shadow}" == 1 && -f "${archive_root}/catalog/plans/${name}.json" ]]; then
+    local v2_reference="${archive_root}/catalog/v2-shadow/references/${name}.json"
+    local v2_plan="${archive_root}/catalog/v2-shadow/plans/${name}.json"
+    local v2_comparison="${archive_root}/catalog/v2-shadow/comparisons/${name}.json"
+    if run_stage "${worker_id}" "${name}" evidence_v2_reference radio \
+        starlink-evidence-plan "${capture}" "${reports}" "${v2_reference}" \
+        --policy conservative-v1 && \
+       run_stage "${worker_id}" "${name}" evidence_v2_shadow radio \
+        starlink-evidence-plan "${capture}" "${reports}" "${v2_plan}" \
+        --policy tiered-v2 && \
+       run_stage "${worker_id}" "${name}" evidence_v2_replay_gate radio \
+        starlink-evidence-compare "${v2_reference}" \
+        "${v2_plan}" --output "${v2_comparison}"; then
+      emit "evidence_v2_shadow_valid worker=${worker_id} job=${name} plan=${v2_plan} comparison=${v2_comparison}"
+    else
+      emit "shadow_stage_failed worker=${worker_id} job=${name} stage=evidence_v2 production_affected=false"
+    fi
+  fi
   emit "coverage_result worker=${worker_id} job=${name} full_coverage=${full_coverage} has_checks=${has_checks} archived=${archived}"
 }
 
@@ -426,7 +445,7 @@ for interrupted in "${queue}"/*.running.*; do
 done
 shopt -u nullglob
 audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"
-emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
+emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_v2_shadow=${evidence_v2_shadow} retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
 emit "recovery ${audit_result}"
 print_progress startup
 for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done

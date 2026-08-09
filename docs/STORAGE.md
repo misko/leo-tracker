@@ -136,10 +136,11 @@ logic stays disabled. The separate reclaimer is the sole authority for local
 deletion and capture still stops at the configured free-space floor if shared
 verification falls behind.
 
-## Future QNAP lifecycle (shadow only)
+## Automatic QNAP raw-IQ lifecycle
 
-QNAP raw deletion is not enabled. `leo-radio starlink-qnap-lifecycle` now
-publishes a complete shadow inventory with this evidence order:
+`leo-radio starlink-qnap-lifecycle` inventories raw captures and automatically
+reclaims only verified tier-0 negatives when QNAP free space is below the
+configured pressure threshold. Its evidence order is:
 
 | Tier | Name | Evidence | Default deletion status |
 |---:|---|---|---|
@@ -168,12 +169,12 @@ Raw deletion eligibility additionally requires:
 6. the configured minimum raw age; and
 7. an exact, non-symlink capture directory below the QNAP capture root.
 
-The default shadow plan is conservative:
+The equivalent dry-run plan is:
 
 ```bash
 uv run --active --no-sync leo-radio starlink-qnap-lifecycle \
   /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
-  --minimum-age-hours 24 --maximum-tier 0 \
+  --minimum-age-hours 0 --maximum-tier 0 \
   --output /mnt/qnap01/mouse9911/leo/reports/retention/qnap-lifecycle.latest.json
 ```
 
@@ -182,7 +183,6 @@ trigger and stops at the target high-water mark. It also requires the literal
 confirmation token:
 
 ```bash
-# Example only. QNAP DELETION IS NOT CURRENTLY ENABLED.
 uv run --active --no-sync leo-radio starlink-qnap-lifecycle \
   /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
   --maximum-tier 0 --trigger-free-gb 500 --target-free-gb 750 \
@@ -196,16 +196,54 @@ fingerprints remain. A prepared/removed transaction receipt is written beneath
 applications.
 
 [`leo-tracker-qnap-lifecycle.service`](../deploy/leo-tracker-qnap-lifecycle.service)
-is checked in with `LEO_QNAP_RECLAIM_ENABLED=0`, a one-hour planning cadence,
-tier 0 maximum, a 500 GB trigger and a 750 GB target. It is intentionally not
-installed or enabled. Changing only the tier cannot activate deletion; both the
-service enable gate and the CLI confirmation token are required.
+is checked in with `LEO_QNAP_RECLAIM_ENABLED=1`, a one-minute post-pass delay, tier 0
+maximum, zero minimum age, a 500 GB trigger and a 750 GB target. The command
+still independently requires the service enable gate, the CLI confirmation
+token, a current verified evidence bundle and every safety gate listed above.
+Tier 1 and above remain protected.
 
-Before any future promotion, a time-travel replay must apply an old policy using
+Before any future tier promotion, a time-travel replay must apply an old policy using
 only the analysis available at that time and prove that newer detectors'
 qualified/high-value events remain covered. Start with tier 0 only. Tier 1–3
 promotion requires a separate written review of event recall and projected
 storage recovery; tiers 4–5 remain prohibited.
+
+## Evidence archive v2 shadow evaluation
+
+The production evidence archive remains the lossless conservative v1 archive.
+The tiered v2 policy is deliberately plan-only: it does not extract IQ, replace
+v1 bundles or authorize deletion. It differs from v1 in two important ways:
+
+- non-triggering checks from a dense confirmed follow-up are not treated as
+  signal spans; and
+- guards and deterministic controls are sized by evidence tier, from one
+  100 ms control for a strict negative to two 500 ms controls plus two-second
+  guards for tracked, confirmed, identified or pinned evidence.
+
+Every plan records detector-required event intervals. A v2 plan passes only if
+it fully contains every event in a freshly regenerated conservative reference
+plan. Older stored v1 plans are not used as the reference because they predate
+this explicit event metadata. Kalman writes the isolated shadow artifacts to:
+
+```text
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2-shadow/references/
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2-shadow/plans/
+/mnt/qnap01/mouse9911/leo-cropped/catalog/v2-shadow/comparisons/
+```
+
+Evaluate all raw captures that still have a v1 archive receipt and publish a
+per-tier storage projection without reading or writing IQ payloads:
+
+```bash
+uv run --active --no-sync leo-radio starlink-evidence-v2-shadow \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
+```
+
+Use `--limit N` for a bounded trial. The summary is written beneath
+`catalog/v2-shadow/summary.json`. A nonzero exit means at least one capture
+could not be planned or failed its replay gate. Promotion requires a reviewed
+shadow population, byte-exact extraction tests, detector replay against the
+new clips, and an explicit migration decision; no automatic promotion exists.
 
 Inspect the live settings:
 

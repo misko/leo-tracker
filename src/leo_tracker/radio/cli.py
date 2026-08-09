@@ -74,7 +74,9 @@ from .beacon.hopping import capture_hop_session
 from .beacon.frame_tracking import track_conditioned_frames
 from .beacon.template_learning import learn_bandpass_beacon
 from .beacon.channel_link import link_channel_tracks
-from .beacon.evidence_archive import (archive_evidence, audit_evidence, extract_evidence,
+from .beacon.evidence_archive import (archive_evidence, audit_evidence,
+                                      build_evidence_v2_shadow,
+                                      compare_evidence_plan_coverage, extract_evidence,
                                       materialize_evidence_clip, plan_evidence,
                                       verify_evidence)
 from .beacon.local_reclamation import (apply_reclamation_plan,
@@ -412,9 +414,29 @@ def command_starlink_evidence_plan(args: argparse.Namespace) -> int:
     report = plan_evidence(args.capture, args.reports, args.output,
                            guard_s=args.guard_s,
                            control_duration_s=args.control_duration_s,
-                           control_count=args.control_count)
+                           control_count=args.control_count, policy=args.policy)
     print(json.dumps({"plan": str(args.output), **report["summary"]}, sort_keys=True))
     return 0
+
+
+def command_starlink_evidence_compare(args: argparse.Namespace) -> int:
+    reference = json.loads(args.reference.read_text(encoding="utf-8"))
+    candidate = json.loads(args.candidate.read_text(encoding="utf-8"))
+    report = compare_evidence_plan_coverage(reference, candidate)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    print(json.dumps(report, sort_keys=True))
+    return 0 if report["valid"] else 1
+
+
+def command_starlink_evidence_v2_shadow(args: argparse.Namespace) -> int:
+    report = build_evidence_v2_shadow(args.shared_root, args.archive_root,
+                                      output=args.output, limit=args.limit)
+    print(json.dumps(report["summary"], sort_keys=True))
+    return 0 if not report["failures"] else 1
 
 
 def command_starlink_evidence_extract(args: argparse.Namespace) -> int:
@@ -1751,10 +1773,25 @@ def build_parser() -> argparse.ArgumentParser:
     evidence_plan.add_argument("capture", type=Path)
     evidence_plan.add_argument("reports", type=Path)
     evidence_plan.add_argument("output", type=Path)
-    evidence_plan.add_argument("--guard-s", type=float, default=10)
-    evidence_plan.add_argument("--control-duration-s", type=float, default=1)
-    evidence_plan.add_argument("--control-count", type=int, default=3)
+    evidence_plan.add_argument("--policy", choices=("conservative-v1", "tiered-v2"),
+                               default="conservative-v1")
+    evidence_plan.add_argument("--guard-s", type=float)
+    evidence_plan.add_argument("--control-duration-s", type=float)
+    evidence_plan.add_argument("--control-count", type=int)
     evidence_plan.set_defaults(handler=command_starlink_evidence_plan)
+    evidence_compare = commands.add_parser("starlink-evidence-compare",
+        help="prove that a candidate plan retains every required detector event")
+    evidence_compare.add_argument("reference", type=Path)
+    evidence_compare.add_argument("candidate", type=Path)
+    evidence_compare.add_argument("--output", type=Path)
+    evidence_compare.set_defaults(handler=command_starlink_evidence_compare)
+    evidence_shadow = commands.add_parser("starlink-evidence-v2-shadow",
+        help="build replay-gated tiered plans and project savings without extracting IQ")
+    evidence_shadow.add_argument("shared_root", type=Path)
+    evidence_shadow.add_argument("archive_root", type=Path)
+    evidence_shadow.add_argument("--output", type=Path)
+    evidence_shadow.add_argument("--limit", type=int)
+    evidence_shadow.set_defaults(handler=command_starlink_evidence_v2_shadow)
     evidence_extract = commands.add_parser("starlink-evidence-extract",
         help="losslessly extract a planned dual-RX evidence bundle")
     evidence_extract.add_argument("capture", type=Path)

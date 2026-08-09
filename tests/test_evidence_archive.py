@@ -9,8 +9,9 @@ import pytest
 
 from leo_tracker.radio.beacon.artifact import BeaconCapture, capture_beacon_iq
 from leo_tracker.radio.beacon.evidence_archive import (
-    AUDIT_SCHEMA, BUNDLE_SCHEMA, PLAN_SCHEMA, VERIFICATION_SCHEMA,
-    archive_evidence, audit_evidence, extract_evidence, materialize_evidence_clip,
+    AUDIT_SCHEMA, BUNDLE_SCHEMA, PLAN_SCHEMA, SHADOW_SCHEMA, VERIFICATION_SCHEMA,
+    archive_evidence, audit_evidence, build_evidence_v2_shadow,
+    extract_evidence, materialize_evidence_clip, compare_evidence_plan_coverage,
     plan_evidence, verify_evidence,
 )
 import leo_tracker.radio.beacon.evidence_archive as evidence_archive_module
@@ -100,6 +101,78 @@ def test_plan_extract_and_verify_preserve_exact_dual_rx_samples(tmp_path):
     for clip in bundle["clips"]:
         actual = np.fromfile(bundle_path / clip["path"], dtype="<i2").reshape(-1, 2, 2)
         assert np.array_equal(actual, expected[clip["first_sample"]:clip["stop_sample"]])
+
+
+def test_tiered_v2_reduces_confirmed_coverage_but_preserves_required_events(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source)
+    reports = _reports(source, capture.name)
+
+    v1 = plan_evidence(capture, reports, policy="conservative-v1")
+    v2 = plan_evidence(capture, reports, policy="tiered-v2")
+    comparison = compare_evidence_plan_coverage(v1, v2)
+
+    assert v2["evidence_tier_name"] == "confirmed_beacon"
+    assert v2["policy"] == {
+        "name": "tiered-v2", "guard_s": 2.0, "control_duration_s": .5,
+        "control_count": 2, "confirmed_followup": True,
+        "selection": "interesting event spans plus tier-sized controls",
+    }
+    assert comparison["valid"] is True
+    assert comparison["missing_required_event_count"] == 0
+    assert v2["summary"]["coverage_fraction"] < v1["summary"]["coverage_fraction"]
+    assert "confirmed_dense_followup_control" not in {
+        reason for item in v2["intervals"] for reason in item["reasons"]}
+
+
+def test_tiered_v2_strict_negative_keeps_one_tiny_deterministic_control(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source)
+    reports = source / "reports"; reports.mkdir()
+    (reports / f"{capture.name}.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-analysis/v1",
+        "exact_checks": [], "windows": [],
+    }) + "\n")
+
+    plan = plan_evidence(capture, reports, policy="tiered-v2")
+
+    assert plan["evidence_tier"] == 0
+    assert plan["required_events"] == []
+    assert plan["summary"]["interval_count"] == 1
+    assert plan["summary"]["coverage_fraction"] == pytest.approx(.01)
+    assert plan["intervals"][0]["reasons"] == ["deterministic_control"]
+
+
+def test_plan_coverage_gate_rejects_candidate_missing_required_event(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source)
+    reports = _reports(source, capture.name)
+    reference = plan_evidence(capture, reports, policy="tiered-v2")
+    candidate = json.loads(json.dumps(reference))
+    candidate["intervals"] = [item for item in candidate["intervals"]
+                              if "broadband_or_window_candidate" not in item["reasons"]]
+
+    comparison = compare_evidence_plan_coverage(reference, candidate)
+
+    assert comparison["valid"] is False
+    assert comparison["missing_required_event_count"] >= 1
+    legacy = json.loads(json.dumps(reference)); legacy.pop("required_events")
+    with pytest.raises(ValueError, match="predates required-event"):
+        compare_evidence_plan_coverage(legacy, candidate)
+
+
+def test_v2_shadow_batch_is_non_destructive_replay_gated_and_projects_savings(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source)
+    reports = _reports(source, capture.name); archive = tmp_path / "archive"
+    archive_evidence(capture, reports, archive)
+    before = _tree_hashes(source)
+
+    result = build_evidence_v2_shadow(source, archive)
+
+    assert result["schema"] == SHADOW_SCHEMA
+    assert result["summary"]["recording_count"] == 1
+    assert result["summary"]["failure_count"] == 0
+    assert result["entries"][0]["replay_gate_valid"] is True
+    assert result["entries"][0]["projected_savings_bytes"] > 0
+    assert (archive / "catalog" / "v2-shadow" / "summary.json").is_file()
+    assert _tree_hashes(source) == before
 
 
 def test_extract_is_idempotent_and_rejects_changed_source_manifest(tmp_path):

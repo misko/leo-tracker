@@ -96,7 +96,8 @@ def _worker_summary(path: Path) -> dict:
     return result
 
 
-def _classification(shared_root: Path, name: str) -> tuple[int | None, list[str], dict]:
+def classify_recording(shared_root: Path, name: str) -> tuple[int | None, list[str], dict]:
+    """Return the authoritative evidence tier recorded by the Kalman worker."""
     reports = shared_root / "reports"
     reasons: list[str] = []
     if (reports / "retention" / "pins" / f"{name}.json").is_file():
@@ -170,7 +171,7 @@ def build_qnap_lifecycle_plan(shared_root: Path, archive_root: Path, *,
             continue
         name = capture.name; manifest_path = capture / "manifest.json"
         manifest = _json(manifest_path); status = "eligible"
-        tier, reasons, evidence = _classification(shared_root, name)
+        tier, reasons, evidence = classify_recording(shared_root, name)
         manifest_sha = _sha256(manifest_path) if manifest else None
         if not _NAME.fullmatch(name) or not _capture_safe(shared_root, capture):
             status = "unsafe_shared_path"
@@ -262,7 +263,7 @@ def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
             valid, _, _ = _archive_gate(shared_root, archive_root, name, manifest_sha)
         if not valid:
             continue
-        tier, _, _ = _classification(shared_root, name)
+        tier, _, _ = classify_recording(shared_root, name)
         if tier != item.get("tier") or tier not in DELETABLE_TIERS:
             continue
         receipt_path = shared_root / "reports" / "reclamation" / "qnap" / f"{name}.json"

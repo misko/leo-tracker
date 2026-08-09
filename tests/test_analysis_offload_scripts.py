@@ -21,6 +21,21 @@ def test_analysis_export_unit_is_persistent_and_copy_only():
     assert "WantedBy=multi-user.target" in unit
 
 
+def test_local_reclaimer_is_qnap_gated_and_uses_existing_uv_environment():
+    unit = (ROOT / "deploy/leo-tracker-local-reclaimer.service").read_text()
+    script = (ROOT / "scripts/starlink-local-reclaimer.sh").read_text()
+    assert "Requires=mnt-leo\\x2dnvme.mount mnt-qnap01.mount" in unit
+    assert "After=network-online.target" in unit
+    assert "LEO_LOCAL_RECLAIM_MINIMUM_AGE_S=300" in unit
+    assert "Restart=always" in unit
+    assert "starlink-local-reclaimer.sh" in unit
+    assert '"${uv_bin}" run \\\n  --active --no-sync leo-radio "${args[@]}"' in script
+    assert "starlink-storage-reconcile" in script
+    assert "--apply --watch" in script
+    assert "--minimum-age-s" in script
+    assert "--output" in script
+
+
 def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():
     unit = (ROOT / "deploy/systemd/leo-tracker-beacon-watch.service").read_text()
     watcher = (ROOT / "scripts/starlink-beacon-watch.sh").read_text()

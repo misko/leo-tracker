@@ -77,6 +77,8 @@ from .beacon.channel_link import link_channel_tracks
 from .beacon.evidence_archive import (archive_evidence, audit_evidence, extract_evidence,
                                       materialize_evidence_clip, plan_evidence,
                                       verify_evidence)
+from .beacon.local_reclamation import (apply_reclamation_plan,
+                                       build_reclamation_plan)
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -366,6 +368,26 @@ def command_starlink_beacon_retain(args: argparse.Namespace) -> int:
                                             keep_hop_sessions=args.keep_hop_sessions,
                                             dry_run=args.dry_run), sort_keys=True))
     return 0
+
+
+def command_starlink_storage_reconcile(args: argparse.Namespace) -> int:
+    if args.interval_s <= 0 or args.minimum_age_s < 0:
+        raise ValueError("interval must be positive and minimum age non-negative")
+    while True:
+        plan = build_reclamation_plan(args.local_root, args.shared_root,
+            verify_sha256=args.verify_sha256,
+            minimum_age_s=args.minimum_age_s, pipeline_id=args.pipeline_id)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            temporary = args.output.with_name(args.output.name + ".next")
+            temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+            temporary.replace(args.output)
+        result = (apply_reclamation_plan(plan, limit=args.limit)
+                  if args.apply else {"dry_run": True, **plan["summary"]})
+        print(json.dumps(result, sort_keys=True), flush=True)
+        if not args.watch:
+            return 0
+        time.sleep(args.interval_s)
 
 
 def command_starlink_evidence_plan(args: argparse.Namespace) -> int:
@@ -1671,6 +1693,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="retain this many newest fully-derived, non-qualified hop sessions")
     beacon_retain.add_argument("--dry-run", action="store_true")
     beacon_retain.set_defaults(handler=command_starlink_beacon_retain)
+    reconcile = commands.add_parser("starlink-storage-reconcile",
+        help="remove local raw IQ only after verified QNAP copy and Kalman success")
+    reconcile.add_argument("local_root", type=Path)
+    reconcile.add_argument("shared_root", type=Path)
+    reconcile.add_argument("--apply", action="store_true",
+        help="apply eligible removals; without this flag only print a plan summary")
+    reconcile.add_argument("--limit", type=int,
+        help="remove at most this many eligible recordings per reconciliation")
+    reconcile.add_argument("--minimum-age-s", type=float, default=300)
+    reconcile.add_argument("--pipeline-id",
+        help="optionally require this exact successful analysis pipeline")
+    reconcile.add_argument("--verify-sha256", action="store_true",
+        help="read and hash every QNAP IQ chunk in addition to manifest/size checks")
+    reconcile.add_argument("--output", type=Path,
+        help="atomically publish the complete eligibility plan as JSON")
+    reconcile.add_argument("--watch", action="store_true")
+    reconcile.add_argument("--interval-s", type=float, default=60)
+    reconcile.set_defaults(handler=command_starlink_storage_reconcile)
     evidence_plan = commands.add_parser("starlink-evidence-plan",
         help="plan conservative signal and control clips from one immutable capture")
     evidence_plan.add_argument("capture", type=Path)

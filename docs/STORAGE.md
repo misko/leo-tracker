@@ -68,11 +68,10 @@ than the source. A short two- or five-second hop child can legitimately retain
 recording. This is not an archive failure. Longer negative and sparse-event
 captures provide most of the measured reduction.
 
-The live Kalman service currently uses `LEO_ANALYSIS_ARCHIVE_MODE=shadow` and
+The live Kalman service uses `LEO_ANALYSIS_ARCHIVE_MODE=shadow` and
 `LEO_ANALYSIS_RETENTION_MODE=disabled`. It attempts one archive transaction per
-job, but an archive failure does not fail analysis and no source is reclaimed.
-Until the migration gates in [`KALMAN_MIGRATION.md`](KALMAN_MIGRATION.md) pass,
-the cropped archive is operational but incomplete.
+job, but an archive failure does not delete QNAP raw IQ. Acquisition-host
+duplicates are governed separately by the verified local reclaimer below.
 
 ## Preservation mode
 
@@ -92,11 +91,60 @@ NVMe space is below 150 GB. The analysis exporter must use:
 LEO_OFFLOAD_SOURCE_POLICY=retain
 ```
 
-`retain` is the safe default: it verifies and queues the QNAP work copy but
-leaves the NVMe directory unchanged. `delete` is the legacy move behavior and
-must be explicitly selected; it must not be used during this evaluation.
+`retain` is required: it verifies and queues the QNAP work copy but leaves the
+NVMe directory unchanged until Kalman has completed. `delete` is the legacy
+move behavior and must not be used because it runs before analysis succeeds.
 In `offload` mode the exporter is the only local analysis-queue consumer;
 SATPI01 must not run the legacy local DSP workers alongside it.
+
+## Verified local reclamation
+
+`leo-tracker-local-reclaimer.service` removes only the redundant SATPI01 copy.
+It does not remove the complete QNAP recording or any cropped evidence. A local
+recording is eligible only when all of the following are true:
+
+1. its manifest is complete and at least five minutes old;
+2. no local/export/Kalman job or partial transfer owns the recording;
+3. the QNAP manifest is byte-identical to the local manifest;
+4. every QNAP chunk has the manifest-declared size (optional full SHA-256 mode
+   additionally re-reads every shared chunk);
+5. the successful analysis receipt names the same recording and its analysis
+   output still exists with the recorded size; and
+6. the local path resolves to exactly one ordinary capture or hop child below
+   the configured NVMe root and is not a symlink.
+
+Before deletion the reclaimer atomically writes a `prepared` receipt beneath
+`reports/reclamation/local/`; after deletion it replaces that receipt with
+`status: removed`, the exact manifest hash and reclaimed byte count. Repeated
+runs are idempotent. Incomplete, missing, corrupt, active and ambiguous sources
+are deferred rather than repaired or removed.
+
+Dry-run and bounded application:
+
+```bash
+uv run --active --no-sync leo-radio starlink-storage-reconcile \
+  /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo \
+  --output /tmp/local-reclamation-plan.json
+
+uv run --active --no-sync leo-radio starlink-storage-reconcile \
+  /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo \
+  --apply --limit 10
+```
+
+The watcher remains in `LEO_BEACON_PRESERVE_RAW=1` so its older ring-retention
+logic stays disabled. The separate reclaimer is the sole authority for local
+deletion and capture still stops at the configured free-space floor if shared
+verification falls behind.
+
+## Future QNAP lifecycle (shadow only)
+
+QNAP raw deletion is not enabled. A future simulator will classify recordings
+into pinned raw, lossless evidence, near-threshold development data, stratified
+controls and ordinary negatives. Before promotion, a time-travel replay must
+apply an old policy using only the analysis available at that time and prove
+that newer detectors' qualified/high-value events remain covered. Qualified
+TLE identities, novel fingerprints, calibration sources and manual pins must
+never be expired by an ordinary age rule.
 
 Inspect the live settings:
 
@@ -252,9 +300,11 @@ permanent.
 - A same-name artifact with different contents stops publication as a
   collision.
 - If QNAP is unavailable, local capture remains authoritative.
-- If NVMe reaches the preservation floor, capture waits for operator review.
+- If NVMe reaches the preservation floor, capture waits while the verified
+  local reclaimer catches up; unresolved sources still require operator review.
 
-No recovery procedure contains an automatic raw-IQ deletion step.
+No recovery procedure deletes QNAP raw IQ. Local deletion is performed only by
+the explicitly deployed, receipt-driven reclaimer.
 
 ## Capacity and future decisions
 

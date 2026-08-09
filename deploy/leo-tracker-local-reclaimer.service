@@ -1,0 +1,21 @@
+[Unit]
+Description=LEO tracker verified local IQ reclamation
+After=network-online.target mnt-leo\x2dnvme.mount mnt-qnap01.mount leo-tracker-analysis-export.service
+Wants=network-online.target
+Requires=mnt-leo\x2dnvme.mount mnt-qnap01.mount
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+WorkingDirectory=/home/satpi01/leo-tracker
+Environment=UV_BIN=/home/satpi01/.local/bin/uv
+Environment=LEO_LOCAL_RECLAIM_INTERVAL_S=60
+Environment=LEO_LOCAL_RECLAIM_MINIMUM_AGE_S=300
+Environment=LEO_LOCAL_RECLAIM_VERIFY_SHA256=0
+ExecStart=/home/satpi01/leo-tracker/scripts/starlink-local-reclaimer.sh /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

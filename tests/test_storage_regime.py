@@ -146,6 +146,29 @@ def test_storage_regime_recrops_archive_only_v1_and_retires_old_shape(tmp_path):
     assert receipt["source_verification"] == "transitive-v1-byte-copy"
 
 
+def test_storage_regime_prioritizes_raw_before_archive_only(tmp_path):
+    import shutil
+
+    shared, archive, raw_capture = _ready(tmp_path, "z-raw-confirmed")
+    other_shared, other_archive, other_capture = _ready(
+        tmp_path / "other", "a-archive-only-confirmed")
+    archive_name = other_capture.name
+    shutil.copytree(other_shared / "reports", shared / "reports", dirs_exist_ok=True)
+    shutil.copytree(other_archive / "evidence" / archive_name,
+                    archive / "evidence" / archive_name)
+    shutil.copy2(other_archive / "catalog" / "receipts" / f"{archive_name}.json",
+                 archive / "catalog" / "receipts" / f"{archive_name}.json")
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    eligible = [item for item in plan["entries"]
+                if item["status"].startswith("eligible")]
+
+    assert eligible[0]["recording_id"] == raw_capture.name
+    assert eligible[0]["status"] == "eligible"
+    assert eligible[1]["recording_id"] == archive_name
+    assert eligible[1]["status"] == "eligible_archive_only"
+
+
 def test_archive_only_gap_fails_without_retiring_v1(tmp_path):
     shared, archive, capture = _ready(tmp_path, "archive-only-gap")
     name = capture.name

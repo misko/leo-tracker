@@ -149,8 +149,16 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
             "classification_reasons": reasons, "evidence": evidence,
             "status": status,
         })
-    entries.sort(key=lambda item: (item["tier"] if item["tier"] is not None else 99,
-                                  item["recording_id"]))
+    # Free the bounded raw working set before spending bandwidth compacting
+    # archive-only v1 bundles. Both paths are safe, but only the former returns
+    # the large raw-IQ allocation the operator is actively trying to reclaim.
+    archive_only_statuses = {"eligible_archive_only",
+                             "eligible_archive_only_pinned"}
+    entries.sort(key=lambda item: (
+        item["status"] in archive_only_statuses,
+        item["tier"] if item["tier"] is not None else 99,
+        item["recording_id"],
+    ))
     statuses: dict[str, int] = {}; tiers: dict[str, int] = {}
     for item in entries:
         statuses[item["status"]] = statuses.get(item["status"], 0) + 1

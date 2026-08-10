@@ -1,6 +1,7 @@
 """Transactional migration from raw/v1 storage to tiered v2 evidence."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -309,15 +310,78 @@ def _remove_v1_artifacts(shared_root: Path, archive_root: Path, name: str) -> di
             "preserved_versioned_outputs": preserved_outputs}
 
 
+def _migrate_storage_item(item: dict, shared_root: Path, archive_root: Path) -> dict:
+    """Execute one independent deletion-last storage transaction."""
+    name = item["recording_id"]
+    archive_only = item["status"] in {"eligible_archive_only",
+                                       "eligible_archive_only_pinned"}
+    raw_pinned = item["status"] == "eligible_pinned_archive"
+    capture = None if archive_only else Path(item["capture_path"])
+    tier, _, _ = classify_recording(shared_root, name)
+    if tier != item["tier"] or tier is None or (tier == 5 and not raw_pinned and
+            item["status"] != "eligible_archive_only_pinned"):
+        raise ValueError("recording classification changed or became protected")
+    if archive_only:
+        manifest_sha = str(item["source_manifest_sha256"])
+        v2 = archive_evidence_v2_from_v1(
+            name, shared_root / "reports", archive_root)
+    else:
+        assert capture is not None
+        if not _capture_safe(shared_root, capture):
+            raise ValueError("capture path failed deletion safety check")
+        manifest_sha = _sha256(capture / "manifest.json")
+        if manifest_sha != item["source_manifest_sha256"]:
+            raise ValueError("capture manifest changed after migration planning")
+        v2 = archive_evidence_v2(capture, shared_root / "reports", archive_root)
+    if (v2.get("schema") != V2_RECEIPT_SCHEMA or
+            v2.get("source_manifest_sha256") != manifest_sha or
+            not v2.get("source_verified") or
+            not v2.get("required_event_replay_valid")):
+        raise ValueError("v2 archive receipt failed the deletion gate")
+    bundle = archive_root / v2["bundle"]
+    verification = verify_evidence(
+        bundle, capture_path=None if archive_only else capture, write=False)
+    if not verification["valid"] or (
+            not archive_only and not verification["source_verified"]):
+        raise ValueError("v2 evidence failed final source comparison")
+    receipt_path = (shared_root / "reports" / "reclamation" /
+                    "storage-regime-v2" / f"{name}.json")
+    prepared = {
+        "schema": RECEIPT_SCHEMA, "recording_id": name,
+        "status": "prepared", "prepared_utc": datetime.now(timezone.utc).isoformat(),
+        "tier": tier, "tier_name": TIERS[tier],
+        "source_bytes": item["source_bytes"],
+        "source_manifest_sha256": manifest_sha,
+        "v2_receipt": str(Path("catalog/v2/receipts") / f"{name}.json"),
+        "v2_bundle_manifest_sha256": v2["bundle_manifest_sha256"],
+        "archive_only": archive_only, "raw_pinned": raw_pinned,
+    }
+    _atomic_json(receipt_path, prepared)
+    retired = _remove_v1_artifacts(shared_root, archive_root, name)
+    if capture is not None and not raw_pinned:
+        shutil.rmtree(capture)
+    final = {**prepared, "status": "complete",
+             "completed_utc": datetime.now(timezone.utc).isoformat(),
+             "raw_absent_verified": capture is None or (
+                 not raw_pinned and not capture.exists()),
+             "raw_preserved_by_pin": raw_pinned,
+             "v1_retired": True, **retired}
+    _atomic_json(receipt_path, final)
+    return final
+
+
 def apply_storage_regime_plan(plan: dict, *, confirmation: str,
-                              limit: int | None = None) -> dict:
-    """Archive, verify, retire v1, and remove old raw one recording at a time."""
+                              limit: int | None = None,
+                              workers: int = 1) -> dict:
+    """Run independent verified transactions, optionally with bounded concurrency."""
     if plan.get("schema") != PLAN_SCHEMA:
         raise ValueError("unsupported storage regime plan")
     if confirmation != CONFIRMATION:
         raise ValueError("storage migration confirmation token is missing or incorrect")
     if limit is not None and limit < 1:
         raise ValueError("limit must be positive")
+    if workers < 1:
+        raise ValueError("workers must be positive")
     shared_root = Path(plan["shared_root"]).resolve()
     archive_root = Path(plan["archive_root"]).resolve()
     lock_path = shared_root / "reports" / "reclamation" / "storage-regime-v2.lock"
@@ -327,72 +391,29 @@ def apply_storage_regime_plan(plan: dict, *, confirmation: str,
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError as exc:
         lock.close(); raise RuntimeError("another v2 storage migration is active") from exc
-    completed = []; failures = []
-    for item in (entry for entry in plan.get("entries", [])
-                 if entry.get("status") in {"eligible", "eligible_archive_only",
-                                            "eligible_pinned_archive",
-                                            "eligible_archive_only_pinned"}):
-        if limit is not None and len(completed) >= limit:
-            break
-        name = item["recording_id"]
-        archive_only = item["status"] in {"eligible_archive_only",
-                                           "eligible_archive_only_pinned"}
-        raw_pinned = item["status"] == "eligible_pinned_archive"
-        capture = None if archive_only else Path(item["capture_path"])
+    items = [entry for entry in plan.get("entries", [])
+             if entry.get("status") in {"eligible", "eligible_archive_only",
+                                        "eligible_pinned_archive",
+                                        "eligible_archive_only_pinned"}]
+    if limit is not None:
+        items = items[:limit]
+
+    def attempt(item: dict) -> tuple[dict | None, dict | None]:
         try:
-            tier, _, _ = classify_recording(shared_root, name)
-            if tier != item["tier"] or tier is None or (tier == 5 and not raw_pinned and
-                    item["status"] != "eligible_archive_only_pinned"):
-                raise ValueError("recording classification changed or became protected")
-            if archive_only:
-                manifest_sha = str(item["source_manifest_sha256"])
-                v2 = archive_evidence_v2_from_v1(
-                    name, shared_root / "reports", archive_root)
-            else:
-                assert capture is not None
-                if not _capture_safe(shared_root, capture):
-                    raise ValueError("capture path failed deletion safety check")
-                manifest_sha = _sha256(capture / "manifest.json")
-                if manifest_sha != item["source_manifest_sha256"]:
-                    raise ValueError("capture manifest changed after migration planning")
-                v2 = archive_evidence_v2(capture, shared_root / "reports", archive_root)
-            if (v2.get("schema") != V2_RECEIPT_SCHEMA or
-                    v2.get("source_manifest_sha256") != manifest_sha or
-                    not v2.get("source_verified") or
-                    not v2.get("required_event_replay_valid")):
-                raise ValueError("v2 archive receipt failed the deletion gate")
-            bundle = archive_root / v2["bundle"]
-            verification = verify_evidence(
-                bundle, capture_path=None if archive_only else capture, write=False)
-            if not verification["valid"] or (
-                    not archive_only and not verification["source_verified"]):
-                raise ValueError("v2 evidence failed final source comparison")
-            receipt_path = (shared_root / "reports" / "reclamation" /
-                            "storage-regime-v2" / f"{name}.json")
-            prepared = {
-                "schema": RECEIPT_SCHEMA, "recording_id": name,
-                "status": "prepared", "prepared_utc": datetime.now(timezone.utc).isoformat(),
-                "tier": tier, "tier_name": TIERS[tier],
-                "source_bytes": item["source_bytes"],
-                "source_manifest_sha256": manifest_sha,
-                "v2_receipt": str(Path("catalog/v2/receipts") / f"{name}.json"),
-                "v2_bundle_manifest_sha256": v2["bundle_manifest_sha256"],
-                "archive_only": archive_only,
-                "raw_pinned": raw_pinned,
-            }
-            _atomic_json(receipt_path, prepared)
-            retired = _remove_v1_artifacts(shared_root, archive_root, name)
-            if capture is not None and not raw_pinned:
-                shutil.rmtree(capture)
-            final = {**prepared, "status": "complete",
-                     "completed_utc": datetime.now(timezone.utc).isoformat(),
-                     "raw_absent_verified": capture is None or (
-                         not raw_pinned and not capture.exists()),
-                     "raw_preserved_by_pin": raw_pinned,
-                     "v1_retired": True, **retired}
-            _atomic_json(receipt_path, final); completed.append(final)
+            return _migrate_storage_item(item, shared_root, archive_root), None
         except (OSError, ValueError, KeyError) as exc:
-            failures.append({"recording_id": name, "error": str(exc)})
+            return None, {"recording_id": item["recording_id"], "error": str(exc)}
+    completed = []; failures = []
+    try:
+        if items:
+            with ThreadPoolExecutor(max_workers=min(workers, len(items))) as executor:
+                for final, failure in executor.map(attempt, items):
+                    if final is not None:
+                        completed.append(final)
+                    if failure is not None:
+                        failures.append(failure)
+    finally:
+        fcntl.flock(lock, fcntl.LOCK_UN); lock.close()
     return {
         "schema": "leo-tracker.storage-regime-v2-result/v1",
         "completed_count": len(completed),

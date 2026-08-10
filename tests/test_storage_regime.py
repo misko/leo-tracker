@@ -1,6 +1,8 @@
 import json
 import os
 from pathlib import Path
+import threading
+import time
 
 import pytest
 
@@ -292,6 +294,38 @@ def test_storage_regime_bounded_inventory_stops_after_eligible_limit(tmp_path):
         build_storage_regime_plan(first_shared, first_archive,
                                   minimum_age_hours=0, scope="all",
                                   eligible_limit=1)
+
+
+def test_storage_regime_runs_bounded_independent_transactions_concurrently(
+        tmp_path, monkeypatch):
+    shared = tmp_path / "shared"; archive = tmp_path / "archive"
+    plan = {"schema": PLAN_SCHEMA, "shared_root": str(shared),
+            "archive_root": str(archive), "entries": [
+                {"recording_id": "one", "status": "eligible", "source_bytes": 10},
+                {"recording_id": "two", "status": "eligible", "source_bytes": 20},
+            ]}
+    state = {"active": 0, "maximum": 0}; guard = threading.Lock()
+
+    def fake_migrate(item, _shared, _archive):
+        with guard:
+            state["active"] += 1
+            state["maximum"] = max(state["maximum"], state["active"])
+        time.sleep(.05)
+        with guard:
+            state["active"] -= 1
+        return {"recording_id": item["recording_id"],
+                "source_bytes": item["source_bytes"], "removed_bytes": 0,
+                "archive_only": False, "raw_pinned": False}
+
+    monkeypatch.setattr(storage_regime_module, "_migrate_storage_item", fake_migrate)
+    result = apply_storage_regime_plan(
+        plan, confirmation=CONFIRMATION, limit=2, workers=2)
+
+    assert result["completed_count"] == 2
+    assert result["raw_removed_bytes"] == 30
+    assert state["maximum"] == 2
+    with pytest.raises(ValueError, match="workers must be positive"):
+        apply_storage_regime_plan(plan, confirmation=CONFIRMATION, workers=0)
 
 
 def test_archive_only_gap_fails_without_retiring_v1(tmp_path):

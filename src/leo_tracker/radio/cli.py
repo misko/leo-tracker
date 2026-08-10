@@ -501,7 +501,8 @@ def command_starlink_storage_regime_v2(args: argparse.Namespace) -> int:
         temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
         temporary.replace(args.output)
     result = (apply_storage_regime_plan(plan, confirmation=args.confirm,
-                                        limit=args.limit) if args.apply else
+                                        limit=args.limit,
+                                        workers=args.workers) if args.apply else
               {"dry_run": True, **plan["summary"]})
     print(json.dumps(result, sort_keys=True))
     return 0 if not result.get("failure_count") else 1
@@ -1874,6 +1875,8 @@ def build_parser() -> argparse.ArgumentParser:
     storage_regime.add_argument("--limit", type=int)
     storage_regime.add_argument("--planning-limit", type=int,
         help="stop inventory after this many eligible records (phased scopes only)")
+    storage_regime.add_argument("--workers", type=int, default=1,
+        help="run this many independent deletion-last transactions concurrently")
     storage_regime.add_argument("--output", type=Path)
     storage_regime.add_argument("--apply", action="store_true")
     storage_regime.add_argument("--confirm", default="",

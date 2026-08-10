@@ -10,6 +10,7 @@ enabled="${LEO_STORAGE_REGIME_ENABLED:-0}"
 interval_s="${LEO_STORAGE_REGIME_INTERVAL_S:-60}"
 limit="${LEO_STORAGE_REGIME_LIMIT:-2}"
 planning_limit="${LEO_STORAGE_REGIME_PLANNING_LIMIT:-16}"
+workers="${LEO_STORAGE_REGIME_WORKERS:-1}"
 minimum_age_hours="${LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS:-6}"
 scope="${LEO_STORAGE_REGIME_SCOPE:-auto}"
 plan="${shared_root}/reports/retention/storage-regime-v2.latest.json"
@@ -21,8 +22,8 @@ if [[ "${scope}" != "all" && "${scope}" != "auto" &&
       "${scope}" != "raw" && "${scope}" != "archive" ]]; then
   echo "LEO_STORAGE_REGIME_SCOPE must be all, auto, raw, or archive" >&2; exit 2
 fi
-if ! [[ "${planning_limit}" =~ ^[1-9][0-9]*$ ]]; then
-  echo "LEO_STORAGE_REGIME_PLANNING_LIMIT must be a positive integer" >&2; exit 2
+if ! [[ "${planning_limit}" =~ ^[1-9][0-9]*$ && "${workers}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "planning limit and workers must be positive integers" >&2; exit 2
 fi
 if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
   echo "uv and the existing ${repo_dir}/.venv are required" >&2; exit 2
@@ -35,7 +36,8 @@ cd "${repo_dir}"
 while true; do
   args=(starlink-storage-regime-v2 "${shared_root}" "${archive_root}"
     --minimum-age-hours "${minimum_age_hours}" --scope "${scope}"
-    --planning-limit "${planning_limit}" --limit "${limit}" --output "${plan}")
+    --planning-limit "${planning_limit}" --workers "${workers}"
+    --limit "${limit}" --output "${plan}")
   if [[ "${enabled}" == "1" ]]; then
     args+=(--apply --confirm MIGRATE-TO-EVIDENCE-V2)
   fi

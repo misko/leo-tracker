@@ -247,8 +247,9 @@ receipts live beneath `reports/reclamation/storage-regime-v2/`.
 
 SATPI01 also runs
 [`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
-as a persistent low-priority fallback. It processes four serial transactions
-per bounded plan, followed by a ten-second idle interval, and shares the global migration lock
+as a persistent low-priority fallback. It processes four transactions with two
+independent deletion-last workers per bounded plan, followed by a ten-second
+idle interval, and shares the global migration lock
 with Kalman, so it survives Pi
 reboots without allowing two migrations to mutate the archive concurrently.
 Its automatic scope scans only raw while an eligible raw backlog exists, then

@@ -60,12 +60,14 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_LIMIT=8" in unit
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=64" in unit
+    assert "Environment=LEO_STORAGE_REGIME_WORKERS=8" in unit
     assert "Environment=LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS=6" in unit
     assert "UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "starlink-storage-regime-v2" in script
     assert 'scope="${LEO_STORAGE_REGIME_SCOPE:-auto}"' in script
     assert '--scope "${scope}"' in script
     assert '--planning-limit "${planning_limit}"' in script
+    assert '--workers "${workers}"' in script
     assert "--confirm MIGRATE-TO-EVIDENCE-V2" in script
     assert '"${uv_bin}" run --active --no-sync' in script
     assert 'cd "${repo_dir}"' in script
@@ -77,6 +79,7 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_LIMIT=4" in unit
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=32" in unit
+    assert "Environment=LEO_STORAGE_REGIME_WORKERS=2" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
     assert "Nice=10" in unit
     assert "CPUWeight=20" in unit

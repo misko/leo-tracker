@@ -17,6 +17,15 @@ minimum_age_hours="${LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS:-6}"
 scope="${LEO_STORAGE_REGIME_SCOPE:-auto}"
 plan="${shared_root}/reports/retention/storage-regime-v2.latest.json"
 legacy_plan="${shared_root}/reports/retention/legacy-layout.latest.json"
+drain_requested=0
+
+request_drain() {
+  drain_requested=1
+  printf '[%s] storage_regime_drain_requested; active_transaction_finishes=true\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >&2
+}
+
+trap request_drain TERM INT
 
 if [[ "${enabled}" != "0" && "${enabled}" != "1" ]]; then
   echo "LEO_STORAGE_REGIME_ENABLED must be 0 or 1" >&2; exit 2
@@ -80,5 +89,15 @@ PY
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${interval_s}" >&2
     fi
   fi
-  sleep "${interval_s}"
+  if (( drain_requested )); then
+    printf '[%s] storage_regime_drain_complete\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    exit 0
+  fi
+  sleep "${interval_s}" || true
+  if (( drain_requested )); then
+    printf '[%s] storage_regime_drain_complete\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    exit 0
+  fi
 done

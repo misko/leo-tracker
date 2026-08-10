@@ -78,6 +78,11 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert "legacy_normalization_ready(plan)" in script
     assert "--confirm NORMALIZE-LEGACY-LAYOUT" in script
     assert "legacy_layout_batch_failed" in script
+    assert "trap request_drain TERM INT" in script
+    assert "storage_regime_drain_complete" in script
+    assert "Restart=on-failure" in unit
+    assert "KillMode=process" in unit
+    assert "TimeoutStopSec=1800" in unit
 
 
 def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
@@ -92,6 +97,60 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "CPUWeight=20" in unit
     assert "IOWeight=20" in unit
     assert "Requires=mnt-qnap01.mount" in unit
+    assert "Restart=on-failure" in unit
+    assert "KillMode=process" in unit
+    assert "TimeoutStopSec=1800" in unit
+
+
+def test_storage_regime_sigterm_finishes_active_batch_without_starting_another(
+    tmp_path,
+):
+    shared = tmp_path / "shared"
+    archive = tmp_path / "archive"
+    shared.mkdir()
+    archive.mkdir()
+    started = tmp_path / "started"
+    completed = tmp_path / "completed"
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf start >> {started!s}\n"
+        "sleep 1\n"
+        f"printf done >> {completed!s}\n"
+        "exit 0\n"
+    )
+    uv_stub.chmod(0o755)
+    env = os.environ | {
+        "LEO_TRACKER_REPO": str(ROOT),
+        "UV_BIN": str(uv_stub),
+        "LEO_STORAGE_REGIME_ENABLED": "1",
+        "LEO_STORAGE_REGIME_INTERVAL_S": "60",
+    }
+    server = subprocess.Popen(
+        [
+            "bash",
+            str(ROOT / "scripts/starlink-storage-regime-v2.sh"),
+            str(shared),
+            str(archive),
+        ],
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    deadline = time.monotonic() + 5
+    while not started.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert started.exists()
+
+    server.terminate()
+    stdout, stderr = server.communicate(timeout=10)
+
+    assert server.returncode == 0, stderr
+    assert completed.read_text() == "done"
+    assert started.read_text() == "start"
+    assert "storage_regime_drain_requested" in stderr
+    assert "storage_regime_drain_complete" in stdout
 
 
 def test_pi_capture_service_delegates_analysis_exclusively_to_kalman():

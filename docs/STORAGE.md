@@ -278,6 +278,14 @@ one transaction does not require a complete multi-thousand-record inventory.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 
+A normal `systemctl stop` or restart now requests a graceful drain. The wrapper
+lets the active migration transaction finish, emits
+`storage_regime_drain_complete`, and exits before claiming another batch.
+Systemd signals only the wrapper process and allows up to 30 minutes for the
+active transaction, so its child is not killed while it is writing verified
+evidence or deleting source data. Both storage-regime units use
+`Restart=on-failure`; a deliberate clean stop therefore stays stopped.
+
 During a large historical raw/v1 backfill, do not run the older six-hour QNAP
 lifecycle scanner concurrently with the storage-regime service. The regime
 transaction already verifies v2 and removes raw last; the lifecycle cannot

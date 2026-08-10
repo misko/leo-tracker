@@ -393,6 +393,12 @@ IQ at 115.9 GB/hour after including the idle window. Kalman's ready queue
 reached zero during the transaction. This is the current measured operating
 point: tier-aware selection, rather than additional NFS writers, keeps raw
 retirement safely ahead of capture ingress.
+A later read-only 640-record comparison found 55 eligible strict negatives,
+versus 38 remaining in the contemporaneous 320-record window, while roughly
+doubling inventory time; both ranked 12 negatives first. The service therefore
+stays at 320. As each batch removes 11 raw directories, the bounded window
+advances and admits later candidates without paying the wider scan cost on
+every transaction.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 

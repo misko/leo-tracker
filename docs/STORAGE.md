@@ -409,8 +409,13 @@ successful queue history, or removed when a later success marker already
 exists, only after its completion outputs still match their hashes and its V2
 receipt is source-verified and replay-valid. Pre-V2 completions additionally
 must match the exact source-artifact hashes embedded in the later V2 receipt.
-Real failures, changed reanalysis outputs, and recordings without V2 evidence
-remain visible for repair rather than being hidden as housekeeping.
+If reanalysis replaced the live reports, a stale completion whose referenced
+outputs no longer match its own hashes may be superseded only when every
+replacement output is authenticated by those V2 source-artifact hashes. The
+new completion records the SHA-256 and time of the invalid completion it
+superseded. A divergent completion whose original output set is still valid,
+a real failure, or a recording without V2 evidence remains visible for repair
+rather than being hidden as housekeeping.
 
 Inspect the live settings:
 

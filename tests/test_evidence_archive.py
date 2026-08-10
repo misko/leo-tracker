@@ -10,6 +10,7 @@ import pytest
 from leo_tracker.radio.beacon.artifact import BeaconCapture, capture_beacon_iq
 from leo_tracker.radio.beacon.evidence_archive import (
     AUDIT_SCHEMA, BUNDLE_SCHEMA, PLAN_SCHEMA, SHADOW_SCHEMA, VERIFICATION_SCHEMA,
+    _adapt_plan_to_verified_source_bundle,
     archive_evidence, archive_evidence_v2, archive_evidence_v2_from_v1,
     audit_evidence, build_evidence_v2_shadow,
     extract_evidence, materialize_evidence_clip, compare_evidence_plan_coverage,
@@ -18,6 +19,65 @@ from leo_tracker.radio.beacon.evidence_archive import (
 import leo_tracker.radio.beacon.evidence_archive as evidence_archive_module
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.paired import PairedSampleBlock
+
+
+def test_archive_only_plan_relocates_optional_control_into_verified_v1_coverage():
+    plan = {
+        "schema": PLAN_SCHEMA, "recording_id": "old", "sample_rate_hz": 1000,
+        "source_total_samples_per_receiver": 10_000,
+        "policy": {"name": "tiered-v2", "control_count": 1,
+                   "control_duration_s": .5},
+        "required_events": [{"event_id": "event-000", "first_sample": 6200,
+                             "stop_sample": 6300, "reason": "exact_candidate"}],
+        "intervals": [
+            {"interval_id": "clip-000", "first_sample": 3000,
+             "stop_sample": 3500, "sample_count": 500,
+             "reasons": ["deterministic_control"]},
+            {"interval_id": "clip-001", "first_sample": 6000,
+             "stop_sample": 7000, "sample_count": 1000,
+             "reasons": ["exact_candidate"]},
+        ],
+        "summary": {},
+    }
+    source = {
+        "schema": BUNDLE_SCHEMA, "recording_id": "old", "clips": [
+            {"first_sample": 0, "stop_sample": 1000,
+             "reasons": ["deterministic_control"],
+             "first_utc_ns": 1_000_000_000, "stop_utc_ns": 2_000_000_000,
+             "utc_mapping_method": "test", "utc_uncertainty_s": .1},
+            {"first_sample": 5500, "stop_sample": 7500,
+             "reasons": ["exact_candidate"],
+             "first_utc_ns": 6_500_000_000, "stop_utc_ns": 8_500_000_000,
+             "utc_mapping_method": "test", "utc_uncertainty_s": .1},
+        ],
+    }
+
+    adapted = _adapt_plan_to_verified_source_bundle(plan, source)
+
+    assert [(item["first_sample"], item["stop_sample"]) for item in
+            adapted["intervals"]] == [(250, 750), (6000, 7000)]
+    assert adapted["intervals"][0]["first_utc_ns"] == 1_250_000_000
+    assert adapted["intervals"][0]["stop_utc_ns"] == 1_750_000_000
+    assert adapted["policy"]["archive_only_control_relocated_samples"] == 500
+    assert adapted["policy"]["archive_only_control_unavailable_samples"] == 0
+    assert adapted["summary"]["selected_samples_per_receiver"] == 1500
+    assert adapted["summary"]["coverage_fraction"] == .15
+
+
+def test_archive_only_plan_never_relocates_missing_signal_interval():
+    plan = {
+        "schema": PLAN_SCHEMA, "recording_id": "old", "sample_rate_hz": 1000,
+        "source_total_samples_per_receiver": 10_000,
+        "policy": {"name": "tiered-v2"}, "required_events": [],
+        "intervals": [{"first_sample": 6000, "stop_sample": 7000,
+                       "reasons": ["exact_candidate"]}], "summary": {},
+    }
+    source = {"schema": BUNDLE_SCHEMA, "recording_id": "old", "clips": [{
+        "first_sample": 0, "stop_sample": 1000,
+        "reasons": ["deterministic_control"]}]}
+
+    with pytest.raises(ValueError, match="does not cover a required v2 interval"):
+        _adapt_plan_to_verified_source_bundle(plan, source)
 
 
 def _capture(root: Path, name: str = "sample-narrow") -> tuple[Path, np.ndarray]:

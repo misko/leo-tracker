@@ -368,6 +368,118 @@ def _existing_plan(path: Path, source_manifest_sha256: str,
     return plan
 
 
+def _adapt_plan_to_verified_source_bundle(plan: dict, source: dict) -> dict:
+    """Relocate optional controls when archive-only v1 coverage is sparse.
+
+    Detector-required events and their guarded signal intervals are never
+    shortened. Only a standalone deterministic control may move, and the
+    replacement is copied from a v1 interval that was itself archived solely
+    as a deterministic control. This keeps the v2 byte budget while respecting
+    the immutable coverage that survived the former lifecycle.
+    """
+    if plan.get("schema") != PLAN_SCHEMA or source.get("schema") != BUNDLE_SCHEMA:
+        raise ValueError("unsupported evidence plan or source bundle")
+    if plan.get("recording_id") != source.get("recording_id"):
+        raise ValueError("evidence plan and source bundle recording differ")
+    clips = sorted(source.get("clips", []),
+                   key=lambda item: int(item.get("first_sample", 0)))
+
+    def covered(first: int, stop: int) -> bool:
+        cursor = first
+        for clip in clips:
+            clip_first = int(clip["first_sample"]); clip_stop = int(clip["stop_sample"])
+            if clip_stop <= cursor:
+                continue
+            if clip_first > cursor:
+                return False
+            cursor = max(cursor, clip_stop)
+            if cursor >= stop:
+                return True
+        return False
+
+    retained = []; missing_control_samples = 0
+    for interval in plan.get("intervals", []):
+        first = int(interval["first_sample"]); stop = int(interval["stop_sample"])
+        if covered(first, stop):
+            retained.append(dict(interval)); continue
+        if set(interval.get("reasons", [])) == {"deterministic_control"}:
+            missing_control_samples += stop-first; continue
+        raise ValueError("v1 evidence does not cover a required v2 interval")
+    if not missing_control_samples:
+        return plan
+
+    def subtract_used(first: int, stop: int) -> list[tuple[int, int]]:
+        spans = [(first, stop)]
+        for interval in retained:
+            used_first = int(interval["first_sample"])
+            used_stop = int(interval["stop_sample"])
+            next_spans = []
+            for left, right in spans:
+                if used_stop <= left or used_first >= right:
+                    next_spans.append((left, right)); continue
+                if left < used_first: next_spans.append((left, used_first))
+                if used_stop < right: next_spans.append((used_stop, right))
+            spans = next_spans
+        return spans
+
+    relocated = 0
+    for clip in clips:
+        if set(clip.get("reasons", [])) != {"deterministic_control"}:
+            continue
+        for left, right in subtract_used(int(clip["first_sample"]),
+                                         int(clip["stop_sample"])):
+            needed = missing_control_samples-relocated
+            if needed <= 0:
+                break
+            count = min(needed, right-left)
+            first = left + (right-left-count)//2; stop = first+count
+            source_count = int(clip["stop_sample"])-int(clip["first_sample"])
+            first_utc = clip.get("first_utc_ns"); stop_utc = clip.get("stop_utc_ns")
+            if (source_count > 0 and first_utc is not None and stop_utc is not None):
+                utc_span = int(stop_utc)-int(first_utc)
+                selected_first_utc = round(int(first_utc) + utc_span *
+                    (first-int(clip["first_sample"]))/source_count)
+                selected_stop_utc = round(int(first_utc) + utc_span *
+                    (stop-int(clip["first_sample"]))/source_count)
+            else:
+                selected_first_utc = first_utc; selected_stop_utc = stop_utc
+            rate = float(plan["sample_rate_hz"])
+            retained.append({
+                "first_sample": first, "stop_sample": stop,
+                "sample_count": count, "start_s": first/rate, "stop_s": stop/rate,
+                "reasons": ["deterministic_control"],
+                "first_utc_ns": selected_first_utc,
+                "stop_utc_ns": selected_stop_utc,
+                "utc_mapping_method": clip.get("utc_mapping_method"),
+                "utc_uncertainty_s": clip.get("utc_uncertainty_s"),
+            })
+            relocated += count
+        if relocated >= missing_control_samples:
+            break
+    retained.sort(key=lambda item: (int(item["first_sample"]),
+                                    int(item["stop_sample"])))
+    for index, interval in enumerate(retained):
+        interval["interval_id"] = f"clip-{index:03d}"
+    total = int(plan.get("source_total_samples_per_receiver", 0) or 0)
+    selected = sum(int(item["stop_sample"])-int(item["first_sample"])
+                   for item in retained)
+    policy = dict(plan.get("policy", {}))
+    policy.update({
+        "archive_only_source_coverage_constrained": True,
+        "archive_only_control_relocated_samples": relocated,
+        "archive_only_control_unavailable_samples":
+            missing_control_samples-relocated,
+    })
+    summary = dict(plan.get("summary", {})); summary.update({
+        "interval_count": len(retained),
+        "signal_reason_count": len({reason for item in retained
+            for reason in item.get("reasons", []) if reason != "deterministic_control"}),
+        "selected_samples_per_receiver": selected,
+        "coverage_fraction": selected/total if total else 0,
+    })
+    return {**plan, "policy": policy, "intervals": retained, "summary": summary}
+
+
 def build_evidence_v2_shadow(shared_root: Path, archive_root: Path, *,
                              output: Path | None = None,
                              limit: int | None = None) -> dict:
@@ -791,9 +903,11 @@ def archive_evidence_v2_from_v1(recording_id: str, reports_root: Path,
         raise ValueError("source v1 archive is not source-verified")
     source_bundle = qnap_root / str(v1_receipt.get("bundle", ""))
     source_manifest = source_bundle / "source-manifest.json"
+    source_evidence = _json(source_bundle / "manifest.json")
     if (_sha256_path(source_bundle / "manifest.json") !=
             v1_receipt.get("bundle_manifest_sha256") or
             _sha256_path(source_manifest) != v1_receipt.get("source_manifest_sha256") or
+            source_evidence is None or
             not verify_evidence(source_bundle, write=False)["valid"]):
         raise ValueError("source v1 archive failed transitive verification")
     base = qnap_root / "catalog" / "v2"
@@ -817,6 +931,8 @@ def archive_evidence_v2_from_v1(recording_id: str, reports_root: Path,
     plan = (_existing_plan(plan_path, source_sha, "tiered-v2") or
         plan_evidence_from_manifest(source_manifest, recording_id, reports_root,
                                     plan_path, policy="tiered-v2"))
+    plan = _adapt_plan_to_verified_source_bundle(plan, source_evidence)
+    _atomic_json(plan_path, plan)
     comparison = compare_evidence_plan_coverage(reference, plan)
     _atomic_json(comparison_path, comparison)
     if not comparison["valid"]:

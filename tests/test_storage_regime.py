@@ -109,8 +109,8 @@ def test_storage_regime_promotes_missing_derived_and_discards_obsolete_copy(tmp_
     assert not archived_plot.exists()
     receipt = json.loads((shared / "reports" / "reclamation" /
                           "storage-regime-v2" / f"{name}.json").read_text())
-    assert "derived/plots/derived-normalization.png" in receipt[
-        "promoted_derived_artifacts"]
+    assert str(live_plot) in receipt["restored_v1_derived_artifacts"]
+    assert receipt["promoted_derived_artifacts"] == []
 
 
 def test_storage_regime_keeps_current_live_derived_over_obsolete_archive(tmp_path):
@@ -243,6 +243,65 @@ def test_storage_regime_recrops_archive_only_v1_and_retires_old_shape(tmp_path):
                           f"{name}.json").read_text())
     assert receipt["source_verified"] is True
     assert receipt["source_verification"] == "transitive-v1-byte-copy"
+
+
+def test_archive_only_v1_restores_verified_reports_before_v2_recrop(tmp_path):
+    import shutil
+
+    shared, archive, capture = _ready(tmp_path, "archive-only-restored-reports")
+    name = capture.name
+    v1_receipt = json.loads((archive / "catalog" / "receipts" /
+                             f"{name}.json").read_text())
+    shutil.rmtree(capture)
+    (shared / "reports" / f"{name}.worker.log").unlink()
+    (shared / "reports" / "receipts" / f"{name}.json").unlink()
+    for artifact in v1_receipt["derived_artifacts"]:
+        relative = Path(artifact["path"])
+        live = shared / "reports" / Path(*relative.parts[1:])
+        live.unlink()
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    entry = next(item for item in plan["entries"] if item["recording_id"] == name)
+
+    assert entry["status"] == "eligible_archive_only"
+    assert entry["tier_name"] == "confirmed_beacon"
+    assert "verified_v1_derived_fallback" in entry["classification_reasons"]
+    result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+    assert result["completed_count"] == 1
+    assert result["failure_count"] == 0
+    assert (shared / "reports" / f"{name}.json").is_file()
+    assert (shared / "reports" / "followups" / f"{name}.json").is_file()
+    assert not (archive / "evidence" / name).exists()
+    v2 = json.loads((archive / "catalog" / "v2" / "receipts" /
+                     f"{name}.json").read_text())
+    assert v2["evidence_tier_name"] == "confirmed_beacon"
+    migration = json.loads((shared / "reports" / "reclamation" /
+                            "storage-regime-v2" / f"{name}.json").read_text())
+    assert migration["restored_v1_derived_artifacts"]
+
+
+def test_archive_only_v1_with_invalid_derived_hash_stays_protected(tmp_path):
+    import shutil
+
+    shared, archive, capture = _ready(tmp_path, "archive-only-invalid-report")
+    name = capture.name
+    shutil.rmtree(capture)
+    (shared / "reports" / f"{name}.worker.log").unlink()
+    (shared / "reports" / "receipts" / f"{name}.json").unlink()
+    (shared / "reports" / f"{name}.json").unlink()
+    (archive / "derived" / f"{name}.json").write_text("{}\n")
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    entry = next(item for item in plan["entries"] if item["recording_id"] == name)
+    result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+    assert entry["status"] == "analysis_incomplete"
+    assert entry["tier"] is None
+    assert result["completed_count"] == 0
+    assert (archive / "evidence" / name).is_dir()
+    assert (archive / "catalog" / "receipts" / f"{name}.json").is_file()
+    assert not (archive / "evidence-v2" / name).exists()
 
 
 def test_storage_regime_prioritizes_raw_before_archive_only(tmp_path):

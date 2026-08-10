@@ -68,7 +68,47 @@ def _active_jobs(shared_root: Path) -> set[str]:
     return {name for name in result if name}
 
 
-def _analysis_complete(shared_root: Path, name: str) -> bool:
+def _verified_v1_fallback_reports(archive_root: Path, name: str) -> Path | None:
+    """Return a read-only report fallback only when its v1 hashes are intact."""
+    receipt = _json(archive_root / "catalog" / "receipts" / f"{name}.json")
+    if (receipt.get("schema") != "leo-tracker.evidence-archive-receipt/v1" or
+            receipt.get("status") != "verified" or
+            not receipt.get("source_verified")):
+        return None
+    verified_analysis = False
+    for artifact in receipt.get("derived_artifacts", []):
+        relative = Path(str(artifact.get("path", "")))
+        if relative.suffix != ".json":
+            continue
+        archived = archive_root / relative
+        expected = artifact.get("sha256")
+        if (relative.is_absolute() or ".." in relative.parts or
+                relative.parts[:1] != ("derived",) or archived.is_symlink() or
+                not archived.is_file() or not expected or
+                _sha256(archived) != expected):
+            return None
+        if relative == Path("derived") / f"{name}.json":
+            verified_analysis = True
+    return archive_root / "derived" if verified_analysis else None
+
+
+def _classify_recording(shared_root: Path, archive_root: Path, name: str
+                        ) -> tuple[int | None, list[str], dict]:
+    tier, reasons, evidence = classify_recording(shared_root, name)
+    if tier is not None:
+        return tier, reasons, evidence
+    fallback = _verified_v1_fallback_reports(archive_root, name)
+    if fallback is None:
+        return tier, reasons, evidence
+    tier, reasons, evidence = classify_recording(
+        shared_root, name, fallback_reports=fallback)
+    if tier is not None:
+        reasons = ["verified_v1_derived_fallback", *reasons]
+    return tier, reasons, evidence
+
+
+def _analysis_complete(shared_root: Path, name: str,
+                       archive_root: Path | None = None) -> bool:
     receipt = _json(shared_root / "reports" / "receipts" / f"{name}.json")
     if (receipt.get("schema") == "leo-tracker.analysis-receipt/v1" and
             receipt.get("status") == "success" and receipt.get("job") == name):
@@ -86,7 +126,48 @@ def _analysis_complete(shared_root: Path, name: str) -> bool:
                 value.get("status") == "success" and value.get("job") == name and
                 isinstance(value.get("outputs"), dict) and value["outputs"]):
             return True
+    if (archive_root is not None and
+            _verified_v1_fallback_reports(archive_root, name) is not None):
+        return True
     return False
+
+
+def _materialize_verified_v1_derivatives(shared_root: Path, archive_root: Path,
+                                         name: str) -> list[str]:
+    """Restore hash-verified v1 reports before transitive v2 planning.
+
+    Copy rather than move: if later replay validation fails, the v1 receipt and
+    every path it references remain valid. The ordinary retirement transaction
+    removes the now-redundant archive copies only after v2 succeeds.
+    """
+    if _verified_v1_fallback_reports(archive_root, name) is None:
+        return []
+    receipt = _json(archive_root / "catalog" / "receipts" / f"{name}.json")
+    verified: list[tuple[Path, Path, str]] = []
+    for artifact in receipt.get("derived_artifacts", []):
+        relative = Path(str(artifact.get("path", "")))
+        archived = archive_root / relative; expected = str(artifact.get("sha256", ""))
+        if (relative.is_absolute() or ".." in relative.parts or
+                relative.parts[:1] != ("derived",) or archived.is_symlink() or
+                not archived.is_file() or not expected or
+                _sha256(archived) != expected):
+            raise ValueError("verified v1 derivative is missing or hash-invalid")
+        verified.append((archived, shared_root / "reports" /
+                         Path(*relative.parts[1:]), expected))
+    restored = []
+    for archived, live, expected in verified:
+        if live.is_file():
+            continue
+        live.parent.mkdir(parents=True, exist_ok=True)
+        temporary = live.with_name(live.name + f".next.{os.getpid()}")
+        with archived.open("rb") as source, temporary.open("wb") as target:
+            shutil.copyfileobj(source, target, length=8 << 20)
+            target.flush(); os.fsync(target.fileno())
+        if _sha256(temporary) != expected:
+            temporary.unlink(missing_ok=True)
+            raise ValueError("verified v1 derivative copy failed verification")
+        os.replace(temporary, live); restored.append(str(live))
+    return restored
 
 
 def _source_bytes(manifest: dict) -> int:
@@ -132,8 +213,8 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         if scope == "archive":
             continue
         manifest_path = capture / "manifest.json"
-        manifest = _json(manifest_path); tier, reasons, evidence = classify_recording(
-            shared_root, name)
+        manifest = _json(manifest_path); tier, reasons, evidence = _classify_recording(
+            shared_root, archive_root, name)
         manifest_sha = _sha256(manifest_path) if manifest else None
         status = "eligible"
         if not _capture_safe(shared_root, capture):
@@ -145,7 +226,7 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
             status = "analysis_active"
         elif now - manifest_path.stat().st_mtime < minimum_age_hours * 3600:
             status = "minimum_age_not_met"
-        elif not _analysis_complete(shared_root, name):
+        elif not _analysis_complete(shared_root, name, archive_root):
             status = "analysis_incomplete"
         elif tier is None:
             status = "classification_unavailable"
@@ -182,15 +263,15 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         name = receipt_path.stem
         if name in raw_names:
             continue
-        receipt = _json(receipt_path); tier, reasons, evidence = classify_recording(
-            shared_root, name)
+        receipt = _json(receipt_path); tier, reasons, evidence = _classify_recording(
+            shared_root, archive_root, name)
         status = "eligible_archive_only"
         if (receipt.get("schema") != "leo-tracker.evidence-archive-receipt/v1" or
                 receipt.get("status") != "verified" or not receipt.get("source_verified")):
             status = "v1_archive_unverified"
         elif now - receipt_path.stat().st_mtime < minimum_age_hours * 3600:
             status = "minimum_age_not_met"
-        elif not _analysis_complete(shared_root, name):
+        elif not _analysis_complete(shared_root, name, archive_root):
             status = "analysis_incomplete"
         elif tier is None:
             status = "classification_unavailable"
@@ -330,7 +411,9 @@ def _migrate_storage_item(item: dict, shared_root: Path, archive_root: Path) -> 
                                        "eligible_archive_only_pinned"}
     raw_pinned = item["status"] == "eligible_pinned_archive"
     capture = None if archive_only else Path(item["capture_path"])
-    tier, _, _ = classify_recording(shared_root, name)
+    restored = _materialize_verified_v1_derivatives(
+        shared_root, archive_root, name)
+    tier, _, _ = _classify_recording(shared_root, archive_root, name)
     if tier != item["tier"] or tier is None or (tier == 5 and not raw_pinned and
             item["status"] != "eligible_archive_only_pinned"):
         raise ValueError("recording classification changed or became protected")
@@ -378,7 +461,8 @@ def _migrate_storage_item(item: dict, shared_root: Path, archive_root: Path) -> 
              "raw_absent_verified": capture is None or (
                  not raw_pinned and not capture.exists()),
              "raw_preserved_by_pin": raw_pinned,
-             "v1_retired": True, **retired}
+             "v1_retired": True,
+             "restored_v1_derived_artifacts": restored, **retired}
     _atomic_json(receipt_path, final)
     return final
 

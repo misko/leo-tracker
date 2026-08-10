@@ -245,6 +245,20 @@ already reclaimed is recropped transitively from source-verified v1 clips; any
 gap covering a required v2 interval fails closed. Completed transaction
 receipts live beneath `reports/reclamation/storage-regime-v2/`.
 
+Some early archive-only records outlived both their raw IQ and the live report
+copy even though the v1 receipt still contains hash-verified `derived/` reports.
+The migration classifies these records from that verified fallback, copies all
+receipt-listed derivatives back to the authoritative report tree, and only then
+plans the transitive v2 recrop. Copying is deliberate: v1 remains replayable if
+v2 extraction fails. A missing or hash-invalid derived report stays protected
+as `analysis_incomplete` and is never inferred to be a negative.
+If a tiered-v2 deterministic control falls outside the sparse v1 coverage, the
+archive-only planner may relocate only that optional control into a span whose
+v1 reason is exactly `deterministic_control`, preserving the same control byte
+budget. A signal-bearing or detector-required interval is never relocated,
+shortened, or silently omitted; incomplete signal coverage fails closed and
+retains v1.
+
 SATPI01 also runs
 [`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
 as a persistent low-priority fallback. It processes four transactions with two

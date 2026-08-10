@@ -136,14 +136,25 @@ def _worker_summary(path: Path) -> dict:
     return result
 
 
-def classify_recording(shared_root: Path, name: str) -> tuple[int | None, list[str], dict]:
+def classify_recording(shared_root: Path, name: str, *,
+                       fallback_reports: Path | None = None
+                       ) -> tuple[int | None, list[str], dict]:
     """Return the authoritative evidence tier recorded by the Kalman worker."""
     reports = shared_root / "reports"
+    fallback_reports = (None if fallback_reports is None else
+                        Path(fallback_reports).resolve())
     reasons: list[str] = []
+
+    def report(relative: Path) -> dict:
+        current = _json(reports / relative)
+        if current:
+            return current
+        return _json(fallback_reports / relative) if fallback_reports else {}
+
     if (reports / "retention" / "pins" / f"{name}.json").is_file():
         return 5, ["manual_pin"], {}
     compact = _worker_summary(reports / f"{name}.worker.log")
-    analysis_document = _json(reports / f"{name}.json")
+    analysis_document = report(Path(f"{name}.json"))
     if compact.get("analysis"):
         summary = compact["analysis"]
     elif analysis_document.get("schema") == "leo-tracker.starlink-beacon-analysis/v1":
@@ -152,19 +163,19 @@ def classify_recording(shared_root: Path, name: str) -> tuple[int | None, list[s
         return None, ["classification_summary_unavailable"], {}
     followup = compact.get("followup", {})
     if not followup:
-        document = _json(reports / "followups" / f"{name}.json")
+        document = report(Path("followups") / f"{name}.json")
         if document.get("schema") == "leo-tracker.starlink-beacon-followup/v1":
             followup = {"confirmed": document.get("confirmation", {}).get(
                             "confirmed", False),
                         "trigger_count": document.get("trigger_count", 0)}
     track_summary = compact.get("track", {})
     if not track_summary:
-        document = _json(reports / "tracks" / f"{name}.json")
+        document = report(Path("tracks") / f"{name}.json")
         if document.get("schema") == "leo-tracker.starlink-continuous-track/v1":
             track_summary = document.get("summary", {})
     association_summary = compact.get("association", {})
     if not association_summary:
-        document = _json(reports / "associations" / f"{name}.json")
+        document = report(Path("associations") / f"{name}.json")
         if document.get("schema") in {"leo-tracker.starlink-tle-association/v1",
                                        "leo-tracker.starlink-tle-association/v2"}:
             association_summary = document.get("summary", {})

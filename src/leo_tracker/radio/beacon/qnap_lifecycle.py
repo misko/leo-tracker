@@ -103,12 +103,31 @@ def classify_recording(shared_root: Path, name: str) -> tuple[int | None, list[s
     if (reports / "retention" / "pins" / f"{name}.json").is_file():
         return 5, ["manual_pin"], {}
     compact = _worker_summary(reports / f"{name}.worker.log")
-    if not compact.get("analysis"):
+    analysis_document = _json(reports / f"{name}.json")
+    if compact.get("analysis"):
+        summary = compact["analysis"]
+    elif analysis_document.get("schema") == "leo-tracker.starlink-beacon-analysis/v1":
+        summary = analysis_document.get("summary", {})
+    else:
         return None, ["classification_summary_unavailable"], {}
-    summary = compact["analysis"]
     followup = compact.get("followup", {})
+    if not followup:
+        document = _json(reports / "followups" / f"{name}.json")
+        if document.get("schema") == "leo-tracker.starlink-beacon-followup/v1":
+            followup = {"confirmed": document.get("confirmation", {}).get(
+                            "confirmed", False),
+                        "trigger_count": document.get("trigger_count", 0)}
     track_summary = compact.get("track", {})
+    if not track_summary:
+        document = _json(reports / "tracks" / f"{name}.json")
+        if document.get("schema") == "leo-tracker.starlink-continuous-track/v1":
+            track_summary = document.get("summary", {})
     association_summary = compact.get("association", {})
+    if not association_summary:
+        document = _json(reports / "associations" / f"{name}.json")
+        if document.get("schema") in {"leo-tracker.starlink-tle-association/v1",
+                                       "leo-tracker.starlink-tle-association/v2"}:
+            association_summary = document.get("summary", {})
     qualified = int(association_summary.get("qualified_association_count", 0) or 0)
     if qualified:
         return 4, ["qualified_tle_identity"], {"qualified_association_count": qualified}

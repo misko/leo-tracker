@@ -30,13 +30,16 @@ def _atomic_fixture(shared: Path, archive: Path, name: str, tier: int):
         "schema": "leo-tracker.starlink-beacon-analysis/v1", "summary": summary}))
     followups = reports / "followups"; followups.mkdir(exist_ok=True)
     (followups / f"{name}.json").write_text(json.dumps({"trigger_count": 1 if tier >= 1 else 0,
+        "schema": "leo-tracker.starlink-beacon-followup/v1",
         "confirmation": {"confirmed": tier == 3}}))
     tracks = reports / "tracks"; tracks.mkdir(exist_ok=True)
-    (tracks / f"{name}.json").write_text(json.dumps({"summary": {
+    (tracks / f"{name}.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-continuous-track/v1", "summary": {
         "longest_dual_valid_duration_s": 10 if tier == 2 else 0,
         "dual_valid_observation_count": 30 if tier == 2 else 0}}))
     associations = reports / "associations"; associations.mkdir(exist_ok=True)
-    (associations / f"{name}.json").write_text(json.dumps({"summary": {
+    (associations / f"{name}.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-tle-association/v2", "summary": {
         "qualified_association_count": 1 if tier == 4 else 0}}))
     receipts = reports / "receipts"; receipts.mkdir(exist_ok=True)
     (receipts / f"{name}.json").write_text(json.dumps({
@@ -92,6 +95,20 @@ def test_default_policy_only_makes_strict_negatives_eligible(tmp_path):
     plan = build_qnap_lifecycle_plan(shared, archive, minimum_age_hours=0)
     assert plan["summary"]["eligible_count"] == 1
     assert plan["entries"][0]["tier_name"] == "strict_negative"
+
+
+def test_structured_reports_classify_when_worker_log_is_corrupt(tmp_path):
+    shared, archive = tmp_path / "qnap", tmp_path / "cropped"
+    for tier in range(5):
+        name = f"capture-{tier}"
+        _atomic_fixture(shared, archive, name, tier)
+        (shared / "reports" / f"{name}.worker.log").write_bytes(b"\0" * 4096)
+
+    plan = build_qnap_lifecycle_plan(shared, archive, minimum_age_hours=0,
+                                     maximum_tier=4)
+
+    assert [item["tier"] for item in plan["entries"]] == list(range(5))
+    assert all(item["status"] == "eligible" for item in plan["entries"])
 
 
 def test_stale_or_missing_evidence_archive_blocks_raw_deletion(tmp_path):

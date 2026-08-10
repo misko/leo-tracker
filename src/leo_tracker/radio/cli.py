@@ -92,6 +92,8 @@ from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
 from .beacon.local_report_convergence import (
     apply_local_report_plan, build_local_report_plan)
+from .beacon.local_artifact_convergence import (
+    apply_local_artifact_plan, build_local_artifact_plan)
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
                                     build_qnap_lifecycle_plan,
                                     qnap_storage_mutation_lock)
@@ -436,6 +438,28 @@ def command_starlink_local_report_converge(args: argparse.Namespace) -> int:
         temporary.replace(args.output)
     result = (apply_local_report_plan(plan) if args.apply else
               {"dry_run": True, **plan["summary"]})
+    print(json.dumps(result, sort_keys=True))
+    return 1 if result.get("deferred") else 0
+
+
+def command_starlink_local_artifact_converge(args: argparse.Namespace) -> int:
+    plan = build_local_artifact_plan(
+        args.local_root, args.shared_root, archive_root=args.archive_root,
+        minimum_age_s=args.minimum_age_s)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    result = (apply_local_artifact_plan(plan) if args.apply else
+              {"dry_run": True, **plan["summary"]})
+    if args.apply:
+        result = {"status": result["status"],
+            "removed_count": result["removed_count"],
+            "removed_bytes": result["removed_bytes"],
+            "deferred_count": len(result.get("deferred", [])),
+            "receipt": str(args.shared_root /
+                "reports/reclamation/local-obsolete-artifacts.json")}
     print(json.dumps(result, sort_keys=True))
     return 1 if result.get("deferred") else 0
 
@@ -1913,6 +1937,15 @@ def build_parser() -> argparse.ArgumentParser:
     report_converge.add_argument("--apply", action="store_true")
     report_converge.add_argument("--output", type=Path)
     report_converge.set_defaults(handler=command_starlink_local_report_converge)
+    artifact_converge = commands.add_parser("starlink-local-artifact-converge",
+        help="receipt-gate removal of obsolete local markers, scratch and checkpoints")
+    artifact_converge.add_argument("local_root", type=Path)
+    artifact_converge.add_argument("shared_root", type=Path)
+    artifact_converge.add_argument("--archive-root", type=Path)
+    artifact_converge.add_argument("--minimum-age-s", type=float, default=6 * 3600)
+    artifact_converge.add_argument("--apply", action="store_true")
+    artifact_converge.add_argument("--output", type=Path)
+    artifact_converge.set_defaults(handler=command_starlink_local_artifact_converge)
     qnap = commands.add_parser("starlink-qnap-lifecycle",
         help="rank QNAP raw IQ for pressure-based retention; dry-run by default")
     qnap.add_argument("shared_root", type=Path)

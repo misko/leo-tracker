@@ -164,6 +164,16 @@ authority or the complete operation is deferred without deletions.
 Legacy pilot-development debug reports outside `reports/` are retired only
 when their recording has a fully validated tiered-V2 receipt and bundle.
 
+Acquisition-host transients from the retired local-analysis regime converge
+with `leo-radio starlink-local-artifact-converge`. This covers old zero-byte
+`.confirmed` cache markers, abandoned `tmp-frame-baseline.*` scratch trees,
+and one-time review checkpoints. Confirmation markers require a matching,
+confirmed QNAP follow-up. Frame scratch requires either a verified V2 receipt
+or the newer canonical QNAP frame-track JSON, samples, and confirmed follow-up.
+The command re-hashes every local and authoritative artifact after taking its
+lock, writes a prepared QNAP receipt, and only then removes the local copy.
+Current queue claims and operational lock files are outside its scope.
+
 Dry-run and bounded application:
 
 ```bash
@@ -176,6 +186,16 @@ uv run --active --no-sync leo-radio starlink-storage-reconcile \
   /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo \
   --archive-root /mnt/qnap01/mouse9911/leo-cropped \
   --apply --limit 10
+
+uv run --active --no-sync leo-radio starlink-local-artifact-converge \
+  /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo \
+  --archive-root /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-s 21600
+
+uv run --active --no-sync leo-radio starlink-local-artifact-converge \
+  /mnt/leo-nvme/leo-tracker /mnt/qnap01/mouse9911/leo \
+  --archive-root /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-s 21600 --apply
 ```
 
 The watcher remains in `LEO_BEACON_PRESERVE_RAW=1` so its older ring-retention
@@ -443,10 +463,10 @@ analysis queue depth, or aggregate bytes. For every recording in scope:
 
 The storage-layout convergence gate additionally requires that no age-eligible
 raw (except a current manual pin), v1 evidence/catalog, shadow catalog,
-same-volume `derived/` duplicate, or physical `runs/.../outputs/` artifact
-remains. Run it only when no mutator owns the shared QNAP lock; the CLI acquires
-that lock for a consistent inventory and exits nonzero until every category is
-zero:
+same-volume `derived/` duplicate, physical `runs/.../outputs/` artifact, local
+legacy marker, abandoned frame scratch, or review checkpoint remains. Run it
+only when no mutator owns the shared QNAP lock; the CLI acquires that lock for
+a consistent inventory and exits nonzero until every category is zero:
 
 ```bash
 uv run --active --no-sync leo-radio starlink-storage-audit-v2 \

@@ -9,6 +9,7 @@ import time
 from .storage_regime import build_storage_regime_plan
 from .local_reclamation import build_reclamation_plan
 from .local_report_convergence import build_local_report_plan
+from .local_artifact_convergence import inventory_obsolete_local_artifacts
 
 
 AUDIT_SCHEMA = "leo-tracker.storage-regime-v2-audit/v1"
@@ -218,18 +219,22 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
             legacy_reports = _tree(
                 local_root / "evidence" / "pilot_symbolwise_v3" / "reports",
                 sample_limit=sample_limit)
+            obsolete = inventory_obsolete_local_artifacts(
+                local_root, sample_limit=sample_limit)
             local = {"root": str(local_root), "missing": False,
                 "reclamation_summary": local_plan["summary"],
                 "unresolved_old": unresolved[:sample_limit],
                 "unresolved_old_count": len(unresolved),
                 "report_plan": report_plan["summary"],
-                "legacy_evidence_reports": legacy_reports}
+                "legacy_evidence_reports": legacy_reports,
+                "obsolete_artifacts": obsolete}
             violation_counts["local_root_missing"] = 0
             violation_counts["local_unresolved_old"] = len(unresolved)
             violation_counts["local_legacy_reports"] = report_plan[
                 "summary"]["eligible_count"]
             violation_counts["local_legacy_evidence_reports"] = legacy_reports[
                 "file_count"]
+            violation_counts["local_obsolete_artifacts"] = obsolete["count"]
     return {
         "schema": AUDIT_SCHEMA,
         "created_utc": datetime.now(timezone.utc).isoformat(),

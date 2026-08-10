@@ -114,6 +114,8 @@ def test_audit_can_prove_local_acquisition_storage_convergence(tmp_path):
     report.parent.mkdir(parents=True); report.write_bytes(b"plot")
     legacy = local / "evidence/pilot_symbolwise_v3/reports/legacy.json"
     legacy.parent.mkdir(parents=True); legacy.write_text("{}")
+    obsolete = local / "staging/old.confirmed"
+    obsolete.parent.mkdir(parents=True); obsolete.write_bytes(b"")
 
     audit = build_storage_regime_audit(
         shared, archive, minimum_age_hours=0, local_root=local)
@@ -122,4 +124,6 @@ def test_audit_can_prove_local_acquisition_storage_convergence(tmp_path):
     assert audit["violation_counts"]["local_unresolved_old"] == 1
     assert audit["violation_counts"]["local_legacy_reports"] == 1
     assert audit["violation_counts"]["local_legacy_evidence_reports"] == 1
+    assert audit["violation_counts"]["local_obsolete_artifacts"] == 1
+    assert audit["local"]["obsolete_artifacts"]["count"] == 1
     assert audit["local"]["unresolved_old"][0]["durable_copy"] == "empty_terminal"

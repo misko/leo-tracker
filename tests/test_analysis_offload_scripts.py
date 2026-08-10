@@ -58,7 +58,8 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     unit = (ROOT / "deploy/leo-tracker-storage-regime-v2.service").read_text()
     script = (ROOT / "scripts/starlink-storage-regime-v2.sh").read_text()
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_LIMIT=2" in unit
+    assert "Environment=LEO_STORAGE_REGIME_LIMIT=8" in unit
+    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=64" in unit
     assert "Environment=LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS=6" in unit
     assert "UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "starlink-storage-regime-v2" in script
@@ -74,8 +75,8 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     unit = (ROOT / "deploy/systemd/leo-tracker-storage-regime-v2-fallback.service").read_text()
     assert "User=satpi01" in unit
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_LIMIT=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=16" in unit
+    assert "Environment=LEO_STORAGE_REGIME_LIMIT=4" in unit
+    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=32" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
     assert "Nice=10" in unit
     assert "CPUWeight=20" in unit

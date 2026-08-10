@@ -243,7 +243,7 @@ uv run --active --no-sync leo-radio starlink-storage-regime-v2 \
 ```
 
 [`leo-tracker-storage-regime-v2.service`](../deploy/leo-tracker-storage-regime-v2.service)
-runs this on Kalman in batches of two with the repository's existing uv virtual
+runs this on Kalman in batches of eight with the repository's existing uv virtual
 environment. A failure preserves raw and v1 and is retried; manual pins are
 recropped to v2 but their raw remains. Archive-only history whose raw was
 already reclaimed is recropped transitively from source-verified v1 clips; any
@@ -277,10 +277,15 @@ on its normal interval. This survives Pi reboots without allowing two policies
 to inventory or mutate the archive concurrently. Current workers also honor
 the former `qnap.lock` and `storage-regime-v2.lock` names, preserving exclusion
 while Kalman or the Pi rolls forward from an older commit.
+Kalman additionally publishes a 30-second primary lease beneath
+`leo/reports/runtime/storage-regime-v2-primary.json`. While that lease is fresh,
+the Pi fallback yields before inventory; if Kalman stops or loses QNAP, the Pi
+resumes after 120 seconds. The global lock remains the final safety boundary
+during lease transitions.
 Its automatic scope scans only raw while an eligible raw backlog exists, then
 switches to archive-only v1 compaction. This avoids walking the multi-terabyte
 legacy archive before every urgent raw transaction. Each operational plan also
-stops after a small batch of eligible records (32 on the Pi, 64 on Kalman), so
+stops after a small batch of eligible records (48 on the Pi, 64 on Kalman), so
 one transaction does not require a complete multi-thousand-record inventory.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.

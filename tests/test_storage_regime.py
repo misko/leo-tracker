@@ -11,13 +11,33 @@ import leo_tracker.radio.cli as cli_module
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.beacon.evidence_archive import archive_evidence
 from leo_tracker.radio.beacon.storage_regime import (
-    CONFIRMATION, PLAN_SCHEMA, apply_storage_regime_plan,
-    build_storage_regime_plan,
+    CONFIRMATION, PLAN_SCHEMA, PRIMARY_LEASE_SCHEMA,
+    apply_storage_regime_plan, build_storage_regime_plan,
+    storage_primary_lease_is_fresh,
 )
 from leo_tracker.radio.beacon.qnap_lifecycle import QNAP_STORAGE_MUTATION_LOCK
 import leo_tracker.radio.beacon.storage_regime as storage_regime_module
 
 from test_evidence_archive import _capture, _reports
+
+
+def test_primary_storage_lease_requires_current_running_schema(tmp_path):
+    lease = tmp_path / "primary.json"
+    lease.write_text(json.dumps({"schema": PRIMARY_LEASE_SCHEMA,
+        "state": "running", "updated_epoch_s": 100}))
+    assert storage_primary_lease_is_fresh(
+        lease, now=150, maximum_age_s=60)
+    assert not storage_primary_lease_is_fresh(
+        lease, now=161, maximum_age_s=60)
+    lease.write_text(json.dumps({"schema": PRIMARY_LEASE_SCHEMA,
+        "state": "stopped", "updated_epoch_s": 150}))
+    assert not storage_primary_lease_is_fresh(
+        lease, now=150, maximum_age_s=60)
+    lease.write_text("not json")
+    assert not storage_primary_lease_is_fresh(
+        lease, now=150, maximum_age_s=60)
+    with pytest.raises(ValueError, match="positive"):
+        storage_primary_lease_is_fresh(lease, maximum_age_s=0)
 
 
 def _ready(tmp_path: Path, name: str = "migration-confirmed") -> tuple[Path, Path, Path]:

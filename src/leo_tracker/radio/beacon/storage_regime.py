@@ -19,6 +19,23 @@ from .qnap_lifecycle import (_archive_gate, TIERS, classify_recording,
 PLAN_SCHEMA = "leo-tracker.storage-regime-v2-plan/v1"
 RECEIPT_SCHEMA = "leo-tracker.storage-regime-v2-receipt/v1"
 CONFIRMATION = "MIGRATE-TO-EVIDENCE-V2"
+PRIMARY_LEASE_SCHEMA = "leo-tracker.storage-regime-v2-primary/v1"
+
+
+def storage_primary_lease_is_fresh(path: Path, *, now: float | None = None,
+                                   maximum_age_s: float = 120) -> bool:
+    """Return whether a remote primary currently owns storage convergence."""
+    if maximum_age_s <= 0:
+        raise ValueError("maximum primary lease age must be positive")
+    value = _json(Path(path))
+    try:
+        updated = float(value["updated_epoch_s"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    current = time.time() if now is None else float(now)
+    return bool(value.get("schema") == PRIMARY_LEASE_SCHEMA and
+                value.get("state") == "running" and
+                0 <= current - updated <= maximum_age_s)
 
 
 def _json(path: Path) -> dict:

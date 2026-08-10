@@ -65,6 +65,9 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=64" in unit
     assert "Environment=LEO_STORAGE_REGIME_WORKERS=8" in unit
     assert "Environment=LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS=6" in unit
+    assert "Environment=LEO_STORAGE_REGIME_ROLE=primary" in unit
+    assert "Environment=LEO_STORAGE_PRIMARY_HEARTBEAT_S=30" in unit
+    assert "Environment=LEO_STORAGE_PRIMARY_LEASE_MAX_AGE_S=120" in unit
     assert "UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "starlink-storage-regime-v2" in script
     assert 'scope="${LEO_STORAGE_REGIME_SCOPE:-auto}"' in script
@@ -83,6 +86,8 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert "legacy_layout_batch_failed" in script
     assert "trap request_drain TERM INT" in script
     assert "storage_regime_drain_complete" in script
+    assert "storage_regime_primary_active" in script
+    assert "storage_primary_lease_is_fresh" in script
     assert "Restart=on-failure" in unit
     assert "KillMode=process" in unit
     assert "TimeoutStopSec=1800" in unit
@@ -96,6 +101,9 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=48" in unit
     assert "Environment=LEO_STORAGE_REGIME_WORKERS=3" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
+    assert "Environment=LEO_STORAGE_REGIME_ROLE=fallback" in unit
+    assert "Environment=LEO_STORAGE_PRIMARY_HEARTBEAT_S=30" in unit
+    assert "Environment=LEO_STORAGE_PRIMARY_LEASE_MAX_AGE_S=120" in unit
     assert "Environment=LEO_STORAGE_AUDIT_INTERVAL_S=600" in unit
     assert "Nice=10" in unit
     assert "CPUWeight=20" in unit
@@ -104,6 +112,36 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "Restart=on-failure" in unit
     assert "KillMode=process" in unit
     assert "TimeoutStopSec=1800" in unit
+
+
+def test_pi_storage_fallback_yields_to_fresh_primary_without_inventory(tmp_path):
+    shared = tmp_path / "shared"; archive = tmp_path / "archive"
+    runtime = shared / "reports/runtime/storage-regime-v2-primary.json"
+    runtime.parent.mkdir(parents=True); archive.mkdir()
+    runtime.write_text(json.dumps({
+        "schema": "leo-tracker.storage-regime-v2-primary/v1",
+        "state": "running", "updated_epoch_s": int(time.time()),
+    }))
+    calls = tmp_path / "calls"
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$UV_STUB_LOG\"\n")
+    uv_stub.chmod(0o755)
+    process = subprocess.Popen(
+        ["bash", str(ROOT / "scripts/starlink-storage-regime-v2.sh"),
+         str(shared), str(archive)],
+        env=os.environ | {
+            "LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+            "UV_STUB_LOG": str(calls), "LEO_STORAGE_REGIME_ROLE": "fallback",
+            "LEO_STORAGE_REGIME_INTERVAL_S": "1",
+            "LEO_STORAGE_PRIMARY_LEASE_MAX_AGE_S": "60",
+        }, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    time.sleep(1.5); process.terminate()
+    output, _ = process.communicate(timeout=10)
+    assert process.returncode == 0
+    assert "storage_regime_primary_active" in output
+    assert "storage_regime_drain_complete" in output
+    assert not calls.exists()
 
 
 def test_storage_regime_sigterm_finishes_active_batch_without_starting_another(

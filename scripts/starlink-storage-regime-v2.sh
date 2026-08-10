@@ -19,6 +19,11 @@ plan="${shared_root}/reports/retention/storage-regime-v2.latest.json"
 legacy_plan="${shared_root}/reports/retention/legacy-layout.latest.json"
 audit_report="${shared_root}/reports/retention/storage-v2-audit.json"
 audit_interval_s="${LEO_STORAGE_AUDIT_INTERVAL_S:-600}"
+role="${LEO_STORAGE_REGIME_ROLE:-standalone}"
+primary_state="${shared_root}/reports/runtime/storage-regime-v2-primary.json"
+primary_heartbeat_s="${LEO_STORAGE_PRIMARY_HEARTBEAT_S:-30}"
+primary_lease_max_age_s="${LEO_STORAGE_PRIMARY_LEASE_MAX_AGE_S:-120}"
+primary_heartbeat_pid=""
 drain_requested=0
 
 request_drain() {
@@ -29,6 +34,16 @@ request_drain() {
 
 trap request_drain TERM INT
 
+stop_primary_heartbeat() {
+  if [[ -n "${primary_heartbeat_pid}" ]]; then
+    kill "${primary_heartbeat_pid}" 2>/dev/null || true
+    wait "${primary_heartbeat_pid}" 2>/dev/null || true
+    publish_primary_state stopped || true
+    primary_heartbeat_pid=""
+  fi
+}
+trap stop_primary_heartbeat EXIT
+
 if [[ "${enabled}" != "0" && "${enabled}" != "1" ]]; then
   echo "LEO_STORAGE_REGIME_ENABLED must be 0 or 1" >&2; exit 2
 fi
@@ -36,10 +51,17 @@ if [[ "${scope}" != "all" && "${scope}" != "auto" &&
       "${scope}" != "raw" && "${scope}" != "archive" ]]; then
   echo "LEO_STORAGE_REGIME_SCOPE must be all, auto, raw, or archive" >&2; exit 2
 fi
+if [[ "${role}" != "standalone" && "${role}" != "primary" &&
+      "${role}" != "fallback" ]]; then
+  echo "LEO_STORAGE_REGIME_ROLE must be standalone, primary, or fallback" >&2
+  exit 2
+fi
 if ! [[ "${planning_limit}" =~ ^[1-9][0-9]*$ && "${workers}" =~ ^[1-9][0-9]*$ &&
         "${legacy_limit}" =~ ^[1-9][0-9]*$ &&
         "${legacy_planning_limit}" =~ ^[1-9][0-9]*$ &&
-        "${audit_interval_s}" =~ ^[1-9][0-9]*$ ]]; then
+        "${audit_interval_s}" =~ ^[1-9][0-9]*$ &&
+        "${primary_heartbeat_s}" =~ ^[1-9][0-9]*$ &&
+        "${primary_lease_max_age_s}" =~ ^[1-9][0-9]*$ ]]; then
   echo "planning limits, batch limits, and workers must be positive integers" >&2; exit 2
 fi
 if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
@@ -50,7 +72,57 @@ fi
 # Do not make the caller's working directory a hidden prerequisite.
 cd "${repo_dir}"
 
+publish_primary_state() {
+  local state="$1" temporary
+  temporary="${primary_state}.next.$$"
+  mkdir -p "$(dirname "${primary_state}")"
+  "${repo_dir}/.venv/bin/python" - "${temporary}" "${primary_state}" \
+      "${state}" "$(date +%s)" "$(hostname)" "$$" <<'PY'
+import json, os, pathlib, sys
+temporary, destination, state, updated, hostname, pid = sys.argv[1:]
+value = {"schema": "leo-tracker.storage-regime-v2-primary/v1",
+         "state": state, "updated_epoch_s": int(updated),
+         "hostname": hostname, "pid": int(pid)}
+path = pathlib.Path(temporary)
+with path.open("w", encoding="utf-8") as stream:
+    json.dump(value, stream, indent=2, sort_keys=True)
+    stream.write("\n"); stream.flush(); os.fsync(stream.fileno())
+os.replace(path, destination)
+PY
+}
+
+if [[ "${role}" == "primary" ]]; then
+  publish_primary_state running
+  (
+    trap - TERM INT EXIT
+    while true; do
+      sleep "${primary_heartbeat_s}"
+      publish_primary_state running
+    done
+  ) &
+  primary_heartbeat_pid="$!"
+fi
+
 while true; do
+  if (( drain_requested )); then
+    printf '[%s] storage_regime_drain_complete\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    exit 0
+  fi
+  if [[ "${role}" == "fallback" ]] &&
+     "${repo_dir}/.venv/bin/python" - "${primary_state}" \
+       "${primary_lease_max_age_s}" <<'PY'
+import pathlib, sys
+from leo_tracker.radio.beacon.storage_regime import storage_primary_lease_is_fresh
+raise SystemExit(0 if storage_primary_lease_is_fresh(
+    pathlib.Path(sys.argv[1]), maximum_age_s=float(sys.argv[2])) else 1)
+PY
+  then
+    printf '[%s] storage_regime_primary_active; fallback_yield_s=%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${interval_s}"
+    sleep "${interval_s}" || true
+    continue
+  fi
   args=(starlink-storage-regime-v2 "${shared_root}" "${archive_root}"
     --minimum-age-hours "${minimum_age_hours}" --scope "${scope}"
     --planning-limit "${planning_limit}" --workers "${workers}"

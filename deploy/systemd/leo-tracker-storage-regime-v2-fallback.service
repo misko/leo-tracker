@@ -18,6 +18,7 @@ Environment=LEO_STORAGE_REGIME_LIMIT=6
 Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=48
 Environment=LEO_STORAGE_REGIME_WORKERS=3
 Environment=LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS=6
+Environment=LEO_STORAGE_AUDIT_INTERVAL_S=600
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-storage-regime-v2.sh /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
 Restart=on-failure
 RestartSec=30

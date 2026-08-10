@@ -6,7 +6,7 @@ import pytest
 
 from leo_tracker.radio.beacon.legacy_normalizer import (
     CONFIRMATION, apply_legacy_layout_plan, build_legacy_layout_plan,
-    legacy_normalization_ready)
+    legacy_normalization_complete, legacy_normalization_ready)
 from leo_tracker.radio.cli import main
 
 
@@ -122,3 +122,17 @@ def test_orphan_handoff_requires_complete_zero_work_archive_inventory(
     assert legacy_normalization_ready({
         "configuration": configuration,
         "summary": {"eligible_count": eligible}}) is expected
+
+
+def test_normalizer_completion_requires_schema_complete_inventory_and_zero_work():
+    complete = {
+        "schema": "leo-tracker.legacy-layout-plan/v1",
+        "configuration": {"inventory_complete": True},
+        "summary": {"eligible_count": 0},
+    }
+    assert legacy_normalization_complete(complete)
+    assert not legacy_normalization_complete({**complete, "schema": "legacy"})
+    assert not legacy_normalization_complete({
+        **complete, "configuration": {"inventory_complete": False}})
+    assert not legacy_normalization_complete({
+        **complete, "summary": {"eligible_count": 1}})

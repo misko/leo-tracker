@@ -427,8 +427,12 @@ The persistent storage-regime wrapper performs this handoff automatically. It
 does not invoke the normalizer merely because a bounded scan found no work: the
 primary plan must be in archive scope, report a complete archive inventory, and
 contain zero eligible v1 records. Until that gate is true, all bandwidth stays
-with raw/v1 migration. The final locked audit remains authoritative for blocked
-primary records, hash conflicts, unreferenced files, and interrupted receipts.
+with raw/v1 migration. After the normalizer also produces a complete zero-work
+inventory, the persistent wrapper runs the locked audit with
+`--require-producer-contract`. Failed final audits are rate-limited to once per
+ten minutes while waiting for a current Kalman heartbeat or another externally
+repaired invariant. The audit remains authoritative for blocked primary records,
+hash conflicts, unreferenced files, and interrupted receipts.
 
 Three populations are permanently outside "archivable" and must be counted
 separately rather than left as an open gap:

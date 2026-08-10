@@ -76,6 +76,9 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert 'cd "${repo_dir}"' in script
     assert "starlink-storage-normalize-legacy" in script
     assert "legacy_normalization_ready(plan)" in script
+    assert "legacy_normalization_complete(plan)" in script
+    assert "starlink-storage-audit-v2" in script
+    assert "--require-producer-contract" in script
     assert "--confirm NORMALIZE-LEGACY-LAYOUT" in script
     assert "legacy_layout_batch_failed" in script
     assert "trap request_drain TERM INT" in script
@@ -93,6 +96,7 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=48" in unit
     assert "Environment=LEO_STORAGE_REGIME_WORKERS=3" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
+    assert "Environment=LEO_STORAGE_AUDIT_INTERVAL_S=600" in unit
     assert "Nice=10" in unit
     assert "CPUWeight=20" in unit
     assert "IOWeight=20" in unit

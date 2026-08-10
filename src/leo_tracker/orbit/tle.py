@@ -33,6 +33,24 @@ def _require_utc(value: datetime) -> None:
         raise ValueError("datetime must be timezone-aware UTC")
 
 
+# Space-Track Alpha-5 extends the five-character catalog field past 99999 by
+# replacing the leading digit with a letter worth ten more than its position.
+# "I" and "O" are omitted so they cannot be misread as "1" and "0".
+ALPHA5_ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+def _catalog_number(field: str) -> int:
+    """Decode a catalog field, accepting Alpha-5 (A0001 is 100001)."""
+    value = field.strip()
+    if value.isdigit():
+        return int(value)
+    if len(value) == 5 and value[1:].isdigit():
+        leading = ALPHA5_ALPHABET.find(value[0])
+        if leading >= 10:
+            return leading * 10000 + int(value[1:])
+    raise ValueError(f"invalid catalog number: {field!r}")
+
+
 def _checksum_valid(line: str) -> bool:
     if len(line) != 69 or not line[68].isdigit():
         return False
@@ -64,7 +82,7 @@ def parse_tle(
     if validate_checksum and (not _checksum_valid(line1) or not _checksum_valid(line2)):
         raise ValueError("invalid TLE checksum")
     try:
-        sat1, sat2 = int(line1[2:7]), int(line2[2:7])
+        sat1, sat2 = _catalog_number(line1[2:7]), _catalog_number(line2[2:7])
         yy, day = int(line1[18:20]), float(line1[20:32])
     except ValueError as exc:
         raise ValueError("invalid TLE numeric field") from exc

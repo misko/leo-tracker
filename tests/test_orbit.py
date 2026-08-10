@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import math
 
 import pytest
+from sgp4.api import Satrec
 
 from leo_tracker.orbit import Observer, look_angle, parse_tle, predicted_doppler_hz, propagate_ecef, propagate_teme
 from leo_tracker.orbit.propagation import ECEFState
@@ -10,6 +11,11 @@ from leo_tracker.orbit.propagation import ECEFState
 VANGUARD = """VANGUARD 1
 1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753
 2 00005  34.2682 331.5174 1849677 331.7664  19.3264 10.82419157413661"""
+
+# Space-Track issues Alpha-5 catalog numbers to Starlink objects past 99999.
+ALPHA5 = """0 STARLINK-38128
+1 A0001U 26160A   26220.69339296  .00095481  00000-0  69434-3 0  9991
+2 A0001  70.0002 316.0979 0002555 291.6114  68.4811 15.72914369  5255"""
 
 
 def test_parse_tle_epoch_provenance_and_digest():
@@ -22,11 +28,28 @@ def test_parse_tle_epoch_provenance_and_digest():
     assert len(tle.sha256) == 64
 
 
+def test_parse_alpha5_catalog_number_matches_sgp4():
+    tle = parse_tle(ALPHA5)
+    assert tle.norad_id == 100_001
+    assert tle.name == "STARLINK-38128"
+    # The reference propagator must agree, or association would key on a
+    # different identity than the one recorded in our catalogs.
+    assert Satrec.twoline2rv(tle.line1, tle.line2).satnum == tle.norad_id
+
+
 def test_parse_rejects_corruption_and_naive_retrieval_time():
     with pytest.raises(ValueError, match="checksum"):
         parse_tle(VANGUARD[:-1] + "8")
     with pytest.raises(ValueError, match="UTC"):
         parse_tle(VANGUARD, retrieved_at=datetime(2020, 1, 1))
+
+
+def test_parse_rejects_ambiguous_and_malformed_catalog_numbers():
+    # "I" and "O" are excluded from Alpha-5 precisely because they read as 1/0.
+    for field in ("I0001", "O0001", "a0001", "1A234"):
+        broken = ALPHA5.replace("A0001", field)
+        with pytest.raises(ValueError, match="numeric field"):
+            parse_tle(broken, validate_checksum=False)
 
 
 def test_published_sgp4_epoch_vector():

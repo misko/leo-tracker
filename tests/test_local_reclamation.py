@@ -120,6 +120,23 @@ def test_verified_v2_is_sufficient_without_separate_analysis_receipt(tmp_path):
     assert not source.exists()
 
 
+def test_verified_v2_wins_over_shared_raw_when_analysis_receipt_is_missing(tmp_path):
+    local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
+                              tmp_path / "archive")
+    source, destination = _write_recording(local, shared)
+    _write_v2(archive, source, source.name)
+    (shared / "reports/receipts/capture-001.json").unlink()
+
+    plan = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+
+    assert plan["entries"][0]["status"] == "eligible"
+    assert plan["entries"][0]["durable_copy"] == "evidence_v2"
+    assert apply_reclamation_plan(plan)["removed_count"] == 1
+    assert not source.exists()
+    assert destination.exists()
+
+
 def test_verified_v2_reclaims_quarantined_interrupted_prefix(tmp_path):
     local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
                               tmp_path / "archive")

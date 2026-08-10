@@ -151,6 +151,12 @@ def _verify_durable(local_manifest_path: Path, shared_root: Path,
         local_manifest_path, shared_root / "captures" / name,
         verify_sha256=verify_sha256)
     if valid:
+        if archive_root is not None and manifest_sha:
+            archive_valid, _, _ = _archive_gate(
+                shared_root, archive_root, name, manifest_sha)
+            if archive_valid:
+                return (True, "eligible", source_bytes, manifest_sha,
+                        "evidence_v2")
         return True, reason, source_bytes, manifest_sha, "qnap_raw"
     if archive_root is None or not manifest_sha:
         return False, reason, source_bytes, manifest_sha, None

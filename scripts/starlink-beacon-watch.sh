@@ -155,6 +155,20 @@ analysis_execution_lock="${storage_root}/staging/analysis-execution.lock"
 analysis_ready="${storage_root}/staging/analysis-workers.ready"
 cd "${repo_dir}"
 
+# The configured USB URI is intentionally stable and serial-selected, while
+# diagnostic tools such as iio_attr require the current concrete bus address.
+resolved_radio_uri="${radio_uri#pluto://}"
+if [[ "${fake_source}" != "1" && -n "${radio_serial}" &&
+      "${resolved_radio_uri}" == usb:* ]]; then
+  resolved_radio_uri="$(env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" \
+    run --active --no-sync python - "${radio_uri}" "${radio_serial}" <<'PY'
+import sys
+from leo_tracker.radio.pluto import _resolve_iio_uri
+print(_resolve_iio_uri(sys.argv[1], sys.argv[2]))
+PY
+  )"
+fi
+
 capture_target() {
     local target="$1" mode="$2" channel region stamp name capture
     local pi_temp_millic pi_temp radio_temp_millic radio_temp
@@ -192,7 +206,7 @@ capture_target() {
     fi
     radio_temp_millic=""
     if [[ "${fake_source}" != "1" ]]; then
-      radio_temp_millic="$(iio_attr -u "${radio_uri#pluto://}" -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
+      radio_temp_millic="$(iio_attr -u "${resolved_radio_uri}" -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
     fi
     temperature_args=()
     [[ -n "${pi_temp}" ]] && temperature_args=(--host-temperature-c "${pi_temp}")

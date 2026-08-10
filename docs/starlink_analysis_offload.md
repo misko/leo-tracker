@@ -57,6 +57,26 @@ LEO_TRACKER_REPO="$PWD" \
   scripts/starlink-analysis-server.sh --workers 16 /mnt/qnap01/mouse9911/leo
 ```
 
+Progress is reported on the heartbeat, not per job. Each worker emits its own
+`job_start`/`job_done` line and claims again immediately; the monitor emits the
+aggregate `progress` line and writes `reports/analysis-server-status.json`. Job
+completion therefore costs the same whether the run holds ten jobs or a hundred
+thousand. Two figures in that report are deliberately not exact:
+
+- `average_job` and `eta` come from the last `LEO_ANALYSIS_DURATION_WINDOW`
+  jobs (200 by default), recorded in `analysis-queue/metrics/recent-durations.tsv`.
+  Recent jobs also predict a remaining queue better than a lifetime mean spanning
+  configuration changes. The per-job `metrics/<job>.tsv` records are still
+  written and remain the forensic record.
+- `versioned_completion_count` stats one receipt per completed run, so it is
+  refreshed only on the slow periodic loop (`LEO_ANALYSIS_BACKFILL_INTERVAL_S`,
+  600s by default) and reads `null` in reports written between refreshes. A
+  `deep_status` log line marks each refresh.
+
+Neither figure gates correctness; the queue directories remain the source of
+truth for what ran. Recomputing them per job previously cost more wall clock
+than the analysis itself and left most workers idle.
+
 Choose the worker count from the server's resources. Kalman is deployed with 16
 workers and BLAS thread counts pinned to one. `--once` drains the current queue
 and exits; without it, the script monitors continuously. Outputs and per-job

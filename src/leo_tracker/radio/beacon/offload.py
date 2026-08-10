@@ -643,8 +643,17 @@ def audit_completed(root: Path, *, default_context: Path | None = None,
 
 def analysis_status(root: Path, *, workers: int, pipeline_id: str,
                     archive_root: Path | None = None,
-                    output: Path | None = None) -> dict:
-    """Build a cheap operational snapshot for dashboards and alerting."""
+                    output: Path | None = None,
+                    include_completion_count: bool = True) -> dict:
+    """Build an operational snapshot for dashboards and alerting.
+
+    Every field here is a single directory read except
+    ``versioned_completion_count``, which must stat one receipt per completed
+    run and so costs a network round trip per historical job. Callers that
+    poll frequently pass ``include_completion_count=False`` and leave the
+    field null; see ``scripts/starlink-analysis-server.sh``, which refreshes
+    the exact count on its slow periodic loop rather than every heartbeat.
+    """
     root = Path(root).resolve(); pipeline_id = _safe_identity(
         pipeline_id, "pipeline identity")
     if workers < 1:
@@ -670,8 +679,8 @@ def analysis_status(root: Path, *, workers: int, pipeline_id: str,
             "failed": len(list((queue / "failed").glob("*.job"))),
             "oldest_ready_age_s": oldest_age,
         },
-        "versioned_completion_count": len(list(receipt_root.glob(
-            "*/completion.json"))),
+        "versioned_completion_count": (len(list(receipt_root.glob(
+            "*/completion.json"))) if include_completion_count else None),
         "verified_archive_count": archived,
     }
     if output is not None:
@@ -837,6 +846,9 @@ def main(argv: list[str] | None = None) -> int:
     status.add_argument("--pipeline-id", required=True)
     status.add_argument("--archive-root", type=Path)
     status.add_argument("--write", type=Path)
+    status.add_argument("--skip-completion-count", action="store_true",
+                        help="leave versioned_completion_count null instead of "
+                             "stating one receipt per historical run")
     enqueue = commands.add_parser("enqueue-backfill")
     enqueue.add_argument("root", type=Path)
     enqueue.add_argument("--pipeline-id", required=True)
@@ -886,7 +898,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "status":
         print(json.dumps(analysis_status(
             args.root, workers=args.workers, pipeline_id=args.pipeline_id,
-            archive_root=args.archive_root, output=args.write), sort_keys=True))
+            archive_root=args.archive_root, output=args.write,
+            include_completion_count=not args.skip_completion_count),
+            sort_keys=True))
     elif args.command == "enqueue-backfill":
         report = enqueue_analysis_backfill(
             args.root, pipeline_id=args.pipeline_id, limit=args.limit,

@@ -129,6 +129,16 @@ run_backfill() {
   fi
 }
 
+reconcile_failed() {
+  local reason="$1" result
+  if result="$(protocol reconcile-failed "${root}" --pipeline-id "${pipeline_id}" \
+      --archive-root "${archive_root}")"; then
+    emit "failed_reconciliation reason=${reason} result=${result}"
+  else
+    emit "failed_reconciliation_failed reason=${reason} result=${result}"
+  fi
+}
+
 run_retention() {
   local worker_id="$1" result
   (
@@ -470,6 +480,7 @@ audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeli
 emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_policy=tiered-v2 retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
 emit "recovery ${audit_result}"
 run_backfill startup
+reconcile_failed startup
 print_progress startup
 for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
 (
@@ -484,6 +495,7 @@ for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); do
       print_progress heartbeat
     done
     run_backfill periodic
+    reconcile_failed periodic
   done
 ) &
 monitor_pid="$!"

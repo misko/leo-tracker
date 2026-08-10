@@ -306,6 +306,15 @@ artifact exists. Hash-invalid legacy files fail safe and are listed in the
 migration receipt. Interrupted v1 `<recording>.partial` bundles are also retired
 only after that recording's production-v2 source and replay gates pass.
 
+Analysis queue failures are reconciled on server startup and every backfill
+interval. A stale `failed/*.job` left by an earlier attempt is promoted to the
+successful queue history, or removed when a later success marker already
+exists, only after its completion outputs still match their hashes and its V2
+receipt is source-verified and replay-valid. Pre-V2 completions additionally
+must match the exact source-artifact hashes embedded in the later V2 receipt.
+Real failures, changed reanalysis outputs, and recordings without V2 evidence
+remain visible for repair rather than being hidden as housekeeping.
+
 Inspect the live settings:
 
 ```bash

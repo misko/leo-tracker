@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +15,7 @@ from leo_tracker.radio.beacon.offload import (
     enqueue_analysis_backfill,
     enqueue_export_backfill,
     followup_has_checks,
+    reconcile_failed_jobs,
     validate_context_bundle,
     validate_outputs,
     write_receipt,
@@ -433,3 +435,104 @@ def test_audit_requeues_false_done_but_accepts_valid_negative(tmp_path):
     assert (queue / "bad.job").is_file()
     receipt = json.loads((reports / "receipts/good.json").read_text())
     assert receipt["status"] == "success"
+
+
+def _write_verified_completion_for_reconciliation(tmp_path: Path) -> None:
+    report = tmp_path / "reports/sample.json"
+    report.parent.mkdir(parents=True, exist_ok=True); report.write_text("{}")
+    digest = hashlib.sha256(b"{}").hexdigest()
+    completion = tmp_path / "reports/runs/kalman-v1/sample/completion.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({
+        "schema": RECEIPT_SCHEMA, "job": "sample", "pipeline_id": "kalman-v1",
+        "status": "success",
+        "versioned_outputs": {"analysis": {
+            "path": str(report), "bytes": 2, "sha256": digest}},
+        "archive_receipt": {
+            "bundle_manifest_sha256": "bundle", "source_manifest_sha256": "source"},
+    }))
+    archive_receipt = tmp_path / "archive/catalog/v2/receipts/sample.json"
+    archive_receipt.parent.mkdir(parents=True)
+    archive_receipt.write_text(json.dumps({
+        "schema": "leo-tracker.evidence-archive-receipt/v2",
+        "recording_id": "sample", "status": "verified", "source_verified": True,
+        "required_event_replay_valid": True,
+        "bundle_manifest_sha256": "bundle", "source_manifest_sha256": "source",
+    }))
+
+
+def test_failed_reconciliation_requires_verified_outputs_and_v2_replay(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    failed = queue / "failed"; failed.mkdir(parents=True)
+    (queue / "done").mkdir()
+    (failed / "old.job").write_text("sample\tcaptures/sample\tnarrow\n")
+    _write_verified_completion_for_reconciliation(tmp_path)
+    receipt = tmp_path / "archive/catalog/v2/receipts/sample.json"
+    value = json.loads(receipt.read_text())
+    value["required_event_replay_valid"] = False
+    receipt.write_text(json.dumps(value))
+
+    blocked = reconcile_failed_jobs(
+        tmp_path, pipeline_id="kalman-v1", archive_root=tmp_path / "archive")
+    assert blocked["preserved"] == ["old.job"]
+    assert (failed / "old.job").is_file()
+
+    value["required_event_replay_valid"] = True
+    receipt.write_text(json.dumps(value))
+    result = reconcile_failed_jobs(
+        tmp_path, pipeline_id="kalman-v1", archive_root=tmp_path / "archive")
+    assert result["promoted"] == ["old.job"]
+    assert result["removed"] == []
+    assert (queue / "done/old.job").is_file()
+    assert not list(failed.glob("*.job"))
+
+
+def test_failed_reconciliation_removes_duplicates_after_success_marker(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    failed = queue / "failed"; failed.mkdir(parents=True)
+    done = queue / "done"; done.mkdir()
+    payload = "sample\tcaptures/sample\tnarrow\n"
+    # Reconciliation must not read every successful marker over NFS. Its name
+    # already carries the recording identity; malformed legacy payload here is
+    # intentionally irrelevant to retiring a separately verified failure.
+    (done / "success-sample.job").write_text("legacy payload is not parsed")
+    (failed / "old-a.job").write_text(payload)
+    (failed / "old-b.job").write_text(payload)
+    _write_verified_completion_for_reconciliation(tmp_path)
+
+    result = reconcile_failed_jobs(
+        tmp_path, pipeline_id="kalman-v1", archive_root=tmp_path / "archive")
+    assert result["promoted"] == []
+    assert result["removed"] == ["old-a.job", "old-b.job"]
+    assert result["errors"] == []
+    assert not list(failed.glob("*.job"))
+
+
+def test_failed_reconciliation_accepts_matching_pre_v2_completion_only(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    failed = queue / "failed"; failed.mkdir(parents=True)
+    (queue / "done").mkdir()
+    (failed / "old.job").write_text("sample\tcaptures/sample\tnarrow\n")
+    _write_verified_completion_for_reconciliation(tmp_path)
+    completion_path = tmp_path / "reports/runs/kalman-v1/sample/completion.json"
+    completion = json.loads(completion_path.read_text())
+    completion.pop("archive_receipt")
+    completion_path.write_text(json.dumps(completion))
+    archive_path = tmp_path / "archive/catalog/v2/receipts/sample.json"
+    archive = json.loads(archive_path.read_text())
+    archive["source_artifacts"] = [{
+        "path": "sample.json",
+        "sha256": completion["versioned_outputs"]["analysis"]["sha256"],
+    }]
+    archive_path.write_text(json.dumps(archive))
+
+    accepted = reconcile_failed_jobs(
+        tmp_path, pipeline_id="kalman-v1", archive_root=tmp_path / "archive")
+    assert accepted["promoted"] == ["old.job"]
+
+    os.replace(queue / "done/old.job", failed / "changed.job")
+    archive["source_artifacts"][0]["sha256"] = "different-analysis"
+    archive_path.write_text(json.dumps(archive))
+    rejected = reconcile_failed_jobs(
+        tmp_path, pipeline_id="kalman-v1", archive_root=tmp_path / "archive")
+    assert rejected["preserved"] == ["changed.job"]

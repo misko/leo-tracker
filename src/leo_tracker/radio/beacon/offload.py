@@ -324,6 +324,133 @@ def parse_job(path: Path) -> tuple[str, Path, str, Path | None]:
     return fields[0], Path(fields[1]), fields[2], (Path(fields[3]) if len(fields) == 4 else None)
 
 
+def _verified_pipeline_completion(root: Path, name: str, *, pipeline_id: str,
+                                  archive_root: Path) -> bool:
+    """Prove a failed queue marker is superseded by durable V2 results."""
+    completion_path = (root / "reports" / "runs" / pipeline_id / name /
+                       "completion.json")
+    try:
+        completion = _read_json(completion_path)
+        if (completion.get("schema") != RECEIPT_SCHEMA or
+                completion.get("job") != name or
+                completion.get("pipeline_id") != pipeline_id or
+                completion.get("status") != "success"):
+            return False
+        outputs = completion.get("versioned_outputs") or completion.get("outputs")
+        if not isinstance(outputs, dict) or not outputs:
+            return False
+        for artifact in outputs.values():
+            path = Path(artifact["path"])
+            if (not path.is_file() or path.stat().st_size != int(artifact["bytes"]) or
+                    _sha256(path) != artifact["sha256"]):
+                return False
+        archive = _read_json(
+            archive_root / "catalog" / "v2" / "receipts" / f"{name}.json")
+        embedded = completion.get("archive_receipt")
+        if (archive.get("schema") != "leo-tracker.evidence-archive-receipt/v2" or
+                archive.get("recording_id") != name or
+                archive.get("status") != "verified" or
+                not archive.get("source_verified") or
+                not archive.get("required_event_replay_valid")):
+            return False
+        if isinstance(embedded, dict):
+            if (embedded.get("bundle_manifest_sha256") !=
+                    archive.get("bundle_manifest_sha256") or
+                    embedded.get("source_manifest_sha256") !=
+                    archive.get("source_manifest_sha256")):
+                return False
+        else:
+            # Historical completions predate required V2 archiving. They can
+            # still supersede a failure only when every immutable completion
+            # output is exactly one of the source artifacts that produced the
+            # later replay-verified V2 receipt. A subsequent reanalysis with
+            # different bytes remains a genuine unresolved failure.
+            source_hashes = {
+                str(artifact.get("path")): artifact.get("sha256")
+                for artifact in archive.get("source_artifacts", [])
+                if isinstance(artifact, dict)
+            }
+            reports_root = (root / "reports").resolve()
+            for artifact in outputs.values():
+                try:
+                    relative = Path(artifact["path"]).resolve().relative_to(
+                        reports_root).as_posix()
+                except (OSError, ValueError, KeyError, TypeError):
+                    return False
+                if source_hashes.get(relative) != artifact["sha256"]:
+                    return False
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return True
+
+
+def reconcile_failed_jobs(root: Path, *, pipeline_id: str,
+                          archive_root: Path) -> dict:
+    """Retire stale failures only after the successful V2 result is proven.
+
+    A successful backfill uses a new queue marker, so the original failed
+    marker otherwise remains forever. Preserve genuine failures. When no
+    successful marker exists, promote one superseded marker to ``done`` to
+    retain queue provenance; duplicate superseded failures are obsolete.
+    """
+    root = Path(root).resolve()
+    archive_root = Path(archive_root).resolve()
+    pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
+    queue = root / "staging" / "analysis-queue"
+    done = queue / "done"
+    failed = queue / "failed"
+    done.mkdir(parents=True, exist_ok=True)
+    # Queue marker names always end in the recording identity. Reading the
+    # payload of every successful marker made a 10k-job reconciliation perform
+    # 10k small NFS reads before it could inspect a handful of failures.
+    # One readdir plus suffix checks has the same provenance decision without
+    # turning this periodic maintenance pass into an archive walk.
+    done_marker_names = [marker.name for marker in done.glob("*.job")]
+    errors: list[str] = []
+
+    groups: dict[str, list[Path]] = {}
+    preserved: list[str] = []
+    for marker in sorted(failed.glob("*.job")):
+        try:
+            name = parse_job(marker)[0]
+        except (OSError, ValueError) as exc:
+            errors.append(f"{marker.name}: {type(exc).__name__}: {exc}")
+            preserved.append(marker.name)
+            continue
+        groups.setdefault(name, []).append(marker)
+
+    promoted: list[str] = []
+    removed: list[str] = []
+    for name, markers in groups.items():
+        if not _verified_pipeline_completion(
+                root, name, pipeline_id=pipeline_id, archive_root=archive_root):
+            preserved.extend(marker.name for marker in markers)
+            continue
+        suffix = f"-{name}.job"
+        already_done = any(marker_name == f"{name}.job" or
+                           marker_name.endswith(suffix)
+                           for marker_name in done_marker_names)
+        if not already_done:
+            marker = markers.pop(0)
+            destination = done / marker.name
+            if destination.exists():
+                destination = done / f"recovered-{uuid.uuid4().hex}-{marker.name}"
+            os.replace(marker, destination)
+            promoted.append(destination.name)
+            done_marker_names.append(destination.name)
+        for marker in markers:
+            marker.unlink()
+            removed.append(marker.name)
+    return {
+        "schema": "leo-tracker.failed-job-reconciliation/v1",
+        "pipeline_id": pipeline_id,
+        "promoted": promoted,
+        "removed": removed,
+        "preserved": preserved,
+        "errors": errors,
+    }
+
+
 def audit_completed(root: Path, *, default_context: Path | None = None,
                     pipeline_id: str = "legacy-v1") -> dict:
     """Requeue legacy/partial successes that lack a valid output receipt."""
@@ -545,6 +672,10 @@ def main(argv: list[str] | None = None) -> int:
     audit = commands.add_parser("audit")
     audit.add_argument("root", type=Path); audit.add_argument("--context", type=Path)
     audit.add_argument("--pipeline-id", default="legacy-v1")
+    reconcile_failed = commands.add_parser("reconcile-failed")
+    reconcile_failed.add_argument("root", type=Path)
+    reconcile_failed.add_argument("--pipeline-id", required=True)
+    reconcile_failed.add_argument("--archive-root", type=Path, required=True)
     current = commands.add_parser("current")
     current.add_argument("context_root", type=Path)
     args = parser.parse_args(argv)
@@ -595,6 +726,12 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "audit":
         print(json.dumps(audit_completed(args.root, default_context=args.context,
                                  pipeline_id=args.pipeline_id), sort_keys=True))
+    elif args.command == "reconcile-failed":
+        report = reconcile_failed_jobs(
+            args.root, pipeline_id=args.pipeline_id,
+            archive_root=args.archive_root)
+        print(json.dumps(report, sort_keys=True))
+        return 1 if report["errors"] else 0
     else:
         print(current_context(args.context_root))
     return 0

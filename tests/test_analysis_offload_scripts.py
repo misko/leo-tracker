@@ -202,6 +202,9 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert "run_backfill startup" in script
     assert "run_backfill periodic" in script
     assert "enqueue-backfill" in script
+    assert "reconcile_failed startup" in script
+    assert "reconcile_failed periodic" in script
+    assert "reconcile-failed" in script
     assert "--summary-only" in script
     assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit

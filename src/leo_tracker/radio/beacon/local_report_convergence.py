@@ -8,8 +8,11 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import uuid
+
+from .qnap_lifecycle import _archive_gate
 
 
 PLAN_SCHEMA = "leo-tracker.local-report-convergence-plan/v1"
@@ -17,6 +20,7 @@ RECEIPT_SCHEMA = "leo-tracker.local-report-convergence-receipt/v1"
 # The live watcher reads or updates these paths. They are operational state,
 # not historical analysis duplicates, and remain on the acquisition host.
 OPERATIONAL_PREFIXES = ("learned-beacons/", "calibration/", "gain-experiment/")
+_RECORDING = re.compile(r"^(.*?\d{8}T\d{6}Z)")
 
 
 def _sha256(path: Path) -> str:
@@ -40,8 +44,10 @@ def _atomic_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def build_local_report_plan(local_root: Path, shared_root: Path) -> dict:
+def build_local_report_plan(local_root: Path, shared_root: Path, *,
+                            archive_root: Path | None = None) -> dict:
     local_root = Path(local_root).resolve(); shared_root = Path(shared_root).resolve()
+    archive_root = Path(archive_root).resolve() if archive_root is not None else None
     reports = local_root / "reports"; entries = []
     for source in sorted(reports.rglob("*")) if reports.is_dir() else []:
         if source.is_dir():
@@ -59,16 +65,41 @@ def build_local_report_plan(local_root: Path, shared_root: Path) -> dict:
             "bytes": source.stat().st_size if source.is_file() else 0,
             "sha256": _sha256(source) if status == "eligible" else None,
             "status": status})
+    legacy_reports = local_root / "evidence/pilot_symbolwise_v3/reports"
+    for source in sorted(legacy_reports.glob("*")) if legacy_reports.is_dir() else []:
+        if not source.is_file() or source.is_symlink():
+            continue
+        match = _RECORDING.match(source.name); name = match.group(1) if match else None
+        status = "legacy_evidence_unverified"; receipt_path = None
+        if name and archive_root is not None:
+            receipt_path = archive_root / "catalog/v2/receipts" / f"{name}.json"
+            try:
+                receipt = json.loads(receipt_path.read_text())
+            except (OSError, ValueError):
+                receipt = {}
+            valid, _, _ = _archive_gate(
+                shared_root, archive_root, name,
+                str(receipt.get("source_manifest_sha256", "")))
+            if valid:
+                status = "eligible_v2_obsolete"
+        entries.append({"relative_path": source.name,
+            "local_path": str(source), "shared_path": None,
+            "bytes": source.stat().st_size, "sha256": _sha256(source),
+            "status": status, "recording_id": name,
+            "v2_receipt": str(receipt_path) if receipt_path else None})
     counts: dict[str, int] = {}
     for item in entries:
         counts[item["status"]] = counts.get(item["status"], 0) + 1
     return {"schema": PLAN_SCHEMA, "created_utc": _now(),
         "local_root": str(local_root), "shared_root": str(shared_root),
+        "archive_root": str(archive_root) if archive_root is not None else None,
         "operational_prefixes": list(OPERATIONAL_PREFIXES), "entries": entries,
         "summary": {"file_count": len(entries), "status_counts": counts,
-            "eligible_count": counts.get("eligible", 0),
+            "eligible_count": (counts.get("eligible", 0) +
+                               counts.get("eligible_v2_obsolete", 0)),
             "eligible_bytes": sum(item["bytes"] for item in entries
-                                  if item["status"] == "eligible")}}
+                                  if item["status"] in {
+                                      "eligible", "eligible_v2_obsolete"})}}
 
 
 def _publish_missing(source: Path, target: Path, digest: str,
@@ -125,23 +156,33 @@ def apply_local_report_plan(plan: dict) -> dict:
         except BlockingIOError as exc:
             raise RuntimeError("another local report convergence is active") from exc
         for item in plan.get("entries", []):
-            if item.get("status") != "eligible":
+            if item.get("status") not in {"eligible", "eligible_v2_obsolete"}:
                 continue
-            source = Path(item["local_path"]); target = Path(item["shared_path"])
+            source = Path(item["local_path"])
             try:
-                relative = source.resolve(strict=True).relative_to(reports.resolve(strict=True))
+                source_root = (local_root / "evidence/pilot_symbolwise_v3/reports"
+                               if item["status"] == "eligible_v2_obsolete"
+                               else reports)
+                relative = source.resolve(strict=True).relative_to(
+                    source_root.resolve(strict=True))
                 if source.is_symlink() or ".." in relative.parts:
                     raise ValueError("unsafe local artifact")
                 digest = _sha256(source)
                 if digest != item.get("sha256") or source.stat().st_size != item.get("bytes"):
                     raise ValueError("local artifact changed after planning")
-                state = _publish_missing(source, target, digest, staging)
-                if not target.is_file():
-                    raise ValueError("shared authority was not published")
+                if item["status"] == "eligible_v2_obsolete":
+                    state = "v2_current_authority"
+                    target = Path(item["v2_receipt"])
+                else:
+                    target = Path(item["shared_path"])
+                    state = _publish_missing(source, target, digest, staging)
+                    if not target.is_file():
+                        raise ValueError("shared authority was not published")
                 migrated.append({"relative_path": relative.as_posix(),
                     "bytes": item["bytes"], "sha256": digest,
                     "destination_state": state,
-                    "shared_bytes": target.stat().st_size})
+                    "shared_bytes": target.stat().st_size,
+                    "local_path": str(source)})
             except Exception as exc:
                 deferred.append({"relative_path": item.get("relative_path"),
                     "reason": f"{type(exc).__name__}: {exc}"})
@@ -152,7 +193,7 @@ def apply_local_report_plan(plan: dict) -> dict:
         _atomic_json(receipt_path, prepared)
         if not deferred:
             for item in migrated:
-                source = reports / item["relative_path"]
+                source = Path(item["local_path"])
                 if source.is_file() and _sha256(source) == item["sha256"]:
                     source.unlink()
             for directory in sorted(
@@ -166,7 +207,7 @@ def apply_local_report_plan(plan: dict) -> dict:
             "status": "complete" if not deferred else "deferred",
             "completed_utc": _now(),
             "removed_count": (len(migrated) if not deferred else 0),
-            "removed_bytes": (sum(item["bytes"] for item in migrated)
+        "removed_bytes": (sum(item["bytes"] for item in migrated)
                               if not deferred else 0)}
         _atomic_json(receipt_path, completed)
     return completed

@@ -66,3 +66,32 @@ def test_local_report_cli_is_dry_run_by_default(tmp_path, capsys):
     assert report["dry_run"] is True
     assert report["eligible_count"] == 1
     assert source.exists() and output.is_file()
+
+
+def test_legacy_evidence_debug_report_retires_only_behind_verified_v2(tmp_path):
+    local, shared, archive = (tmp_path / "local", tmp_path / "shared",
+                              tmp_path / "archive")
+    name = "ch4-lower-edge-narrow-20260805T171900Z"
+    report = local / "evidence/pilot_symbolwise_v3/reports" / f"{name}-dense.png"
+    report.parent.mkdir(parents=True); report.write_bytes(b"legacy debug plot")
+    bundle = archive / "evidence-v2" / name; bundle.mkdir(parents=True)
+    manifest = bundle / "manifest.json"; manifest.write_text("{}")
+    receipt = archive / "catalog/v2/receipts" / f"{name}.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(json.dumps({
+        "schema": "leo-tracker.evidence-archive-receipt/v2",
+        "status": "verified", "source_verified": True,
+        "required_event_replay_valid": True, "policy": "tiered-v2",
+        "source_manifest_sha256": "source-hash", "bundle": f"evidence-v2/{name}",
+        "bundle_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+    }))
+
+    without_v2 = build_local_report_plan(local, shared)
+    with_v2 = build_local_report_plan(local, shared, archive_root=archive)
+
+    assert without_v2["summary"]["eligible_count"] == 0
+    assert with_v2["summary"]["eligible_count"] == 1
+    result = apply_local_report_plan(with_v2)
+    assert result["removed_count"] == 1
+    assert result["migrated"][0]["destination_state"] == "v2_current_authority"
+    assert not report.exists()

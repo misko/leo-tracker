@@ -161,6 +161,8 @@ The live learned beacon, calibration, and gain-experiment state remains local
 because the watcher reads or updates it. Everything else under local `reports/`
 is historical and is removed only after every planned artifact has a shared
 authority or the complete operation is deferred without deletions.
+Legacy pilot-development debug reports outside `reports/` are retired only
+when their recording has a fully validated tiered-V2 receipt and bundle.
 
 Dry-run and bounded application:
 

@@ -427,7 +427,8 @@ def command_starlink_storage_reconcile(args: argparse.Namespace) -> int:
 
 
 def command_starlink_local_report_converge(args: argparse.Namespace) -> int:
-    plan = build_local_report_plan(args.local_root, args.shared_root)
+    plan = build_local_report_plan(
+        args.local_root, args.shared_root, archive_root=args.archive_root)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         temporary = args.output.with_name(args.output.name + ".next")
@@ -1907,6 +1908,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="atomically move legacy local reports under QNAP authority")
     report_converge.add_argument("local_root", type=Path)
     report_converge.add_argument("shared_root", type=Path)
+    report_converge.add_argument("--archive-root", type=Path,
+        help="retire legacy evidence reports only behind verified V2 receipts")
     report_converge.add_argument("--apply", action="store_true")
     report_converge.add_argument("--output", type=Path)
     report_converge.set_defaults(handler=command_starlink_local_report_converge)

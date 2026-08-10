@@ -89,9 +89,9 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     unit = (ROOT / "deploy/systemd/leo-tracker-storage-regime-v2-fallback.service").read_text()
     assert "User=satpi01" in unit
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_LIMIT=4" in unit
-    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=32" in unit
-    assert "Environment=LEO_STORAGE_REGIME_WORKERS=2" in unit
+    assert "Environment=LEO_STORAGE_REGIME_LIMIT=6" in unit
+    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=48" in unit
+    assert "Environment=LEO_STORAGE_REGIME_WORKERS=3" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
     assert "Nice=10" in unit
     assert "CPUWeight=20" in unit

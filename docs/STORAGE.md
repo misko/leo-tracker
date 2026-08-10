@@ -261,9 +261,11 @@ retains v1.
 
 SATPI01 also runs
 [`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
-as a persistent low-priority fallback. It processes four transactions with two
-independent deletion-last workers per bounded plan, followed by a ten-second
-idle interval. Kalman migration, the Pi fallback, and the six-hour QNAP raw
+as a persistent low-priority fallback. On the wired 1 GbE deployment it
+processes six transactions with three independent deletion-last workers per
+bounded plan, followed by a ten-second idle interval. `Nice=10`,
+`CPUWeight=20`, and `IOWeight=20` continue to give capture priority. Kalman
+migration, the Pi fallback, and the six-hour QNAP raw
 lifecycle acquire one global QNAP storage lock before inventory as well as
 mutation. A competing policy defers before walking the NFS archive and retries
 on its normal interval. This survives Pi reboots without allowing two policies

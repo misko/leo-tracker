@@ -132,6 +132,27 @@ def test_storage_regime_is_dry_run_by_default_and_requires_token(tmp_path):
     assert capture.exists()
 
 
+def test_storage_regime_accepts_authoritative_pipeline_completion(tmp_path):
+    shared, archive, capture = _ready(tmp_path, "completion-only")
+    name = capture.name
+    top_level = shared / "reports" / "receipts" / f"{name}.json"
+    receipt = json.loads(top_level.read_text())
+    completion = (shared / "reports" / "runs" / "kalman-v1" / name /
+                  "completion.json")
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({
+        **receipt, "pipeline_id": "kalman-v1",
+        "outputs": {"analysis": {"path": str(shared / "reports" / f"{name}.json"),
+                                   "bytes": 1, "sha256": "recorded"}},
+    }))
+    top_level.unlink()
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+
+    entry = next(item for item in plan["entries"] if item["recording_id"] == name)
+    assert entry["status"] == "eligible"
+
+
 def test_storage_regime_preserves_manual_pin(tmp_path):
     shared, archive, capture = _ready(tmp_path)
     pins = shared / "reports" / "retention" / "pins"; pins.mkdir(parents=True)

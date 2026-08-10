@@ -69,8 +69,23 @@ def _active_jobs(shared_root: Path) -> set[str]:
 
 def _analysis_complete(shared_root: Path, name: str) -> bool:
     receipt = _json(shared_root / "reports" / "receipts" / f"{name}.json")
-    return (receipt.get("schema") == "leo-tracker.analysis-receipt/v1" and
-            receipt.get("status") == "success" and receipt.get("job") == name)
+    if (receipt.get("schema") == "leo-tracker.analysis-receipt/v1" and
+            receipt.get("status") == "success" and receipt.get("job") == name):
+        return True
+    # Older workers could finish and atomically publish the authoritative
+    # pipeline completion, then fail while refreshing the convenience receipt
+    # because its versioned-output layout had changed. The analysis protocol
+    # itself treats this completion as done during backfill/audit, so retention
+    # must not strand the same recording forever by requiring the secondary
+    # receipt. Production-v2 replay remains the stronger raw-deletion gate.
+    runs = shared_root / "reports" / "runs"
+    for completion in runs.glob(f"*/{name}/completion.json"):
+        value = _json(completion)
+        if (value.get("schema") == "leo-tracker.analysis-receipt/v1" and
+                value.get("status") == "success" and value.get("job") == name and
+                isinstance(value.get("outputs"), dict) and value["outputs"]):
+            return True
+    return False
 
 
 def _source_bytes(manifest: dict) -> int:

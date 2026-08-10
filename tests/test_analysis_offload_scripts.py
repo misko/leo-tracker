@@ -129,6 +129,19 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "TimeoutStopSec=1800" in unit
 
 
+def test_kalman_storage_cutover_drains_installs_and_verifies_both_contracts():
+    script = (ROOT / "scripts/kalman-storage-cutover.sh").read_text()
+    assert "sudo systemctl stop leo-tracker-analysis-server.service" in script
+    assert "sudo install -m 0644" in script
+    assert "leo-tracker-storage-regime-v2.service" in script
+    assert "sudo systemctl enable --now" in script
+    assert 'analysis.get("producer_contract_valid") is True' in script
+    assert 'analysis.get("evidence_policy") == "tiered-v2"' in script
+    assert 'storage.get("state") == "running"' in script
+    assert ".venv/bin/python" in script
+    assert "uv venv" not in script
+
+
 def test_pi_storage_fallback_yields_to_fresh_primary_without_inventory(tmp_path):
     shared = tmp_path / "shared"; archive = tmp_path / "archive"
     runtime = shared / "reports/runtime/storage-regime-v2-primary.json"

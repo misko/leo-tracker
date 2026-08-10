@@ -71,6 +71,21 @@ and archive coverage remain separate properties. A server still reporting
 
 ## Install on Kalman
 
+The preferred cutover is a single command from a current checkout. It drains
+claimed legacy jobs, installs both current units, starts direct production-v2
+analysis and the 16-worker storage primary, then waits for both runtime
+contracts to become valid:
+
+```bash
+git pull --ff-only origin main
+./scripts/kalman-storage-cutover.sh \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
+```
+
+The helper uses only the checkout's existing `.venv`. It fails closed when a
+mount is absent, either service fails, or the direct-V2 producer and migration
+primary contracts do not appear within three minutes.
+
 From `/home/mouse9911/gits/leo-tracker`:
 
 ```bash

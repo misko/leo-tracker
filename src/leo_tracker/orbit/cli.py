@@ -18,6 +18,7 @@ from .association import associate_tracks
 from .catalog_sources import _space_track_bytes, fetch_bytes
 from .catalog_store import CatalogStore
 from .catalog_watch import load_config, run_watch, store_status
+from .source_comparison import compare_source_associations
 from .doppler import predicted_doppler_hz
 from .fragment_diagnostics import diagnose_fragments
 from .topocentric import Observer
@@ -159,6 +160,13 @@ def _parser() -> argparse.ArgumentParser:
     history.add_argument("--root", type=Path, required=True)
     history.add_argument("--source", required=True)
     history.add_argument("--scope", required=True)
+    compare = commands.add_parser("compare-sources",
+        help="pair two catalog providers on identical tracks and score the difference")
+    compare.add_argument("--reports", type=Path, required=True,
+                         help="analysis reports root holding associations/<source>/")
+    compare.add_argument("--sources", nargs=2, required=True,
+                         metavar=("SOURCE", "SOURCE"))
+    compare.add_argument("--output", type=Path)
     associate = commands.add_parser("associate",
         help="rank archived TLEs against a continuous 10 Hz Starlink Doppler track")
     associate.add_argument("--observations", type=Path, required=True)
@@ -253,6 +261,12 @@ def main(argv: list[str] | None = None) -> int:
             "tle_epoch_max": utc_iso(item.epoch_max),
             "catalog": str(item.normalized_artifact),
         } for item in snapshots], sort_keys=True))
+        return 0
+    if args.command == "compare-sources":
+        result = compare_source_associations(
+            args.reports, sources=tuple(args.sources), output=args.output)
+        print(json.dumps({k: v for k, v in result.items()
+                          if k != "disagreements"}, sort_keys=True))
         return 0
     if args.command == "associate":
         if args.candidate_limit < 0:

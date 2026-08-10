@@ -11,12 +11,14 @@ ROOT = Path(__file__).parents[1]
 
 def test_analysis_export_unit_is_persistent_and_copy_only():
     unit = (ROOT / "deploy/leo-tracker-analysis-export.service").read_text()
+    script = (ROOT / "scripts/starlink-analysis-export.sh").read_text()
     assert "Requires=mnt-leo\\x2dnvme.mount" in unit
     assert "Environment=LEO_OFFLOAD_SOURCE_POLICY=retain" in unit
     assert "Environment=LEO_OFFLOAD_RECONCILE_S=600" in unit
     assert "Environment=LEO_ANALYSIS_PIPELINE_ID=kalman-full-v1" in unit
     assert "Environment=UV_BIN=/home/satpi01/.local/bin/uv" in unit
     assert "ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh" in unit
+    assert '--archive-root "${archive_root}"' in script
     assert "Restart=always" in unit
     assert "WantedBy=multi-user.target" in unit
 

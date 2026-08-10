@@ -583,9 +583,19 @@ def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
 
 def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
                             pipeline_id: str, limit: int | None = None,
-                            dry_run: bool = False) -> dict:
-    """Queue preserved acquisition captures absent from the shared pipeline."""
+                            dry_run: bool = False,
+                            archive_root: Path | None = None) -> dict:
+    """Queue preserved sources absent from the current durable regime.
+
+    A historical pipeline completion is not sufficient when the source still
+    exists locally and no replay-verified tiered-V2 archive exists. In that
+    case the raw source is restored to the shared work area and requeued so the
+    current producer can archive it. Without ``archive_root`` the legacy
+    completion behavior is preserved for callers that are not V2-aware.
+    """
     source_root = Path(source_root).resolve(); shared_root = Path(shared_root).resolve()
+    archive_root = (Path(archive_root).resolve()
+                    if archive_root is not None else None)
     pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
     if limit is not None and limit < 1:
         raise ValueError("backfill limit must be positive")
@@ -603,8 +613,7 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
         completion = (shared_root / "reports" / "runs" / pipeline_id / name /
                       "completion.json")
         shared_capture = shared_root / "captures" / name
-        if (completion.is_file() or shared_capture.is_dir() or
-                name in active_names):
+        if shared_capture.is_dir() or name in active_names:
             skipped.append(name); continue
         try:
             manifest = _read_json(capture / "manifest.json")
@@ -617,6 +626,15 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
                     skipped.append(name); continue
             elif state != "complete":
                 skipped.append(name); continue
+            if completion.is_file():
+                if archive_root is None:
+                    skipped.append(name); continue
+                from .qnap_lifecycle import _archive_gate
+                manifest_sha = _sha256(capture / "manifest.json")
+                archived, _, _ = _archive_gate(
+                    shared_root, archive_root, name, manifest_sha)
+                if archived:
+                    skipped.append(name); continue
             mode = observation_mode(name, manifest.get("metadata", {}))
             marker = queue / f"backfill-export-{pipeline_id}-{name}.job"
             payload = f"{name}\t{capture}\t{mode}\n"
@@ -666,6 +684,8 @@ def main(argv: list[str] | None = None) -> int:
     enqueue_export.add_argument("source_root", type=Path)
     enqueue_export.add_argument("shared_root", type=Path)
     enqueue_export.add_argument("--pipeline-id", required=True)
+    enqueue_export.add_argument("--archive-root", type=Path,
+        help="restore completed sources that still lack verified tiered-V2 evidence")
     enqueue_export.add_argument("--limit", type=int)
     enqueue_export.add_argument("--dry-run", action="store_true")
     enqueue_export.add_argument("--summary-only", action="store_true")
@@ -714,7 +734,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "enqueue-export-backfill":
         report = enqueue_export_backfill(
             args.source_root, args.shared_root, pipeline_id=args.pipeline_id,
-            limit=args.limit, dry_run=args.dry_run)
+            limit=args.limit, dry_run=args.dry_run,
+            archive_root=args.archive_root)
         if args.summary_only:
             report = {"schema": report["schema"], "pipeline_id": report["pipeline_id"],
                       "queued_count": len(report["queued"]),

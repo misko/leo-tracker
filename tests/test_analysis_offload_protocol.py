@@ -270,6 +270,56 @@ def test_export_backfill_queues_only_missing_preserved_sources(tmp_path):
     assert fields == ["three", str(captures / "three"), "narrow"]
 
 
+def test_export_backfill_restores_completed_source_missing_v2(tmp_path):
+    source, shared, archive = (tmp_path / "source", tmp_path / "shared",
+                               tmp_path / "archive")
+    capture = source / "captures/old"; capture.mkdir(parents=True)
+    (capture / "manifest.json").write_text(json.dumps({
+        "state": "complete", "chunks": [{"path": "chunk.ci16", "bytes": 4}],
+        "metadata": {"observation_mode": "narrow"}}))
+    (capture / "chunk.ci16").write_bytes(b"data")
+    completion = shared / "reports/runs/kalman-v1/old/completion.json"
+    completion.parent.mkdir(parents=True); completion.write_text("{}")
+
+    legacy = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
+    repaired = enqueue_export_backfill(
+        source, shared, pipeline_id="kalman-v1", archive_root=archive)
+
+    assert legacy["queued"] == []
+    assert repaired["queued"] == ["old"]
+    assert next((source / "staging/analysis-queue").glob("*.job")).is_file()
+
+
+def test_export_backfill_does_not_restore_source_with_verified_v2(tmp_path):
+    source, shared, archive = (tmp_path / "source", tmp_path / "shared",
+                               tmp_path / "archive")
+    capture = source / "captures/old"; capture.mkdir(parents=True)
+    manifest = capture / "manifest.json"
+    manifest.write_text(json.dumps({
+        "state": "complete", "chunks": [{"path": "chunk.ci16", "bytes": 4}],
+        "metadata": {"observation_mode": "narrow"}}))
+    (capture / "chunk.ci16").write_bytes(b"data")
+    completion = shared / "reports/runs/kalman-v1/old/completion.json"
+    completion.parent.mkdir(parents=True); completion.write_text("{}")
+    bundle = archive / "evidence-v2/old"; bundle.mkdir(parents=True)
+    bundle_manifest = bundle / "manifest.json"; bundle_manifest.write_text("{}")
+    receipt = archive / "catalog/v2/receipts/old.json"; receipt.parent.mkdir(parents=True)
+    receipt.write_text(json.dumps({
+        "schema": "leo-tracker.evidence-archive-receipt/v2",
+        "status": "verified", "source_verified": True,
+        "required_event_replay_valid": True, "policy": "tiered-v2",
+        "source_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "bundle": "evidence-v2/old",
+        "bundle_manifest_sha256": hashlib.sha256(bundle_manifest.read_bytes()).hexdigest(),
+    }))
+
+    result = enqueue_export_backfill(
+        source, shared, pipeline_id="kalman-v1", archive_root=archive)
+
+    assert result["queued"] == []
+    assert not list((source / "staging/analysis-queue").glob("*.job"))
+
+
 def test_full_coverage_wide_receipt_does_not_require_a_skipped_track(tmp_path):
     """The server skips doppler_track for wide, so requiring it fails every wide job.
 

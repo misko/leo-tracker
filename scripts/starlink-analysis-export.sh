@@ -29,6 +29,7 @@ fi
 context_refresh_s="${LEO_OFFLOAD_CONTEXT_REFRESH_S:-600}"
 reconcile_s="${LEO_OFFLOAD_RECONCILE_S:-600}"
 pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
+archive_root="${LEO_EVIDENCE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 uv_bin="${UV_BIN:-$(command -v uv || true)}"
 if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
@@ -82,7 +83,8 @@ reconcile_exports() {
   fi
   env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
     python -m leo_tracker.radio.beacon.offload enqueue-export-backfill \
-    "${source_root}" "${shared_root}" --pipeline-id "${pipeline_id}" --summary-only
+    "${source_root}" "${shared_root}" --pipeline-id "${pipeline_id}" \
+    --archive-root "${archive_root}" --summary-only
   reconciled_at="${now}"
 }
 

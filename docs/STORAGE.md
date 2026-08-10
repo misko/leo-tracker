@@ -135,6 +135,12 @@ or orphan payload exists. The v2 path is essential for
 historical convergence: if QNAP raw was already correctly reclaimed, the local
 full-IQ duplicate no longer remains stranded.
 
+The exporter's periodic backfill is V2-aware. A legacy analysis completion does
+not suppress export when the immutable local source remains and its matching
+replay-verified tiered-V2 receipt is absent. The source is restored atomically
+through `staging/incoming`, queued for the current analysis pipeline, and kept
+locally until the ordinary V2 reclaimer gates succeed.
+
 Dry-run and bounded application:
 
 ```bash

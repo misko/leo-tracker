@@ -19,6 +19,8 @@ def test_analysis_export_unit_is_persistent_and_copy_only():
     assert "Environment=UV_BIN=/home/satpi01/.local/bin/uv" in unit
     assert "ExecStart=/home/satpi01/leo-tracker/scripts/starlink-analysis-export.sh" in unit
     assert '--archive-root "${archive_root}"' in script
+    assert "recover-stale" in script
+    assert "LEO_OFFLOAD_STALE_CAPTURE_AGE_S" in script
     assert "Restart=always" in unit
     assert "WantedBy=multi-user.target" in unit
 

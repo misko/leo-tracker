@@ -15,6 +15,7 @@ from leo_tracker.radio.beacon.offload import (
     enqueue_analysis_backfill,
     enqueue_export_backfill,
     followup_has_checks,
+    recover_stale_recordings,
     reconcile_failed_jobs,
     validate_context_bundle,
     validate_outputs,
@@ -318,6 +319,71 @@ def test_export_backfill_does_not_restore_source_with_verified_v2(tmp_path):
 
     assert result["queued"] == []
     assert not list((source / "staging/analysis-queue").glob("*.job"))
+
+
+def test_stale_capture_recovery_salvages_atomic_orphan_chunk(tmp_path):
+    source = tmp_path / "source"
+    capture = source / "captures/stale"; capture.mkdir(parents=True)
+    first = b"abcdefgh"; orphan = b"ijklmnop"
+    (capture / "chunk-000000.ci16").write_bytes(first)
+    (capture / "chunk-000001.ci16").write_bytes(orphan)
+    manifest = capture / "manifest.json"
+    manifest.write_text(json.dumps({
+        "schema": "leo-tracker.beacon-iq/v1", "state": "capturing",
+        "sample_rate_hz": 1, "receiver_count": 2, "chunk_samples": 1,
+        "created_utc_ns": 100, "chunks": [{
+            "path": "chunk-000000.ci16", "first_sample_index": 0,
+            "sample_count": 1, "first_utc_ns": 100, "last_utc_ns": 200,
+            "read_count": 1, "sha256": hashlib.sha256(first).hexdigest(),
+            "bytes": len(first)}]}))
+    os.utime(manifest, (1, 1))
+
+    result = recover_stale_recordings(source, minimum_age_s=0)
+
+    assert result["errors"] == []
+    assert result["recovered"][0]["synthesized_orphan_chunks"] == [
+        "chunk-000001.ci16"]
+    recovered = json.loads(manifest.read_text())
+    assert recovered["state"] == "interrupted"
+    assert recovered["captured_samples_per_receiver"] == 2
+    assert recovered["stored_bytes"] == 16
+    assert recovered["chunks"][1]["sha256"] == hashlib.sha256(orphan).hexdigest()
+    assert recovered["recovery"]["original_manifest_sha256"]
+
+
+def test_stale_capture_recovery_refuses_corrupt_or_unexpected_content(tmp_path):
+    source = tmp_path / "source"
+    capture = source / "captures/stale"; capture.mkdir(parents=True)
+    payload = b"abcdefgh"
+    (capture / "chunk-000000.ci16").write_bytes(payload)
+    (capture / "notes.txt").write_text("ambiguous")
+    manifest = capture / "manifest.json"
+    manifest.write_text(json.dumps({
+        "state": "capturing", "sample_rate_hz": 1, "receiver_count": 2,
+        "chunk_samples": 1, "chunks": [{
+            "path": "chunk-000000.ci16", "first_sample_index": 0,
+            "sample_count": 1, "first_utc_ns": 100, "last_utc_ns": 200,
+            "sha256": hashlib.sha256(payload).hexdigest(), "bytes": 8}]}))
+    os.utime(manifest, (1, 1))
+
+    result = recover_stale_recordings(source, minimum_age_s=0)
+
+    assert len(result["errors"]) == 1
+    assert "unexpected unmanifested files" in result["errors"][0]
+    assert json.loads(manifest.read_text())["state"] == "capturing"
+
+
+def test_stale_capture_recovery_leaves_fresh_writer_untouched(tmp_path):
+    source = tmp_path / "source"
+    capture = source / "captures/fresh"; capture.mkdir(parents=True)
+    manifest = capture / "manifest.json"
+    manifest.write_text(json.dumps({"state": "capturing", "chunks": []}))
+
+    result = recover_stale_recordings(source, minimum_age_s=3600)
+
+    assert result["recovered"] == []
+    assert result["skipped"] == ["fresh"]
+    assert json.loads(manifest.read_text())["state"] == "capturing"
 
 
 def test_full_coverage_wide_receipt_does_not_require_a_skipped_track(tmp_path):

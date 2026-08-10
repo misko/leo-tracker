@@ -28,6 +28,7 @@ if [[ "${source_policy}" != "delete" && "${source_policy}" != "retain" ]]; then
 fi
 context_refresh_s="${LEO_OFFLOAD_CONTEXT_REFRESH_S:-600}"
 reconcile_s="${LEO_OFFLOAD_RECONCILE_S:-600}"
+stale_capture_age_s="${LEO_OFFLOAD_STALE_CAPTURE_AGE_S:-3600}"
 pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 archive_root="${LEO_EVIDENCE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -81,6 +82,9 @@ reconcile_exports() {
   if (( force == 0 && now - reconciled_at < reconcile_s )); then
     return
   fi
+  env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
+    python -m leo_tracker.radio.beacon.offload recover-stale "${source_root}" \
+    --minimum-age-s "${stale_capture_age_s}" --summary-only
   env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
     python -m leo_tracker.radio.beacon.offload enqueue-export-backfill \
     "${source_root}" "${shared_root}" --pipeline-id "${pipeline_id}" \

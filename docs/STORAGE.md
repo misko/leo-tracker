@@ -141,6 +141,13 @@ replay-verified tiered-V2 receipt is absent. The source is restored atomically
 through `staging/incoming`, queued for the current analysis pipeline, and kept
 locally until the ordinary V2 reclaimer gates succeed.
 
+Before each periodic backfill, the exporter also repairs local manifests left
+in `capturing` by a host reset. Only manifests stale for at least one hour are
+eligible. Every declared chunk is SHA-256 verified, children must be either the
+manifest or sequential atomic chunk files, and any atomically written orphan
+chunk is added with exact sample extent and an explicit reconstructed-timestamp
+provenance note. Ambiguous or corrupt directories remain untouched.
+
 Dry-run and bounded application:
 
 ```bash

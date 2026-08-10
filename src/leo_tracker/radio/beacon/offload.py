@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import time
 import uuid
 
 
@@ -62,6 +63,99 @@ def preserved_recordings(source_root: Path) -> list[tuple[str, Path]]:
             found += [(f"{session.name}-{item.name}", item)
                       for item in session.iterdir() if item.is_dir()]
     return sorted(found, key=lambda item: item[1].stat().st_mtime)
+
+
+def recover_stale_recordings(source_root: Path, *, minimum_age_s: float = 3600,
+                             dry_run: bool = False) -> dict:
+    """Finalize crash-left local captures as checksummed interrupted prefixes.
+
+    The writer publishes each chunk atomically before updating the manifest, so
+    a hard reset can leave one complete sequential chunk on disk but absent from
+    the manifest. Such a chunk is salvageable; its sample extent is exact while
+    its timestamps are explicitly reconstructed and marked as uncertain.
+    Unexpected files or corrupt declared chunks make the recording ineligible.
+    """
+    source_root = Path(source_root).resolve()
+    if minimum_age_s < 0:
+        raise ValueError("minimum age must be non-negative")
+    now = time.time(); recovered = []; skipped = []; errors = []
+    for name, capture in preserved_recordings(source_root):
+        manifest_path = capture / "manifest.json"
+        try:
+            manifest = _read_json(manifest_path)
+            if manifest.get("state") != "capturing":
+                skipped.append(name); continue
+            if now - manifest_path.stat().st_mtime < minimum_age_s:
+                skipped.append(name); continue
+            original_sha = _sha256(manifest_path)
+            chunks = list(manifest.get("chunks") or [])
+            expected_index = 0; previous_utc = None; declared_names = set()
+            for chunk in chunks:
+                relative = chunk.get("path")
+                if not isinstance(relative, str) or Path(relative).name != relative:
+                    raise ValueError("unsafe declared chunk path")
+                path = capture / relative; declared_names.add(relative)
+                if path.stat().st_size != int(chunk.get("bytes", -1)):
+                    raise ValueError(f"declared chunk size mismatch: {relative}")
+                if _sha256(path) != chunk.get("sha256"):
+                    raise ValueError(f"declared chunk checksum mismatch: {relative}")
+                if int(chunk.get("first_sample_index", -1)) != expected_index:
+                    raise ValueError("declared chunks are not contiguous")
+                expected_index += int(chunk.get("sample_count", 0))
+                previous_utc = int(chunk.get("last_utc_ns", previous_utc or 0))
+            children = {item.name for item in capture.iterdir() if item.is_file()}
+            extras = children - declared_names - {"manifest.json"}
+            expected_extra_names = []
+            index = len(chunks)
+            while f"chunk-{index:06d}.ci16" in extras:
+                expected_extra_names.append(f"chunk-{index:06d}.ci16")
+                index += 1
+            if extras != set(expected_extra_names):
+                raise ValueError(f"unexpected unmanifested files: {sorted(extras)}")
+            rate = float(manifest["sample_rate_hz"])
+            receiver_count = int(manifest.get("receiver_count", 2))
+            sample_bytes = receiver_count * 2 * 2
+            synthesized = []
+            for relative in expected_extra_names:
+                path = capture / relative; byte_count = path.stat().st_size
+                if byte_count <= 0 or byte_count % sample_bytes:
+                    raise ValueError(f"invalid orphan chunk extent: {relative}")
+                sample_count = byte_count // sample_bytes
+                if sample_count > int(manifest.get("chunk_samples", sample_count)):
+                    raise ValueError(f"oversized orphan chunk: {relative}")
+                first_utc = (previous_utc if previous_utc is not None else
+                             int(manifest.get("created_utc_ns", 0)))
+                last_utc = first_utc + round(sample_count / rate * 1e9)
+                record = {"path": relative,
+                    "first_sample_index": expected_index,
+                    "sample_count": sample_count,
+                    "first_utc_ns": first_utc, "last_utc_ns": last_utc,
+                    "read_count": 0, "sha256": _sha256(path),
+                    "bytes": byte_count}
+                chunks.append(record); synthesized.append(relative)
+                expected_index += sample_count; previous_utc = last_utc
+            recovered_manifest = dict(manifest)
+            recovered_manifest.update({"state": "interrupted", "chunks": chunks,
+                "captured_samples_per_receiver": expected_index,
+                "completed_utc_ns": previous_utc or int(manifest.get("created_utc_ns", 0)),
+                "stored_bytes": sum(int(item["bytes"]) for item in chunks),
+                "recovery": {"reason": "stale_capturing_manifest",
+                    "original_manifest_sha256": original_sha,
+                    "recovered_utc": datetime.now(timezone.utc).isoformat(),
+                    "synthesized_orphan_chunks": synthesized,
+                    "timestamp_note": ("orphan chunk UTC bounds are extrapolated from the "
+                        "preceding committed chunk; samples and checksums are exact")}})
+            if not dry_run:
+                _atomic_json(manifest_path, recovered_manifest)
+            recovered.append({"recording_id": name,
+                "captured_samples_per_receiver": expected_index,
+                "stored_bytes": recovered_manifest["stored_bytes"],
+                "synthesized_orphan_chunks": synthesized})
+        except Exception as exc:
+            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+    return {"schema": "leo-tracker.stale-capture-recovery/v1",
+        "recovered": recovered, "skipped": skipped, "errors": errors,
+        "dry_run": dry_run}
 
 
 def _sha256(path: Path) -> str:
@@ -689,6 +783,11 @@ def main(argv: list[str] | None = None) -> int:
     enqueue_export.add_argument("--limit", type=int)
     enqueue_export.add_argument("--dry-run", action="store_true")
     enqueue_export.add_argument("--summary-only", action="store_true")
+    recover_stale = commands.add_parser("recover-stale")
+    recover_stale.add_argument("source_root", type=Path)
+    recover_stale.add_argument("--minimum-age-s", type=float, default=3600)
+    recover_stale.add_argument("--dry-run", action="store_true")
+    recover_stale.add_argument("--summary-only", action="store_true")
     audit = commands.add_parser("audit")
     audit.add_argument("root", type=Path); audit.add_argument("--context", type=Path)
     audit.add_argument("--pipeline-id", default="legacy-v1")
@@ -742,6 +841,20 @@ def main(argv: list[str] | None = None) -> int:
                       "skipped_count": len(report["skipped"]),
                       "error_count": len(report["errors"]),
                       "errors": report["errors"][:20], "dry_run": report["dry_run"]}
+        print(json.dumps(report, sort_keys=True))
+        return 1 if report["errors"] else 0
+    elif args.command == "recover-stale":
+        report = recover_stale_recordings(
+            args.source_root, minimum_age_s=args.minimum_age_s,
+            dry_run=args.dry_run)
+        if args.summary_only:
+            report = {"schema": report["schema"],
+                "recovered_count": len(report["recovered"]),
+                "recovered_bytes": sum(item["stored_bytes"]
+                                       for item in report["recovered"]),
+                "skipped_count": len(report["skipped"]),
+                "error_count": len(report["errors"]),
+                "errors": report["errors"][:20], "dry_run": report["dry_run"]}
         print(json.dumps(report, sort_keys=True))
         return 1 if report["errors"] else 0
     elif args.command == "audit":

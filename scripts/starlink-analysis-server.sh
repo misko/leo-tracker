@@ -514,7 +514,10 @@ worker() {
       done="${queue}/done/$(basename "${marker}")"
       mv "${claim}" "${done}"
       elapsed=$(( $(date +%s) - started ))
-      metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
+      metric="${metrics}/${name}.tsv"
+      # $$ is the server pid in every worker subshell, so it cannot
+      # separate two workers holding markers for the same job name.
+      temporary="${metric}.next.${worker_id}.$$"
       printf 'success\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
       record_duration success "${elapsed}" "${mode}" "${worker_id}"
@@ -529,7 +532,10 @@ worker() {
       failed="${queue}/failed/$(basename "${marker}")"
       mv "${claim}" "${failed}"
       elapsed=$(( $(date +%s) - started ))
-      metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
+      metric="${metrics}/${name}.tsv"
+      # $$ is the server pid in every worker subshell, so it cannot
+      # separate two workers holding markers for the same job name.
+      temporary="${metric}.next.${worker_id}.$$"
       printf 'failed\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
       record_duration failed "${elapsed}" "${mode}" "${worker_id}"
@@ -540,6 +546,7 @@ worker() {
 
 pids=()
 monitor_pid=""
+startup_pid=""
 terminate_process_tree() {
   local parent="$1" child
   while read -r child; do
@@ -550,6 +557,7 @@ terminate_process_tree() {
 }
 stop_children() {
   local pid
+  [[ -z "${startup_pid}" ]] || terminate_process_tree "${startup_pid}"
   [[ -z "${monitor_pid}" ]] || terminate_process_tree "${monitor_pid}"
   for pid in "${pids[@]}"; do terminate_process_tree "${pid}"; done
 }
@@ -575,14 +583,39 @@ for interrupted in "${queue}"/*.running.*; do
   mv "${interrupted}" "${restored}"
 done
 shopt -u nullglob
-audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"
 publish_runtime_state running
 emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_policy=tiered-v2 retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
-emit "recovery ${audit_result}"
-run_backfill startup
-reconcile_failed startup
-print_progress startup
-for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
+startup_reconciliation() {
+  local audit_result
+  audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"
+  emit "recovery ${audit_result}"
+  run_backfill startup
+  reconcile_failed startup
+  print_progress startup
+}
+# Startup reconciliation costs one round trip per already-finished recording,
+# so it scales with the size of the archive rather than with the work waiting.
+# On a high-latency share that walk outgrew the restart interval, and because
+# it gated the worker spawn it left every ready capture unprocessed while the
+# queue kept filling.  Run it beside the workers instead.  The audit only moves
+# entries out of done/ back into the ready queue, and backfill only adds to it,
+# which is precisely what the periodic monitor below already does while workers
+# hold claims -- workers claim under claim.lock, so a late arrival is ordinary.
+# --once keeps the original order: it must reconcile before the workers look,
+# because startup backfill is what populates the queue it is asked to drain.
+if (( once == 1 )); then
+  startup_reconciliation
+  for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
+else
+  for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
+  (
+    # As with the monitor, this must die on teardown rather than inherit the
+    # server's graceful-drain handler and outlive the workers it feeds.
+    trap - TERM INT EXIT
+    startup_reconciliation
+  ) &
+  startup_pid="$!"
+fi
 (
   # This helper must terminate immediately when the parent tears it down; it
   # must not inherit the server's graceful-drain TERM handler.
@@ -614,6 +647,13 @@ done
 terminate_process_tree "${monitor_pid}"
 wait "${monitor_pid}" 2>/dev/null || true
 monitor_pid=""
+if [[ -n "${startup_pid}" ]]; then
+  # Reconciliation is resumed from scratch on the next start, so a drain must
+  # not wait out a walk that can outlast the shutdown timeout.
+  terminate_process_tree "${startup_pid}"
+  wait "${startup_pid}" 2>/dev/null || true
+  startup_pid=""
+fi
 pids=()
 print_progress shutdown
 if [[ -f "${drain_request}" ]]; then

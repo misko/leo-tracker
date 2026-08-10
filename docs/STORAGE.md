@@ -378,7 +378,7 @@ whenever both raw and archive backlogs exist, then fills the remaining slots
 with urgent raw IQ. The Pi reserves one of twelve applied records; Kalman reserves
 16 of 32. This prevents continuous acquisition from starving old v1 forever.
 Each operational plan also stops after a bounded inventory of eligible records
-(320 on the Pi and 128 on Kalman), so one transaction does not require a
+(640 on the Pi and 128 on Kalman), so one transaction does not require a
 complete multi-thousand-record inventory. The wider Pi window is intentional:
 an 80-record production prefix contained nine confirmed beacons and 70
 qualified identities, whereas a read-only 320-record comparison exposed 56
@@ -395,10 +395,12 @@ point: tier-aware selection, rather than additional NFS writers, keeps raw
 retirement safely ahead of capture ingress.
 A later read-only 640-record comparison found 55 eligible strict negatives,
 versus 38 remaining in the contemporaneous 320-record window, while roughly
-doubling inventory time; both ranked 12 negatives first. The service therefore
-stays at 320. As each batch removes 11 raw directories, the bounded window
-advances and admits later candidates without paying the wider scan cost on
-every transaction.
+doubling inventory time; both ranked 12 negatives first. The service remained
+at 320 until its advancing window fell to 19 negatives, only eight beyond the
+next batch's eleven raw slots. It then promoted to 640, where the measured scan
+still projects raw retirement above 100 GB/hour while exposing enough
+low-retention work for several additional batches. This staged widening avoids
+paying the broader scan cost before it produces a different applied plan.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 

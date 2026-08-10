@@ -112,7 +112,7 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert 'audit_args+=(--local-root "${local_root}")' in script
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_LIMIT=12" in unit
-    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=320" in unit
+    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=640" in unit
     assert "Environment=LEO_STORAGE_REGIME_WORKERS=6" in unit
     assert "Environment=LEO_STORAGE_REGIME_ARCHIVE_SLOTS=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=60" in unit

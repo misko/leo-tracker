@@ -377,9 +377,15 @@ Its bounded automatic scope reserves a configured prefix for archive-only v1
 whenever both raw and archive backlogs exist, then fills the remaining slots
 with urgent raw IQ. The Pi reserves one of twelve applied records; Kalman reserves
 16 of 32. This prevents continuous acquisition from starving old v1 forever.
-Each operational plan also stops after a small inventory of eligible records
-(80 on the Pi and 128 on Kalman), so one transaction does not require a
-complete multi-thousand-record inventory.
+Each operational plan also stops after a bounded inventory of eligible records
+(320 on the Pi and 128 on Kalman), so one transaction does not require a
+complete multi-thousand-record inventory. The wider Pi window is intentional:
+an 80-record production prefix contained nine confirmed beacons and 70
+qualified identities, whereas a read-only 320-record comparison exposed 56
+strict negatives and ranked 12 negatives first. Their one-percent controls
+write roughly an order of magnitude less V2 IQ than the 30--40 percent retained
+by the dense historical batches, more than repaying the additional inventory
+reads while reducing NFS contention.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 

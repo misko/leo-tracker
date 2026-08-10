@@ -211,6 +211,29 @@ run_stage() {
   return 1
 }
 
+template_matches_capture() {
+  local template="$1" capture="$2"
+  "${venv}/bin/python" - "${template}" "${capture}/manifest.json" <<'PY'
+import json
+import pathlib
+import sys
+
+try:
+    template = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+    manifest = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+    template_rate = float(template["sample_rate_hz"])
+    capture_rate = float(manifest["sample_rate_hz"])
+    template_region = str(template["region"])
+    capture_region = str(manifest.get("metadata", {}).get("region", ""))
+except (OSError, ValueError, KeyError, TypeError):
+    raise SystemExit(1)
+
+qualified = bool(template.get("summary", {}).get("qualified", False))
+raise SystemExit(0 if (qualified and abs(template_rate-capture_rate) <= 1e-6 and
+                       template_region == capture_region) else 1)
+PY
+}
+
 process_job() {
   local worker_id="$1" name="$2" capture="$3" mode="$4" job_context="$5"
   local report="${reports}/${name}.json" plot="${reports}/plots/${name}.png"
@@ -234,7 +257,11 @@ process_job() {
     *) analysis_args+=(--exact-interval-s "${full_exact_interval_s}") ;;
   esac
   if [[ ("${mode}" == narrow || "${mode}" == hop) && -f "${job_context}/learned-beacon.json" ]]; then
-    template_args=(--beacon-template "${job_context}/learned-beacon.json")
+    if template_matches_capture "${job_context}/learned-beacon.json" "${capture}"; then
+      template_args=(--beacon-template "${job_context}/learned-beacon.json")
+    else
+      emit "template_skipped worker=${worker_id} job=${name} reason=incompatible_rate_region_or_qualification"
+    fi
   fi
   [[ -f "${job_context}/passes.json" ]] && passes_args=(--passes "${job_context}/passes.json")
   run_stage "${worker_id}" "${name}" acquire radio starlink-beacon-analyze "${capture}" "${report}" --window-s 1 \

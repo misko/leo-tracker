@@ -69,7 +69,11 @@ Doppler tracking, TLE association, and cropped evidence publication. A valid
 conditioned-frame artifact that yields no compatible dual-RX group produces an
 explicit zero-track result rather than failing the job. The exporter snapshots
 the current TLE catalog, pass predictions, learned beacon JSON, and its NPZ
-dependency into `leo/context`.
+dependency into `leo/context`. A learned template is an optional detector: the
+worker uses it only when it is qualified and its sample rate and edge region
+match the capture. An incompatible template is logged and the worker falls back
+to the published pilot detector, so a lower-edge context cannot strand valid
+upper-edge history.
 
 Archive `shadow` mode is not a completeness guarantee. Use the receipt and
 cross-store audits in [`STORAGE.md`](STORAGE.md) and

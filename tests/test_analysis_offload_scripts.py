@@ -313,6 +313,86 @@ def test_server_worker_stops_pipeline_and_marks_failed_when_analysis_fails(tmp_p
     assert not list((queue / "done").glob("*.job"))
 
 
+def test_server_skips_incompatible_optional_learned_template(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/upper-edge"
+    context = tmp_path / "context/upper-edge-job"
+    queue.mkdir(parents=True); capture.mkdir(parents=True); context.mkdir(parents=True)
+    (capture / "manifest.json").write_text(json.dumps({
+        "sample_rate_hz": 2_500_000,
+        "metadata": {"region": "upper-edge"},
+    }))
+    (context / "learned-beacon.json").write_text(json.dumps({
+        "sample_rate_hz": 2_500_000,
+        "region": "lower-edge",
+        "summary": {"qualified": True},
+    }))
+    (queue / "0001.job").write_text(
+        f"upper-edge\t{capture}\tnarrow\t{context}\n")
+    calls = tmp_path / "calls.log"
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$*\" >> \"$UV_STUB_LOG\"\n"
+        "exit 0\n")
+    uv_stub.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",
+         "--workers", "1", str(tmp_path)],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+                          "UV_STUB_LOG": str(calls)},
+        text=True, capture_output=True, timeout=30)
+
+    assert result.returncode == 0, result.stderr
+    assert ("template_skipped worker=0 job=upper-edge "
+            "reason=incompatible_rate_region_or_qualification") in result.stdout
+    analyze_call = next(line for line in calls.read_text().splitlines()
+                        if "starlink-beacon-analyze" in line)
+    assert "--beacon-template" not in analyze_call
+    assert list((queue / "done").glob("*.job"))
+
+
+def test_server_uses_compatible_qualified_learned_template(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/lower-edge"
+    context = tmp_path / "context/lower-edge-job"
+    queue.mkdir(parents=True); capture.mkdir(parents=True); context.mkdir(parents=True)
+    (capture / "manifest.json").write_text(json.dumps({
+        "sample_rate_hz": 2_500_000,
+        "metadata": {"region": "lower-edge"},
+    }))
+    template = context / "learned-beacon.json"
+    template.write_text(json.dumps({
+        "sample_rate_hz": 2_500_000,
+        "region": "lower-edge",
+        "summary": {"qualified": True},
+    }))
+    (queue / "0001.job").write_text(
+        f"lower-edge\t{capture}\tnarrow\t{context}\n")
+    calls = tmp_path / "calls.log"
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$*\" >> \"$UV_STUB_LOG\"\n"
+        "exit 0\n")
+    uv_stub.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",
+         "--workers", "1", str(tmp_path)],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+                          "UV_STUB_LOG": str(calls)},
+        text=True, capture_output=True, timeout=30)
+
+    assert result.returncode == 0, result.stderr
+    analyze_call = next(line for line in calls.read_text().splitlines()
+                        if "starlink-beacon-analyze" in line)
+    assert f"--beacon-template {template}" in analyze_call
+    assert "template_skipped" not in result.stdout
+    assert list((queue / "done").glob("*.job"))
+
+
 def test_server_drain_finishes_claimed_job_without_claiming_next(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     capture = tmp_path / "captures/sample"

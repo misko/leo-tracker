@@ -41,6 +41,20 @@ def test_audit_detects_orphan_derived_and_versioned_outputs(tmp_path):
     assert audit["violation_counts"]["versioned_outputs"] == 2
 
 
+def test_audit_detects_stale_shared_transient(tmp_path):
+    shared, archive = tmp_path / "shared", tmp_path / "archive"
+    queue = shared / "staging/analysis-queue"; queue.mkdir(parents=True)
+    stale = queue / "drain.request.next.42"; stale.write_text("old")
+    import os
+    os.utime(stale, (1, 1))
+
+    audit = build_storage_regime_audit(
+        shared, archive, minimum_age_hours=0)
+
+    assert audit["converged"] is False
+    assert audit["violation_counts"]["stale_shared_transients"] == 1
+
+
 def test_audit_cli_writes_report_and_returns_nonzero_until_converged(
         tmp_path, capsys):
     shared, archive, _ = _ready(tmp_path, "audit-cli")

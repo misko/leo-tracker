@@ -97,6 +97,9 @@ from .beacon.local_artifact_convergence import (
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
                                     build_qnap_lifecycle_plan,
                                     qnap_storage_mutation_lock)
+from .beacon.shared_transient_convergence import (
+    CONFIRMATION as SHARED_TRANSIENT_CONFIRMATION,
+    apply_shared_transient_plan, build_shared_transient_plan)
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -462,6 +465,29 @@ def command_starlink_local_artifact_converge(args: argparse.Namespace) -> int:
                 "reports/reclamation/local-obsolete-artifacts.json")}
     print(json.dumps(result, sort_keys=True))
     return 1 if result.get("deferred") else 0
+
+
+def command_starlink_shared_transient_converge(args: argparse.Namespace) -> int:
+    plan = build_shared_transient_plan(
+        args.shared_root, args.archive_root,
+        minimum_age_s=args.minimum_age_s)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    if args.apply:
+        result = apply_shared_transient_plan(plan, confirmation=args.confirm)
+        output = {"status": result["status"],
+            "removed_count": result["removed_count"],
+            "removed_bytes": result["removed_bytes"],
+            "deferred_count": len(result.get("deferred", [])),
+            "receipt": str(args.shared_root /
+                "reports/reclamation/shared-transients.json")}
+    else:
+        output = {"dry_run": True, **plan["summary"]}
+    print(json.dumps(output, sort_keys=True))
+    return 1 if output.get("deferred_count") else 0
 
 
 def command_starlink_qnap_lifecycle(args: argparse.Namespace) -> int:
@@ -1946,6 +1972,16 @@ def build_parser() -> argparse.ArgumentParser:
     artifact_converge.add_argument("--apply", action="store_true")
     artifact_converge.add_argument("--output", type=Path)
     artifact_converge.set_defaults(handler=command_starlink_local_artifact_converge)
+    shared_transients = commands.add_parser("starlink-shared-transient-converge",
+        help="audit and retire stale atomic files and superseded QNAP partials")
+    shared_transients.add_argument("shared_root", type=Path)
+    shared_transients.add_argument("archive_root", type=Path)
+    shared_transients.add_argument("--minimum-age-s", type=float, default=6 * 3600)
+    shared_transients.add_argument("--output", type=Path)
+    shared_transients.add_argument("--apply", action="store_true")
+    shared_transients.add_argument("--confirm", default="",
+        help=f"required literal {SHARED_TRANSIENT_CONFIRMATION} with --apply")
+    shared_transients.set_defaults(handler=command_starlink_shared_transient_converge)
     qnap = commands.add_parser("starlink-qnap-lifecycle",
         help="rank QNAP raw IQ for pressure-based retention; dry-run by default")
     qnap.add_argument("shared_root", type=Path)

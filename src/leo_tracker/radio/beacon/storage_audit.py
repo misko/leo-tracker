@@ -10,6 +10,7 @@ from .storage_regime import build_storage_regime_plan
 from .local_reclamation import build_reclamation_plan
 from .local_report_convergence import build_local_report_plan
 from .local_artifact_convergence import inventory_obsolete_local_artifacts
+from .shared_transient_convergence import inventory_stale_shared_transients
 
 
 AUDIT_SCHEMA = "leo-tracker.storage-regime-v2-audit/v1"
@@ -198,6 +199,11 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         maximum_heartbeat_age_s=maximum_producer_heartbeat_age_s)
     violation_counts["producer_contract"] = int(
         require_producer_contract and not producer["valid"])
+    stale_shared = inventory_stale_shared_transients(
+        shared_root, archive_root,
+        minimum_age_s=minimum_age_hours * 3600,
+        sample_limit=sample_limit)
+    violation_counts["stale_shared_transients"] = stale_shared["count"]
     local = None
     if local_root is not None:
         if not local_root.is_dir():
@@ -250,6 +256,7 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         "old_raw_samples": old_raw[:sample_limit],
         "migration_summary": migration["summary"],
         "producer_contract": producer,
+        "stale_shared_transients": stale_shared,
         "local": local,
         "legacy": legacy,
     }

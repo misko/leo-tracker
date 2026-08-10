@@ -174,6 +174,26 @@ The command re-hashes every local and authoritative artifact after taking its
 lock, writes a prepared QNAP receipt, and only then removes the local copy.
 Current queue claims and operational lock files are outside its scope.
 
+Shared transient cleanup is separate because it mutates QNAP. The
+`starlink-shared-transient-converge` plan covers old interrupted atomic
+`*.next.<pid>` files and stale upload or Evidence-v2 `.partial` directories.
+An upload partial is deletable only when its final immutable capture manifest
+already exists. An Evidence-v2 partial is deletable only behind the matching
+verified production receipt. Unresolved partials remain visible to the final
+audit and are never guessed away. Application revalidates every tree and
+authority under the global QNAP lock and requires an explicit confirmation:
+
+```bash
+uv run --active --no-sync leo-radio starlink-shared-transient-converge \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-s 21600
+
+uv run --active --no-sync leo-radio starlink-shared-transient-converge \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-s 21600 --apply \
+  --confirm DELETE-STALE-LEO-TRANSIENTS
+```
+
 Dry-run and bounded application:
 
 ```bash
@@ -465,7 +485,8 @@ analysis queue depth, or aggregate bytes. For every recording in scope:
 The storage-layout convergence gate additionally requires that no age-eligible
 raw (except a current manual pin), v1 evidence/catalog, shadow catalog,
 same-volume `derived/` duplicate, physical `runs/.../outputs/` artifact, local
-legacy marker, abandoned frame scratch, or review checkpoint remains. Run it
+legacy marker, abandoned frame scratch, review checkpoint, or stale shared
+atomic/upload/archive transient remains. Run it
 only when no mutator owns the shared QNAP lock; the CLI acquires that lock for
 a consistent inventory and exits nonzero until every category is zero:
 

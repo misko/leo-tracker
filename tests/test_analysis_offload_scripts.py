@@ -410,6 +410,59 @@ def test_server_worker_exits_cleanly_when_once_queue_is_empty(tmp_path):
     assert "server_stop status=0" in result.stdout
 
 
+def test_server_claims_ready_work_while_startup_reconciliation_still_runs(
+    tmp_path,
+):
+    """Workers must not wait for a walk whose cost scales with the archive.
+
+    `offload audit` stats one completion record per finished recording, so on a
+    high-latency share it grew past the restart interval: a queue of ready
+    captures sat unclaimed for the entire walk, and every restart began it
+    again from the top, so nothing was analysed at all.
+    """
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/sample-one"
+    queue.mkdir(parents=True)
+    capture.mkdir(parents=True)
+    (queue / "0001.job").write_text(f"sample-one\t{capture}\tnarrow\n")
+    audit_started = tmp_path / "audit-started"
+    audit_finished = tmp_path / "audit-finished"
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"$*\" == *\"offload audit\"* ]]; then\n"
+        f"  printf start > {audit_started!s}\n"
+        "  sleep 30\n"
+        f"  printf done > {audit_finished!s}\n"
+        "fi\n"
+        "exit 0\n")
+    uv_stub.chmod(0o755)
+
+    server = subprocess.Popen(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"),
+         "--workers", "1", str(tmp_path)],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub)},
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    try:
+        deadline = time.monotonic() + 20
+        while (not list((queue / "done").glob("*.job"))
+               and time.monotonic() < deadline):
+            time.sleep(0.05)
+        claimed = list((queue / "done").glob("*.job"))
+        # The audit is still sleeping, so the job can only have been claimed
+        # concurrently with it -- never after it.
+        assert audit_started.exists()
+        assert not audit_finished.exists()
+        assert claimed, "worker never claimed ready work during the audit"
+    finally:
+        server.terminate()
+        output, _ = server.communicate(timeout=30)
+
+    assert server.returncode == 0, output
+    assert "job_done worker=0 job=sample-one" in output
+    assert not audit_finished.exists()
+
+
 def test_server_worker_reports_job_stage_progress_and_eta(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     capture = tmp_path / "captures/sample-one"

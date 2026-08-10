@@ -3,7 +3,7 @@ import json
 import os
 import shutil
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -1424,3 +1424,44 @@ def test_beacon_evidence_plot_is_published(tmp_path):
     plot_beacon_followup({"source_analysis": str(source),
                           "checks": report["exact_checks"]}, followup_plot)
     assert followup_plot.read_bytes().startswith(b"\x89PNG")
+
+
+def test_capture_name_survives_a_same_second_collision(tmp_path):
+    """A recording name is an identity, and it resolves to one second.
+
+    Two captures of the same channel, region, and mode inside one second used
+    to collide on the exclusive mkdir and abort the capture. Pre-creating the
+    names for this second and the next two forces the collision regardless of
+    where the test lands relative to the second boundary.
+    """
+    repo = Path(__file__).parents[1]
+    storage = tmp_path / "collision-store"
+    captures = storage / "captures"
+    captures.mkdir(parents=True)
+    taken = []
+    for ahead in range(3):
+        moment = datetime.now(timezone.utc) + timedelta(seconds=ahead)
+        stamp = moment.strftime("%Y%m%dT%H%M%SZ")
+        occupied = captures / f"ch4-lower-edge-narrow-{stamp}"
+        occupied.mkdir()
+        taken.append(occupied.name)
+
+    environment = os.environ | {
+        "LEO_TRACKER_REPO": str(repo), "LEO_BEACON_STORAGE": str(storage),
+        "LEO_BEACON_DWELL_S": ".04", "LEO_BEACON_OVERSAMPLE_ON_STARTUP": "0",
+        "LEO_BEACON_OVERSAMPLE_EVERY_CYCLES": "0",
+        "LEO_BEACON_WIDE_EVERY_CYCLES": "0", "LEO_BEACON_HOP_EVERY_CYCLES": "0",
+        "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
+        "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
+        "UV_CACHE_DIR": str(repo / ".uv-cache"), "UV_BIN": shutil.which("uv") or "uv"}
+
+    result = subprocess.run(["bash", str(repo / "scripts/starlink-beacon-watch.sh")],
+                            env=environment, text=True, capture_output=True,
+                            timeout=180)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    written = {path.name for path in captures.iterdir()
+               if path.is_dir() and (path / "manifest.json").is_file()}
+    # It must have stepped past every occupied name rather than failing.
+    assert written, result.stdout + result.stderr
+    assert not written & set(taken)

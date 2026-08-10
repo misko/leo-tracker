@@ -170,7 +170,7 @@ PY
 fi
 
 capture_target() {
-    local target="$1" mode="$2" channel region stamp name capture
+    local target="$1" mode="$2" channel region stamp name capture name_attempt
     local pi_temp_millic pi_temp radio_temp_millic radio_temp
     local gain_draw gain_bucket gain_probability gain_mode
     local -a temperature_args capture_args gain_args
@@ -182,13 +182,31 @@ capture_target() {
     done
     channel="${target%%:*}"
     region="${target##*:}"
-    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-    if [[ -n "${radio_id}" ]]; then
-      name="ch${channel}-${region}-${mode}-${radio_id}-${stamp}"
-    else
-      name="ch${channel}-${region}-${mode}-${stamp}"
-    fi
-    capture="${storage_root}/captures/${name}"
+    # The stamp resolves to one second, and a recording name is an identity:
+    # it keys the archive, the receipts, and every report path. Two captures of
+    # the same channel, region, and mode inside one second therefore collide,
+    # and the capture aborts outright on the exclusive mkdir. Wait past the
+    # second boundary and re-stamp rather than inventing a new name format,
+    # which would orphan every artifact that already refers to the old one.
+    name_attempt=0
+    while :; do
+      stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+      if [[ -n "${radio_id}" ]]; then
+        name="ch${channel}-${region}-${mode}-${radio_id}-${stamp}"
+      else
+        name="ch${channel}-${region}-${mode}-${stamp}"
+      fi
+      capture="${storage_root}/captures/${name}"
+      [[ -e "${capture}" ]] || break
+      name_attempt=$((name_attempt + 1))
+      if (( name_attempt >= 10 )); then
+        # Bounded: something other than a same-second collision is wrong, and
+        # the capture should fail loudly rather than spin.
+        printf '{"capture_name_unavailable":true,"name":"%s"}\n' "${name}" >&2
+        break
+      fi
+      sleep 1
+    done
     if read_host_temperature &&
        (( host_temperature_millic_value >= maximum_pi_temp_millic )); then
       while (( host_temperature_millic_value >= resume_pi_temp_millic )); do

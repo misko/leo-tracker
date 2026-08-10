@@ -22,6 +22,7 @@ Environment=LEO_STORAGE_REGIME_ROLE=fallback
 Environment=LEO_STORAGE_PRIMARY_HEARTBEAT_S=30
 Environment=LEO_STORAGE_PRIMARY_LEASE_MAX_AGE_S=120
 Environment=LEO_STORAGE_AUDIT_INTERVAL_S=600
+Environment=LEO_STORAGE_LOCAL_ROOT=/mnt/leo-nvme/leo-tracker
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-storage-regime-v2.sh /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
 Restart=on-failure
 RestartSec=30

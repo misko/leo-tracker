@@ -7,6 +7,8 @@ from pathlib import Path
 import time
 
 from .storage_regime import build_storage_regime_plan
+from .local_reclamation import build_reclamation_plan
+from .local_report_convergence import build_local_report_plan
 
 
 AUDIT_SCHEMA = "leo-tracker.storage-regime-v2-audit/v1"
@@ -108,7 +110,8 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
                                minimum_age_hours: float = 6,
                                sample_limit: int = 20,
                                require_producer_contract: bool = False,
-                               maximum_producer_heartbeat_age_s: float = 180) -> dict:
+                               maximum_producer_heartbeat_age_s: float = 180,
+                               local_root: Path | None = None) -> dict:
     """Prove whether all durable storage uses the current production layout."""
     if minimum_age_hours < 0:
         raise ValueError("minimum age must be non-negative")
@@ -117,6 +120,7 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
     if maximum_producer_heartbeat_age_s <= 0:
         raise ValueError("maximum producer heartbeat age must be positive")
     shared_root = Path(shared_root).resolve(); archive_root = Path(archive_root).resolve()
+    local_root = Path(local_root).resolve() if local_root is not None else None
     migration = build_storage_regime_plan(
         shared_root, archive_root, minimum_age_hours=minimum_age_hours,
         scope="all")
@@ -193,6 +197,39 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         maximum_heartbeat_age_s=maximum_producer_heartbeat_age_s)
     violation_counts["producer_contract"] = int(
         require_producer_contract and not producer["valid"])
+    local = None
+    if local_root is not None:
+        if not local_root.is_dir():
+            local = {"root": str(local_root), "missing": True,
+                     "unresolved_old": [], "report_plan": None,
+                     "legacy_evidence_reports": None}
+            violation_counts["local_root_missing"] = 1
+            violation_counts["local_unresolved_old"] = 0
+            violation_counts["local_legacy_reports"] = 0
+            violation_counts["local_legacy_evidence_reports"] = 0
+        else:
+            local_plan = build_reclamation_plan(
+                local_root, shared_root, archive_root=archive_root,
+                minimum_age_s=minimum_age_hours * 3600)
+            allowed = {"minimum_age_not_met", "active_or_partial"}
+            unresolved = [item for item in local_plan["entries"]
+                          if item.get("status") not in allowed]
+            report_plan = build_local_report_plan(local_root, shared_root)
+            legacy_reports = _tree(
+                local_root / "evidence" / "pilot_symbolwise_v3" / "reports",
+                sample_limit=sample_limit)
+            local = {"root": str(local_root), "missing": False,
+                "reclamation_summary": local_plan["summary"],
+                "unresolved_old": unresolved[:sample_limit],
+                "unresolved_old_count": len(unresolved),
+                "report_plan": report_plan["summary"],
+                "legacy_evidence_reports": legacy_reports}
+            violation_counts["local_root_missing"] = 0
+            violation_counts["local_unresolved_old"] = len(unresolved)
+            violation_counts["local_legacy_reports"] = report_plan[
+                "summary"]["eligible_count"]
+            violation_counts["local_legacy_evidence_reports"] = legacy_reports[
+                "file_count"]
     return {
         "schema": AUDIT_SCHEMA,
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -208,5 +245,6 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         "old_raw_samples": old_raw[:sample_limit],
         "migration_summary": migration["summary"],
         "producer_contract": producer,
+        "local": local,
         "legacy": legacy,
     }

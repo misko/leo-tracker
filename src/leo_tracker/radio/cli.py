@@ -576,7 +576,8 @@ def command_starlink_storage_audit_v2(args: argparse.Namespace) -> int:
             sample_limit=args.sample_limit,
             require_producer_contract=args.require_producer_contract,
             maximum_producer_heartbeat_age_s=
-                args.maximum_producer_heartbeat_age_s)
+                args.maximum_producer_heartbeat_age_s,
+            local_root=args.local_root)
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             temporary = args.output.with_name(args.output.name + ".next")
@@ -2012,6 +2013,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="also require a fresh running Kalman tiered-v2 producer heartbeat")
     storage_audit.add_argument("--maximum-producer-heartbeat-age-s", type=float,
         default=180)
+    storage_audit.add_argument("--local-root", type=Path,
+        help="also prove acquisition-host raw, quarantine and reports converged")
     storage_audit.add_argument("--output", type=Path)
     storage_audit.set_defaults(handler=command_starlink_storage_audit_v2)
     legacy_normalize = commands.add_parser("starlink-storage-normalize-legacy",

@@ -19,6 +19,7 @@ plan="${shared_root}/reports/retention/storage-regime-v2.latest.json"
 legacy_plan="${shared_root}/reports/retention/legacy-layout.latest.json"
 audit_report="${shared_root}/reports/retention/storage-v2-audit.json"
 audit_interval_s="${LEO_STORAGE_AUDIT_INTERVAL_S:-600}"
+local_root="${LEO_STORAGE_LOCAL_ROOT:-}"
 role="${LEO_STORAGE_REGIME_ROLE:-standalone}"
 primary_state="${shared_root}/reports/runtime/storage-regime-v2-primary.json"
 primary_heartbeat_s="${LEO_STORAGE_PRIMARY_HEARTBEAT_S:-30}"
@@ -183,6 +184,7 @@ PY
         audit_args=(starlink-storage-audit-v2 "${shared_root}" "${archive_root}"
           --minimum-age-hours "${minimum_age_hours}"
           --require-producer-contract --output "${audit_report}")
+        [[ -z "${local_root}" ]] || audit_args+=(--local-root "${local_root}")
         if env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run \
             --active --no-sync leo-radio "${audit_args[@]}"; then
           printf '[%s] storage_regime_converged audit=%s\n' \

@@ -102,3 +102,24 @@ def test_audit_can_require_a_fresh_tiered_v2_producer_contract(tmp_path):
     assert current["converged"] is True
     assert current["violation_counts"]["producer_contract"] == 0
     assert current["producer_contract"]["valid"] is True
+
+
+def test_audit_can_prove_local_acquisition_storage_convergence(tmp_path):
+    shared, archive, local = (tmp_path / "shared", tmp_path / "archive",
+                              tmp_path / "local")
+    stale = local / "captures/stale"; stale.mkdir(parents=True)
+    (stale / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "chunks": []}))
+    report = local / "reports/plots/legacy.png"
+    report.parent.mkdir(parents=True); report.write_bytes(b"plot")
+    legacy = local / "evidence/pilot_symbolwise_v3/reports/legacy.json"
+    legacy.parent.mkdir(parents=True); legacy.write_text("{}")
+
+    audit = build_storage_regime_audit(
+        shared, archive, minimum_age_hours=0, local_root=local)
+
+    assert audit["converged"] is False
+    assert audit["violation_counts"]["local_unresolved_old"] == 1
+    assert audit["violation_counts"]["local_legacy_reports"] == 1
+    assert audit["violation_counts"]["local_legacy_evidence_reports"] == 1
+    assert audit["local"]["unresolved_old"][0]["durable_copy"] == "empty_terminal"

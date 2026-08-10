@@ -102,7 +102,10 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
 
 def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     unit = (ROOT / "deploy/systemd/leo-tracker-storage-regime-v2-fallback.service").read_text()
+    script = (ROOT / "scripts/starlink-storage-regime-v2.sh").read_text()
     assert "User=satpi01" in unit
+    assert "LEO_STORAGE_LOCAL_ROOT=/mnt/leo-nvme/leo-tracker" in unit
+    assert 'audit_args+=(--local-root "${local_root}")' in script
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_LIMIT=6" in unit
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=48" in unit

@@ -90,6 +90,8 @@ from .beacon.legacy_normalizer import (
     apply_legacy_layout_plan, build_legacy_layout_plan)
 from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
+from .beacon.local_report_convergence import (
+    apply_local_report_plan, build_local_report_plan)
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
                                     build_qnap_lifecycle_plan,
                                     qnap_storage_mutation_lock)
@@ -422,6 +424,19 @@ def command_starlink_storage_reconcile(args: argparse.Namespace) -> int:
         if not args.watch:
             return 0
         time.sleep(args.interval_s)
+
+
+def command_starlink_local_report_converge(args: argparse.Namespace) -> int:
+    plan = build_local_report_plan(args.local_root, args.shared_root)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    result = (apply_local_report_plan(plan) if args.apply else
+              {"dry_run": True, **plan["summary"]})
+    print(json.dumps(result, sort_keys=True))
+    return 1 if result.get("deferred") else 0
 
 
 def command_starlink_qnap_lifecycle(args: argparse.Namespace) -> int:
@@ -1887,6 +1902,13 @@ def build_parser() -> argparse.ArgumentParser:
     reconcile.add_argument("--watch", action="store_true")
     reconcile.add_argument("--interval-s", type=float, default=60)
     reconcile.set_defaults(handler=command_starlink_storage_reconcile)
+    report_converge = commands.add_parser("starlink-local-report-converge",
+        help="atomically move legacy local reports under QNAP authority")
+    report_converge.add_argument("local_root", type=Path)
+    report_converge.add_argument("shared_root", type=Path)
+    report_converge.add_argument("--apply", action="store_true")
+    report_converge.add_argument("--output", type=Path)
+    report_converge.set_defaults(handler=command_starlink_local_report_converge)
     qnap = commands.add_parser("starlink-qnap-lifecycle",
         help="rank QNAP raw IQ for pressure-based retention; dry-run by default")
     qnap.add_argument("shared_root", type=Path)

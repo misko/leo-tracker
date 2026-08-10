@@ -153,6 +153,15 @@ treated as acquisition sources, not as a permanent second archive. They pass
 through the same atomic exporter and V2 replay gates, after which the local
 full-IQ directories are reclaimed by receipt like captures and quarantine.
 
+Legacy local derived reports converge separately with
+`leo-radio starlink-local-report-converge`. Missing relative paths are copied
+atomically into the QNAP report authority; if a QNAP artifact already exists it
+wins and is never overwritten. A receipt is published before local removal.
+The live learned beacon, calibration, and gain-experiment state remains local
+because the watcher reads or updates it. Everything else under local `reports/`
+is historical and is removed only after every planned artifact has a shared
+authority or the complete operation is deferred without deletions.
+
 Dry-run and bounded application:
 
 ```bash

@@ -46,6 +46,11 @@ wide_exact_interval_s="${LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S:-2}"
 # Wide captures are recorded at 10 MS/s, so 2.5 MHz subbands can only be tuned
 # +-3.75 MHz before leaving the sampled band.  Match the acquisition watcher.
 wide_acquisition_span_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ:-3500000}"
+# Provider comparison runs the same track against each independently retrieved
+# catalog. Empty disables it. The receipt never depends on these outputs.
+catalog_store_root="${LEO_CATALOG_STORE_ROOT:-/mnt/qnap01/mouse9911/tle}"
+association_compare_sources="${LEO_ASSOCIATION_COMPARE_SOURCES:-space-track huggingface}"
+association_compare_scope="${LEO_ASSOCIATION_COMPARE_SCOPE:-starlink}"
 wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
 # Conditioned dual-RX frames remain separated unless both CFO trajectories and
 # their relative receiver offset extrapolate across the outage. Fifteen seconds
@@ -128,6 +133,16 @@ git_commit="$(git rev-parse --verify HEAD 2>/dev/null || printf unknown)"
 radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
 orbit() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-orbit "$@"; }
 protocol() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python -m leo_tracker.radio.beacon.offload "$@"; }
+
+# Associate one track against a named catalog-store snapshot. Used only for
+# provider comparison, so it reports failure to the caller instead of aborting.
+associate_against_snapshot() {
+  local observations="$1" snapshot="$2" output="$3"
+  orbit associate --observations "${observations}" --catalog "${snapshot}" \
+    --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
+    --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
+    --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" --output "${output}" >/dev/null
+}
 
 run_backfill() {
   local reason="$1" result
@@ -356,6 +371,7 @@ process_job() {
   local fragment_association="${reports}/fragment-associations/${name}.json"
   local fragment_diagnostic="${reports}/fragment-diagnostics/${name}.json"
   local has_checks=0 archived=0
+  local source comparison snapshot
   local -a analysis_args template_args frame_args track_args passes_args
   analysis_args=(--exact-window-s .01)
   template_args=(); frame_args=(); passes_args=()
@@ -416,6 +432,24 @@ process_job() {
       --lat "${LEO_BEACON_OBSERVER_LAT:-37.849165355010086}" \
       --lon "${LEO_BEACON_OBSERVER_LON:--122.48567658142287}" \
       --alt-m "${LEO_BEACON_OBSERVER_ALT_M:-0}" --output "${association}" || return 1
+    # Repeat the same track against each independently retrieved catalog so the
+    # providers can be compared on identical observations. This is additive:
+    # the receipt still depends only on the context-bundle association above,
+    # and a provider that is unavailable or stale must never fail a job.
+    for source in ${association_compare_sources}; do
+      comparison="${reports}/associations/${source}/${name}.json"
+      snapshot="${catalog_store_root}/latest/${source}/${association_compare_scope}.json"
+      if [[ ! -f "${snapshot}" ]]; then
+        emit "association_compare_skipped worker=${worker_id} job=${name} source=${source} reason=no_snapshot"
+        continue
+      fi
+      mkdir -p "$(dirname "${comparison}")"
+      if associate_against_snapshot "${track}" "${snapshot}" "${comparison}"; then
+        emit "association_compare worker=${worker_id} job=${name} source=${source} output=${comparison}"
+      else
+        emit "association_compare_failed worker=${worker_id} job=${name} source=${source}"
+      fi
+    done
   fi
   # Fixed-tuning beacon traffic can disappear for seconds while the same
   # spacecraft remains visible. Preserve those outages, conservatively link

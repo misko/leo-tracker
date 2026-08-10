@@ -917,3 +917,24 @@ def test_exporter_refuses_incomplete_capture(tmp_path):
     assert result.returncode == 0
     assert capture.exists()
     assert not list((shared / "staging/analysis-queue").glob("*.job"))
+
+
+def test_provider_comparison_is_additive_and_never_fails_a_job():
+    """Comparison runs must not become a new way for analysis to fail.
+
+    The receipt depends only on the context-bundle association, so a provider
+    that is missing or erroring is recorded and skipped. Without this the
+    pipeline would gain a hard dependency on an external catalog service.
+    """
+    source = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
+    assert 'association_compare_sources="${LEO_ASSOCIATION_COMPARE_SOURCES:-space-track huggingface}"' in source
+    assert 'catalog_store_root="${LEO_CATALOG_STORE_ROOT:-/mnt/qnap01/mouse9911/tle}"' in source
+    # Per-source outputs, so two providers never overwrite each other.
+    assert 'comparison="${reports}/associations/${source}/${name}.json"' in source
+    assert "association_compare_skipped" in source and "association_compare_failed" in source
+    # The comparison loop must not use run_stage, which aborts the job on failure.
+    block = source.split("for source in ${association_compare_sources}")[1].split("    done")[0]
+    assert "run_stage" not in block
+    assert "|| return 1" not in block
+    # The receipted association still comes from the context bundle.
+    assert '--catalog "${job_context}/tle-catalog.json" \\' in source

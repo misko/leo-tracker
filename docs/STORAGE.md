@@ -354,11 +354,11 @@ processes twelve transactions with six independent deletion-last workers per
 bounded plan, followed by a sixty-second idle interval. The idle window lets
 Kalman's NFS-backed analysis workers drain queue claims between write-heavy
 migration batches; field measurements showed nine live jobs clearing in under
-one minute. Six-worker field batches retired 79.7--85.5 GB of raw IQ per hour;
-including the idle window projects about 78.5 GB/hour, slightly above the
-measured 77.48 GB/hour verified capture ingress. The previous five-worker
-setting retired only 69.6 GB in the same one-hour comparison and therefore
-allowed the raw backlog to grow.
+one minute. Dense six-worker field batches retired 75.6--85.5 GB of raw IQ per
+hour before the idle window, which could still fall below the measured 77.48
+GB/hour verified capture ingress. The previous five-worker setting retired
+only 69.6 GB in the same one-hour comparison and therefore allowed the raw
+backlog to grow.
 `Nice=10`,
 `CPUWeight=20`, and `IOWeight=20` continue to give capture priority. Kalman
 migration, the Pi fallback, and the six-hour QNAP raw
@@ -386,6 +386,13 @@ strict negatives and ranked 12 negatives first. Their one-percent controls
 write roughly an order of magnitude less V2 IQ than the 30--40 percent retained
 by the dense historical batches, more than repaying the additional inventory
 reads while reducing NFS contention.
+The first production 320-record batch selected eleven strict negatives plus
+one confirmed archive-only fairness record. It migrated 28.8 GB of source in
+759.96 seconds, wrote only 0.6124 GB of V2 evidence, and retired 26.4 GB of raw
+IQ at 115.9 GB/hour after including the idle window. Kalman's ready queue
+reached zero during the transaction. This is the current measured operating
+point: tier-aware selection, rather than additional NFS writers, keeps raw
+retirement safely ahead of capture ingress.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 

@@ -182,7 +182,7 @@ def test_watcher_rejects_ambiguous_analysis_mode(tmp_path):
     assert "must be local or offload" in result.stderr
 
 
-def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
+def test_kalman_service_uses_sixteen_single_thread_workers_with_required_v2():
     unit = (ROOT / "deploy/leo-tracker-analysis-server.service").read_text()
     assert "Environment=LEO_ANALYSIS_WORKERS=16" in unit
     assert "Environment=LEO_ANALYSIS_FULL_COVERAGE=1" in unit
@@ -212,6 +212,32 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert "Environment=OPENBLAS_NUM_THREADS=1" in unit
     assert "Environment=MKL_NUM_THREADS=1" in unit
     assert "TimeoutStopSec=1800" in unit
+
+
+def test_server_publishes_atomic_v2_runtime_contract(tmp_path):
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text("#!/usr/bin/env bash\nexit 0\n")
+    uv_stub.chmod(0o755)
+    archive = tmp_path / "archive"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",
+         "--workers", "1", str(tmp_path)],
+        env=os.environ | {
+            "LEO_TRACKER_REPO": str(ROOT),
+            "UV_BIN": str(uv_stub),
+            "LEO_ANALYSIS_ARCHIVE_MODE": "required",
+            "LEO_ANALYSIS_ARCHIVE_ROOT": str(archive),
+        },
+        text=True, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    state = json.loads(
+        (tmp_path / "reports/runtime/analysis-server.json").read_text())
+    assert state["schema"] == "leo-tracker.analysis-server-runtime/v1"
+    assert state["state"] == "stopped"
+    assert state["archive_mode"] == "required"
+    assert state["evidence_policy"] == "tiered-v2"
+    assert state["archive_command"] == "starlink-evidence-archive-v2"
+    assert state["producer_contract_valid"] is False
 
 
 def test_wide_acquisition_span_fits_the_recorded_wide_capture_bandwidth():

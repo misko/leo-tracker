@@ -68,9 +68,14 @@ than the source. A short two- or five-second hop child can legitimately retain
 recording. This is not an archive failure. Longer negative and sparse-event
 captures provide most of the measured reduction.
 
-The live Kalman service uses `LEO_ANALYSIS_ARCHIVE_MODE=shadow` and
-`LEO_ANALYSIS_RETENTION_MODE=disabled`. It attempts one archive transaction per
-job, but an archive failure does not delete QNAP raw IQ. Acquisition-host
+The live Kalman service must use `LEO_ANALYSIS_ARCHIVE_MODE=required` and
+`LEO_ANALYSIS_RETENTION_MODE=disabled`. Every successful job therefore publishes
+a replay-verified production-v2 bundle; archive failure fails the job and leaves
+QNAP raw IQ intact. The server atomically publishes its current code revision,
+heartbeat and producer contract to
+`leo/reports/runtime/analysis-server.json`. A running producer is current only
+when that document reports `producer_contract_valid: true`,
+`archive_mode: required`, and `evidence_policy: tiered-v2`. Acquisition-host
 duplicates are governed separately by the verified local reclaimer below.
 
 ## Preservation mode

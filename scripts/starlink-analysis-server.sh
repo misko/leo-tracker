@@ -98,6 +98,7 @@ export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
 export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
 metrics="${queue}/metrics"
 progress_log="${reports}/analysis-server.log"
+runtime_state="${reports}/runtime/analysis-server.json"
 progress_lock="${queue}/progress.lock"
 retention_lock="${queue}/retention.lock"
 keep_negative="${LEO_ANALYSIS_KEEP_NEGATIVE:-6}"
@@ -114,6 +115,8 @@ if ! flock -n 8; then
 fi
 rm -f -- "${drain_request}"
 cd "${repo_dir}"
+server_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+git_commit="$(git rev-parse --verify HEAD 2>/dev/null || printf unknown)"
 
 radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
 orbit() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-orbit "$@"; }
@@ -162,6 +165,56 @@ emit() {
     flock 9
     printf '%s\n' "${line}" | tee -a "${progress_log}"
   ) 9>"${progress_lock}"
+}
+
+publish_runtime_state() {
+  local state="$1" heartbeat_utc temporary
+  heartbeat_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  temporary="${runtime_state}.next.$$"
+  mkdir -p "$(dirname "${runtime_state}")"
+  "${venv}/bin/python" - "${temporary}" "${runtime_state}" \
+      "${state}" "${server_started_utc}" "${heartbeat_utc}" "$$" \
+      "$(hostname)" "${repo_dir}" "${git_commit}" "${pipeline_id}" \
+      "${workers}" "${full_coverage}" "${archive_mode}" "${archive_root}" \
+      "${retention_mode}" <<'PY'
+import json
+import os
+from pathlib import Path
+import sys
+
+(temporary, destination, state, started, heartbeat, pid, hostname, repo,
+ commit, pipeline, workers, full_coverage, archive_mode, archive_root,
+ retention_mode) = sys.argv[1:]
+value = {
+    "schema": "leo-tracker.analysis-server-runtime/v1",
+    "state": state,
+    "started_utc": started,
+    "heartbeat_utc": heartbeat,
+    "pid": int(pid),
+    "hostname": hostname,
+    "repo": repo,
+    "git_commit": commit,
+    "pipeline_id": pipeline,
+    "workers": int(workers),
+    "full_coverage": full_coverage == "1",
+    "archive_mode": archive_mode,
+    "archive_root": archive_root,
+    "evidence_policy": "tiered-v2",
+    "archive_command": "starlink-evidence-archive-v2",
+    "retention_mode": retention_mode,
+    "producer_contract_valid": (
+        state == "running" and full_coverage == "1" and
+        archive_mode == "required"
+    ),
+}
+temporary_path = Path(temporary)
+with temporary_path.open("w", encoding="utf-8") as stream:
+    json.dump(value, stream, indent=2, sort_keys=True)
+    stream.write("\n")
+    stream.flush()
+    os.fsync(stream.fileno())
+os.replace(temporary_path, destination)
+PY
 }
 
 count_files() {
@@ -477,6 +530,7 @@ for interrupted in "${queue}"/*.running.*; do
 done
 shopt -u nullglob
 audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"
+publish_runtime_state running
 emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_policy=tiered-v2 retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
 emit "recovery ${audit_result}"
 run_backfill startup
@@ -493,6 +547,7 @@ for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); do
       sleep "${heartbeat_s}"
       elapsed=$((elapsed + heartbeat_s))
       print_progress heartbeat
+      publish_runtime_state running
     done
     run_backfill periodic
     reconcile_failed periodic
@@ -520,4 +575,5 @@ if [[ -f "${drain_request}" ]]; then
   status=0
 fi
 emit "server_stop status=${status}"
+publish_runtime_state stopped
 exit "${status}"

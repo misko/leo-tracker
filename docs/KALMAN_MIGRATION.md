@@ -102,6 +102,24 @@ The runtime document must report `state: running`,
 `evidence_policy: tiered-v2`. The storage convergence audit uses the same
 contract when invoked with `--require-producer-contract`.
 
+Install or refresh the high-throughput storage primary from the same checkout:
+
+```bash
+sudo systemctl stop leo-tracker-storage-regime-v2.service
+sudo cp "$PWD/deploy/leo-tracker-storage-regime-v2.service" \
+  /etc/systemd/system/leo-tracker-storage-regime-v2.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now leo-tracker-storage-regime-v2.service
+systemctl status leo-tracker-storage-regime-v2.service --no-pager -l
+cat /mnt/qnap01/mouse9911/leo/reports/runtime/storage-regime-v2-primary.json
+```
+
+The primary publishes a 30-second lease before taking work. SATPI01 then yields
+automatically, so only one host inventories or mutates QNAP at a time. The
+current Kalman profile uses 16 workers and balanced 16 archive-only/16 raw
+batches; a missing primary lease means the low-rate Pi fallback is still doing
+the migration.
+
 A normal `systemctl stop` sends `SIGTERM`; the server converts it into a drain
 request and gives claimed jobs up to 30 minutes to finish.
 `starlink-analysis-server.sh --drain` is useful for a manually launched server,

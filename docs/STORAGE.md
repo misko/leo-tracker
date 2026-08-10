@@ -365,12 +365,13 @@ Kalman additionally publishes a 30-second primary lease beneath
 the Pi fallback yields before inventory; if Kalman stops or loses QNAP, the Pi
 resumes after 120 seconds. The global lock remains the final safety boundary
 during lease transitions.
-Its bounded automatic scope reserves the first transaction for archive-only v1
+Its bounded automatic scope reserves a configured prefix for archive-only v1
 whenever both raw and archive backlogs exist, then fills the remaining slots
-with urgent raw IQ. This prevents continuous acquisition from starving old v1
-forever. Each operational plan also stops after a small batch of eligible
-records (80 on the Pi and 128 on Kalman), so one transaction does not require a complete
-multi-thousand-record inventory.
+with urgent raw IQ. The Pi reserves one of ten applied records; Kalman reserves
+16 of 32. This prevents continuous acquisition from starving old v1 forever.
+Each operational plan also stops after a small inventory of eligible records
+(80 on the Pi and 128 on Kalman), so one transaction does not require a
+complete multi-thousand-record inventory.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 

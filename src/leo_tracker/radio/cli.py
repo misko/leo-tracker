@@ -844,6 +844,36 @@ def command_starlink_beacon_gain_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_beacon_dashboard_row(args: argparse.Namespace) -> int:
+    # Imported here, not at module scope: on-demand detail records are a newer
+    # capability than this command, and a missing one must degrade to a failed
+    # listing row rather than breaking every leo-radio entry point, which
+    # includes the analysis server itself.
+    from leo_tracker.radio.beacon.dashboard_index import capture_dashboard_record
+    from leo_tracker.radio.beacon.dashboard_shards import write_listing_row
+    record = capture_dashboard_record(args.root, args.name)
+    if record is None:
+        raise ValueError(f"no dashboard record for {args.name}")
+    path = write_listing_row(args.root, args.name, record)
+    print(json.dumps({"dashboard_row": str(path), "recording_id": args.name},
+                     sort_keys=True))
+    return 0
+
+
+def command_starlink_dashboard_shards(args: argparse.Namespace) -> int:
+    from leo_tracker.radio.beacon.dashboard_shards import (compact_shards,
+                                                           migrate_index)
+    if args.action == "migrate":
+        if args.index is None:
+            raise ValueError("migrate needs --index")
+        result = migrate_index(args.index, args.root)
+    else:
+        result = compact_shards(args.root)
+    print(json.dumps({"action": args.action, "root": str(args.root), **result},
+                     sort_keys=True))
+    return 0
+
+
 def command_starlink_beacon_dashboard_index(args: argparse.Namespace) -> int:
     report = update_dashboard_index(args.root, args.output,
                                     capture_name=args.capture_name)
@@ -2259,6 +2289,18 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_gain_summary.add_argument("root", type=Path)
     beacon_gain_summary.add_argument("output", type=Path)
     beacon_gain_summary.set_defaults(handler=command_starlink_beacon_gain_summary)
+    dashboard_row = commands.add_parser("starlink-beacon-dashboard-row",
+        help="publish one recording's compact dashboard listing row")
+    dashboard_row.add_argument("root", type=Path)
+    dashboard_row.add_argument("name")
+    dashboard_row.set_defaults(handler=command_starlink_beacon_dashboard_row)
+    dashboard_shards = commands.add_parser("starlink-dashboard-shards",
+        help="publish and compact the date-sharded dashboard listing")
+    dashboard_shards.add_argument("action", choices=("migrate", "compact"))
+    dashboard_shards.add_argument("root", type=Path)
+    dashboard_shards.add_argument("--index", type=Path,
+        help="existing monolithic index to project, for migrate")
+    dashboard_shards.set_defaults(handler=command_starlink_dashboard_shards)
     beacon_dashboard_index = commands.add_parser("starlink-beacon-dashboard-index",
         help="incrementally build the lightweight beacon dashboard index")
     beacon_dashboard_index.add_argument("root", type=Path)

@@ -251,7 +251,10 @@ as a persistent low-priority fallback. It processes one transaction at a time,
 followed by a one-minute idle interval, and shares the global migration lock
 with Kalman, so it survives Pi
 reboots without allowing two migrations to mutate the archive concurrently.
-Kalman remains the high-throughput worker.
+Its automatic scope scans only raw while an eligible raw backlog exists, then
+switches to archive-only v1 compaction. This avoids walking the multi-terabyte
+legacy archive before every urgent raw transaction. Kalman remains the
+high-throughput worker.
 
 Analysis completion records no longer copy immutable outputs beneath
 `reports/runs/.../outputs/`; they store hashes and authoritative references to

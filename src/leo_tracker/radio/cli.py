@@ -1861,7 +1861,7 @@ def build_parser() -> argparse.ArgumentParser:
     storage_regime.add_argument("shared_root", type=Path)
     storage_regime.add_argument("archive_root", type=Path)
     storage_regime.add_argument("--minimum-age-hours", type=float, default=6)
-    storage_regime.add_argument("--scope", choices=("all", "raw", "archive"),
+    storage_regime.add_argument("--scope", choices=("all", "auto", "raw", "archive"),
                                 default="all")
     storage_regime.add_argument("--limit", type=int)
     storage_regime.add_argument("--output", type=Path)

@@ -98,8 +98,22 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
     """Inventory raw captures that can be promoted to the production v2 regime."""
     if minimum_age_hours < 0:
         raise ValueError("minimum age must be non-negative")
-    if scope not in {"all", "raw", "archive"}:
-        raise ValueError("storage regime scope must be all, raw, or archive")
+    if scope not in {"all", "auto", "raw", "archive"}:
+        raise ValueError("storage regime scope must be all, auto, raw, or archive")
+    if scope == "auto":
+        raw = build_storage_regime_plan(
+            shared_root, archive_root, minimum_age_hours=minimum_age_hours,
+            scope="raw")
+        if raw["summary"]["eligible_count"]:
+            raw["configuration"] = {"minimum_age_hours": minimum_age_hours,
+                                    "scope": "auto", "active_scope": "raw"}
+            return raw
+        archive = build_storage_regime_plan(
+            shared_root, archive_root, minimum_age_hours=minimum_age_hours,
+            scope="archive")
+        archive["configuration"] = {"minimum_age_hours": minimum_age_hours,
+                                    "scope": "auto", "active_scope": "archive"}
+        return archive
     shared_root = Path(shared_root).resolve(); archive_root = Path(archive_root).resolve()
     active = _active_jobs(shared_root); now = time.time(); entries = []
     captures = shared_root / "captures"

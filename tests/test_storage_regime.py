@@ -253,6 +253,22 @@ def test_storage_regime_prioritizes_raw_before_archive_only(tmp_path):
     assert eligible[1]["status"] == "eligible_archive_only"
 
 
+def test_storage_regime_auto_scans_raw_then_falls_back_to_archive(tmp_path):
+    import shutil
+
+    shared, archive, capture = _ready(tmp_path, "raw-first")
+    raw_plan = build_storage_regime_plan(
+        shared, archive, minimum_age_hours=0, scope="auto")
+    assert raw_plan["configuration"]["active_scope"] == "raw"
+    assert {item["recording_id"] for item in raw_plan["entries"]} == {capture.name}
+
+    shutil.rmtree(capture)
+    archive_plan = build_storage_regime_plan(
+        shared, archive, minimum_age_hours=0, scope="auto")
+    assert archive_plan["configuration"]["active_scope"] == "archive"
+    assert archive_plan["entries"][0]["status"] == "eligible_archive_only"
+
+
 def test_archive_only_gap_fails_without_retiring_v1(tmp_path):
     shared, archive, capture = _ready(tmp_path, "archive-only-gap")
     name = capture.name

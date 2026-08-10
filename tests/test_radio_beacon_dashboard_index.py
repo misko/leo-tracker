@@ -4,10 +4,12 @@ from leo_tracker.radio.beacon.dashboard_index import (capture_radio_parameters,
                                                        confirmed_beacon_events,
                                                        update_dashboard_index)
 from leo_tracker.radio.cli import main
-from leo_tracker.radio.dashboard import DETAIL_HTML, DashboardModel
+from leo_tracker.radio.dashboard import DETAIL_HTML, INDEX_HTML, DashboardModel
 
 
-def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
+def _capture(root, name, created_ns, *, confirmed=False, decoded=False,
+             radio_id="pluto-a", radio_serial="PLUTO-SERIAL-A",
+             receiver_labels=("zenith-a", "zenith-b")):
     capture = root / "captures" / name
     capture.mkdir(parents=True)
     manifest = {"state": "complete", "created_utc_ns": created_ns,
@@ -35,8 +37,8 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
             "host_read_duty_fraction": .96, "read_count": 48,
             "maximum_positive_host_gap_s": .01},
         "identity": {"enabled_channels": [0, 1],
-                     "radio_id": "pluto-a", "serial": "PLUTO-SERIAL-A",
-                     "receiver_labels": ["zenith-a", "zenith-b"],
+                     "radio_id": radio_id, "serial": radio_serial,
+                     "receiver_labels": list(receiver_labels),
                      "firmware_version": "v0.38-test", "kernel_version": "5.15-test",
                      "hardware_model": "PlutoSDR Rev.C", "xo_correction_hz": 40_000_000,
                      "gain_mode_readback": ["manual", "manual"],
@@ -127,7 +129,9 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
         (root / directory).mkdir(parents=True, exist_ok=True)
     first, second = "ch4-lower-edge-narrow-first", "ch4-lower-edge-narrow-second"
     _capture(root, first, 1_700_000_000_000_000_000, confirmed=True, decoded=True)
-    _capture(root, second, 1_700_000_100_000_000_000)
+    _capture(root, second, 1_700_000_100_000_000_000,
+             radio_id="pluto-b", radio_serial="PLUTO-SERIAL-B",
+             receiver_labels=("horizon-a", "horizon-b"))
     (root / "reports" / "fingerprints" / "index.json").write_text(json.dumps({
         "fingerprint_count": 1, "membership": {first: "wf-1"},
         "clusters": [{"cluster_id": "wf-1", "member_count": 2}],
@@ -139,6 +143,10 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     report = update_dashboard_index(root, output)
 
     assert report["summary"]["analyzed_capture_count"] == 2
+    persisted = json.loads(output.read_text())
+    assert persisted["schema"] == "leo-tracker.beacon-dashboard-index/v3"
+    assert all("_statistics" not in item for item in persisted["recordings"])
+    assert output.stat().st_size < 20_000
     assert report["summary"]["temporally_confirmed_capture_count"] == 1
     row = next(item for item in report["recordings"] if item["recording_id"] == first)
     assert row["candidate_count"] == 5
@@ -169,6 +177,14 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert row["_statistics"]["fragment_diagnostic"]["summary"][
         "production_qualification_affected"] is False
     assert row["fingerprint_nearest_matches"][0]["temporal_qpsk_similarity"] == .8
+    assert row["radio_id"] == "pluto-a"
+    assert row["radio_serial"] == "PLUTO-SERIAL-A"
+    assert row["receiver_labels"] == ["zenith-a", "zenith-b"]
+    second_row = next(item for item in report["recordings"]
+                      if item["recording_id"] == second)
+    assert second_row["radio_id"] == "pluto-b"
+    assert second_row["radio_serial"] == "PLUTO-SERIAL-B"
+    assert second_row["receiver_labels"] == ["horizon-a", "horizon-b"]
     assert row["_statistics"]["exact_checks"][0]["receivers"][0][
         "pilot_frequency_offset_hz"] == -30_000
     radio = row["_statistics"]["radio_parameters"]
@@ -193,6 +209,8 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
         AssertionError("persisted recording index must bypass the heavyweight beacon model"))
     index = model.recordings()
     assert len(index["recordings"]) == 2
+    assert {item["radio_id"] for item in index["recordings"]} == {
+        "pluto-a", "pluto-b"}
     assert "_statistics" not in index["recordings"][0]
     detail = model.recording_detail("beacon", first)
     assert detail["statistics"]["confirmation"]["confirmed"]
@@ -221,12 +239,72 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert "Firmware" in DETAIL_HTML
     assert "Fragment identity evidence" in DETAIL_HTML
     assert "production qualification" in DETAIL_HTML
+    assert "<th>Radio</th>" in INDEX_HTML
+    assert "Receiver / LNB mapping" in DETAIL_HTML
 
     assert main(["starlink-beacon-dashboard-index", str(root), str(output),
                  "--capture-name", second]) == 0
     cli = json.loads(capsys.readouterr().out)
     assert cli["recording_count"] == 2
     assert cli["summary"]["analyzed_capture_count"] == 2
+
+
+def test_dashboard_lists_each_simultaneous_radio_capture_and_opens_its_detail(tmp_path):
+    root = tmp_path / "beacons"
+    (root / "reports").mkdir(parents=True)
+    (root / "reports" / "dashboard-index.json").write_text(json.dumps({
+        "schema": "leo-tracker.beacon-dashboard-index/v2",
+        "summary": {}, "recordings": []}))
+    for index, (radio_id, serial, labels) in enumerate((
+            ("pluto-5d4d", "SERIAL-5D4D", ["lnb-a", "lnb-b"]),
+            ("pluto-19f2", "SERIAL-19F2", ["lnb-c", "lnb-d"]))):
+        capture = root / "captures" / f"capture-{radio_id}"
+        capture.mkdir(parents=True)
+        (capture / "manifest.json").write_text(json.dumps({
+            "state": "capturing", "created_utc_ns": 1_700_000_000_000_000_000 + index,
+            "sample_rate_hz": 2_500_000, "bandwidth_hz": 2_500_000,
+            "center_frequency_hz": 1_709_687_500,
+            "receiver_count": 2, "gain_mode": "slow_attack", "chunks": [],
+            "metadata": {"channel_number": 4, "region": "lower-edge",
+                         "observation_mode": "narrow"},
+            "identity": {"radio_id": radio_id, "serial": serial,
+                         "receiver_labels": labels, "enabled_channels": [0, 1]}}))
+    observation = tmp_path / "watch"
+    observation.mkdir()
+    model = DashboardModel(observation, beacon_root=root)
+
+    rows = model.recordings()["recordings"]
+
+    assert {row["radio_id"] for row in rows} == {"pluto-5d4d", "pluto-19f2"}
+    assert {tuple(row["receiver_labels"]) for row in rows} == {
+        ("lnb-a", "lnb-b"), ("lnb-c", "lnb-d")}
+    for row in rows:
+        detail = model.recording_detail("beacon", row["recording_id"])
+        assert detail is not None and detail["active"] is True
+        assert detail["statistics"]["radio_id"] == row["radio_id"]
+        assert detail["statistics"]["radio_serial"] == row["radio_serial"]
+
+
+def test_dashboard_ignores_manifest_removed_during_live_inventory(tmp_path):
+    existing = tmp_path / "existing.json"
+    existing.write_text("{}")
+    removed = tmp_path / "removed.json"
+
+    assert DashboardModel._newest_existing_paths([removed, existing]) == [existing]
+
+
+def test_dashboard_selects_recent_capture_manifests_by_timestamp_without_stats(tmp_path):
+    captures = tmp_path / "captures"
+    for name in ("ch4-narrow-pluto-z-20260810T120000Z",
+                 "ch4-wide-pluto-a-20260810T140000Z",
+                 "ch4-narrow-pluto-z-20260810T130000Z"):
+        (captures / name).mkdir(parents=True)
+
+    selected = DashboardModel._recent_capture_manifests(captures, limit=2)
+
+    assert [path.parent.name for path in selected] == [
+        "ch4-wide-pluto-a-20260810T140000Z",
+        "ch4-narrow-pluto-z-20260810T130000Z"]
 
 
 def test_capture_radio_parameters_handles_partial_active_manifest():

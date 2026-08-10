@@ -17,7 +17,8 @@ import numpy as np
 from .physics import doppler_radial_acceleration_m_s2
 from .tuning_dither import dither_phase_locked
 from .beacon.fingerprint import render_fingerprint_svg
-from .beacon.dashboard_index import (capture_radio_parameters,
+from .beacon.dashboard_index import (capture_dashboard_record,
+                                     capture_radio_parameters,
                                      confirmed_beacon_events)
 
 
@@ -94,6 +95,34 @@ class DashboardModel:
             return json.loads(path.read_text())
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             return default
+
+    @staticmethod
+    def _newest_existing_paths(paths, *, limit: int | None = None) -> list[Path]:
+        """Sort a changing artifact set without failing when cleanup removes a path."""
+        scored = []
+        for path in paths:
+            try:
+                scored.append((path.stat().st_mtime_ns, path))
+            except (FileNotFoundError, OSError):
+                continue
+        scored.sort(key=lambda item: item[0], reverse=True)
+        ordered = [path for _, path in scored]
+        return ordered if limit is None else ordered[:limit]
+
+    @staticmethod
+    def _recent_capture_manifests(captures_root: Path, *, limit: int = 20) -> list[Path]:
+        """Find timestamp-named captures without an NFS stat call for every directory."""
+        try:
+            directories = list(captures_root.iterdir())
+        except (FileNotFoundError, OSError):
+            return []
+
+        def capture_timestamp(path: Path) -> str:
+            match = re.search(r"(\d{8}T\d{6}Z)$", path.name)
+            return match.group(1) if match else ""
+
+        directories.sort(key=lambda path: (capture_timestamp(path), path.name), reverse=True)
+        return [path / "manifest.json" for path in directories[:max(0, limit)]]
 
     def _plot_url(self, plot_name: str) -> str:
         """Version immutable plot URLs so regenerated diagnostics refresh in browsers."""
@@ -726,8 +755,8 @@ class DashboardModel:
         captures_root, reports_root = self.beacon_root / "captures", self.beacon_root / "reports"
         report_paths = sorted(reports_root.glob("*.json"),
                               key=lambda path: path.stat().st_mtime_ns, reverse=True)
-        manifest_paths = sorted(captures_root.glob("*/manifest.json"),
-                                key=lambda path: path.stat().st_mtime_ns, reverse=True)
+        manifest_paths = self._newest_existing_paths(
+            captures_root.glob("*/manifest.json"))
         followup_paths = list((reports_root / "followups").glob("*.json"))
         decode_paths = list((reports_root / "decoded").glob("*.json"))
         fingerprint_paths = list((reports_root / "fingerprints").glob("*.json"))
@@ -918,27 +947,42 @@ class DashboardModel:
         limit = max(1, min(int(limit), 200))
         rows = []
         persisted = self._beacon_recording_index()
-        if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v2":
+        if persisted.get("schema") in {
+                "leo-tracker.beacon-dashboard-index/v2",
+                "leo-tracker.beacon-dashboard-index/v3"}:
             persisted_rows = persisted.get("recordings", [])
-            rows.extend({key: value for key, value in item.items()
-                         if not key.startswith("_")}
-                        for item in persisted_rows[:limit])
+            for item in persisted_rows[:limit]:
+                public = {key: value for key, value in item.items()
+                          if not key.startswith("_")}
+                radio = item.get("_statistics", {}).get(
+                    "radio_parameters", {})
+                hardware = radio.get("hardware", {}) or {}
+                receivers = radio.get("receivers", {}) or {}
+                public.setdefault("radio_id", hardware.get("radio_id"))
+                public.setdefault("radio_serial", hardware.get("serial"))
+                public.setdefault("receiver_labels", receivers.get("receiver_labels"))
+                rows.append(public)
             beacon = {"inventory": persisted.get("summary", {}),
                 "fingerprints": {"count": persisted.get("summary", {}).get(
-                    "fingerprint_count", 0)}, "captures": [], "active": None}
-            manifest_paths = sorted((self.beacon_root / "captures").glob("*/manifest.json"),
-                                    key=lambda path: path.stat().st_mtime_ns, reverse=True)
-            for manifest_path in manifest_paths[:3]:
+                    "fingerprint_count", 0)}, "captures": [], "active": None,
+                "active_captures": []}
+            manifest_paths = self._recent_capture_manifests(
+                self.beacon_root / "captures", limit=20)
+            for manifest_path in manifest_paths:
                 manifest = self._json(manifest_path, {})
                 name = manifest_path.parent.name
                 report_exists = (self.beacon_root / "reports" / f"{name}.json").is_file()
                 if manifest.get("state") == "capturing" or (
                         manifest.get("state") == "complete" and not report_exists):
                     metadata = manifest.get("metadata", {})
+                    identity = manifest.get("identity", {}) or {}
                     created_ns = int(manifest.get("created_utc_ns", 0) or 0)
-                    beacon["active"] = {"name": name,
+                    pending = {"name": name,
                         "stage": "capturing" if manifest.get("state") == "capturing" else "analyzing",
                         "created_utc": _iso_from_ns(created_ns) if created_ns else None,
+                        "radio_id": identity.get("radio_id"),
+                        "radio_serial": identity.get("serial"),
+                        "receiver_labels": identity.get("receiver_labels"),
                         "channel_number": metadata.get("channel_number"),
                         "region": metadata.get("region"),
                         "observation_mode": metadata.get("observation_mode", "narrow"),
@@ -948,13 +992,22 @@ class DashboardModel:
                         "bandwidth_hz": manifest.get("bandwidth_hz"),
                         "gain_mode": manifest.get("gain_mode"),
                         "configured_gain_db": manifest.get("configured_gain_db")}
-                    break
+                    beacon["active_captures"].append(pending)
+            beacon["active"] = (beacon["active_captures"][0]
+                                if beacon["active_captures"] else None)
         else:
             beacon = self.beacon(limit=min(limit, 100))
-        active = beacon.get("active")
-        if active:
+        active_captures = beacon.get("active_captures") or (
+            [beacon["active"]] if beacon.get("active") else [])
+        persisted_ids = {row.get("recording_id") for row in rows}
+        for active in active_captures:
+            if active.get("name") in persisted_ids:
+                continue
             rows.append({"kind": "beacon", "recording_id": active.get("name"),
                 "start_utc": active.get("created_utc"), "status": active.get("stage", "active"),
+                "radio_id": active.get("radio_id"),
+                "radio_serial": active.get("radio_serial"),
+                "receiver_labels": active.get("receiver_labels"),
                 "mode": active.get("observation_mode"),
                 "channel": active.get("channel_number"), "region": active.get("region"),
                 "if_center_hz": active.get("if_center_hz"),
@@ -969,6 +1022,7 @@ class DashboardModel:
                 "pilot_accuracy": None,
                 "detail_url": f"/recordings/beacon/{active.get('name')}"})
         for item in beacon.get("captures", []):
+            identity = (item.get("capture_manifest") or {}).get("identity", {}) or {}
             decode = item.get("decode") or {}
             pilot = (decode.get("soft_dual_rx") or {}).get("pilot") or {}
             pilot_accuracy = pilot.get("hard_symbol_accuracy",
@@ -984,6 +1038,9 @@ class DashboardModel:
                 gain += f" {float(item['configured_gain_db']):g} dB"
             rows.append({"kind": "beacon", "recording_id": item.get("name"),
                 "start_utc": item.get("created_utc"), "status": status,
+                "radio_id": identity.get("radio_id"),
+                "radio_serial": identity.get("serial"),
+                "receiver_labels": identity.get("receiver_labels"),
                 "mode": item.get("observation_mode"), "channel": item.get("channel_number"),
                 "region": item.get("region"), "if_center_hz": item.get("if_center_hz"),
                 "rf_center_hz": item.get("rf_center_hz"),
@@ -1050,14 +1107,52 @@ class DashboardModel:
         """Return one recording's statistics and plot links on demand."""
         if kind == "beacon":
             persisted = self._beacon_recording_index()
-            if persisted.get("schema") == "leo-tracker.beacon-dashboard-index/v2":
+            if persisted.get("schema") in {
+                    "leo-tracker.beacon-dashboard-index/v2",
+                    "leo-tracker.beacon-dashboard-index/v3"}:
                 row = next((item for item in persisted.get("recordings", [])
                             if item.get("recording_id") == recording_id), None)
                 if row is not None:
+                    complete = (row if row.get("_statistics") else
+                                capture_dashboard_record(self.beacon_root,
+                                                         recording_id))
+                    if complete is None:
+                        return None
                     return {"kind": kind, "recording_id": recording_id, "active": False,
-                            "statistics": row.get("_statistics", {}),
-                            "plots": row.get("_plots", []),
-                            "artifacts": row.get("_artifacts", [])}
+                            "statistics": complete.get("_statistics", {}),
+                            "plots": complete.get("_plots", []),
+                            "artifacts": complete.get("_artifacts", [])}
+            manifest_path = (self.beacon_root / "captures" / recording_id /
+                             "manifest.json")
+            analysis_path = self.beacon_root / "reports" / f"{recording_id}.json"
+            if manifest_path.is_file() and not analysis_path.is_file():
+                manifest = self._json(manifest_path, {})
+                metadata = manifest.get("metadata", {}) or {}
+                identity = manifest.get("identity", {}) or {}
+                created_ns = int(manifest.get("created_utc_ns", 0) or 0)
+                return {"kind": kind, "recording_id": recording_id, "active": True,
+                        "statistics": {
+                            "name": recording_id,
+                            "stage": ("capturing" if manifest.get("state") == "capturing"
+                                      else "analyzing"),
+                            "created_utc": (_iso_from_ns(created_ns)
+                                            if created_ns else None),
+                            "radio_id": identity.get("radio_id"),
+                            "radio_serial": identity.get("serial"),
+                            "receiver_labels": identity.get("receiver_labels"),
+                            "channel_number": metadata.get("channel_number"),
+                            "region": metadata.get("region"),
+                            "observation_mode": metadata.get(
+                                "observation_mode", "narrow"),
+                            "if_center_hz": manifest.get("center_frequency_hz"),
+                            "rf_center_hz": manifest.get("rf_center_hz"),
+                            "sample_rate_hz": manifest.get("sample_rate_hz"),
+                            "bandwidth_hz": manifest.get("bandwidth_hz"),
+                            "gain_mode": manifest.get("gain_mode"),
+                            "configured_gain_db": manifest.get("configured_gain_db"),
+                            "capture_manifest": manifest,
+                            "radio_parameters": capture_radio_parameters(manifest)},
+                        "plots": [], "artifacts": []}
             report = self.beacon(limit=100)
             if (report.get("active") or {}).get("name") == recording_id:
                 manifest = self._json(self.beacon_root / "captures" / recording_id /
@@ -1199,7 +1294,7 @@ main{max-width:1900px;margin:auto;padding:20px}.top{display:flex;align-items:end
 @media(max-width:700px){main{padding:12px}.top{align-items:start;flex-direction:column}h1{font-size:23px}}
 </style></head><body><main>
 <div class="top"><div><h1>LEO / Starlink recordings</h1><div class="muted">Click any recording for statistics, artifacts, and plots. “Beacons detected” counts distinct confirmed time intervals, not unique satellite identities.</div><div id="totals" class="muted">Counting beacon observations…</div></div><div id="stamp" class="muted">loading…</div></div>
-<div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Type</th><th>Recording</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Dual / single candidates</th><th>Beacons detected</th><th>Strongest drift</th><th>TLE overlaps</th><th>Confirmed</th><th>Decoded</th><th>Frames</th><th>Pilot accuracy</th><th>Confidence</th><th>EVM</th><th>Fingerprint family</th></tr></thead><tbody><tr><td colspan="22" class="empty">Loading recordings…</td></tr></tbody></table></div>
+<div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Radio</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Dual / single candidates</th><th>Beacons detected</th><th>Strongest drift</th><th>TLE overlaps</th><th>Confirmed</th><th>Decoded</th><th>Frames</th><th>Pilot accuracy</th><th>Confidence</th><th>EVM</th><th>Fingerprint family</th></tr></thead><tbody><tr><td colspan="21" class="empty">Loading recordings…</td></tr></tbody></table></div>
 </main><script>
 const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const f=(v,n=2)=>Number.isFinite(v)?Number(v).toFixed(n):'—';
@@ -1208,7 +1303,7 @@ let refreshing=false;
 async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/recordings',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()});const rows=d.recordings||[];
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString()+' · '+rows.length+' recordings';
 const s=d.summary||{};document.querySelector('#totals').textContent=`${s.analyzed_capture_count||0} capture windows analyzed · ${s.temporally_confirmed_capture_count||0} temporally confirmed beacon observations · ${s.decoded_capture_count||0} decoded · ${s.retained_iq_capture_count||0} IQ captures retained · ${s.fingerprint_count||0} fingerprints`;
-document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.kind)}</td><td><a href="${esc(x.detail_url)}">${esc(x.recording_id)}</a></td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.dual_candidate_count)} / ${esc(x.single_receiver_candidate_count)}</td><td class="${x.beacon_detected_count?'yes':''}">${x.beacon_detected_count===null||x.beacon_detected_count===undefined?'—':esc(x.beacon_detected_count)}</td><td>${Number.isFinite(x.strongest_drift_hz_s)?f(x.strongest_drift_hz_s/1000,2)+' kHz/s':'—'}</td><td>${esc(x.tle_overlap_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${esc(x.decode_frame_count)}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_confidence)?f(100*x.pilot_confidence,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_evm)?f(x.pilot_evm,3):'—'}</td><td>${x.fingerprint_family?esc(x.fingerprint_family)+' ('+esc(x.fingerprint_family_size)+')':'—'}</td></tr>`).join(''):'<tr><td colspan="22" class="empty">No recordings available.</td></tr>';
+document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.radio_id||'—')}</td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.dual_candidate_count)} / ${esc(x.single_receiver_candidate_count)}</td><td class="${x.beacon_detected_count?'yes':''}">${x.beacon_detected_count===null||x.beacon_detected_count===undefined?'—':esc(x.beacon_detected_count)}</td><td>${Number.isFinite(x.strongest_drift_hz_s)?f(x.strongest_drift_hz_s/1000,2)+' kHz/s':'—'}</td><td>${esc(x.tle_overlap_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${esc(x.decode_frame_count)}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_confidence)?f(100*x.pilot_confidence,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_evm)?f(x.pilot_evm,3):'—'}</td><td>${x.fingerprint_family?esc(x.fingerprint_family)+' ('+esc(x.fingerprint_family_size)+')':'—'}</td></tr>`).join(''):'<tr><td colspan="21" class="empty">No recordings available.</td></tr>';
 document.querySelectorAll('tr[data-href]').forEach(row=>row.addEventListener('click',event=>{if(event.target.closest('a'))return;location.href=row.dataset.href}));
 }catch(error){document.querySelector('#stamp').textContent='offline';console.error(error)}finally{refreshing=false}}
 refresh();setInterval(refresh,10000);
@@ -1232,7 +1327,7 @@ function radioCard(title,rows){const present=rows.filter(([,v])=>v!==null&&v!==u
 function gainReadback(rows){return (rows||[]).map(x=>`RX${x.receiver}: ${Number.isFinite(x.minimum_db)?f(x.minimum_db,1):'—'} / ${Number.isFinite(x.median_db)?f(x.median_db,1):'—'} / ${Number.isFinite(x.maximum_db)?f(x.maximum_db,1):'—'} dB (min / median / max; n=${x.sample_count||0})`).join(' · ')||null}
 function signalReadback(rows){return (rows||[]).map(x=>`RX${x.receiver}: RMS ${f(x.rms_magnitude,2)} · peak ${f(x.peak_abs_component,0)} · near-full-scale ${Number.isFinite(x.near_full_scale_fraction)?f(100*x.near_full_scale_fraction,6)+'%':'—'}`).join(' · ')||null}
 async function load(){try{const d=await fetch(api,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}),s=d.statistics||{};document.title=d.recording_id+' · LEO Tracker';document.querySelector('#title').textContent=d.recording_id;document.querySelector('#subtitle').textContent=d.kind+' recording · '+(d.active?'capture in progress':'completed analysis');
-const preferred=[['Recorded',s.created_utc||s.start_utc],['Status',s.stage||(d.active?'active':s.followup_confirmed?'confirmed':s.qualified_count?'qualified':s.candidate_count?'candidate':'analyzed')],['Mode',s.observation_mode],['Channel',s.channel_number],['Region',s.region],['IF center',Number.isFinite(s.if_center_hz)?f(s.if_center_hz/1e6,3)+' MHz':Number.isFinite(s.channel?.if_center_hz)?f(s.channel.if_center_hz/1e6,3)+' MHz':null],['Ku RF center',Number.isFinite(s.rf_center_hz)?f(s.rf_center_hz/1e9,6)+' GHz':null],['Sample rate',Number.isFinite(s.sample_rate_hz)?f(s.sample_rate_hz/1e6,2)+' MS/s':null],['RF bandwidth',Number.isFinite(s.bandwidth_hz)?f(s.bandwidth_hz/1e6,2)+' MHz':null],['Gain control',s.gain_mode],['Configured gain',Number.isFinite(s.configured_gain_db)?f(s.configured_gain_db,1)+' dB':null],['Duration',Number.isFinite(s.duration_s)?f(s.duration_s,1)+' s':Number.isFinite(s.wall_duration_s)?f(s.wall_duration_s,1)+' s':null],['Exact candidates',s.candidate_count],['Single-RX candidates',s.single_receiver_candidate_count],['Temporally confirmed',s.followup_confirmed],['Doppler observations',s.doppler_observation_count],['Fingerprint family',s.fingerprint_cluster_id],['Fingerprint family size',s.fingerprint_cluster_size]];
+const preferred=[['Recorded',s.created_utc||s.start_utc],['Radio',s.radio_id||s.radio_parameters?.hardware?.radio_id],['Radio serial',s.radio_serial||s.radio_parameters?.hardware?.serial],['Receiver / LNB mapping',(s.receiver_labels||s.radio_parameters?.receivers?.receiver_labels||[]).map((x,i)=>'RX'+i+': '+x).join(' · ')||null],['Status',s.stage||(d.active?'active':s.followup_confirmed?'confirmed':s.qualified_count?'qualified':s.candidate_count?'candidate':'analyzed')],['Mode',s.observation_mode],['Channel',s.channel_number],['Region',s.region],['IF center',Number.isFinite(s.if_center_hz)?f(s.if_center_hz/1e6,3)+' MHz':Number.isFinite(s.channel?.if_center_hz)?f(s.channel.if_center_hz/1e6,3)+' MHz':null],['Ku RF center',Number.isFinite(s.rf_center_hz)?f(s.rf_center_hz/1e9,6)+' GHz':null],['Sample rate',Number.isFinite(s.sample_rate_hz)?f(s.sample_rate_hz/1e6,2)+' MS/s':null],['RF bandwidth',Number.isFinite(s.bandwidth_hz)?f(s.bandwidth_hz/1e6,2)+' MHz':null],['Gain control',s.gain_mode],['Configured gain',Number.isFinite(s.configured_gain_db)?f(s.configured_gain_db,1)+' dB':null],['Duration',Number.isFinite(s.duration_s)?f(s.duration_s,1)+' s':Number.isFinite(s.wall_duration_s)?f(s.wall_duration_s,1)+' s':null],['Exact candidates',s.candidate_count],['Single-RX candidates',s.single_receiver_candidate_count],['Temporally confirmed',s.followup_confirmed],['Doppler observations',s.doppler_observation_count],['Fingerprint family',s.fingerprint_cluster_id],['Fingerprint family size',s.fingerprint_cluster_size]];
 document.querySelector('#summary').innerHTML=preferred.filter(([,v])=>v!==null&&v!==undefined).map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(value(v))}</td></tr>`).join('');
 const rp=s.radio_parameters||{},t=rp.tuning||{},r=rp.receivers||{},g=rp.gain_experiment||{},h=rp.hardware||{},q=rp.signal||{},st=rp.stream||{},c=rp.capture||{};const cards=[radioCard('Tuning and bandwidth',[['IF / Pluto LO',hz(t.if_center_hz,1e6,'MHz')],['LNB local oscillator',hz(t.lnb_lo_hz,1e9,'GHz',6)],['Ku-band RF center',hz(t.rf_center_hz,1e9,'GHz',6)],['Complex sample rate',hz(t.sample_rate_hz,1e6,'MS/s',3)],['RF analog bandwidth',hz(t.rf_bandwidth_hz,1e6,'MHz',3)],['Sampled baseband span',Number.isFinite(t.sample_rate_hz)?'±'+f(t.sample_rate_hz/2e6,3)+' MHz':null],['Tuning basis',t.tuning_basis]]),radioCard('Receivers and gain',[['Receiver count',r.receiver_count],['Enabled channels',Array.isArray(r.enabled_channels)?r.enabled_channels.map(x=>'RX'+x).join(', '):null],['Receiver / LNB labels',Array.isArray(r.receiver_labels)?r.receiver_labels.map((x,i)=>'RX'+i+': '+x).join(' · '):null],['Requested gain mode',r.gain_mode_requested],['Gain-mode readback',Array.isArray(r.gain_mode_readback)?r.gain_mode_readback.map((x,i)=>'RX'+i+': '+x).join(' · '):null],['Configured manual gain',Number.isFinite(r.configured_manual_gain_db)?f(r.configured_manual_gain_db,1)+' dB':null],['Hardware gain readback',gainReadback(r.gain_readback_by_receiver)],['Gain telemetry cadence',Number.isFinite(r.gain_telemetry_interval_s)?f(r.gain_telemetry_interval_s,2)+' s':null],['Sample layout',r.layout]]),radioCard('Randomized gain experiment',[['Experiment',g.experiment_id],['Assigned mode',g.assigned_gain_mode],['AGC assignment probability',Number.isFinite(g.agc_assignment_probability)?f(100*g.agc_assignment_probability,1)+'%':null],['Random draw (uint32)',g.random_draw_u32],['AGC settling delay',Number.isFinite(g.agc_settle_s)?f(g.agc_settle_s,2)+' s':null]]),radioCard('Hardware and temperatures',[['Operator radio ID',h.radio_id],['Radio',h.kind],['Hardware model',h.hardware_model],['Firmware',h.firmware_version],['Radio kernel',h.kernel_version],['AD9361 model',h.ad9361_model],['XO correction',Number.isFinite(h.xo_correction_hz)?hz(h.xo_correction_hz,1e6,'MHz',6):h.xo_correction_hz],['Driver',h.implementation],['Transport',h.transport],['Configured URI',h.uri],['Resolved IIO URI',h.context_uri],['Serial',h.serial],['Pi temperature',Number.isFinite(h.host_temperature_c)?f(h.host_temperature_c,1)+' °C':null],['Pluto temperature',Number.isFinite(h.radio_temperature_c)?f(h.radio_temperature_c,1)+' °C':null]]),radioCard('Signal levels',[['ADC nominal full scale',q.adc_nominal_full_scale],['Near-full-scale threshold',q.near_full_scale_threshold],['Per-receiver measurements',signalReadback(q.receivers)],['Interpretation',q.note]]),radioCard('Stream continuity',[['RF sample time',Number.isFinite(st.sample_time_s)?f(st.sample_time_s,3)+' s':null],['Host wall span',Number.isFinite(st.wall_span_s)?f(st.wall_span_s,3)+' s':null],['Host read duty',Number.isFinite(st.host_read_duty_fraction)?f(100*st.host_read_duty_fraction,2)+'%':null],['IIO read count',st.read_count],['Total / maximum read time',Number.isFinite(st.total_read_duration_s)?f(st.total_read_duration_s,3)+' / '+f(st.maximum_read_duration_s,3)+' s':null],['Total / maximum host gap',Number.isFinite(st.total_positive_host_gap_s)?f(st.total_positive_host_gap_s,3)+' / '+f(st.maximum_positive_host_gap_s,3)+' s':null],['Timing note',st.note]]),radioCard('Capture storage',[['Capture state',c.state],['Observation',c.observation_mode],['Channel / region',[c.channel_number,c.region].filter(x=>x!==null&&x!==undefined).join(' · ')||null],['Requested duration',Number.isFinite(c.requested_duration_s)?f(c.requested_duration_s,1)+' s':null],['Requested samples / RX',c.requested_samples_per_receiver?.toLocaleString()],['Captured samples / RX',c.captured_samples_per_receiver?.toLocaleString()],['I/Q format',c.dtype],['Samples / storage chunk',c.chunk_samples?.toLocaleString()],['Storage chunks / IIO reads',Number.isFinite(c.chunk_count)?c.chunk_count+' / '+(c.read_count??'—'):null],['Stored size',bytes(c.stored_bytes)],['Timestamp semantics',c.timestamp_semantics]])].filter(Boolean);document.querySelector('#radiopanel').hidden=!cards.length;document.querySelector('#radio').innerHTML=cards.join('');
 const confirmation=s.confirmation||{},links=[...(confirmation.cross_receiver_links||[]),...(confirmation.dual_receiver_links||[]),...(confirmation.receivers||[]).flatMap(x=>x.links||[])],passes=[...(s.overlapping_passes||[])],ft=s.frame_tracking||{},fs=ft.summary||{},ct=s.continuous_tracking||{},tc=ct.configuration||{},cl=s.continuous_linking||{},associations=[...((s.tle_association||{}).associations||[]),...((s.linked_tle_association||{}).associations||[])];if(s.coherent_joint_track?.qualified)links.push({drift_hz_s:s.coherent_joint_track.mean_drift_hz_s,kind:'coherent dual-receiver track'});if(s.best_tle_candidate)passes.push({name:s.best_tle_candidate.name,norad_id:s.best_tle_candidate.norad_id,nearest_prediction:{expected_doppler_hz:s.best_tle_candidate.expected_doppler_hz}});const trackRows=[...(ct.tracks||[]).map(x=>[x,tc.measurement_source||'direct']),...(cl.tracks||[]).filter(x=>(x.summary?.source_segment_count||0)>1).map(x=>[x,'gapped hypothesis'])].map(([x,source])=>{const q=x.summary||{};return `<tr><td>${esc(x.track_id)}</td><td>${esc(source)}</td><td>${esc(q.dual_valid_observation_count??0)}</td><td>${Number.isFinite(q.dual_valid_duration_s)?f(q.dual_valid_duration_s,2)+' s':'—'}</td><td>${Number.isFinite(x.relative_receiver_calibration?.residual_rms_hz)?f(x.relative_receiver_calibration.residual_rms_hz,1)+' Hz':'—'}</td></tr>`}).join('');const associationRows=associations.map(x=>{const b=(x.candidates||[])[0]||{},st=x.stability||{};return `<tr><td>${esc(x.track_id)}</td><td>${esc(b.name||'—')} ${Number.isFinite(x.best_norad_id)?'('+esc(x.best_norad_id)+')':''}</td><td>${Number.isFinite(x.best_holdout_residual_rms_hz)?f(x.best_holdout_residual_rms_hz,1)+' Hz':'—'}</td><td>${Number.isFinite(x.margin_to_second_hz)?f(x.margin_to_second_hz,1)+' Hz':'—'}</td><td class="${x.qualified?'yes':''}">${x.qualified?'qualified':st.passed===false?'unstable / rejected':'not qualified'}</td></tr>`}).join('');document.querySelector('#dopplerpanel').hidden=!fs.frame_observation_count&&!links.length&&!passes.length&&!trackRows&&!associationRows;document.querySelector('#doppler').innerHTML=`${fs.frame_observation_count?'<h3>Conditioned 750 Hz frames</h3><table><tbody><tr><th>Observed frames</th><td>'+esc(fs.frame_observation_count)+'</td></tr><tr><th>Dual-valid frames</th><td>'+esc(fs.dual_valid_frame_count??0)+'</td></tr><tr><th>Dual-valid fraction</th><td>'+esc(Number.isFinite(fs.dual_valid_fraction)?f(100*fs.dual_valid_fraction,1)+'%':'—')+'</td></tr><tr><th>Measured span</th><td>'+esc(Number.isFinite(fs.measured_span_s)?f(fs.measured_span_s,2)+' s':'—')+'</td></tr><tr><th>Propagated windows</th><td>'+esc((fs.extension_accepted_window_count??0)+' / '+(fs.extension_attempted_window_count??0)+' accepted / attempted')+'</td></tr></tbody></table>':''}${trackRows?'<h3 style="margin-top:18px">Calibrated 10 Hz tracks and gapped hypotheses</h3><table><thead><tr><th>Track</th><th>Epoch source</th><th>Dual epochs</th><th>Measured span</th><th>RX calibration RMS</th></tr></thead><tbody>'+trackRows+'</tbody></table>':''}${associationRows?'<h3 style="margin-top:18px">Held-out TLE association</h3><table><thead><tr><th>Track</th><th>Best candidate</th><th>Held-out RMS</th><th>Margin</th><th>Stability gate</th></tr></thead><tbody>'+associationRows+'</tbody></table>':''}${links.length?'<h3 style="margin-top:18px">Temporal Doppler links</h3><table><thead><tr><th>Start–stop</th><th>Drift</th><th>Evidence</th></tr></thead><tbody>'+links.map(x=>`<tr><td>${Number.isFinite(x.start_s)?f(x.start_s,2):'—'}–${Number.isFinite(x.stop_s)?f(x.stop_s,2):'—'} s</td><td>${Number.isFinite(x.drift_hz_s)?f(x.drift_hz_s/1000,3)+' kHz/s':'—'}</td><td>${esc(x.kind||x.classification||'dual-receiver temporal link')}</td></tr>`).join('')+'</tbody></table>':''}${passes.length?'<h3 style="margin-top:18px">Overlapping Starlink predictions</h3><table><thead><tr><th>Satellite</th><th>NORAD</th><th>Maximum elevation</th><th>Predicted Doppler</th></tr></thead><tbody>'+passes.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.norad_id)}</td><td>${Number.isFinite(p.culmination_elevation_deg)?f(p.culmination_elevation_deg,1)+'°':'—'}</td><td>${Number.isFinite(p.nearest_prediction?.expected_doppler_hz)?f(p.nearest_prediction.expected_doppler_hz/1000,1)+' kHz':'—'}</td></tr>`).join('')+'</tbody></table>':''}`;

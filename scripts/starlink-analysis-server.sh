@@ -33,6 +33,8 @@ claim_lock="${queue}/claim.lock"
 drain_request="${queue}/drain.request"
 poll_s="${LEO_ANALYSIS_POLL_S:-3}"
 heartbeat_s="${LEO_ANALYSIS_HEARTBEAT_S:-30}"
+backfill_interval_s="${LEO_ANALYSIS_BACKFILL_INTERVAL_S:-600}"
+backfill_limit="${LEO_ANALYSIS_BACKFILL_LIMIT:-100}"
 pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
 archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
@@ -67,8 +69,10 @@ if [[ -z "${uv_bin}" || ! -x "${venv}/bin/python" ]]; then
   echo "uv and an existing ${venv} are required" >&2
   exit 2
 fi
-if ! [[ "${heartbeat_s}" =~ ^[1-9][0-9]*$ ]]; then
-  echo "LEO_ANALYSIS_HEARTBEAT_S must be a positive integer" >&2
+if ! [[ "${heartbeat_s}" =~ ^[1-9][0-9]*$ &&
+        "${backfill_interval_s}" =~ ^[1-9][0-9]*$ &&
+        "${backfill_limit}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "heartbeat, backfill interval, and backfill limit must be positive integers" >&2
   exit 2
 fi
 if [[ "${full_coverage}" != "0" && "${full_coverage}" != "1" ]]; then
@@ -114,6 +118,16 @@ cd "${repo_dir}"
 radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
 orbit() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-orbit "$@"; }
 protocol() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python -m leo_tracker.radio.beacon.offload "$@"; }
+
+run_backfill() {
+  local reason="$1" result
+  if result="$(protocol enqueue-backfill "${root}" --pipeline-id "${pipeline_id}" \
+      --limit "${backfill_limit}" --summary-only)"; then
+    emit "backfill reason=${reason} result=${result}"
+  else
+    emit "backfill_failed reason=${reason} result=${result}"
+  fi
+}
 
 run_retention() {
   local worker_id="$1" result
@@ -428,6 +442,7 @@ shopt -u nullglob
 audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"
 emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_policy=tiered-v2 retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
 emit "recovery ${audit_result}"
+run_backfill startup
 print_progress startup
 for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); done
 (
@@ -435,8 +450,13 @@ for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); do
   # must not inherit the server's graceful-drain TERM handler.
   trap - TERM INT EXIT
   while true; do
-    sleep "${heartbeat_s}"
-    print_progress heartbeat
+    elapsed=0
+    while (( elapsed < backfill_interval_s )); do
+      sleep "${heartbeat_s}"
+      elapsed=$((elapsed + heartbeat_s))
+      print_progress heartbeat
+    done
+    run_backfill periodic
   done
 ) &
 monitor_pid="$!"

@@ -534,6 +534,7 @@ def main(argv: list[str] | None = None) -> int:
     enqueue.add_argument("--pipeline-id", required=True)
     enqueue.add_argument("--limit", type=int)
     enqueue.add_argument("--dry-run", action="store_true")
+    enqueue.add_argument("--summary-only", action="store_true")
     enqueue_export = commands.add_parser("enqueue-export-backfill")
     enqueue_export.add_argument("source_root", type=Path)
     enqueue_export.add_argument("shared_root", type=Path)
@@ -571,6 +572,12 @@ def main(argv: list[str] | None = None) -> int:
         report = enqueue_analysis_backfill(
             args.root, pipeline_id=args.pipeline_id, limit=args.limit,
             dry_run=args.dry_run)
+        if args.summary_only:
+            report = {"schema": report["schema"], "pipeline_id": report["pipeline_id"],
+                      "queued_count": len(report["queued"]),
+                      "skipped_count": len(report["skipped"]),
+                      "error_count": len(report["errors"]),
+                      "errors": report["errors"][:20], "dry_run": report["dry_run"]}
         print(json.dumps(report, sort_keys=True))
         return 1 if report["errors"] else 0
     elif args.command == "enqueue-export-backfill":

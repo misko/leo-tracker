@@ -111,6 +111,12 @@ def test_kalman_service_uses_sixteen_single_thread_workers_in_shadow_mode():
     assert 'catalog/v2/receipts/${name}.json' in script
     assert "starlink-evidence-archive \"" not in script
     assert "Environment=LEO_ANALYSIS_FRAGMENT_MAXIMUM_GAP_S=30" in unit
+    assert "Environment=LEO_ANALYSIS_BACKFILL_INTERVAL_S=600" in unit
+    assert "Environment=LEO_ANALYSIS_BACKFILL_LIMIT=100" in unit
+    assert "run_backfill startup" in script
+    assert "run_backfill periodic" in script
+    assert "enqueue-backfill" in script
+    assert "--summary-only" in script
     assert "Environment=UV_BIN=/home/mouse9911/.local/bin/uv" in unit
     assert "Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache" in unit
     assert "Environment=OMP_NUM_THREADS=1" in unit

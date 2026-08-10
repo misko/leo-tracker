@@ -84,6 +84,7 @@ from .beacon.evidence_archive import (archive_evidence, audit_evidence,
 from .beacon.storage_regime import (CONFIRMATION as STORAGE_REGIME_CONFIRMATION,
                                     apply_storage_regime_plan,
                                     build_storage_regime_plan)
+from .beacon.storage_audit import build_storage_regime_audit
 from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
@@ -527,6 +528,23 @@ def _command_starlink_storage_regime_v2(
               {"dry_run": True, **plan["summary"]})
     print(json.dumps(result, sort_keys=True))
     return 0 if not result.get("failure_count") else 1
+
+
+def command_starlink_storage_audit_v2(args: argparse.Namespace) -> int:
+    with qnap_storage_mutation_lock(args.shared_root):
+        audit = build_storage_regime_audit(
+            args.shared_root, args.archive_root,
+            minimum_age_hours=args.minimum_age_hours,
+            sample_limit=args.sample_limit)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            temporary = args.output.with_name(args.output.name + ".next")
+            temporary.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n")
+            temporary.replace(args.output)
+    print(json.dumps({"audit": str(args.output) if args.output else None,
+                      "converged": audit["converged"],
+                      "violation_counts": audit["violation_counts"]}, sort_keys=True))
+    return 0 if audit["converged"] else 1
 
 
 def command_starlink_evidence_repair_v2_summaries(args: argparse.Namespace) -> int:
@@ -1903,6 +1921,14 @@ def build_parser() -> argparse.ArgumentParser:
     storage_regime.add_argument("--confirm", default="",
         help=f"required literal {STORAGE_REGIME_CONFIRMATION} with --apply")
     storage_regime.set_defaults(handler=command_starlink_storage_regime_v2)
+    storage_audit = commands.add_parser("starlink-storage-audit-v2",
+        help="prove that QNAP storage has converged to the production v2 layout")
+    storage_audit.add_argument("shared_root", type=Path)
+    storage_audit.add_argument("archive_root", type=Path)
+    storage_audit.add_argument("--minimum-age-hours", type=float, default=6)
+    storage_audit.add_argument("--sample-limit", type=int, default=20)
+    storage_audit.add_argument("--output", type=Path)
+    storage_audit.set_defaults(handler=command_starlink_storage_audit_v2)
     repair_v2 = commands.add_parser("starlink-evidence-repair-v2-summaries",
         help="repair legacy v2 source-byte accounting without changing IQ clips")
     repair_v2.add_argument("qnap_root", type=Path)

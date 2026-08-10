@@ -346,6 +346,20 @@ analysis queue depth, or aggregate bytes. For every recording in scope:
 5. all source identifiers from both NVMe and the QNAP working set have been
    reconciled, including quarantine and intentionally excluded records.
 
+The storage-layout convergence gate additionally requires that no age-eligible
+raw (except a current manual pin), v1 evidence/catalog, shadow catalog,
+same-volume `derived/` duplicate, or physical `runs/.../outputs/` artifact
+remains. Run it only when no mutator owns the shared QNAP lock; the CLI acquires
+that lock for a consistent inventory and exits nonzero until every category is
+zero:
+
+```bash
+uv run --active --no-sync leo-radio starlink-storage-audit-v2 \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --minimum-age-hours 6 \
+  --output /mnt/qnap01/mouse9911/leo/reports/retention/storage-v2-audit.json
+```
+
 Three populations are permanently outside "archivable" and must be counted
 separately rather than left as an open gap:
 

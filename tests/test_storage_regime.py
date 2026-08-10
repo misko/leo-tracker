@@ -198,6 +198,11 @@ def test_storage_regime_preserves_manual_pin(tmp_path):
     assert not (archive / "evidence" / capture.name).exists()
     assert (archive / "evidence-v2" / capture.name).exists()
 
+    converged = build_storage_regime_plan(
+        shared, archive, minimum_age_hours=0, scope="raw")
+    assert converged["summary"]["eligible_count"] == 0
+    assert converged["entries"][0]["status"] == "protected_pinned_current"
+
 
 def test_storage_regime_failure_never_removes_raw_or_v1(tmp_path, monkeypatch):
     shared, archive, capture = _ready(tmp_path)

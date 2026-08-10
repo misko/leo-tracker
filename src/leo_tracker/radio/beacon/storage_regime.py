@@ -12,7 +12,7 @@ import time
 
 from .evidence_archive import (V2_RECEIPT_SCHEMA, archive_evidence_v2,
                                archive_evidence_v2_from_v1, verify_evidence)
-from .qnap_lifecycle import (TIERS, classify_recording,
+from .qnap_lifecycle import (_archive_gate, TIERS, classify_recording,
                              qnap_storage_mutation_lock)
 
 
@@ -134,6 +134,7 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         manifest_path = capture / "manifest.json"
         manifest = _json(manifest_path); tier, reasons, evidence = classify_recording(
             shared_root, name)
+        manifest_sha = _sha256(manifest_path) if manifest else None
         status = "eligible"
         if not _capture_safe(shared_root, capture):
             status = "unsafe_shared_path"
@@ -149,10 +150,22 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         elif tier is None:
             status = "classification_unavailable"
         elif tier == 5:
-            status = "eligible_pinned_archive"
+            migration = _json(shared_root / "reports" / "reclamation" /
+                              "storage-regime-v2" / f"{name}.json")
+            archive_valid, _, _ = _archive_gate(
+                shared_root, archive_root, name, str(manifest_sha))
+            if (archive_valid and migration.get("schema") == RECEIPT_SCHEMA and
+                    migration.get("status") == "complete" and
+                    migration.get("source_manifest_sha256") == manifest_sha and
+                    migration.get("raw_pinned") is True and
+                    migration.get("raw_preserved_by_pin") is True and
+                    migration.get("v1_retired") is True):
+                status = "protected_pinned_current"
+            else:
+                status = "eligible_pinned_archive"
         entries.append({
             "recording_id": name, "capture_path": str(capture),
-            "source_manifest_sha256": _sha256(manifest_path) if manifest else None,
+            "source_manifest_sha256": manifest_sha,
             "source_bytes": _source_bytes(manifest), "tier": tier,
             "tier_name": TIERS.get(tier, "unclassified"),
             "classification_reasons": reasons, "evidence": evidence,

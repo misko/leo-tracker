@@ -116,7 +116,8 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         status = "eligible"
         if not _capture_safe(shared_root, capture):
             status = "unsafe_shared_path"
-        elif manifest.get("state") != "complete" or not manifest.get("chunks"):
+        elif (manifest.get("state") not in {"complete", "interrupted"} or
+              not manifest.get("chunks")):
             status = "capture_incomplete"
         elif name in active:
             status = "analysis_active"

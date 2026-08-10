@@ -104,6 +104,23 @@ def test_plan_extract_and_verify_preserve_exact_dual_rx_samples(tmp_path):
         assert np.array_equal(actual, expected[clip["first_sample"]:clip["stop_sample"]])
 
 
+def test_plan_accepts_checksummed_interrupted_prefix(tmp_path):
+    source_root = tmp_path / "source"
+    capture, _ = _capture(source_root, "interrupted-prefix")
+    reports = _reports(source_root, capture.name)
+    manifest_path = capture / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["state"] = "interrupted"
+    manifest["captured_samples_per_receiver"] += 500
+    manifest_path.write_text(json.dumps(manifest))
+
+    plan = plan_evidence(capture, reports, policy="tiered-v2")
+
+    assert plan["schema"] == PLAN_SCHEMA
+    assert plan["summary"]["interval_count"] > 0
+    assert max(item["stop_sample"] for item in plan["intervals"]) <= 10_000
+
+
 def test_tiered_v2_reduces_confirmed_coverage_but_preserves_required_events(tmp_path):
     source = tmp_path / "source"; capture, _ = _capture(source)
     reports = _reports(source, capture.name)

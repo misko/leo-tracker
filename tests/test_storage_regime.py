@@ -153,6 +153,26 @@ def test_storage_regime_accepts_authoritative_pipeline_completion(tmp_path):
     assert entry["status"] == "eligible"
 
 
+def test_storage_regime_migrates_durable_interrupted_prefix(tmp_path):
+    shared, archive, capture = _ready(tmp_path, "interrupted-prefix")
+    manifest_path = capture / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["state"] = "interrupted"
+    manifest["captured_samples_per_receiver"] += 500
+    manifest_path.write_text(json.dumps(manifest))
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    entry = next(item for item in plan["entries"]
+                 if item["recording_id"] == capture.name)
+    assert entry["status"] == "eligible"
+
+    result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+    assert result["completed_count"] == 1
+    assert not capture.exists()
+    assert (archive / "evidence-v2" / "interrupted-prefix" / "manifest.json").is_file()
+
+
 def test_storage_regime_preserves_manual_pin(tmp_path):
     shared, archive, capture = _ready(tmp_path)
     pins = shared / "reports" / "retention" / "pins"; pins.mkdir(parents=True)

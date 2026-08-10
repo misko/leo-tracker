@@ -131,8 +131,9 @@ def plan_evidence(capture_path: Path, reports_root: Path, output: Path | None = 
         raise ValueError("evidence plan output must not modify the source storage root")
     capture = BeaconCapture.open(capture_path)
     manifest = capture.manifest
-    if manifest.get("state") != "complete":
-        raise ValueError("evidence requires a complete capture")
+    if (manifest.get("state") not in {"complete", "interrupted"} or
+            not manifest.get("chunks")):
+        raise ValueError("evidence requires a complete capture or durable interrupted prefix")
     rate = float(manifest["sample_rate_hz"])
     total = int(manifest["captured_samples_per_receiver"])
     duration = total / rate

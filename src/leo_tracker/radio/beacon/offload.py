@@ -431,7 +431,11 @@ def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
             skipped.append(name); continue
         try:
             manifest = _read_json(capture / "manifest.json")
-            if manifest.get("state") != "complete":
+            state = manifest.get("state")
+            if state == "interrupted":
+                if not manifest.get("chunks"):
+                    skipped.append(name); continue
+            elif state != "complete":
                 skipped.append(name); continue
             mode = observation_mode(name, manifest.get("metadata", {}))
             marker = queue / f"backfill-{pipeline_id}-{name}.job"

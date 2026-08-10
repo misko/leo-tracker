@@ -366,6 +366,26 @@ def test_analysis_backfill_accepts_the_capture_side_hop_mode_name(tmp_path):
     assert job.read_text().split("\t")[2] == "hop"
 
 
+def test_analysis_backfill_queues_interrupted_prefix_but_not_empty_capture(tmp_path):
+    create_context_bundle(tmp_path / "context")
+    captures = tmp_path / "captures"; captures.mkdir()
+    prefix = captures / "interrupted-prefix"; prefix.mkdir()
+    (prefix / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "metadata": {"observation_mode": "narrow"},
+        "chunks": [{"path": "chunk-000000.ci16", "sample_count": 100}],
+    }))
+    empty = captures / "interrupted-empty"; empty.mkdir()
+    (empty / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "metadata": {"observation_mode": "narrow"},
+        "chunks": [],
+    }))
+
+    result = enqueue_analysis_backfill(tmp_path, pipeline_id="kalman-v1")
+
+    assert result["queued"] == [prefix.name]
+    assert empty.name in result["skipped"]
+
+
 def test_audit_accepts_a_recording_this_pipeline_already_completed(tmp_path):
     """A completion record is authoritative; revalidating it requeues real work.
 

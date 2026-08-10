@@ -382,6 +382,31 @@ def test_storage_regime_auto_scans_raw_then_falls_back_to_archive(tmp_path):
     assert archive_plan["entries"][0]["status"] == "eligible_archive_only"
 
 
+def test_bounded_auto_reserves_first_apply_slot_for_archive_only(tmp_path):
+    import shutil
+
+    shared, archive, raw_capture = _ready(tmp_path, "z-raw")
+    other_shared, other_archive, other_capture = _ready(
+        tmp_path / "other", "a-archive-only")
+    name = other_capture.name
+    shutil.copytree(other_shared / "reports", shared / "reports", dirs_exist_ok=True)
+    shutil.copytree(other_archive / "evidence" / name,
+                    archive / "evidence" / name)
+    shutil.copy2(other_archive / "catalog" / "receipts" / f"{name}.json",
+                 archive / "catalog" / "receipts" / f"{name}.json")
+
+    plan = build_storage_regime_plan(
+        shared, archive, minimum_age_hours=0, scope="auto", eligible_limit=4)
+    eligible = [item for item in plan["entries"]
+                if item["status"].startswith("eligible")]
+
+    assert plan["configuration"]["active_scope"] == "raw_with_archive_fairness"
+    assert plan["configuration"]["archive_reserved_slots"] == 1
+    assert eligible[0]["recording_id"] == name
+    assert eligible[0]["status"] == "eligible_archive_only"
+    assert eligible[1]["recording_id"] == raw_capture.name
+
+
 def test_storage_regime_bounded_inventory_stops_after_eligible_limit(tmp_path):
     first_shared, first_archive, first = _ready(tmp_path / "first", "a-first")
     second_shared, second_archive, second = _ready(tmp_path / "second", "b-second")

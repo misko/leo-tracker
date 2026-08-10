@@ -191,6 +191,20 @@ def _source_bytes(manifest: dict) -> int:
     return sum(int(item.get("bytes", 0)) for item in manifest.get("chunks", []))
 
 
+def _summary(entries: list[dict]) -> dict:
+    statuses: dict[str, int] = {}; tiers: dict[str, int] = {}
+    eligible = {"eligible", "eligible_archive_only", "eligible_pinned_archive",
+                "eligible_archive_only_pinned"}
+    for item in entries:
+        statuses[item["status"]] = statuses.get(item["status"], 0) + 1
+        tiers[item["tier_name"]] = tiers.get(item["tier_name"], 0) + 1
+    return {"recording_count": len(entries), "status_counts": statuses,
+        "tier_counts": tiers,
+        "eligible_count": sum(item["status"] in eligible for item in entries),
+        "eligible_bytes": sum(item["source_bytes"] for item in entries
+                              if item["status"] in eligible)}
+
+
 def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
                               minimum_age_hours: float = 6,
                               scope: str = "all",
@@ -205,10 +219,38 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
     if scope == "all" and eligible_limit is not None:
         raise ValueError("eligible planning limit requires auto, raw, or archive scope")
     if scope == "auto":
+        # A bounded raw-only plan can never reach archive-only V1 while capture
+        # continuously creates more age-eligible raw. Reserve the first apply
+        # slot for one archive-only record, then devote the rest to raw. The
+        # unbounded audit behavior remains raw-first and only falls back after
+        # raw is exhausted.
+        raw_limit = (max(1, eligible_limit - 1)
+                     if eligible_limit is not None else None)
         raw = build_storage_regime_plan(
             shared_root, archive_root, minimum_age_hours=minimum_age_hours,
-            scope="raw", eligible_limit=eligible_limit)
+            scope="raw", eligible_limit=raw_limit)
         if raw["summary"]["eligible_count"]:
+            if eligible_limit is not None and eligible_limit > 1:
+                archive = build_storage_regime_plan(
+                    shared_root, archive_root,
+                    minimum_age_hours=minimum_age_hours,
+                    scope="archive", eligible_limit=1)
+                archive_eligible = [item for item in archive["entries"]
+                    if item["status"] in {"eligible_archive_only",
+                                          "eligible_archive_only_pinned"}]
+                if archive_eligible:
+                    selected = archive_eligible[:1]
+                    selected_ids = {item["recording_id"] for item in selected}
+                    entries = [*selected, *raw["entries"],
+                        *(item for item in archive["entries"]
+                          if item["recording_id"] not in selected_ids)]
+                    return {**raw, "entries": entries,
+                        "configuration": {**raw["configuration"],
+                            "scope": "auto",
+                            "active_scope": "raw_with_archive_fairness",
+                            "archive_reserved_slots": 1,
+                            "inventory_complete": False},
+                        "summary": _summary(entries)}
             raw["configuration"] = {**raw["configuration"], "scope": "auto",
                                     "active_scope": "raw"}
             return raw
@@ -327,10 +369,6 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         item["tier"] if item["tier"] is not None else 99,
         item["recording_id"],
     ))
-    statuses: dict[str, int] = {}; tiers: dict[str, int] = {}
-    for item in entries:
-        statuses[item["status"]] = statuses.get(item["status"], 0) + 1
-        tiers[item["tier_name"]] = tiers.get(item["tier_name"], 0) + 1
     return {
         "schema": PLAN_SCHEMA,
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -338,19 +376,7 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         "configuration": {"minimum_age_hours": minimum_age_hours, "scope": scope,
                           "eligible_limit": eligible_limit,
                           "inventory_complete": inventory_complete},
-        "summary": {
-            "recording_count": len(entries), "status_counts": statuses,
-            "tier_counts": tiers,
-            "eligible_count": (statuses.get("eligible", 0) +
-                               statuses.get("eligible_archive_only", 0) +
-                               statuses.get("eligible_pinned_archive", 0) +
-                               statuses.get("eligible_archive_only_pinned", 0)),
-            "eligible_bytes": sum(item["source_bytes"] for item in entries
-                                  if item["status"] in
-                                  {"eligible", "eligible_archive_only",
-                                   "eligible_pinned_archive",
-                                   "eligible_archive_only_pinned"}),
-        },
+        "summary": _summary(entries),
         "entries": entries,
     }
 

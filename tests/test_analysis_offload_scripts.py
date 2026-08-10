@@ -80,6 +80,8 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert 'scope="${LEO_STORAGE_REGIME_SCOPE:-auto}"' in script
     assert '--scope "${scope}"' in script
     assert '--planning-limit "${planning_limit}"' in script
+    assert "starlink-shared-transient-converge" in script
+    assert "DELETE-STALE-LEO-TRANSIENTS" in script
     assert '--workers "${workers}"' in script
     assert "--confirm MIGRATE-TO-EVIDENCE-V2" in script
     assert '"${uv_bin}" run --active --no-sync' in script

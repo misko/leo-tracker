@@ -518,7 +518,10 @@ does not invoke the normalizer merely because a bounded scan found no work: the
 primary plan must be in archive scope, report a complete archive inventory, and
 contain zero eligible v1 records. Until that gate is true, all bandwidth stays
 with raw/v1 migration. After the normalizer also produces a complete zero-work
-inventory, the persistent wrapper runs the locked audit with
+inventory, the wrapper receipt-gates stale shared transients; unresolved
+partials remain audit violations. This keeps cleanup automatic without adding
+an expensive Evidence-v2 directory scan to every ordinary migration batch.
+The persistent wrapper then runs the locked audit with
 `--require-producer-contract`. Failed final audits are rate-limited to once per
 ten minutes while waiting for a current Kalman heartbeat or another externally
 repaired invariant. The audit remains authoritative for blocked primary records,

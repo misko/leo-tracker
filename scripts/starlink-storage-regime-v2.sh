@@ -18,6 +18,7 @@ scope="${LEO_STORAGE_REGIME_SCOPE:-auto}"
 plan="${shared_root}/reports/retention/storage-regime-v2.latest.json"
 legacy_plan="${shared_root}/reports/retention/legacy-layout.latest.json"
 audit_report="${shared_root}/reports/retention/storage-v2-audit.json"
+transient_plan="${shared_root}/reports/retention/shared-transients.latest.json"
 audit_interval_s="${LEO_STORAGE_AUDIT_INTERVAL_S:-600}"
 local_root="${LEO_STORAGE_LOCAL_ROOT:-}"
 role="${LEO_STORAGE_REGIME_ROLE:-standalone}"
@@ -178,6 +179,19 @@ except (OSError, ValueError):
 raise SystemExit(0 if complete else 1)
 PY
     then
+      transient_args=(starlink-shared-transient-converge
+        "${shared_root}" "${archive_root}"
+        --minimum-age-s "$("${repo_dir}/.venv/bin/python" -c
+          'import sys; print(float(sys.argv[1]) * 3600)' "${minimum_age_hours}")"
+        --output "${transient_plan}")
+      if [[ "${enabled}" == "1" ]]; then
+        transient_args+=(--apply --confirm DELETE-STALE-LEO-TRANSIENTS)
+      fi
+      if ! env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run \
+          --active --no-sync leo-radio "${transient_args[@]}"; then
+        printf '[%s] shared_transient_convergence_pending plan=%s\n' \
+          "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${transient_plan}" >&2
+      fi
       now="$(date +%s)"
       previous="$(stat -c %Y "${audit_report}" 2>/dev/null || printf 0)"
       if (( now - previous >= audit_interval_s )); then

@@ -245,6 +245,13 @@ already reclaimed is recropped transitively from source-verified v1 clips; any
 gap covering a required v2 interval fails closed. Completed transaction
 receipts live beneath `reports/reclamation/storage-regime-v2/`.
 
+SATPI01 also runs
+[`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
+as a persistent low-priority fallback. It processes one transaction every five
+minutes and shares the global migration lock with Kalman, so it survives Pi
+reboots without allowing two migrations to mutate the archive concurrently.
+Kalman remains the high-throughput worker.
+
 Analysis completion records no longer copy immutable outputs beneath
 `reports/runs/.../outputs/`; they store hashes and authoritative references to
 the ordinary report tree. Historical `reports/runs/.../outputs/` and

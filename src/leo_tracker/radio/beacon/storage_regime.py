@@ -545,6 +545,8 @@ def apply_storage_regime_plan(plan: dict, *, confirmation: str,
             return apply_storage_regime_plan(
                 plan, confirmation=confirmation, limit=limit,
                 workers=workers, mutation_lock_held=True)
+    started = datetime.now(timezone.utc)
+    started_monotonic = time.monotonic()
     items = [entry for entry in plan.get("entries", [])
              if entry.get("status") in {"eligible", "eligible_archive_only",
                                         "eligible_pinned_archive",
@@ -565,13 +567,26 @@ def apply_storage_regime_plan(plan: dict, *, confirmation: str,
                     completed.append(final)
                 if failure is not None:
                     failures.append(failure)
+    completed_utc = datetime.now(timezone.utc)
+    elapsed_s = max(0.0, time.monotonic() - started_monotonic)
+    raw_removed = sum(item["source_bytes"] for item in completed
+                      if not item["archive_only"] and not item["raw_pinned"])
+    v1_removed = sum(item["removed_bytes"] for item in completed)
     return {
         "schema": "leo-tracker.storage-regime-v2-result/v1",
+        "started_utc": started.isoformat(),
+        "completed_utc": completed_utc.isoformat(),
+        "elapsed_s": elapsed_s,
         "completed_count": len(completed),
+        "raw_completed_count": sum(
+            not item["archive_only"] for item in completed),
+        "archive_only_completed_count": sum(
+            item["archive_only"] for item in completed),
         "source_bytes_migrated": sum(item["source_bytes"] for item in completed),
-        "raw_removed_bytes": sum(item["source_bytes"] for item in completed
-                                 if not item["archive_only"] and not item["raw_pinned"]),
-        "v1_removed_bytes": sum(item["removed_bytes"] for item in completed),
+        "raw_removed_bytes": raw_removed,
+        "v1_removed_bytes": v1_removed,
+        "raw_removed_bytes_per_s": raw_removed / elapsed_s if elapsed_s else None,
+        "v1_removed_bytes_per_s": v1_removed / elapsed_s if elapsed_s else None,
         "failure_count": len(failures), "failures": failures,
         "receipts": [str(shared_root / "reports" / "reclamation" /
                          "storage-regime-v2" / f"{item['recording_id']}.json")

@@ -486,7 +486,14 @@ def test_storage_regime_runs_bounded_independent_transactions_concurrently(
         plan, confirmation=CONFIRMATION, limit=2, workers=2)
 
     assert result["completed_count"] == 2
+    assert result["raw_completed_count"] == 2
+    assert result["archive_only_completed_count"] == 0
     assert result["raw_removed_bytes"] == 30
+    assert result["elapsed_s"] >= .05
+    assert result["completed_utc"] >= result["started_utc"]
+    assert result["raw_removed_bytes_per_s"] == pytest.approx(
+        result["raw_removed_bytes"] / result["elapsed_s"])
+    assert result["v1_removed_bytes_per_s"] == 0
     assert state["maximum"] == 2
     with pytest.raises(ValueError, match="workers must be positive"):
         apply_storage_regime_plan(plan, confirmation=CONFIRMATION, workers=0)

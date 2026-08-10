@@ -76,6 +76,10 @@ def test_storage_regime_migrates_exact_v2_then_removes_raw_v1_and_duplicates(tmp
     assert versioned["storage"] == "authoritative-reference"
     assert (archive / "evidence-v2" / name / "manifest.json").is_file()
     assert (archive / "catalog" / "v2" / "receipts" / f"{name}.json").is_file()
+    v2_receipt = json.loads((archive / "catalog" / "v2" / "receipts" /
+                             f"{name}.json").read_text())
+    assert v2_receipt["summary"]["source_bytes"] > 0
+    assert 0 < v2_receipt["summary"]["storage_fraction"] <= 1
     receipt = json.loads((shared / "reports" / "reclamation" /
                           "storage-regime-v2" / f"{name}.json").read_text())
     assert receipt["status"] == "complete"

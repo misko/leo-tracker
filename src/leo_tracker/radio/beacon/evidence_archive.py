@@ -63,6 +63,20 @@ def _sha256_path(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _manifest_stored_bytes(manifest: dict) -> int:
+    """Return durable IQ bytes even for older manifests lacking stored_bytes."""
+    declared = int(manifest.get("stored_bytes", 0) or 0)
+    if declared > 0:
+        return declared
+    total = 0
+    for chunk in manifest.get("chunks", []):
+        size = int(chunk.get("bytes", 0) or 0)
+        if size <= 0:
+            size = int(chunk.get("sample_count", 0) or 0) * BYTES_PER_PAIRED_SAMPLE
+        total += size
+    return total
+
+
 def _atomic_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + f".next.{os.getpid()}")
@@ -518,11 +532,14 @@ def extract_evidence(capture_path: Path, plan_path: Path, destination: Path) -> 
         _atomic_json(progress_path, bundle)
     bundle["state"] = "complete"
     bundle["created_utc"] = datetime.now(timezone.utc).isoformat()
+    stored_bytes = sum(item["bytes"] for item in bundle["clips"])
+    source_bytes = _manifest_stored_bytes(capture.manifest)
+    if source_bytes <= 0:
+        raise ValueError("source manifest has no durable IQ byte extent")
     bundle["summary"] = {"clip_count": len(bundle["clips"]),
-                         "stored_bytes": sum(item["bytes"] for item in bundle["clips"]),
-                         "source_bytes": int(capture.manifest.get("stored_bytes", 0)),
-                         "storage_fraction": (sum(item["bytes"] for item in bundle["clips"]) /
-                                              int(capture.manifest.get("stored_bytes", 1) or 1))}
+                         "stored_bytes": stored_bytes,
+                         "source_bytes": source_bytes,
+                         "storage_fraction": stored_bytes / source_bytes}
     _atomic_json(progress_path, bundle)
     os.replace(partial, destination)
     return bundle
@@ -736,6 +753,11 @@ def extract_evidence_from_bundle(source_bundle: Path, plan_path: Path,
                           "sha256": digest, "dtype": "ci16_le",
                           "layout": source.get("radio_parameters", {}).get("layout"),
                           "receiver_count": 2})
+        original_manifest = _json(source_bundle / "source-manifest.json") or {}
+        source_bytes = _manifest_stored_bytes(original_manifest)
+        if source_bytes <= 0:
+            raise ValueError("source manifest has no durable IQ byte extent")
+        stored_bytes = sum(item["bytes"] for item in clips)
         bundle = {"schema": BUNDLE_SCHEMA, "state": "complete",
                   "created_utc": datetime.now(timezone.utc).isoformat(),
                   "recording_id": plan["recording_id"],
@@ -746,11 +768,9 @@ def extract_evidence_from_bundle(source_bundle: Path, plan_path: Path,
                   "sample_rate_hz": plan["sample_rate_hz"],
                   "radio_parameters": plan["radio_parameters"], "clips": clips,
                   "summary": {"clip_count": len(clips),
-                              "stored_bytes": sum(item["bytes"] for item in clips),
-                              "source_bytes": int(source.get("summary", {}).get(
-                                  "source_bytes", 0)),
-                              "storage_fraction": (sum(item["bytes"] for item in clips) /
-                                  int(source.get("summary", {}).get("source_bytes", 1) or 1))}}
+                              "stored_bytes": stored_bytes,
+                              "source_bytes": source_bytes,
+                              "storage_fraction": stored_bytes / source_bytes}}
         (partial / "resume.json").unlink()
         _atomic_json(partial / "manifest.json", bundle)
         os.replace(partial, destination)
@@ -824,6 +844,60 @@ def archive_evidence_v2_from_v1(recording_id: str, reports_root: Path,
         "source_artifacts": plan.get("source_artifacts", []), "summary": bundle["summary"]}
     _atomic_json(receipt_path, receipt)
     return receipt
+
+
+def repair_evidence_v2_summaries(qnap_root: Path, *, limit: int | None = None) -> dict:
+    """Repair legacy zero-byte v2 accounting without changing retained IQ bytes."""
+    if limit is not None and limit < 1:
+        raise ValueError("repair limit must be positive")
+    qnap_root = Path(qnap_root).resolve()
+    receipt_root = qnap_root / "catalog" / "v2" / "receipts"
+    repaired: list[str] = []; unchanged = 0; errors: list[dict] = []
+    for receipt_path in sorted(receipt_root.glob("*.json") if receipt_root.is_dir() else []):
+        if limit is not None and len(repaired) >= limit:
+            break
+        try:
+            receipt = _json(receipt_path)
+            if receipt is None or receipt.get("schema") != V2_RECEIPT_SCHEMA:
+                raise ValueError("unsupported v2 receipt")
+            relative = Path(str(receipt.get("bundle", "")))
+            if (relative.is_absolute() or ".." in relative.parts or
+                    relative.parts[:1] != ("evidence-v2",)):
+                raise ValueError("unsafe v2 bundle path")
+            bundle_path = qnap_root / relative
+            manifest_path = bundle_path / "manifest.json"
+            manifest = _json(manifest_path)
+            if manifest is None or manifest.get("schema") != BUNDLE_SCHEMA:
+                raise ValueError("missing v2 bundle manifest")
+            if (_sha256_path(manifest_path) != receipt.get("bundle_manifest_sha256") or
+                    not verify_evidence(bundle_path, write=False)["valid"]):
+                raise ValueError("v2 bundle failed pre-repair verification")
+            source_manifest = _json(bundle_path / "source-manifest.json") or {}
+            source_bytes = _manifest_stored_bytes(source_manifest)
+            stored_bytes = sum(int(item.get("bytes", 0) or 0)
+                               for item in manifest.get("clips", []))
+            if source_bytes <= 0 or stored_bytes <= 0:
+                raise ValueError("bundle has no durable byte extent")
+            expected = {"clip_count": len(manifest.get("clips", [])),
+                        "stored_bytes": stored_bytes,
+                        "source_bytes": source_bytes,
+                        "storage_fraction": stored_bytes / source_bytes}
+            if manifest.get("summary") == expected and receipt.get("summary") == expected:
+                unchanged += 1; continue
+            manifest["summary"] = expected
+            _atomic_json(manifest_path, manifest)
+            receipt["summary"] = expected
+            receipt["bundle_manifest_sha256"] = _sha256_path(manifest_path)
+            receipt["summary_repaired_utc"] = datetime.now(timezone.utc).isoformat()
+            _atomic_json(receipt_path, receipt)
+            if not verify_evidence(bundle_path, write=False)["valid"]:
+                raise ValueError("v2 bundle failed post-repair verification")
+            repaired.append(receipt_path.stem)
+        except (OSError, ValueError, KeyError) as exc:
+            errors.append({"recording_id": receipt_path.stem, "error": str(exc)})
+    return {"schema": "leo-tracker.evidence-v2-summary-repair/v1",
+            "repaired_count": len(repaired), "unchanged_count": unchanged,
+            "error_count": len(errors), "repaired": repaired, "errors": errors}
 
 
 def materialize_evidence_clip(bundle_path: Path, interval_id: str,

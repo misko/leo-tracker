@@ -79,6 +79,7 @@ from .beacon.evidence_archive import (archive_evidence, audit_evidence,
                                       build_evidence_v2_shadow,
                                       compare_evidence_plan_coverage, extract_evidence,
                                       materialize_evidence_clip, plan_evidence,
+                                      repair_evidence_v2_summaries,
                                       verify_evidence)
 from .beacon.storage_regime import (CONFIRMATION as STORAGE_REGIME_CONFIRMATION,
                                     apply_storage_regime_plan,
@@ -504,6 +505,12 @@ def command_starlink_storage_regime_v2(args: argparse.Namespace) -> int:
               {"dry_run": True, **plan["summary"]})
     print(json.dumps(result, sort_keys=True))
     return 0 if not result.get("failure_count") else 1
+
+
+def command_starlink_evidence_repair_v2_summaries(args: argparse.Namespace) -> int:
+    result = repair_evidence_v2_summaries(args.qnap_root, limit=args.limit)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if not result["error_count"] else 1
 
 
 def command_starlink_evidence_materialize(args: argparse.Namespace) -> int:
@@ -1872,6 +1879,11 @@ def build_parser() -> argparse.ArgumentParser:
     storage_regime.add_argument("--confirm", default="",
         help=f"required literal {STORAGE_REGIME_CONFIRMATION} with --apply")
     storage_regime.set_defaults(handler=command_starlink_storage_regime_v2)
+    repair_v2 = commands.add_parser("starlink-evidence-repair-v2-summaries",
+        help="repair legacy v2 source-byte accounting without changing IQ clips")
+    repair_v2.add_argument("qnap_root", type=Path)
+    repair_v2.add_argument("--limit", type=int)
+    repair_v2.set_defaults(handler=command_starlink_evidence_repair_v2_summaries)
     evidence_materialize = commands.add_parser("starlink-evidence-materialize",
         help="create a standard replayable BeaconCapture view of one exact clip")
     evidence_materialize.add_argument("bundle", type=Path)

@@ -13,7 +13,7 @@ from leo_tracker.radio.beacon.evidence_archive import (
     archive_evidence, archive_evidence_v2, archive_evidence_v2_from_v1,
     audit_evidence, build_evidence_v2_shadow,
     extract_evidence, materialize_evidence_clip, compare_evidence_plan_coverage,
-    plan_evidence, verify_evidence,
+    plan_evidence, repair_evidence_v2_summaries, verify_evidence,
 )
 import leo_tracker.radio.beacon.evidence_archive as evidence_archive_module
 from leo_tracker.radio.cli import main
@@ -319,6 +319,55 @@ def test_v2_archive_is_source_verified_and_does_not_duplicate_reports(tmp_path):
     assert verify_evidence(archive / receipt["bundle"], capture_path=capture,
                            write=False)["valid"] is True
     assert archive_evidence_v2(capture, reports, archive) == receipt
+
+
+def test_v2_archive_derives_source_bytes_for_legacy_manifest(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source, "legacy-bytes")
+    reports = _reports(source, capture.name); archive = tmp_path / "archive"
+    manifest_path = capture / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest.pop("stored_bytes", None)
+    expected = sum(int(item["bytes"]) for item in manifest["chunks"])
+    manifest_path.write_text(json.dumps(manifest))
+
+    receipt = archive_evidence_v2(capture, reports, archive)
+
+    assert receipt["summary"]["source_bytes"] == expected
+    assert receipt["summary"]["stored_bytes"] < expected
+    assert receipt["summary"]["storage_fraction"] == pytest.approx(
+        receipt["summary"]["stored_bytes"] / expected)
+
+
+def test_repair_v2_summary_updates_metadata_without_changing_iq(tmp_path):
+    source = tmp_path / "source"; capture, _ = _capture(source, "repair-summary")
+    reports = _reports(source, capture.name); archive = tmp_path / "archive"
+    receipt = archive_evidence_v2(capture, reports, archive)
+    bundle = archive / receipt["bundle"]
+    before_iq = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                 for path in bundle.glob("*.ci16")}
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["summary"] = {"clip_count": len(manifest["clips"]),
+                           "stored_bytes": sum(x["bytes"] for x in manifest["clips"]),
+                           "source_bytes": 0, "storage_fraction": 1e9}
+    manifest_path.write_text(json.dumps(manifest))
+    receipt_path = archive / "catalog/v2/receipts/repair-summary.json"
+    broken_receipt = json.loads(receipt_path.read_text())
+    broken_receipt["summary"] = manifest["summary"]
+    broken_receipt["bundle_manifest_sha256"] = hashlib.sha256(
+        manifest_path.read_bytes()).hexdigest()
+    receipt_path.write_text(json.dumps(broken_receipt))
+
+    result = repair_evidence_v2_summaries(archive)
+
+    assert result["repaired"] == ["repair-summary"]
+    fixed = json.loads(receipt_path.read_text())
+    assert fixed["summary"]["source_bytes"] > fixed["summary"]["stored_bytes"]
+    assert fixed["summary"]["storage_fraction"] < 1
+    assert fixed["summary_repaired_utc"]
+    assert {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in bundle.glob("*.ci16")} == before_iq
+    assert verify_evidence(bundle, capture_path=capture, write=False)["valid"]
 
 
 def test_archive_only_v2_recrop_rebuilds_its_own_interrupted_partial(tmp_path, monkeypatch):

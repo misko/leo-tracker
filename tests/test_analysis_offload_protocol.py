@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from leo_tracker.radio.beacon.offload import (
     RECEIPT_SCHEMA,
@@ -135,6 +136,58 @@ def test_full_coverage_receipt_references_authoritative_output_without_duplicate
     assert versioned_receipt["versioned_outputs"]["track"]["storage"] == \
         "authoritative-reference"
     assert versioned_receipt["versioned_outputs"]["track"]["sha256"]
+
+
+def test_receipt_upgrades_byte_identical_legacy_output_layout(tmp_path):
+    report = tmp_path / "reports/sample.json"
+    report.parent.mkdir(parents=True); report.write_bytes(b"science")
+    digest = hashlib.sha256(report.read_bytes()).hexdigest()
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "job": "sample", "pipeline_id": "kalman-v1",
+        "status": "success", "completed_utc": "2026-08-09T00:00:00+00:00",
+        "outputs": {"analysis": {"path": str(report), "bytes": 7,
+                                  "sha256": digest}},
+    }
+    completion = tmp_path / "reports/runs/kalman-v1/sample/completion.json"
+    legacy = tmp_path / "reports/runs/kalman-v1/sample/outputs/analysis.json"
+    legacy.parent.mkdir(parents=True); legacy.write_bytes(report.read_bytes())
+    completion.write_text(json.dumps({
+        **receipt,
+        "versioned_outputs": {"analysis": {"path": str(legacy), "bytes": 7,
+                                              "sha256": digest}},
+    }))
+
+    write_receipt(tmp_path, receipt)
+
+    upgraded = json.loads(completion.read_text())
+    assert upgraded["versioned_outputs"]["analysis"]["path"] == str(report)
+    assert upgraded["versioned_outputs"]["analysis"]["storage"] == \
+        "authoritative-reference"
+    assert upgraded["completed_utc"] == "2026-08-09T00:00:00+00:00"
+    assert upgraded["storage_layout_upgraded_utc"]
+
+
+def test_receipt_does_not_upgrade_different_scientific_output(tmp_path):
+    report = tmp_path / "reports/sample.json"
+    report.parent.mkdir(parents=True); report.write_bytes(b"new")
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "job": "sample", "pipeline_id": "kalman-v1",
+        "status": "success",
+        "outputs": {"analysis": {"path": str(report), "bytes": 3,
+                                  "sha256": hashlib.sha256(b"new").hexdigest()}},
+    }
+    completion = tmp_path / "reports/runs/kalman-v1/sample/completion.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({
+        **receipt,
+        "outputs": {"analysis": {"path": str(report), "bytes": 3,
+                                   "sha256": hashlib.sha256(b"old").hexdigest()}},
+        "versioned_outputs": {"analysis": {"path": "legacy", "bytes": 3,
+                                              "sha256": hashlib.sha256(b"old").hexdigest()}},
+    }))
+
+    with pytest.raises(ValueError, match="pipeline completion collision"):
+        write_receipt(tmp_path, receipt)
 
 
 def test_analysis_status_reports_queue_age_versioned_runs_and_archives(tmp_path):

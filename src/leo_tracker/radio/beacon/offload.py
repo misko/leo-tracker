@@ -289,8 +289,27 @@ def write_receipt(root: Path, receipt: dict) -> Path:
     if versioned.exists():
         existing = _read_json(versioned)
         if existing.get("versioned_outputs") != versioned_outputs:
-            raise ValueError(
-                f"pipeline completion collision for {pipeline_id}/{receipt['job']}")
+            def scientific_identity(outputs: dict) -> dict:
+                return {key: (artifact.get("bytes"), artifact.get("sha256"))
+                        for key, artifact in outputs.items()}
+
+            # Pre-v2 completions copied the same immutable bytes under
+            # runs/.../outputs. Upgrade only the storage metadata when the
+            # complete scientific output set is byte-identical; a genuine
+            # rerun collision must still fail closed.
+            if (existing.get("schema") != RECEIPT_SCHEMA or
+                    existing.get("job") != receipt["job"] or
+                    existing.get("pipeline_id") != pipeline_id or
+                    scientific_identity(existing.get("outputs", {})) !=
+                    scientific_identity(receipt.get("outputs", {}))):
+                raise ValueError(
+                    f"pipeline completion collision for {pipeline_id}/{receipt['job']}")
+            original_completed = existing.get("completed_utc")
+            if original_completed:
+                versioned_receipt["completed_utc"] = original_completed
+            versioned_receipt["storage_layout_upgraded_utc"] = (
+                datetime.now(timezone.utc).isoformat())
+            _atomic_json(versioned, versioned_receipt)
     else:
         _atomic_json(versioned, versioned_receipt)
     path = Path(root) / "reports" / "receipts" / f"{receipt['job']}.json"

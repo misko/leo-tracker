@@ -253,6 +253,9 @@ def test_export_backfill_queues_only_missing_preserved_sources(tmp_path):
         (capture / "manifest.json").write_text(json.dumps({
             "state": "complete", "metadata": {"observation_mode": "narrow"}}))
     (shared / "captures/two").mkdir(parents=True)
+    receipt = shared / "reports/receipts/two.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(json.dumps({"status": "success", "job": "two"}))
     completed = shared / "reports/runs/kalman-v1/one/completion.json"
     completed.parent.mkdir(parents=True); completed.write_text("{}")
 
@@ -316,6 +319,38 @@ def test_export_backfill_does_not_restore_source_with_verified_v2(tmp_path):
 
     result = enqueue_export_backfill(
         source, shared, pipeline_id="kalman-v1", archive_root=archive)
+
+    assert result["queued"] == []
+    assert not list((source / "staging/analysis-queue").glob("*.job"))
+
+
+def test_export_backfill_requeues_shared_raw_when_analysis_never_completed(tmp_path):
+    source, shared = tmp_path / "source", tmp_path / "shared"
+    local_capture = source / "captures/incomplete"; local_capture.mkdir(parents=True)
+    manifest = {"state": "complete", "chunks": [{"path": "chunk.ci16", "bytes": 4}],
+                "metadata": {"observation_mode": "oversample"}}
+    (local_capture / "manifest.json").write_text(json.dumps(manifest))
+    (local_capture / "chunk.ci16").write_bytes(b"data")
+    shared_capture = shared / "captures/incomplete"; shared_capture.mkdir(parents=True)
+    (shared_capture / "manifest.json").write_text(json.dumps(manifest))
+    (shared_capture / "chunk.ci16").write_bytes(b"data")
+
+    result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
+
+    assert result["queued"] == ["incomplete"]
+    assert next((source / "staging/analysis-queue").glob("*.job")).is_file()
+
+
+def test_export_backfill_sees_remote_queue_as_active(tmp_path):
+    source, shared = tmp_path / "source", tmp_path / "shared"
+    capture = source / "captures/active"; capture.mkdir(parents=True)
+    (capture / "manifest.json").write_text(json.dumps({
+        "state": "complete", "chunks": [{"path": "chunk.ci16", "bytes": 4}]}))
+    remote = shared / "staging/analysis-queue/active.running.3"
+    remote.parent.mkdir(parents=True); remote.write_text(
+        "active\tcaptures/active\tnarrow\tcontext/bundles/x\n")
+
+    result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
 
     assert result["queued"] == []
     assert not list((source / "staging/analysis-queue").glob("*.job"))

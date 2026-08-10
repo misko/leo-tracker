@@ -700,18 +700,20 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
     queue = source_root / "staging" / "analysis-queue"
     queue.mkdir(parents=True, exist_ok=True)
     active_names: set[str] = set()
-    for pattern in ("*.job", "*.exporting.*", "*.running.*"):
-        for marker in queue.glob(pattern):
-            try:
-                active_names.add(parse_job(marker)[0])
-            except (OSError, ValueError):
-                continue
+    shared_queue = shared_root / "staging/analysis-queue"
+    for queue_root in (queue, shared_queue):
+        for pattern in ("*.job", "*.exporting.*", "*.running.*"):
+            for marker in queue_root.glob(pattern) if queue_root.is_dir() else []:
+                try:
+                    active_names.add(parse_job(marker)[0])
+                except (OSError, ValueError):
+                    continue
     queued, skipped, errors = [], [], []
     for name, capture in preserved_recordings(source_root):
         completion = (shared_root / "reports" / "runs" / pipeline_id / name /
                       "completion.json")
         shared_capture = shared_root / "captures" / name
-        if shared_capture.is_dir() or name in active_names:
+        if name in active_names:
             skipped.append(name); continue
         try:
             manifest = _read_json(capture / "manifest.json")
@@ -723,6 +725,14 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
                 if not manifest.get("chunks"):
                     skipped.append(name); continue
             elif state != "complete":
+                skipped.append(name); continue
+            analysis_receipt_path = (
+                shared_root / "reports/receipts" / f"{name}.json")
+            analysis_receipt = (_read_json(analysis_receipt_path)
+                                if analysis_receipt_path.is_file() else {})
+            analysis_complete = (analysis_receipt.get("status") == "success" and
+                                 analysis_receipt.get("job") == name)
+            if shared_capture.is_dir() and (completion.is_file() or analysis_complete):
                 skipped.append(name); continue
             if completion.is_file():
                 if archive_root is None:

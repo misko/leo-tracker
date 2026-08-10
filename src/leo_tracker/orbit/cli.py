@@ -193,6 +193,15 @@ def _parser() -> argparse.ArgumentParser:
     fragment.add_argument("--maximum-fragment-rms-hz", type=float, default=500.0)
     fragment.add_argument("--maximum-differential-fraction", type=float, default=.15)
     fragment.add_argument("--output", type=Path, required=True)
+    sky = commands.add_parser("sky-map",
+        help="render qualified satellite tracks and a daily beacon/identity census")
+    sky.add_argument("--beacon-root", type=Path, required=True)
+    sky.add_argument("--output", type=Path, required=True)
+    sky.add_argument("--latest-output", type=Path)
+    sky.add_argument("--daily-output", type=Path)
+    sky.add_argument("--timezone", default="America/Los_Angeles")
+    sky.add_argument("--high-separation-ratio", type=float, default=20.0)
+    sky.add_argument("--workers", type=int, default=16)
     for name in ("passes", "schedule"):
         command = commands.add_parser(name, help="predict visible passes" if name == "passes" else "create a recording schedule")
         command.add_argument("--catalog", type=Path, required=True)
@@ -281,6 +290,14 @@ def main(argv: list[str] | None = None) -> int:
             maximum_differential_fraction=args.maximum_differential_fraction)
         print(json.dumps({"fragment_diagnostic": str(args.output),
             **result["summary"]}, sort_keys=True))
+        return 0
+    if args.command == "sky-map":
+        from .sky_map import render_sky_map
+        result = render_sky_map(args.beacon_root, args.output,
+            latest_output=args.latest_output, daily_output=args.daily_output,
+            timezone_name=args.timezone,
+            high_separation_ratio=args.high_separation_ratio, workers=args.workers)
+        print(json.dumps(result, sort_keys=True))
         return 0
     catalog = TLECatalogArtifact.read(args.catalog)
     if args.candidate_limit < 0:

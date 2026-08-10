@@ -8,7 +8,9 @@ from pathlib import Path
 from statistics import median
 
 
-SCHEMA = "leo-tracker.beacon-dashboard-index/v2"
+SCHEMA = "leo-tracker.beacon-dashboard-index/v3"
+LEGACY_SCHEMAS = {"leo-tracker.beacon-dashboard-index/v2"}
+DASHBOARD_FIELDS_VERSION = 1
 
 
 def _json(path: Path) -> dict:
@@ -198,6 +200,7 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
         for item in fingerprint_index.get("clusters", [])}
     nearest_matches = fingerprint_index.get("nearest_matches", {}).get(name, [])[:5]
     metadata = manifest.get("metadata", {})
+    identity = manifest.get("identity", {}) or {}
     created_ns = int(manifest.get("created_utc_ns", 0) or 0)
     created_utc = (datetime.fromtimestamp(created_ns / 1e9, timezone.utc).isoformat()
                    .replace("+00:00", "Z") if created_ns else None)
@@ -235,6 +238,9 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
             artifacts.append({"label": label, "url": url})
     common = {"kind": "beacon", "recording_id": name, "start_utc": created_utc,
         "status": status, "mode": metadata.get("observation_mode", "narrow"),
+        "radio_id": identity.get("radio_id"),
+        "radio_serial": identity.get("serial"),
+        "receiver_labels": identity.get("receiver_labels"),
         "channel": metadata.get("channel_number"), "region": metadata.get("region"),
         "if_center_hz": manifest.get("center_frequency_hz"),
         "rf_center_hz": manifest.get("rf_center_hz"),
@@ -316,16 +322,28 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
             "_statistics": statistics, "_plots": plots, "_artifacts": artifacts}
 
 
+def capture_dashboard_record(root: Path, name: str) -> dict | None:
+    """Build one complete dashboard record on demand for its detail page."""
+    root = Path(root).resolve()
+    return _capture_row(root, name, _json(
+        root / "reports" / "fingerprints" / "index.json"))
+
+
 def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None = None) -> dict:
     """Incrementally update a compact index; unchanged multi-MB reports are not reparsed."""
     root, output = Path(root).resolve(), Path(output)
     previous = _json(output)
     rows = ({row.get("recording_id"): row for row in previous.get("recordings", [])
-             if row.get("recording_id")} if previous.get("schema") == SCHEMA else {})
+             if row.get("recording_id")}
+            if previous.get("schema") in ({SCHEMA} | LEGACY_SCHEMAS) else {})
     fingerprint_index = _json(root / "reports" / "fingerprints" / "index.json")
-    reports = sorted(path for path in (root / "reports").glob("*.json")
-                     if path.resolve() != output.resolve())
-    targets = ([root / "reports" / f"{capture_name}.json"] if capture_name else reports)
+    if capture_name:
+        reports = []
+        targets = [root / "reports" / f"{capture_name}.json"]
+    else:
+        reports = sorted(path for path in (root / "reports").glob("*.json")
+                         if path.resolve() != output.resolve())
+        targets = reports
     for report_path in targets:
         name = report_path.stem
         sidecars = (report_path, root / "reports" / "followups" / report_path.name,
@@ -338,10 +356,10 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
             root / "reports" / "channel-links" / report_path.name,
             root / "reports" / "associations" /
                 f"{report_path.stem}-channel-link.json")
-        radio_parameters = rows.get(name, {}).get("_statistics", {}).get(
-            "radio_parameters", {})
+        existing = rows.get(name, {})
         if (capture_name is None and name in rows and
-                "signal" in radio_parameters and "stream" in radio_parameters and
+                existing.get("_dashboard_fields_version") ==
+                DASHBOARD_FIELDS_VERSION and
                 rows[name].get("_source_signature") == _signature(sidecars)):
             continue
         row = _capture_row(root, name, fingerprint_index)
@@ -351,18 +369,43 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
     cluster_sizes = {item.get("cluster_id"): item.get("member_count", 0)
         for item in fingerprint_index.get("clusters", [])}
     for name, row in rows.items():
+        radio_parameters = row.get("_statistics", {}).get(
+            "radio_parameters", {})
+        hardware = radio_parameters.get("hardware", {}) or {}
+        receivers = radio_parameters.get("receivers", {}) or {}
+        if not row.get("radio_id"):
+            row["radio_id"] = hardware.get("radio_id")
+        if not row.get("radio_serial"):
+            row["radio_serial"] = hardware.get("serial")
+        if not row.get("receiver_labels"):
+            row["receiver_labels"] = receivers.get("receiver_labels")
+        row["_dashboard_fields_version"] = DASHBOARD_FIELDS_VERSION
         cluster_id = membership.get(name)
         row["fingerprint_family"] = cluster_id
         row["fingerprint_family_size"] = cluster_sizes.get(cluster_id, 0)
         row["fingerprint_nearest_matches"] = fingerprint_index.get(
             "nearest_matches", {}).get(name, [])[:5]
-        row.setdefault("_statistics", {})["fingerprint"] = {
-            "cluster_id": cluster_id, "cluster_size": cluster_sizes.get(cluster_id, 0)}
-        row["_statistics"]["fingerprint_nearest_matches"] = row[
-            "fingerprint_nearest_matches"]
+        if "_statistics" in row:
+            row["_statistics"]["fingerprint"] = {
+                "cluster_id": cluster_id,
+                "cluster_size": cluster_sizes.get(cluster_id, 0)}
+            row["_statistics"]["fingerprint_nearest_matches"] = row[
+                "fingerprint_nearest_matches"]
     ordered = sorted(rows.values(), key=lambda row: row.get("start_utc") or "", reverse=True)
-    report = {"schema": SCHEMA, "created_utc": datetime.now(timezone.utc).isoformat(),
-        "root": str(root), "summary": {"analyzed_capture_count": len(reports),
+    if capture_name:
+        summary = dict(previous.get("summary", {}))
+        summary.update({
+            "analyzed_capture_count": len(ordered),
+            "temporally_confirmed_capture_count": sum(
+                bool(row.get("confirmed")) for row in ordered),
+            "decoded_capture_count": sum(bool(row.get("decoded")) for row in ordered),
+            "continuous_track_capture_count": sum(
+                bool(row.get("continuous_track_count")) for row in ordered),
+            "conditioned_frame_track_capture_count": sum(
+                bool(row.get("conditioned_frame_count")) for row in ordered),
+            "fingerprint_count": fingerprint_index.get("fingerprint_count", 0)})
+    else:
+        summary = {"analyzed_capture_count": len(reports),
             "retained_iq_capture_count": len(list((root / "captures").glob("*/manifest.json"))),
             "followup_capture_count": len(list((root / "reports" / "followups").glob("*.json"))),
             "temporally_confirmed_capture_count": sum(bool(row.get("confirmed"))
@@ -374,10 +417,20 @@ def update_dashboard_index(root: Path, output: Path, *, capture_name: str | None
                 (root / "reports" / "frame-tracks").glob("*.json"))),
             "tle_association_capture_count": len(list(
                 (root / "reports" / "associations").glob("*.json"))),
-            "fingerprint_count": fingerprint_index.get("fingerprint_count", 0)},
+            "fingerprint_count": fingerprint_index.get("fingerprint_count", 0)}
+    report = {"schema": SCHEMA, "created_utc": datetime.now(timezone.utc).isoformat(),
+        "root": str(root), "summary": summary,
         "recordings": ordered}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(output.suffix + ".next")
-    temporary.write_text(json.dumps(report, separators=(",", ":"), sort_keys=True) + "\n")
+    # The table index is read every ten seconds over NFS. Full detector arrays
+    # belong to the detail endpoint and made the historical v2 index hundreds
+    # of megabytes. Keep only compact rows here; reconstruct one detail from
+    # its authoritative reports when the user clicks it.
+    persisted = {**report, "recordings": [
+        {key: value for key, value in row.items() if key != "_statistics"}
+        for row in ordered]}
+    temporary.write_text(json.dumps(
+        persisted, separators=(",", ":"), sort_keys=True) + "\n")
     os.replace(temporary, output)
     return report

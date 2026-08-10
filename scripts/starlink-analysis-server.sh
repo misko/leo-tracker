@@ -514,7 +514,10 @@ worker() {
       done="${queue}/done/$(basename "${marker}")"
       mv "${claim}" "${done}"
       elapsed=$(( $(date +%s) - started ))
-      metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
+      metric="${metrics}/${name}.tsv"
+      # $$ is the server pid in every worker subshell, so it cannot
+      # separate two workers holding markers for the same job name.
+      temporary="${metric}.next.${worker_id}.$$"
       printf 'success\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
       record_duration success "${elapsed}" "${mode}" "${worker_id}"
@@ -529,7 +532,10 @@ worker() {
       failed="${queue}/failed/$(basename "${marker}")"
       mv "${claim}" "${failed}"
       elapsed=$(( $(date +%s) - started ))
-      metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
+      metric="${metrics}/${name}.tsv"
+      # $$ is the server pid in every worker subshell, so it cannot
+      # separate two workers holding markers for the same job name.
+      temporary="${metric}.next.${worker_id}.$$"
       printf 'failed\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
       record_duration failed "${elapsed}" "${mode}" "${worker_id}"

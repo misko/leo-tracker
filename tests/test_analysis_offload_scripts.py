@@ -515,7 +515,8 @@ def test_recent_duration_window_stays_bounded_as_jobs_accumulate(tmp_path):
     queue.mkdir(parents=True)
     capture.mkdir(parents=True)
     for index in range(12):
-        (queue / f"{index:04d}.job").write_text(f"sample-one\t{capture}\tnarrow\n")
+        (queue / f"{index:04d}.job").write_text(
+            f"sample-{index:02d}\t{capture}\tnarrow\n")
     uv_stub = tmp_path / "uv-stub"
     uv_stub.write_text("#!/usr/bin/env bash\nexit 0\n")
     uv_stub.chmod(0o755)

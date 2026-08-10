@@ -55,8 +55,9 @@ def _utc_now() -> str:
 
 def _recordings(local_root: Path) -> list[tuple[str, Path, str]]:
     rows: list[tuple[str, Path, str]] = []
-    for manifest in sorted((local_root / "captures").glob("*/manifest.json")):
-        rows.append((manifest.parent.name, manifest.parent, "capture"))
+    for store, kind in (("captures", "capture"), ("quarantine", "quarantine")):
+        for manifest in sorted((local_root / store).glob("*/manifest.json")):
+            rows.append((manifest.parent.name, manifest.parent, kind))
     for manifest in sorted((local_root / "hop-sessions").glob("*/*/manifest.json")):
         session = manifest.parents[1].name
         rows.append((f"{session}-{manifest.parent.name}", manifest.parent, "hop"))
@@ -71,8 +72,23 @@ def _safe_local_path(local_root: Path, path: Path) -> bool:
     except (FileNotFoundError, ValueError, OSError):
         return False
     parts = relative.parts
-    return ((len(parts) == 2 and parts[0] == "captures") or
+    return ((len(parts) == 2 and parts[0] in {"captures", "quarantine"}) or
             (len(parts) == 3 and parts[0] == "hop-sessions"))
+
+
+def _verify_empty_terminal(path: Path) -> tuple[bool, str, str | None]:
+    """Prove that an interrupted recording contains metadata but no IQ."""
+    manifest_path = path / "manifest.json"
+    manifest = _json(manifest_path)
+    try:
+        children = list(path.iterdir())
+    except OSError:
+        return False, "local_source_missing", None
+    if manifest.get("state") != "interrupted" or manifest.get("chunks"):
+        return False, "local_capture_incomplete", None
+    if any(item.name != "manifest.json" or not item.is_file() for item in children):
+        return False, "unmanifested_local_payload", None
+    return True, "eligible", _sha256(manifest_path)
 
 
 def _active(local_root: Path, shared_root: Path, name: str) -> bool:
@@ -175,18 +191,22 @@ def build_reclamation_plan(local_root: Path, shared_root: Path, *,
         manifest = _json(manifest_path)
         if not _NAME.fullmatch(name) or not _safe_local_path(local_root, local_path):
             reason = "unsafe_local_path"
-        elif (manifest.get("state") not in {"complete", "interrupted"} or
-              not manifest.get("chunks")):
-            reason = "local_capture_incomplete"
         elif now - manifest_path.stat().st_mtime < minimum_age_s:
             reason = "minimum_age_not_met"
         elif _active(local_root, shared_root, name):
             reason = "active_or_partial"
+        elif manifest.get("state") == "interrupted" and not manifest.get("chunks"):
+            valid, reason, manifest_sha = _verify_empty_terminal(local_path)
+            if valid:
+                durable_copy = "empty_terminal"
+        elif (manifest.get("state") not in {"complete", "interrupted"} or
+              not manifest.get("chunks")):
+            reason = "local_capture_incomplete"
         else:
             valid, reason, source_bytes, manifest_sha, durable_copy = _verify_durable(
                 manifest_path, shared_root, archive_root, name,
                 verify_sha256=verify_sha256)
-            if valid:
+            if valid and durable_copy != "evidence_v2":
                 valid, reason, _ = _verify_analysis(shared_root, name, pipeline_id)
         entries.append({"recording_id": name, "kind": kind,
             "local_path": str(local_path),
@@ -248,14 +268,17 @@ def apply_reclamation_plan(plan: dict, *, limit: int | None = None) -> dict:
                 deferred.append({"recording_id": name, "reason": "unsafe_local_path"})
                 continue
             manifest_path = local_path / "manifest.json"
-            valid, reason, source_bytes, manifest_sha, durable_copy = _verify_durable(
-                manifest_path, shared_root, archive_root, name,
-                verify_sha256=bool(config.get("verify_sha256")))
-            if valid:
+            if original.get("durable_copy") == "empty_terminal":
+                valid, reason, manifest_sha = _verify_empty_terminal(local_path)
+                source_bytes, durable_copy, analysis = 0, "empty_terminal", {}
+            else:
+                valid, reason, source_bytes, manifest_sha, durable_copy = _verify_durable(
+                    manifest_path, shared_root, archive_root, name,
+                    verify_sha256=bool(config.get("verify_sha256")))
+                analysis = {}
+            if valid and durable_copy != "evidence_v2" and durable_copy != "empty_terminal":
                 valid, reason, analysis = _verify_analysis(
                     shared_root, name, config.get("pipeline_id"))
-            else:
-                analysis = {}
             if valid and _active(local_root, shared_root, name):
                 valid, reason = False, "active_or_partial"
             if not valid:

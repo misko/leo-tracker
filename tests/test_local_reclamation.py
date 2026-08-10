@@ -13,8 +13,9 @@ from leo_tracker.radio.cli import main
 
 
 def _write_recording(local: Path, shared: Path, name: str = "capture-001",
-                     *, state: str = "complete", payload: bytes = b"radio-data"):
-    source = local / "captures" / name
+                     *, state: str = "complete", payload: bytes = b"radio-data",
+                     store: str = "captures"):
+    source = local / store / name
     destination = shared / "captures" / name
     source.mkdir(parents=True); destination.mkdir(parents=True)
     chunk = {"path": "chunk-000000.ci16", "bytes": len(payload),
@@ -102,6 +103,58 @@ def test_verified_v2_reclaims_local_raw_after_qnap_raw_is_already_gone(tmp_path)
     assert not source.exists()
     receipt = json.loads((shared / "reports/reclamation/local/capture-001.json").read_text())
     assert receipt["durable_copy"] == "evidence_v2"
+
+
+def test_verified_v2_is_sufficient_without_separate_analysis_receipt(tmp_path):
+    local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
+                              tmp_path / "archive")
+    source, destination = _write_recording(local, shared)
+    _write_v2(archive, source, source.name)
+    shutil.rmtree(destination)
+    (shared / "reports/receipts/capture-001.json").unlink()
+
+    plan = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+    assert plan["entries"][0]["status"] == "eligible"
+    assert apply_reclamation_plan(plan)["removed_count"] == 1
+    assert not source.exists()
+
+
+def test_verified_v2_reclaims_quarantined_interrupted_prefix(tmp_path):
+    local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
+                              tmp_path / "archive")
+    source, destination = _write_recording(
+        local, shared, state="interrupted", store="quarantine")
+    _write_v2(archive, source, source.name)
+    shutil.rmtree(destination)
+
+    plan = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+    assert plan["entries"][0]["kind"] == "quarantine"
+    assert plan["entries"][0]["status"] == "eligible"
+    assert apply_reclamation_plan(plan)["removed_count"] == 1
+    assert not source.exists()
+
+
+def test_empty_interrupted_metadata_is_reclaimed_but_unmanifested_payload_is_not(
+        tmp_path):
+    local, shared = tmp_path / "nvme", tmp_path / "qnap"
+    empty = local / "captures/empty"; empty.mkdir(parents=True)
+    (empty / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "chunks": []}))
+    unsafe = local / "quarantine/unsafe"; unsafe.mkdir(parents=True)
+    (unsafe / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "chunks": []}))
+    (unsafe / "orphan.ci16").write_bytes(b"science")
+
+    plan = build_reclamation_plan(local, shared, minimum_age_s=0)
+    by_name = {item["recording_id"]: item for item in plan["entries"]}
+    assert by_name["empty"]["status"] == "eligible"
+    assert by_name["empty"]["durable_copy"] == "empty_terminal"
+    assert by_name["unsafe"]["status"] == "unmanifested_local_payload"
+    assert apply_reclamation_plan(plan)["removed_count"] == 1
+    assert not empty.exists()
+    assert unsafe.exists()
 
 
 def test_v2_fallback_accepts_analyzed_interrupted_prefix_but_rejects_stale_receipt(

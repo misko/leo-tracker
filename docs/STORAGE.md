@@ -108,8 +108,9 @@ SATPI01 must not run the legacy local DSP workers alongside it.
 It does not remove the complete QNAP recording or any cropped evidence. A local
 recording is eligible only when all of the following are true:
 
-1. its manifest is complete, or an interrupted prefix with chunks, and at least
-   five minutes old;
+1. its manifest is complete, an interrupted prefix with chunks, or an
+   interrupted terminal manifest containing no IQ payload, and is at least five
+   minutes old;
 2. no local/export/Kalman job or partial transfer owns the recording;
 3. either the complete QNAP raw manifest is byte-identical and every shared
    chunk has its declared size, or a production tiered-v2 receipt matches the
@@ -117,8 +118,9 @@ recording is eligible only when all of the following are true:
    bundle manifest hash is intact;
 4. optional full SHA-256 mode additionally re-reads every shared raw chunk when
    QNAP raw is the durable copy;
-5. the successful analysis receipt names the same recording and its analysis
-   output still exists with the recorded size; and
+5. when the durable copy is shared raw, the successful analysis receipt names
+   the same recording and its analysis output still exists with the recorded
+   size (the replay-verified V2 receipt itself proves this for V2 archives); and
 6. the local path resolves to exactly one ordinary capture or hop child below
    the configured NVMe root and is not a symlink.
 
@@ -126,7 +128,10 @@ Before deletion the reclaimer atomically writes a `prepared` receipt beneath
 `reports/reclamation/local/`; after deletion it replaces that receipt with
 `status: removed`, the exact manifest hash and reclaimed byte count. Repeated
 runs are idempotent. Incomplete, missing, corrupt, active and ambiguous sources
-are deferred rather than repaired or removed. The v2 path is essential for
+are deferred rather than repaired or removed. Quarantined interrupted prefixes
+use exactly the same gates as ordinary captures. Empty interrupted terminals
+are removed only when `manifest.json` is their sole child, proving that no IQ
+or orphan payload exists. The v2 path is essential for
 historical convergence: if QNAP raw was already correctly reclaimed, the local
 full-IQ duplicate no longer remains stranded.
 

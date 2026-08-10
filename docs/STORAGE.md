@@ -404,7 +404,7 @@ zero:
 ```bash
 uv run --active --no-sync leo-radio starlink-storage-audit-v2 \
   /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
-  --minimum-age-hours 6 \
+  --minimum-age-hours 6 --require-producer-contract \
   --output /mnt/qnap01/mouse9911/leo/reports/retention/storage-v2-audit.json
 ```
 

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 from leo_tracker.radio.beacon.storage_audit import build_storage_regime_audit
 from leo_tracker.radio.beacon.storage_regime import (
@@ -72,3 +73,32 @@ def test_audit_rejects_interrupted_legacy_normalization_receipt(tmp_path):
     audit = build_storage_regime_audit(shared, archive, minimum_age_hours=0)
     assert audit["converged"] is False
     assert audit["violation_counts"]["incomplete_normalizer_receipts"] == 1
+
+
+def test_audit_can_require_a_fresh_tiered_v2_producer_contract(tmp_path):
+    shared, archive = tmp_path / "shared", tmp_path / "archive"
+    missing = build_storage_regime_audit(
+        shared, archive, minimum_age_hours=0,
+        require_producer_contract=True)
+    assert missing["converged"] is False
+    assert missing["violation_counts"]["producer_contract"] == 1
+    assert missing["producer_contract"]["reason"] == "missing"
+
+    runtime = shared / "reports/runtime/analysis-server.json"
+    runtime.parent.mkdir(parents=True)
+    runtime.write_text(json.dumps({
+        "schema": "leo-tracker.analysis-server-runtime/v1",
+        "state": "running",
+        "heartbeat_utc": datetime.now(timezone.utc).isoformat(),
+        "producer_contract_valid": True,
+        "archive_mode": "required",
+        "archive_root": str(archive),
+        "evidence_policy": "tiered-v2",
+        "archive_command": "starlink-evidence-archive-v2",
+    }))
+    current = build_storage_regime_audit(
+        shared, archive, minimum_age_hours=0,
+        require_producer_contract=True)
+    assert current["converged"] is True
+    assert current["violation_counts"]["producer_contract"] == 0
+    assert current["producer_contract"]["valid"] is True

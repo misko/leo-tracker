@@ -10,6 +10,15 @@ from .storage_regime import build_storage_regime_plan
 
 
 AUDIT_SCHEMA = "leo-tracker.storage-regime-v2-audit/v1"
+PRODUCER_SCHEMA = "leo-tracker.analysis-server-runtime/v1"
+
+
+def _json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
 
 
 def _tree(root: Path, *, sample_limit: int) -> dict:
@@ -55,14 +64,58 @@ def _incomplete_receipts(root: Path, *, sample_limit: int) -> dict:
             "samples": incomplete[:sample_limit]}
 
 
+def _producer_contract(shared_root: Path, archive_root: Path, *,
+                       required: bool, now: float,
+                       maximum_heartbeat_age_s: float) -> dict:
+    path = shared_root / "reports" / "runtime" / "analysis-server.json"
+    value = _json(path) if path.is_file() else {}
+    reason = None; age = None
+    if not value:
+        reason = "missing"
+    elif value.get("schema") != PRODUCER_SCHEMA:
+        reason = "unsupported_schema"
+    elif value.get("state") != "running":
+        reason = "not_running"
+    elif not value.get("producer_contract_valid"):
+        reason = "contract_invalid"
+    elif value.get("archive_mode") != "required":
+        reason = "archive_not_required"
+    elif value.get("evidence_policy") != "tiered-v2":
+        reason = "legacy_evidence_policy"
+    elif value.get("archive_command") != "starlink-evidence-archive-v2":
+        reason = "legacy_archive_command"
+    elif value.get("archive_root") != str(archive_root):
+        reason = "archive_root_mismatch"
+    else:
+        try:
+            heartbeat = datetime.fromisoformat(
+                str(value["heartbeat_utc"]).replace("Z", "+00:00"))
+            age = max(0.0, now - heartbeat.timestamp())
+            if age > maximum_heartbeat_age_s:
+                reason = "heartbeat_stale"
+        except (KeyError, TypeError, ValueError):
+            reason = "heartbeat_invalid"
+    return {
+        "path": str(path), "required": required,
+        "valid": reason is None, "reason": reason,
+        "heartbeat_age_s": age,
+        "maximum_heartbeat_age_s": maximum_heartbeat_age_s,
+        "runtime": value,
+    }
+
+
 def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
                                minimum_age_hours: float = 6,
-                               sample_limit: int = 20) -> dict:
+                               sample_limit: int = 20,
+                               require_producer_contract: bool = False,
+                               maximum_producer_heartbeat_age_s: float = 180) -> dict:
     """Prove whether all durable storage uses the current production layout."""
     if minimum_age_hours < 0:
         raise ValueError("minimum age must be non-negative")
     if sample_limit < 0:
         raise ValueError("sample limit must be non-negative")
+    if maximum_producer_heartbeat_age_s <= 0:
+        raise ValueError("maximum producer heartbeat age must be positive")
     shared_root = Path(shared_root).resolve(); archive_root = Path(archive_root).resolve()
     migration = build_storage_regime_plan(
         shared_root, archive_root, minimum_age_hours=minimum_age_hours,
@@ -134,16 +187,26 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         "incomplete_normalizer_receipts": legacy[
             "incomplete_normalizer_receipts"]["count"],
     }
+    producer = _producer_contract(
+        shared_root, archive_root, required=require_producer_contract,
+        now=time.time(),
+        maximum_heartbeat_age_s=maximum_producer_heartbeat_age_s)
+    violation_counts["producer_contract"] = int(
+        require_producer_contract and not producer["valid"])
     return {
         "schema": AUDIT_SCHEMA,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "shared_root": str(shared_root), "archive_root": str(archive_root),
         "configuration": {"minimum_age_hours": minimum_age_hours,
-                          "sample_limit": sample_limit},
+                          "sample_limit": sample_limit,
+                          "require_producer_contract": require_producer_contract,
+                          "maximum_producer_heartbeat_age_s":
+                              maximum_producer_heartbeat_age_s},
         "converged": not any(violation_counts.values()),
         "violation_counts": violation_counts,
         "old_raw_bytes": sum(int(item["source_bytes"]) for item in old_raw),
         "old_raw_samples": old_raw[:sample_limit],
         "migration_summary": migration["summary"],
+        "producer_contract": producer,
         "legacy": legacy,
     }

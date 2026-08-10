@@ -294,6 +294,37 @@ def test_analysis_status_reports_queue_age_versioned_runs_and_archives(tmp_path)
     assert json.loads((tmp_path / "reports/status.json").read_text()) == report
 
 
+def test_status_can_skip_the_per_run_receipt_scan(tmp_path, monkeypatch):
+    queue = tmp_path / "staging/analysis-queue"
+    (queue / "done").mkdir(parents=True)
+    (queue / "failed").mkdir()
+    (queue / "one.job").write_text("job")
+    completion = tmp_path / "reports/runs/kalman-test/three/completion.json"
+    completion.parent.mkdir(parents=True); completion.write_text("{}")
+    archived = tmp_path / "archive/catalog/v2/receipts/three.json"
+    archived.parent.mkdir(parents=True); archived.write_text("{}")
+
+    patterns: list[str] = []
+    original = Path.glob
+
+    def recording(self, pattern, *args, **kwargs):
+        patterns.append(pattern)
+        return original(self, pattern, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "glob", recording)
+    report = analysis_status(
+        tmp_path, workers=16, pipeline_id="kalman-test",
+        archive_root=tmp_path / "archive", include_completion_count=False)
+
+    # The scan costs one network round trip per historical run, so the polling
+    # path must not perform it at all rather than merely discard the result.
+    assert "*/completion.json" not in patterns
+    assert report["versioned_completion_count"] is None
+    # Every other field stays exact; only the O(history) one is withheld.
+    assert report["queue"]["ready"] == 1
+    assert report["verified_archive_count"] == 1
+
+
 def test_backfill_is_versioned_bounded_atomic_and_idempotent(tmp_path):
     create_context_bundle(tmp_path / "context")
     captures = tmp_path / "captures"; captures.mkdir()

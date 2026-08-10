@@ -35,6 +35,7 @@ poll_s="${LEO_ANALYSIS_POLL_S:-3}"
 heartbeat_s="${LEO_ANALYSIS_HEARTBEAT_S:-30}"
 backfill_interval_s="${LEO_ANALYSIS_BACKFILL_INTERVAL_S:-600}"
 backfill_limit="${LEO_ANALYSIS_BACKFILL_LIMIT:-100}"
+duration_window="${LEO_ANALYSIS_DURATION_WINDOW:-200}"
 pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
 archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
@@ -71,8 +72,9 @@ if [[ -z "${uv_bin}" || ! -x "${venv}/bin/python" ]]; then
 fi
 if ! [[ "${heartbeat_s}" =~ ^[1-9][0-9]*$ &&
         "${backfill_interval_s}" =~ ^[1-9][0-9]*$ &&
-        "${backfill_limit}" =~ ^[1-9][0-9]*$ ]]; then
-  echo "heartbeat, backfill interval, and backfill limit must be positive integers" >&2
+        "${backfill_limit}" =~ ^[1-9][0-9]*$ &&
+        "${duration_window}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "heartbeat, backfill interval, backfill limit, and duration window must be positive integers" >&2
   exit 2
 fi
 if [[ "${full_coverage}" != "0" && "${full_coverage}" != "1" ]]; then
@@ -97,6 +99,11 @@ export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
 export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
 metrics="${queue}/metrics"
+# Job durations feed one ETA string, so the progress path reads a bounded tail
+# of recent jobs rather than every historical per-job metric file. Reading all
+# of them made each completion cost a network round trip per job already done,
+# which is quadratic in the size of the run and starves workers of claims.
+recent_durations="${metrics}/recent-durations.tsv"
 progress_log="${reports}/analysis-server.log"
 runtime_state="${reports}/runtime/analysis-server.json"
 progress_lock="${queue}/progress.lock"
@@ -167,6 +174,24 @@ emit() {
   ) 9>"${progress_lock}"
 }
 
+# Append one finished job to the bounded duration window. The lock is held for
+# an append and an occasional rewrite, both O(duration_window), so a worker
+# never waits on history to claim its next job. Trimming at a multiple of the
+# window keeps that rewrite amortized while bounding what print_progress reads.
+record_duration() {
+  local outcome="$1" elapsed="$2" mode="$3" worker_id="$4" trimmed
+  (
+    flock 9
+    printf '%s\t%s\t%s\t%s\n' "${outcome}" "${elapsed}" "${mode}" "${worker_id}" \
+      >> "${recent_durations}"
+    if (( $(wc -l < "${recent_durations}") > duration_window * 4 )); then
+      trimmed="${recent_durations}.next.$$"
+      tail -n "${duration_window}" "${recent_durations}" > "${trimmed}" &&
+        mv "${trimmed}" "${recent_durations}"
+    fi
+  ) 9>"${progress_lock}"
+}
+
 publish_runtime_state() {
   local state="$1" heartbeat_utc temporary
   heartbeat_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -231,6 +256,11 @@ human_duration() {
   }'
 }
 
+# Progress is a periodic report, not a per-job one. Workers emit their own
+# job_done/job_failed line and immediately claim again; only the monitor calls
+# this. Calling it per job made all sixteen workers recount the queue and
+# rescan history concurrently after every completion, which cost more wall
+# clock than the analysis itself and left the queue draining on a few workers.
 print_progress() {
   local reason="$1" ready running completed failed total finished percent
   local metric_count average_seconds eta_seconds eta average
@@ -243,8 +273,8 @@ print_progress() {
   if (( total > 0 )); then percent="$(awk -v n="${finished}" -v d="${total}" 'BEGIN {printf "%.1f", 100*n/d}')"
   else percent="100.0"; fi
   read -r metric_count average_seconds < <(
-    awk -F '\t' '{sum+=$2; count++} END {printf "%d %.3f\n", count, count ? sum/count : 0}' \
-      "${metrics}"/*.tsv 2>/dev/null || printf '0 0\n')
+    tail -n "${duration_window}" "${recent_durations}" 2>/dev/null |
+      awk -F '\t' '{sum+=$2; count++} END {printf "%d %.3f\n", count, count ? sum/count : 0}')
   if (( metric_count > 0 )); then
     eta_seconds="$(awk -v jobs="$((ready + running))" -v avg="${average_seconds}" \
       -v workers="${workers}" 'BEGIN {printf "%.0f", jobs*avg/workers}')"
@@ -255,8 +285,24 @@ print_progress() {
   fi
   emit "progress reason=${reason} complete=${finished}/${total} percent=${percent}% ready=${ready} running=${running} succeeded=${completed} failed=${failed} workers=${workers} average_job=${average} eta=${eta}"
   protocol status "${root}" --workers "${workers}" --pipeline-id "${pipeline_id}" \
-    --archive-root "${archive_root}" --write "${reports}/analysis-server-status.json" \
+    --archive-root "${archive_root}" --skip-completion-count \
+    --write "${reports}/analysis-server-status.json" \
     >/dev/null || emit "status_write_failed"
+}
+
+# The exact versioned completion count stats one receipt per historical run, so
+# it rides the slow periodic loop instead of the heartbeat. The count is
+# advisory, and a bounded staleness is worth far more than the throughput lost
+# to recomputing it every thirty seconds.
+publish_deep_status() {
+  local reason="$1"
+  if protocol status "${root}" --workers "${workers}" --pipeline-id "${pipeline_id}" \
+      --archive-root "${archive_root}" \
+      --write "${reports}/analysis-server-status.json" >/dev/null; then
+    emit "deep_status reason=${reason}"
+  else
+    emit "deep_status_failed reason=${reason}"
+  fi
 }
 
 run_stage() {
@@ -471,6 +517,7 @@ worker() {
       metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
       printf 'success\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
+      record_duration success "${elapsed}" "${mode}" "${worker_id}"
       if [[ "${retention_mode}" == verified &&
             -f "${archive_root}/catalog/v2/receipts/${name}.json" ]]; then
         run_retention "${worker_id}"
@@ -478,7 +525,6 @@ worker() {
         emit "retention_skipped worker=${worker_id} job=${name} mode=${retention_mode} archive_required=true"
       fi
       emit "job_done worker=${worker_id} job=${name} mode=${mode} elapsed=$(human_duration "${elapsed}") report=${reports}/${name}.json"
-      print_progress "job_done"
     else
       failed="${queue}/failed/$(basename "${marker}")"
       mv "${claim}" "${failed}"
@@ -486,8 +532,8 @@ worker() {
       metric="${metrics}/${name}.tsv"; temporary="${metric}.next.$$"
       printf 'failed\t%d\t%s\t%s\n' "${elapsed}" "${mode}" "${worker_id}" > "${temporary}"
       mv "${temporary}" "${metric}"
+      record_duration failed "${elapsed}" "${mode}" "${worker_id}"
       emit "job_failed worker=${worker_id} job=${name} mode=${mode} elapsed=$(human_duration "${elapsed}") log=${log}"
-      print_progress "job_failed"
     fi
   done
 }
@@ -551,6 +597,7 @@ for ((index=0; index<workers; index++)); do worker "${index}" & pids+=("$!"); do
     done
     run_backfill periodic
     reconcile_failed periodic
+    publish_deep_status periodic
   done
 ) &
 monitor_pid="$!"

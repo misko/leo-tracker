@@ -441,6 +441,47 @@ def test_server_worker_reports_job_stage_progress_and_eta(tmp_path):
     assert list((queue / "metrics").glob("*.tsv"))
 
 
+def test_job_completion_never_rescans_history():
+    source = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
+    # Progress once cost a round trip per already-finished job, paid by every
+    # worker after every job. Completion must stay O(1) as the run grows.
+    assert '"${metrics}"/*.tsv' not in source
+    assert 'print_progress "job_done"' not in source
+    assert 'print_progress "job_failed"' not in source
+    assert 'record_duration success' in source
+    assert 'record_duration failed' in source
+    assert 'tail -n "${duration_window}" "${recent_durations}"' in source
+    # The exact per-run receipt scan rides the slow loop, not the heartbeat.
+    assert "--skip-completion-count" in source
+    assert "publish_deep_status periodic" in source
+
+
+def test_recent_duration_window_stays_bounded_as_jobs_accumulate(tmp_path):
+    queue = tmp_path / "staging/analysis-queue"
+    capture = tmp_path / "captures/sample-one"
+    queue.mkdir(parents=True)
+    capture.mkdir(parents=True)
+    for index in range(12):
+        (queue / f"{index:04d}.job").write_text(f"sample-one\t{capture}\tnarrow\n")
+    uv_stub = tmp_path / "uv-stub"
+    uv_stub.write_text("#!/usr/bin/env bash\nexit 0\n")
+    uv_stub.chmod(0o755)
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",
+         "--workers", "2", str(tmp_path)],
+        env=os.environ | {"LEO_TRACKER_REPO": str(ROOT), "UV_BIN": str(uv_stub),
+                          "LEO_ANALYSIS_DURATION_WINDOW": "2"},
+        text=True, capture_output=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    assert len(list((queue / "done").glob("*.job"))) == 12
+    window = (queue / "metrics/recent-durations.tsv").read_text().splitlines()
+    # Twelve completions, trimmed back to the window whenever it reaches a
+    # multiple of it, so the file the progress path reads never grows with the
+    # length of the run.
+    assert 0 < len(window) <= 2 * 4
+    assert "eta=" in result.stdout
+
+
 def test_server_worker_stops_pipeline_and_marks_failed_when_analysis_fails(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     capture = tmp_path / "captures/sample-bad"

@@ -111,9 +111,9 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "LEO_STORAGE_LOCAL_ROOT=/mnt/leo-nvme/leo-tracker" in unit
     assert 'audit_args+=(--local-root "${local_root}")' in script
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_LIMIT=10" in unit
+    assert "Environment=LEO_STORAGE_REGIME_LIMIT=12" in unit
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=80" in unit
-    assert "Environment=LEO_STORAGE_REGIME_WORKERS=5" in unit
+    assert "Environment=LEO_STORAGE_REGIME_WORKERS=6" in unit
     assert "Environment=LEO_STORAGE_REGIME_ARCHIVE_SLOTS=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
     assert "Environment=LEO_STORAGE_REGIME_ROLE=fallback" in unit

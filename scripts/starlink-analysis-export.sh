@@ -132,7 +132,8 @@ export_one() {
   if [[ ! "${name}" =~ ^[A-Za-z0-9._-]+$ || -z "${mode}" ||
         ("${capture_real}" != "${source_real}/captures/"* &&
          "${capture_real}" != "${source_real}/hop-sessions/"* &&
-         "${capture_real}" != "${source_real}/quarantine/"*) ]]; then
+         "${capture_real}" != "${source_real}/quarantine/"* &&
+         "${capture_real}" != "${source_real}/evidence/pilot_symbolwise_v3/"*) ]]; then
     mv "${claim}" "${claim%%.exporting.*}.failed"
     echo "invalid offload job: ${claim}" >&2
     return 1

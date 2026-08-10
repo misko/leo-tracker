@@ -148,6 +148,11 @@ manifest or sequential atomic chunk files, and any atomically written orphan
 chunk is added with exact sample extent and an explicit reconstructed-timestamp
 provenance note. Ambiguous or corrupt directories remain untouched.
 
+The three historical `evidence/pilot_symbolwise_v3` full-IQ captures are also
+treated as acquisition sources, not as a permanent second archive. They pass
+through the same atomic exporter and V2 replay gates, after which the local
+full-IQ directories are reclaimed by receipt like captures and quarantine.
+
 Dry-run and bounded application:
 
 ```bash

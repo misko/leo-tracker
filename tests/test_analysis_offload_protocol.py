@@ -468,6 +468,24 @@ def test_quarantined_prefixes_are_queued_but_empty_ones_are_not(tmp_path):
     assert result["errors"] == []
 
 
+def test_legacy_local_evidence_capture_is_exportable(tmp_path):
+    source, shared = tmp_path / "source", tmp_path / "shared"
+    (source / "captures").mkdir(parents=True)
+    capture = source / "evidence/pilot_symbolwise_v3/old-science"
+    capture.mkdir(parents=True)
+    (capture / "manifest.json").write_text(json.dumps({
+        "state": "complete", "chunks": [{"path": "chunk.ci16", "bytes": 4}],
+        "metadata": {"observation_mode": "narrow"}}))
+    (capture / "chunk.ci16").write_bytes(b"data")
+
+    result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
+
+    assert result["queued"] == ["old-science"]
+    job = next((source / "staging/analysis-queue").glob("*.job"))
+    assert job.read_text().rstrip().split("\t") == [
+        "old-science", str(capture), "narrow"]
+
+
 def test_analysis_backfill_accepts_the_capture_side_hop_mode_name(tmp_path):
     create_context_bundle(tmp_path / "context")
     captures = tmp_path / "captures"; captures.mkdir()

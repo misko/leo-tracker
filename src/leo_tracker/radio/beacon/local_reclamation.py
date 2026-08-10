@@ -58,6 +58,9 @@ def _recordings(local_root: Path) -> list[tuple[str, Path, str]]:
     for store, kind in (("captures", "capture"), ("quarantine", "quarantine")):
         for manifest in sorted((local_root / store).glob("*/manifest.json")):
             rows.append((manifest.parent.name, manifest.parent, kind))
+    for manifest in sorted((local_root / "evidence" / "pilot_symbolwise_v3").glob(
+            "*/manifest.json")):
+        rows.append((manifest.parent.name, manifest.parent, "legacy_evidence"))
     for manifest in sorted((local_root / "hop-sessions").glob("*/*/manifest.json")):
         session = manifest.parents[1].name
         rows.append((f"{session}-{manifest.parent.name}", manifest.parent, "hop"))
@@ -73,6 +76,7 @@ def _safe_local_path(local_root: Path, path: Path) -> bool:
         return False
     parts = relative.parts
     return ((len(parts) == 2 and parts[0] in {"captures", "quarantine"}) or
+            (len(parts) == 3 and parts[:2] == ("evidence", "pilot_symbolwise_v3")) or
             (len(parts) == 3 and parts[0] == "hop-sessions"))
 
 

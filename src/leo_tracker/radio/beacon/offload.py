@@ -55,6 +55,10 @@ def preserved_recordings(source_root: Path) -> list[tuple[str, Path]]:
         root = Path(source_root) / store
         if root.is_dir():
             found += [(item.name, item) for item in root.iterdir() if item.is_dir()]
+    legacy_evidence = Path(source_root) / "evidence" / "pilot_symbolwise_v3"
+    if legacy_evidence.is_dir():
+        found += [(item.name, item) for item in legacy_evidence.iterdir()
+                  if item.is_dir() and (item / "manifest.json").is_file()]
     sessions_root = Path(source_root) / "hop-sessions"
     if sessions_root.is_dir():
         for session in sessions_root.iterdir():

@@ -136,6 +136,21 @@ def test_verified_v2_reclaims_quarantined_interrupted_prefix(tmp_path):
     assert not source.exists()
 
 
+def test_verified_v2_reclaims_legacy_local_evidence_capture(tmp_path):
+    local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
+                              tmp_path / "archive")
+    source, destination = _write_recording(
+        local, shared, store="evidence/pilot_symbolwise_v3")
+    _write_v2(archive, source, source.name)
+    shutil.rmtree(destination)
+
+    plan = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+    assert plan["entries"][0]["kind"] == "legacy_evidence"
+    assert apply_reclamation_plan(plan)["removed_count"] == 1
+    assert not source.exists()
+
+
 def test_empty_interrupted_metadata_is_reclaimed_but_unmanifested_payload_is_not(
         tmp_path):
     local, shared = tmp_path / "nvme", tmp_path / "qnap"

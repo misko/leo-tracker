@@ -49,10 +49,10 @@ def build_local_report_plan(local_root: Path, shared_root: Path) -> dict:
         relative = source.relative_to(reports)
         relative_text = relative.as_posix()
         status = "eligible"
-        if source.is_symlink() or not source.is_file() or ".." in relative.parts:
-            status = "unsafe_local_artifact"
-        elif any(relative_text.startswith(prefix) for prefix in OPERATIONAL_PREFIXES):
+        if any(relative_text.startswith(prefix) for prefix in OPERATIONAL_PREFIXES):
             status = "preserve_operational"
+        elif source.is_symlink() or not source.is_file() or ".." in relative.parts:
+            status = "unsafe_local_artifact"
         entries.append({"relative_path": relative_text,
             "local_path": str(source),
             "shared_path": str(shared_root / "reports" / relative),

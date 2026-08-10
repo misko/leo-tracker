@@ -13,16 +13,18 @@ def test_missing_reports_copy_existing_authority_wins_and_operational_state_stay
     missing = local / "reports/decoded/old.npz"
     collision = local / "reports/tracks/same.json"
     learned = local / "reports/learned-beacons/active.json"
+    learned_target = local / "reports/learned-beacons/model.json"
     for path, payload in ((missing, b"legacy science"),
                           (collision, b"old interpretation"),
-                          (learned, b"live model")):
+                          (learned_target, b"live model")):
         path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(payload)
+    learned.symlink_to(learned_target.name)
     authority = shared / "reports/tracks/same.json"
     authority.parent.mkdir(parents=True); authority.write_bytes(b"current authority")
 
     plan = build_local_report_plan(local, shared)
     assert plan["summary"]["status_counts"] == {
-        "eligible": 2, "preserve_operational": 1}
+        "eligible": 2, "preserve_operational": 2}
     result = apply_local_report_plan(plan)
 
     assert result["status"] == "complete"
@@ -30,7 +32,7 @@ def test_missing_reports_copy_existing_authority_wins_and_operational_state_stay
     assert (shared / "reports/decoded/old.npz").read_bytes() == b"legacy science"
     assert authority.read_bytes() == b"current authority"
     assert not missing.exists() and not collision.exists()
-    assert learned.read_bytes() == b"live model"
+    assert learned.is_symlink() and learned.read_bytes() == b"live model"
     receipt = json.loads(
         (shared / "reports/reclamation/local-reports.json").read_text())
     assert receipt["schema"] == RECEIPT_SCHEMA

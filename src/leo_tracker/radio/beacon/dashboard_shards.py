@@ -49,8 +49,59 @@ LISTING_FIELDS = (
     "if_center_hz", "rf_center_hz", "radio_id", "candidate_count",
     "dual_candidate_count", "beacon_detected_count", "continuous_track_count",
     "longest_track_duration_s", "qualified_tle_association_count",
-    "fingerprint_family", "detail_url",
+    "fingerprint_family", "detail_url", "satellite_name", "satellite_norad_id",
+    "source_fit_hz", "source_identity_agreement",
 )
+
+
+def _qualified_identity(path: Path) -> dict | None:
+    """Best qualified identity in one association artifact, if any."""
+    value = _read_json(path)
+    if value is None:
+        return None
+    for association in value.get("associations", []):
+        if not association.get("qualified"):
+            continue
+        primary = (association.get("stability") or {}).get("primary") or {}
+        return {"norad_id": primary.get("best_norad_id"),
+                "name": (primary.get("best_name") or "").strip() or None,
+                "holdout_residual_rms_hz": primary.get("holdout_residual_rms_hz")}
+    return None
+
+
+def identity_fields(root: Path, name: str, sources: tuple[str, ...] = ()) -> dict:
+    """Which satellite a recording identified, and how well each provider fitted it.
+
+    A count of qualified associations does not say which spacecraft was found,
+    which is the result the whole pipeline exists to produce. Providers are
+    reported side by side because a shared identity across independently
+    retrieved catalogs is far stronger evidence than either alone.
+
+    Reading these costs one small file per provider, so callers should ask only
+    for recordings already known to have qualified.
+    """
+    reports = Path(root) / "reports"
+    fields: dict = {}
+    primary = _qualified_identity(reports / "associations" / f"{name}.json")
+    identities = {}
+    fits = {}
+    for source in sources:
+        found = _qualified_identity(reports / "associations" / source / f"{name}.json")
+        if found is None:
+            continue
+        identities[source] = found.get("norad_id")
+        if found.get("holdout_residual_rms_hz") is not None:
+            fits[source] = round(float(found["holdout_residual_rms_hz"]), 1)
+        primary = primary or found
+    if primary:
+        fields["satellite_name"] = primary.get("name")
+        fields["satellite_norad_id"] = primary.get("norad_id")
+    if fits:
+        fields["source_fit_hz"] = fits
+    if len(identities) > 1:
+        # Only meaningful when more than one provider actually qualified it.
+        fields["source_identity_agreement"] = len(set(identities.values())) == 1
+    return {key: value for key, value in fields.items() if value is not None}
 
 
 def recording_date(name: str) -> str | None:
@@ -81,11 +132,14 @@ def _atomic_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def write_listing_row(root: Path, name: str, record: dict) -> Path:
+def write_listing_row(root: Path, name: str, record: dict,
+                      sources: tuple[str, ...] = ()) -> Path:
     """Publish one recording's listing row. Safe from concurrent producers."""
     path = Path(root) / "reports" / ROWS_DIRECTORY / f"{name}.json"
     row = listing_row(record)
     row.setdefault("recording_id", name)
+    if record.get("qualified_tle_association_count"):
+        row.update(identity_fields(root, name, sources))
     _atomic_json(path, row)
     return path
 
@@ -199,7 +253,8 @@ def read_listing(root: Path, *, limit: int = 100) -> list[dict]:
     return rows[:limit]
 
 
-def migrate_index(index_path: Path, root: Path) -> dict:
+def migrate_index(index_path: Path, root: Path,
+                  sources: tuple[str, ...] = ()) -> dict:
     """Build shards from an already-rebuilt monolithic index.
 
     Parsing the reports is what makes a rebuild expensive, and the monolithic
@@ -229,6 +284,11 @@ def migrate_index(index_path: Path, root: Path) -> dict:
             continue
         row = listing_row(record)
         row.setdefault("recording_id", name)
+        # Roughly one recording in a hundred qualifies, so reading association
+        # artifacts for the rest would cost thousands of pointless round trips
+        # for a field that would be empty anyway.
+        if record.get("qualified_tle_association_count"):
+            row.update(identity_fields(root, name, sources))
         by_date.setdefault(date, {})[name] = row
 
     for date, rows in sorted(by_date.items()):

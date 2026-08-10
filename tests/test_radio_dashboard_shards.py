@@ -159,3 +159,74 @@ def test_summary_counts_only_what_a_header_shows(tmp_path):
     assert summary["confirmed_count"] == 2
     assert summary["qualified_association_count"] == 2
     assert summary["by_date"] == {"2026-08-10": 3}
+
+
+def _association(path, *, qualified, norad=57622, name="STARLINK-30056", rms=120.0):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"associations": [
+        {"track_id": "track-000", "qualified": qualified,
+         **({"stability": {"primary": {
+             "best_norad_id": norad, "best_name": name,
+             "holdout_residual_rms_hz": rms}}} if qualified else {})}]}))
+
+
+def test_listing_row_names_the_satellite_and_each_provider_fit(tmp_path):
+    """A count of qualified associations does not say which spacecraft was found.
+
+    Providers appear side by side because a shared identity across
+    independently retrieved catalogs is stronger evidence than either alone.
+    """
+    from leo_tracker.radio.beacon.dashboard_shards import identity_fields
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    reports = tmp_path / "reports" / "associations"
+    _association(reports / f"{name}.json", qualified=True)
+    _association(reports / "space-track" / f"{name}.json", qualified=True, rms=67.5)
+    _association(reports / "huggingface" / f"{name}.json", qualified=True, rms=57.8)
+
+    fields = identity_fields(tmp_path, name, ("space-track", "huggingface"))
+
+    assert fields["satellite_name"] == "STARLINK-30056"
+    assert fields["satellite_norad_id"] == 57622
+    assert fields["source_fit_hz"] == {"space-track": 67.5, "huggingface": 57.8}
+    assert fields["source_identity_agreement"] is True
+
+
+def test_listing_row_flags_when_providers_name_different_satellites(tmp_path):
+    from leo_tracker.radio.beacon.dashboard_shards import identity_fields
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    reports = tmp_path / "reports" / "associations"
+    _association(reports / "space-track" / f"{name}.json", qualified=True, norad=57622)
+    _association(reports / "huggingface" / f"{name}.json", qualified=True,
+                 norad=11111, name="STARLINK-OTHER")
+
+    fields = identity_fields(tmp_path, name, ("space-track", "huggingface"))
+
+    assert fields["source_identity_agreement"] is False
+
+
+def test_agreement_is_absent_when_only_one_provider_qualified(tmp_path):
+    """Agreement between one provider and nothing is not agreement."""
+    from leo_tracker.radio.beacon.dashboard_shards import identity_fields
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    reports = tmp_path / "reports" / "associations"
+    _association(reports / "space-track" / f"{name}.json", qualified=True)
+    _association(reports / "huggingface" / f"{name}.json", qualified=False)
+
+    fields = identity_fields(tmp_path, name, ("space-track", "huggingface"))
+
+    assert "source_identity_agreement" not in fields
+    assert fields["source_fit_hz"] == {"space-track": 120.0}
+
+
+def test_unqualified_recordings_never_read_association_artifacts(tmp_path, monkeypatch):
+    """Roughly one recording in a hundred qualifies; the rest must cost nothing."""
+    import leo_tracker.radio.beacon.dashboard_shards as shards
+    calls = []
+    monkeypatch.setattr(shards, "identity_fields",
+                        lambda *a, **k: calls.append(a) or {})
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    shards.write_listing_row(tmp_path, name, {
+        "recording_id": name, "start_utc": "2026-08-10T00:00:00Z",
+        "qualified_tle_association_count": 0}, ("space-track",))
+
+    assert calls == []

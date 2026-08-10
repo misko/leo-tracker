@@ -350,11 +350,15 @@ retains v1.
 SATPI01 also runs
 [`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
 as a persistent low-priority fallback. On the wired 1 GbE deployment it
-processes ten transactions with five independent deletion-last workers per
+processes twelve transactions with six independent deletion-last workers per
 bounded plan, followed by a sixty-second idle interval. The idle window lets
 Kalman's NFS-backed analysis workers drain queue claims between write-heavy
 migration batches; field measurements showed nine live jobs clearing in under
-one minute while reducing raw-migration throughput by only about five percent.
+one minute. Six-worker field batches retired 79.7--85.5 GB of raw IQ per hour;
+including the idle window projects about 78.5 GB/hour, slightly above the
+measured 77.48 GB/hour verified capture ingress. The previous five-worker
+setting retired only 69.6 GB in the same one-hour comparison and therefore
+allowed the raw backlog to grow.
 `Nice=10`,
 `CPUWeight=20`, and `IOWeight=20` continue to give capture priority. Kalman
 migration, the Pi fallback, and the six-hour QNAP raw
@@ -371,7 +375,7 @@ resumes after 120 seconds. The global lock remains the final safety boundary
 during lease transitions.
 Its bounded automatic scope reserves a configured prefix for archive-only v1
 whenever both raw and archive backlogs exist, then fills the remaining slots
-with urgent raw IQ. The Pi reserves one of ten applied records; Kalman reserves
+with urgent raw IQ. The Pi reserves one of twelve applied records; Kalman reserves
 16 of 32. This prevents continuous acquisition from starving old v1 forever.
 Each operational plan also stops after a small inventory of eligible records
 (80 on the Pi and 128 on Kalman), so one transaction does not require a

@@ -2,6 +2,7 @@ import fcntl
 import hashlib
 import json
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -31,6 +32,26 @@ def _write_recording(local: Path, shared: Path, name: str = "capture-001",
         "completed_utc": "2026-08-08T00:00:00Z",
         "outputs": {"analysis": {"path": str(analysis), "bytes": 2}}}))
     return source, destination
+
+
+def _write_v2(archive: Path, source: Path, name: str) -> Path:
+    bundle = archive / "evidence-v2" / name
+    bundle.mkdir(parents=True)
+    bundle_manifest = bundle / "manifest.json"
+    bundle_manifest.write_text("{}\n")
+    receipt = archive / "catalog/v2/receipts" / f"{name}.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(json.dumps({
+        "schema": "leo-tracker.evidence-archive-receipt/v2",
+        "status": "verified", "source_verified": True,
+        "required_event_replay_valid": True, "policy": "tiered-v2",
+        "source_manifest_sha256": hashlib.sha256(
+            (source / "manifest.json").read_bytes()).hexdigest(),
+        "bundle": f"evidence-v2/{name}",
+        "bundle_manifest_sha256": hashlib.sha256(
+            bundle_manifest.read_bytes()).hexdigest(),
+    }))
+    return receipt
 
 
 def test_plan_and_apply_remove_only_local_verified_duplicate(tmp_path):
@@ -65,8 +86,46 @@ def test_reclamation_is_idempotent_from_completed_receipt(tmp_path):
     assert repeated["removed_bytes"] == len(b"radio-data")
 
 
+def test_verified_v2_reclaims_local_raw_after_qnap_raw_is_already_gone(tmp_path):
+    local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
+                              tmp_path / "archive")
+    source, destination = _write_recording(local, shared)
+    _write_v2(archive, source, source.name)
+    shutil.rmtree(destination)
+
+    plan = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+    assert plan["entries"][0]["status"] == "eligible"
+    assert plan["entries"][0]["durable_copy"] == "evidence_v2"
+    result = apply_reclamation_plan(plan)
+    assert result["removed_count"] == 1
+    assert not source.exists()
+    receipt = json.loads((shared / "reports/reclamation/local/capture-001.json").read_text())
+    assert receipt["durable_copy"] == "evidence_v2"
+
+
+def test_v2_fallback_accepts_analyzed_interrupted_prefix_but_rejects_stale_receipt(
+        tmp_path):
+    local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",
+                              tmp_path / "archive")
+    source, destination = _write_recording(local, shared, state="interrupted")
+    receipt = _write_v2(archive, source, source.name)
+    shutil.rmtree(destination)
+    plan = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+    assert plan["entries"][0]["status"] == "eligible"
+
+    value = json.loads(receipt.read_text())
+    value["source_manifest_sha256"] = "0" * 64
+    receipt.write_text(json.dumps(value))
+    stale = build_reclamation_plan(
+        local, shared, archive_root=archive, minimum_age_s=0)
+    assert stale["entries"][0]["status"] == "evidence_archive_stale"
+    assert source.exists()
+
+
 @pytest.mark.parametrize(("mutation", "reason"), [
-    ("incomplete", "local_capture_incomplete"),
+    ("invalid_state", "local_capture_incomplete"),
     ("missing_receipt", "analysis_incomplete"),
     ("wrong_pipeline", "analysis_pipeline_mismatch"),
     ("missing_chunk", "missing_qnap_chunk"),
@@ -76,9 +135,9 @@ def test_reclamation_is_idempotent_from_completed_receipt(tmp_path):
 def test_safety_gates_defer_unverified_recordings(tmp_path, mutation, reason):
     local, shared = tmp_path / "nvme", tmp_path / "qnap"
     source, destination = _write_recording(local, shared)
-    if mutation == "incomplete":
+    if mutation == "invalid_state":
         value = json.loads((source / "manifest.json").read_text())
-        value["state"] = "interrupted"
+        value["state"] = "capturing"
         (source / "manifest.json").write_text(json.dumps(value, sort_keys=True))
         (destination / "manifest.json").write_text(json.dumps(value, sort_keys=True))
     elif mutation == "missing_receipt":

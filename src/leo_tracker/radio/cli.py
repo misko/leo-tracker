@@ -408,6 +408,7 @@ def command_starlink_storage_reconcile(args: argparse.Namespace) -> int:
         raise ValueError("interval must be positive and minimum age non-negative")
     while True:
         plan = build_reclamation_plan(args.local_root, args.shared_root,
+            archive_root=args.archive_root,
             verify_sha256=args.verify_sha256,
             minimum_age_s=args.minimum_age_s, pipeline_id=args.pipeline_id)
         if args.output:
@@ -1870,6 +1871,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="remove local raw IQ only after verified QNAP copy and Kalman success")
     reconcile.add_argument("local_root", type=Path)
     reconcile.add_argument("shared_root", type=Path)
+    reconcile.add_argument("--archive-root", type=Path,
+        help="accept matching replay-verified production-v2 evidence as durable")
     reconcile.add_argument("--apply", action="store_true",
         help="apply eligible removals; without this flag only print a plan summary")
     reconcile.add_argument("--limit", type=int,

@@ -27,6 +27,8 @@ def test_local_reclaimer_is_qnap_gated_and_uses_existing_uv_environment():
     assert "Requires=mnt-leo\\x2dnvme.mount mnt-qnap01.mount" in unit
     assert "After=network-online.target" in unit
     assert "LEO_LOCAL_RECLAIM_MINIMUM_AGE_S=300" in unit
+    assert "/mnt/qnap01/mouse9911/leo-cropped" in unit
+    assert '--archive-root "${archive_root}"' in script
     assert "Restart=always" in unit
     assert "starlink-local-reclaimer.sh" in unit
     assert '"${uv_bin}" run \\\n  --active --no-sync leo-radio "${args[@]}"' in script

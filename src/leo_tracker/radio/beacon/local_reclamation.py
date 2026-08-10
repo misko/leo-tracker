@@ -16,6 +16,8 @@ import re
 import shutil
 import time
 
+from .qnap_lifecycle import _archive_gate
+
 
 PLAN_SCHEMA = "leo-tracker.local-reclamation-plan/v1"
 RECEIPT_SCHEMA = "leo-tracker.local-reclamation-receipt/v1"
@@ -90,11 +92,13 @@ def _active(local_root: Path, shared_root: Path, name: str) -> bool:
 def _verify_shared(local_manifest_path: Path, shared_capture: Path, *,
                    verify_sha256: bool) -> tuple[bool, str, int, str | None]:
     local_manifest = _json(local_manifest_path)
+    local_sha = _sha256(local_manifest_path) if local_manifest else None
     shared_manifest_path = shared_capture / "manifest.json"
     shared_manifest = _json(shared_manifest_path)
     if not shared_manifest:
-        return False, "missing_qnap_copy", 0, None
-    local_sha = _sha256(local_manifest_path)
+        return False, "missing_qnap_copy", 0, local_sha
+    if local_sha is None:
+        return False, "local_manifest_invalid", 0, None
     if _sha256(shared_manifest_path) != local_sha:
         return False, "qnap_manifest_mismatch", 0, local_sha
     chunks = local_manifest.get("chunks", [])
@@ -119,6 +123,27 @@ def _verify_shared(local_manifest_path: Path, shared_capture: Path, *,
     return True, "eligible", total, local_sha
 
 
+def _verify_durable(local_manifest_path: Path, shared_root: Path,
+                    archive_root: Path | None, name: str, *,
+                    verify_sha256: bool) -> tuple[bool, str, int, str | None, str | None]:
+    """Accept either an exact QNAP raw duplicate or production-v2 evidence."""
+    valid, reason, source_bytes, manifest_sha = _verify_shared(
+        local_manifest_path, shared_root / "captures" / name,
+        verify_sha256=verify_sha256)
+    if valid:
+        return True, reason, source_bytes, manifest_sha, "qnap_raw"
+    if archive_root is None or not manifest_sha:
+        return False, reason, source_bytes, manifest_sha, None
+    archive_valid, archive_reason, _ = _archive_gate(
+        shared_root, archive_root, name, manifest_sha)
+    if not archive_valid:
+        return False, archive_reason, source_bytes, manifest_sha, None
+    manifest = _json(local_manifest_path)
+    source_bytes = sum(int(chunk.get("bytes", 0))
+                       for chunk in manifest.get("chunks", []))
+    return True, "eligible", source_bytes, manifest_sha, "evidence_v2"
+
+
 def _verify_analysis(shared_root: Path, name: str,
                      pipeline_id: str | None) -> tuple[bool, str, dict]:
     receipt = _json(shared_root / "reports" / "receipts" / f"{name}.json")
@@ -135,27 +160,31 @@ def _verify_analysis(shared_root: Path, name: str,
 
 
 def build_reclamation_plan(local_root: Path, shared_root: Path, *,
+                           archive_root: Path | None = None,
                            verify_sha256: bool = False,
                            minimum_age_s: float = 300,
                            pipeline_id: str | None = None) -> dict:
     """Return a deterministic plan; no filesystem object is removed."""
     local_root, shared_root = Path(local_root).resolve(), Path(shared_root).resolve()
+    archive_root = Path(archive_root).resolve() if archive_root is not None else None
     now = time.time(); entries = []
     for name, local_path, kind in _recordings(local_root):
         reason = "eligible"; source_bytes = 0; manifest_sha = None
+        durable_copy = None
         manifest_path = local_path / "manifest.json"
         manifest = _json(manifest_path)
         if not _NAME.fullmatch(name) or not _safe_local_path(local_root, local_path):
             reason = "unsafe_local_path"
-        elif manifest.get("state") != "complete":
+        elif (manifest.get("state") not in {"complete", "interrupted"} or
+              not manifest.get("chunks")):
             reason = "local_capture_incomplete"
         elif now - manifest_path.stat().st_mtime < minimum_age_s:
             reason = "minimum_age_not_met"
         elif _active(local_root, shared_root, name):
             reason = "active_or_partial"
         else:
-            valid, reason, source_bytes, manifest_sha = _verify_shared(
-                manifest_path, shared_root / "captures" / name,
+            valid, reason, source_bytes, manifest_sha, durable_copy = _verify_durable(
+                manifest_path, shared_root, archive_root, name,
                 verify_sha256=verify_sha256)
             if valid:
                 valid, reason, _ = _verify_analysis(shared_root, name, pipeline_id)
@@ -164,12 +193,14 @@ def build_reclamation_plan(local_root: Path, shared_root: Path, *,
             "shared_path": str(shared_root / "captures" / name),
             "source_manifest_sha256": manifest_sha,
             "source_bytes": source_bytes, "status": reason,
+            "durable_copy": durable_copy,
             "verification": "sha256" if verify_sha256 else "manifest_and_size"})
     counts: dict[str, int] = {}
     for entry in entries:
         counts[entry["status"]] = counts.get(entry["status"], 0) + 1
     return {"schema": PLAN_SCHEMA, "created_utc": _utc_now(),
         "local_root": str(local_root), "shared_root": str(shared_root),
+        "archive_root": str(archive_root) if archive_root is not None else None,
         "configuration": {"verify_sha256": verify_sha256,
             "minimum_age_s": minimum_age_s, "pipeline_id": pipeline_id},
         "summary": {"recording_count": len(entries), "status_counts": counts,
@@ -187,6 +218,8 @@ def apply_reclamation_plan(plan: dict, *, limit: int | None = None) -> dict:
         raise ValueError("limit must be positive")
     local_root = Path(plan["local_root"]).resolve()
     shared_root = Path(plan["shared_root"]).resolve()
+    archive_value = plan.get("archive_root")
+    archive_root = Path(archive_value).resolve() if archive_value else None
     config = plan.get("configuration", {})
     lock_path = local_root / "staging" / "local-reclamation.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,8 +248,8 @@ def apply_reclamation_plan(plan: dict, *, limit: int | None = None) -> dict:
                 deferred.append({"recording_id": name, "reason": "unsafe_local_path"})
                 continue
             manifest_path = local_path / "manifest.json"
-            valid, reason, source_bytes, manifest_sha = _verify_shared(
-                manifest_path, shared_root / "captures" / name,
+            valid, reason, source_bytes, manifest_sha, durable_copy = _verify_durable(
+                manifest_path, shared_root, archive_root, name,
                 verify_sha256=bool(config.get("verify_sha256")))
             if valid:
                 valid, reason, analysis = _verify_analysis(
@@ -233,6 +266,7 @@ def apply_reclamation_plan(plan: dict, *, limit: int | None = None) -> dict:
                 "shared_path": str(shared_root / "captures" / name),
                 "source_manifest_sha256": manifest_sha,
                 "source_bytes": source_bytes,
+                "durable_copy": durable_copy,
                 "verification": original.get("verification"),
                 "analysis_pipeline_id": analysis.get("pipeline_id"),
                 "analysis_completed_utc": analysis.get("completed_utc")}

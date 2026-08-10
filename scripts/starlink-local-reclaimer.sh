@@ -4,6 +4,7 @@ set -euo pipefail
 
 local_root="${1:-${LEO_BEACON_STORAGE:-/mnt/leo-nvme/leo-tracker}}"
 shared_root="${2:-${LEO_OFFLOAD_ROOT:-/mnt/qnap01/mouse9911/leo}}"
+archive_root="${3:-${LEO_EVIDENCE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 uv_bin="${UV_BIN:-$(command -v uv || true)}"
 interval_s="${LEO_LOCAL_RECLAIM_INTERVAL_S:-60}"
@@ -16,6 +17,7 @@ if [[ -z "${uv_bin}" || ! -x "${repo_dir}/.venv/bin/python" ]]; then
 fi
 
 args=(starlink-storage-reconcile "${local_root}" "${shared_root}"
+  --archive-root "${archive_root}"
   --apply --watch --interval-s "${interval_s}"
   --minimum-age-s "${minimum_age_s}" --output "${plan}")
 if [[ "${LEO_LOCAL_RECLAIM_VERIFY_SHA256:-0}" == "1" ]]; then

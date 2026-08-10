@@ -74,6 +74,10 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert "--confirm MIGRATE-TO-EVIDENCE-V2" in script
     assert '"${uv_bin}" run --active --no-sync' in script
     assert 'cd "${repo_dir}"' in script
+    assert "starlink-storage-normalize-legacy" in script
+    assert "legacy_normalization_ready(plan)" in script
+    assert "--confirm NORMALIZE-LEGACY-LAYOUT" in script
+    assert "legacy_layout_batch_failed" in script
 
 
 def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():

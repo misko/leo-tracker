@@ -15,6 +15,14 @@ RECEIPT_SCHEMA = "leo-tracker.legacy-layout-receipt/v1"
 CONFIRMATION = "NORMALIZE-LEGACY-LAYOUT"
 
 
+def legacy_normalization_ready(primary_plan: dict) -> bool:
+    """Return true only after a complete zero-work archive migration scan."""
+    config = primary_plan.get("configuration", {})
+    return bool(config.get("active_scope") == "archive" and
+                config.get("inventory_complete") is True and
+                primary_plan.get("summary", {}).get("eligible_count") == 0)
+
+
 def _json(path: Path) -> dict:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))

@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from leo_tracker.radio.beacon.legacy_normalizer import (
-    CONFIRMATION, apply_legacy_layout_plan, build_legacy_layout_plan)
+    CONFIRMATION, apply_legacy_layout_plan, build_legacy_layout_plan,
+    legacy_normalization_ready)
 from leo_tracker.radio.cli import main
 
 
@@ -108,3 +109,16 @@ def test_normalizer_removes_empty_versioned_output_directory(tmp_path):
     result = apply_legacy_layout_plan(plan, confirmation=CONFIRMATION)
     assert result["failure_count"] == 0
     assert not duplicate.parent.exists(); assert current.exists()
+
+
+@pytest.mark.parametrize("configuration,eligible,expected", [
+    ({"active_scope": "raw", "inventory_complete": True}, 0, False),
+    ({"active_scope": "archive", "inventory_complete": False}, 0, False),
+    ({"active_scope": "archive", "inventory_complete": True}, 1, False),
+    ({"active_scope": "archive", "inventory_complete": True}, 0, True),
+])
+def test_orphan_handoff_requires_complete_zero_work_archive_inventory(
+        configuration, eligible, expected):
+    assert legacy_normalization_ready({
+        "configuration": configuration,
+        "summary": {"eligible_count": eligible}}) is expected

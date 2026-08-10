@@ -375,6 +375,13 @@ uv run --active --no-sync leo-radio starlink-storage-normalize-legacy \
   --apply --confirm NORMALIZE-LEGACY-LAYOUT
 ```
 
+The persistent storage-regime wrapper performs this handoff automatically. It
+does not invoke the normalizer merely because a bounded scan found no work: the
+primary plan must be in archive scope, report a complete archive inventory, and
+contain zero eligible v1 records. Until that gate is true, all bandwidth stays
+with raw/v1 migration. The final locked audit remains authoritative for blocked
+primary records, hash conflicts, unreferenced files, and interrupted receipts.
+
 Three populations are permanently outside "archivable" and must be counted
 separately rather than left as an open gap:
 

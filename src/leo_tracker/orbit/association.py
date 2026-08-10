@@ -10,6 +10,7 @@ from sgp4.api import Satrec, SatrecArray, jday
 
 from .artifacts import TLECatalogArtifact, parse_catalog, parse_utc, utc_iso
 from .archive import SNAPSHOT_SCHEMA
+from .catalog_store import SNAPSHOT_SCHEMA as STORE_SNAPSHOT_SCHEMA
 from .doppler import SPEED_OF_LIGHT_M_S
 from .tle import TLE
 from .topocentric import Observer
@@ -19,14 +20,39 @@ ASSOCIATION_SCHEMA = "leo-tracker.starlink-tle-association/v2"
 TRACK_SCHEMA = "leo-tracker.starlink-continuous-track/v1"
 
 
-def _read_catalog_or_snapshot(path: Path) -> tuple[TLECatalogArtifact, Path]:
+def _catalog_store_root(path: Path) -> Path:
+    """Find the store root holding the shared object pool.
+
+    The store addresses objects relative to its root but exposes them through
+    two different depths, `latest/<source>/<scope>.json` and
+    `snapshots/<source>/<scope>/YYYY/MM/DD/<file>.json`. Locating the pool
+    itself keeps this independent of that layout.
+    """
+    for parent in Path(path).resolve().parents:
+        if (parent / "objects").is_dir():
+            return parent
+    raise ValueError(f"no catalog store root above {path}")
+
+
+def _read_catalog_or_snapshot(path: Path) -> tuple[TLECatalogArtifact, Path, dict]:
+    """Resolve a catalog artifact, an archive snapshot, or a catalog-store snapshot.
+
+    The store publishes a different snapshot schema from the original archive,
+    and returning its manifest lets the association record which source and
+    scope produced the elements. Comparing two sources is meaningless unless
+    every result says which one it used.
+    """
     path = Path(path)
     value = json.loads(path.read_text())
-    if value.get("schema") != SNAPSHOT_SCHEMA:
-        return TLECatalogArtifact.from_dict(value), path
-    root = path.parent.parent if path.parent.name == "snapshots" else path.parent
-    object_path = root / value["object"]
-    return TLECatalogArtifact.read(object_path), object_path
+    schema = value.get("schema")
+    if schema == SNAPSHOT_SCHEMA:
+        root = path.parent.parent if path.parent.name == "snapshots" else path.parent
+        object_path = root / value["object"]
+        return TLECatalogArtifact.read(object_path), object_path, value
+    if schema == STORE_SNAPSHOT_SCHEMA:
+        object_path = _catalog_store_root(path) / value["normalized_object"]
+        return TLECatalogArtifact.read(object_path), object_path, value
+    return TLECatalogArtifact.from_dict(value), path, {}
 
 
 def catalog_doppler(tles: list[TLE], observer: Observer,
@@ -377,7 +403,7 @@ def associate_tracks(observations_path: Path, catalog_path: Path, output: Path, 
             any(not 0 < value < 1 for value in stability_train_fractions) or
             not 0 < sensitivity_drift_fraction < 1):
         raise ValueError("association stability requirements are invalid")
-    catalog, resolved_catalog_path = _read_catalog_or_snapshot(catalog_path)
+    catalog, resolved_catalog_path, catalog_manifest = _read_catalog_or_snapshot(catalog_path)
     all_tles = parse_catalog(catalog.content, source=catalog.source_url,
                              retrieved_at=catalog.retrieved_at)
     carrier_hz = float(report["signal"]["nominal_rf_hz"])
@@ -502,11 +528,16 @@ def associate_tracks(observations_path: Path, catalog_path: Path, output: Path, 
     result = {"schema": ASSOCIATION_SCHEMA,
         "created_utc": utc_iso(datetime.now(timezone.utc)),
         "source_observations": str(Path(observations_path).resolve()),
+        # source/scope are present only for catalog-store snapshots. A
+        # source-to-source comparison reads these, so they name the provider
+        # rather than leaving it to be inferred from a URL.
         "catalog": {"path": str(Path(catalog_path).resolve()),
                     "resolved_object_path": str(resolved_catalog_path.resolve()),
                     "source_url": catalog.source_url,
                     "retrieved_at": utc_iso(catalog.retrieved_at),
-                    "sha256": catalog.sha256},
+                    "sha256": catalog.sha256,
+                    "source": catalog_manifest.get("source"),
+                    "scope": catalog_manifest.get("scope")},
         "observer": {"latitude_deg": observer.latitude_deg,
                      "longitude_deg": observer.longitude_deg,
                      "altitude_m": observer.altitude_m},

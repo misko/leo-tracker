@@ -382,3 +382,100 @@ def test_long_track_artifact_to_sgp4_association_e2e(tmp_path):
     assert result["best_norad_id"] == tle.norad_id
     assert result["best_holdout_residual_rms_hz"] < 1
     assert result["candidates"][0]["epoch_adjustment_s"] == pytest.approx(.3, abs=.051)
+
+
+def _catalog_store(tmp_path, *, source: str, scope: str = "starlink"):
+    """Build the minimal catalog-store layout the association must resolve."""
+    from leo_tracker.orbit.catalog_store import SNAPSHOT_SCHEMA as STORE_SCHEMA
+    retrieved = datetime(2026, 8, 10, 19, 37, tzinfo=timezone.utc)
+    artifact = TLECatalogArtifact.create(
+        f"https://{source}.example/query", retrieved, VANGUARD.encode())
+    objects = tmp_path / "objects"
+    objects.mkdir(exist_ok=True)
+    object_path = objects / f"{artifact.sha256}.json"
+    artifact.write(object_path)
+    manifest = tmp_path / "latest" / source / f"{scope}.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps({
+        "schema": STORE_SCHEMA, "source": source, "scope": scope,
+        "retrieved_at": retrieved.isoformat().replace("+00:00", "Z"),
+        "catalog_sha256": artifact.sha256,
+        "normalized_object": f"objects/{artifact.sha256}.json"}))
+    return manifest, object_path, artifact
+
+
+def test_association_resolves_a_catalog_store_snapshot_and_names_its_source(tmp_path):
+    """The store publishes its own snapshot schema, addressed relative to its root.
+
+    Association previously understood only the archive schema, so every
+    catalog-store snapshot fell through to the raw-artifact path and failed.
+    That left a fully populated Space-Track branch unreadable.
+    """
+    from leo_tracker.orbit.association import _read_catalog_or_snapshot
+
+    manifest, object_path, artifact = _catalog_store(tmp_path, source="space-track")
+
+    resolved, resolved_path, catalog_manifest = _read_catalog_or_snapshot(manifest)
+
+    assert resolved.sha256 == artifact.sha256
+    assert resolved_path.resolve() == object_path.resolve()
+    assert catalog_manifest["source"] == "space-track"
+    assert catalog_manifest["scope"] == "starlink"
+
+
+def test_association_resolves_a_store_snapshot_from_the_dated_layout(tmp_path):
+    """`snapshots/<source>/<scope>/YYYY/MM/DD/` sits deeper than `latest/`."""
+    from leo_tracker.orbit.catalog_store import SNAPSHOT_SCHEMA as STORE_SCHEMA
+    from leo_tracker.orbit.association import _read_catalog_or_snapshot
+
+    _, object_path, artifact = _catalog_store(tmp_path, source="huggingface")
+    dated = tmp_path / "snapshots/huggingface/starlink/2026/08/10/retrieval.json"
+    dated.parent.mkdir(parents=True)
+    dated.write_text(json.dumps({
+        "schema": STORE_SCHEMA, "source": "huggingface", "scope": "starlink",
+        "normalized_object": f"objects/{artifact.sha256}.json"}))
+
+    resolved, resolved_path, catalog_manifest = _read_catalog_or_snapshot(dated)
+
+    assert resolved.sha256 == artifact.sha256
+    assert resolved_path.resolve() == object_path.resolve()
+    assert catalog_manifest["source"] == "huggingface"
+
+
+def test_association_still_reads_a_plain_catalog_artifact(tmp_path):
+    from leo_tracker.orbit.association import _read_catalog_or_snapshot
+
+    artifact = TLECatalogArtifact.create(
+        "https://example.test/tle", datetime(2026, 8, 10, tzinfo=timezone.utc),
+        VANGUARD.encode())
+    path = tmp_path / "catalog.json"
+    artifact.write(path)
+
+    resolved, resolved_path, catalog_manifest = _read_catalog_or_snapshot(path)
+
+    assert resolved.sha256 == artifact.sha256
+    assert resolved_path.resolve() == path.resolve()
+    # A bare artifact names no provider, and must not invent one.
+    assert catalog_manifest == {}
+
+
+def test_association_still_reads_an_archive_snapshot(tmp_path):
+    """The original archive schema addresses its object differently; keep it working."""
+    from leo_tracker.orbit.archive import SNAPSHOT_SCHEMA as ARCHIVE_SCHEMA
+    from leo_tracker.orbit.association import _read_catalog_or_snapshot
+
+    artifact = TLECatalogArtifact.create(
+        "https://example.test/tle", datetime(2026, 8, 10, tzinfo=timezone.utc),
+        VANGUARD.encode())
+    objects = tmp_path / "objects"; objects.mkdir()
+    object_path = objects / f"{artifact.sha256}.json"
+    artifact.write(object_path)
+    manifest = tmp_path / "latest.json"
+    manifest.write_text(json.dumps({
+        "schema": ARCHIVE_SCHEMA, "object": f"objects/{artifact.sha256}.json"}))
+
+    resolved, resolved_path, catalog_manifest = _read_catalog_or_snapshot(manifest)
+
+    assert resolved.sha256 == artifact.sha256
+    assert resolved_path.resolve() == object_path.resolve()
+    assert catalog_manifest["schema"] == ARCHIVE_SCHEMA

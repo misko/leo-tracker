@@ -7,6 +7,7 @@ from leo_tracker.radio import (FakePairedSource, PairedCI16Block, RadioConfig,
 from leo_tracker.radio.artifact import CaptureArtifact
 from leo_tracker.radio.cli import main
 from leo_tracker.radio.pluto import PairedPlutoSource
+from leo_tracker.radio.pluto import _resolve_iio_uri
 
 
 def test_paired_artifacts_are_synchronized_and_cross_linked(tmp_path):
@@ -60,6 +61,48 @@ def test_injected_paired_pluto_reads_hardware_once_per_block(monkeypatch):
     assert block.read_duration_ns == 400
     assert "host UTC bracket" in source.identity["timestamp_semantics"]
     source.close(); assert device.closed
+
+
+def test_paired_pluto_records_detected_hardware_identity_and_rejects_mismatch():
+    class Device:
+        closed = False
+        def hardware_identity(self):
+            return {"serial": "PLUTO-A", "firmware_version": "v0.38-test",
+                    "hardware_model": "PlutoSDR Rev.C"}
+        def close(self): self.closed = True
+
+    device = Device()
+    source = PairedPlutoSource(
+        RadioConfig(1e9, 10_000, 8_000), uri="usb:test", serial="PLUTO-A",
+        device_factory=lambda **kwargs: device)
+    assert source.identity["serial"] == "PLUTO-A"
+    assert source.identity["firmware_version"] == "v0.38-test"
+    assert source.identity["hardware_model"] == "PlutoSDR Rev.C"
+    source.close()
+
+    mismatch = Device()
+    with pytest.raises(ValueError, match="opened Pluto serial PLUTO-A"):
+        PairedPlutoSource(
+            RadioConfig(1e9, 10_000, 8_000), uri="usb:test", serial="PLUTO-B",
+            device_factory=lambda **kwargs: mismatch)
+    assert mismatch.closed
+
+
+def test_usb_pluto_uri_resolves_by_stable_serial_across_reenumeration():
+    contexts = {
+        "usb:1.10.5": "Pluto, serial=RADIO-A",
+        "usb:3.22.5": "Pluto, serial=RADIO-B",
+        "ip:pluto.local": "Pluto, serial=RADIO-A",
+    }
+    assert _resolve_iio_uri(
+        "pluto://usb:", "RADIO-B", contexts=contexts) == "usb:3.22.5"
+    assert _resolve_iio_uri(
+        "usb:9.99.5", "RADIO-A", contexts=contexts) == "usb:1.10.5"
+    assert _resolve_iio_uri(
+        "pluto://ip:192.168.2.1", "RADIO-A", contexts=contexts) == \
+        "ip:192.168.2.1"
+    with pytest.raises(ValueError, match="found 0"):
+        _resolve_iio_uri("usb:", "MISSING", contexts=contexts)
 
 
 def test_injected_paired_pluto_native_ci16_skips_complex_rx(monkeypatch):

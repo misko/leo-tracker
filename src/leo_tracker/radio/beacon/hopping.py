@@ -39,6 +39,7 @@ def capture_hop_session(source, destination: Path, *,
                         settle_buffers: int = 2, chunk_s: float = 1.0,
                         gain_mode: str = "manual",
                         configured_gain_db: float | None = None,
+                        identity: dict | None = None,
                         metadata: dict | None = None) -> dict:
     """Retune one open dual-RX stream and publish one fixed capture per channel.
 
@@ -65,7 +66,8 @@ def capture_hop_session(source, destination: Path, *,
         "region": region, "dwell_s": float(dwell_s),
         "sample_rate_hz": float(sample_rate_hz),
         "bandwidth_hz": float(bandwidth_hz), "lnb_lo_hz": float(lnb_lo_hz),
-        "settle_buffers": int(settle_buffers), "identity": dict(source.identity),
+        "settle_buffers": int(settle_buffers),
+        "identity": dict(identity if identity is not None else source.identity),
         "metadata": dict(metadata or {}), "segments": []}
     _atomic_json(session_path, session)
     blocks = iter(source.blocks())
@@ -89,7 +91,8 @@ def capture_hop_session(source, destination: Path, *,
                 sample_rate_hz=sample_rate_hz, center_frequency_hz=center_hz,
                 bandwidth_hz=bandwidth_hz, duration_s=dwell_s,
                 lnb_lo_hz=lnb_lo_hz, chunk_s=min(chunk_s, dwell_s),
-                identity=dict(source.identity), gain_mode=gain_mode,
+                identity=dict(identity if identity is not None else source.identity),
+                gain_mode=gain_mode,
                 configured_gain_db=configured_gain_db,
                 metadata={"channel_number": channel, "region": region,
                     "observation_mode": "channel-hop",

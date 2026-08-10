@@ -264,6 +264,16 @@ one transaction does not require a complete multi-thousand-record inventory.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.
 
+During a large historical raw/v1 backfill, do not run the older six-hour QNAP
+lifecycle scanner concurrently with the storage-regime service. The regime
+transaction already verifies v2 and removes raw last; the lifecycle cannot
+reclaim a recording before that same v2 receipt exists, but its full inventory
+holds the shared mutation lock and can starve the producer. Keep
+`leo-tracker-qnap-lifecycle.service` stopped/disabled until the locked
+`starlink-storage-audit-v2` reports no raw migration backlog. Reinstall and
+resume it afterward for steady-state age enforcement, never as a second
+concurrent backfill worker.
+
 Analysis completion records no longer copy immutable outputs beneath
 `reports/runs/.../outputs/`; they store hashes and authoritative references to
 the ordinary report tree. Historical `reports/runs/.../outputs/` and

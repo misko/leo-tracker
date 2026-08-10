@@ -10,6 +10,31 @@ from .source import RadioConfig, SampleBlock
 from .paired import PairedCI16Block, PairedSampleBlock
 
 
+def _hardware_identity(device: object) -> dict[str, object]:
+    reader = getattr(device, "hardware_identity", None)
+    if reader is None:
+        return {}
+    value = reader()
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _resolve_iio_uri(uri: str, serial: str | None, *,
+                     contexts: Mapping[str, str] | None = None) -> str:
+    """Resolve a USB Pluto by stable serial instead of transient bus address."""
+    normalized = uri.removeprefix("pluto://")
+    if not serial or not normalized.startswith("usb:"):
+        return normalized
+    if contexts is None:
+        iio = importlib.import_module("iio")
+        contexts = iio.scan_contexts()
+    matches = [candidate for candidate, description in contexts.items()
+               if candidate.startswith("usb:") and f"serial={serial}" in description]
+    if len(matches) != 1:
+        raise ValueError(
+            f"expected one USB Pluto with serial {serial}, found {len(matches)}")
+    return matches[0]
+
+
 class PlutoSource:
     def __init__(self, config: RadioConfig, *, uri: str, block_size: int = 65536,
                  transport: str = "iio", serial: str | None = None,
@@ -31,16 +56,23 @@ class PlutoSource:
             else:
                 if transport != "iio":
                     raise ImportError("direct_usb capture requires the SPF package and firmware")
-                self._device = _PyadiRx(uri, config, block_size)
+                self._device = _PyadiRx(uri, config, block_size, serial=serial)
                 implementation = "pyadi.ad9361"
         else:
             self._device = device_factory(config=config, uri=uri, block_size=block_size,
                                           transport=transport, serial=serial)
             implementation = "injected"
-        self._identity = {"kind": "plutoplus", "uri": uri, "serial": serial,
+        detected = _hardware_identity(self._device)
+        detected_serial = str(detected.get("serial") or "")
+        if serial and detected_serial and serial != detected_serial:
+            self.close()
+            raise ValueError(
+                f"opened Pluto serial {detected_serial}, expected {serial}")
+        self._identity = {"kind": "plutoplus", "uri": uri,
+                          "serial": detected_serial or serial,
                           "transport": transport, "implementation": implementation,
                           "gain_mode": config.gain_mode or ("manual" if config.gain_db is not None else "slow_attack"),
-                          "configured_gain_db": config.gain_db}
+                          "configured_gain_db": config.gain_db, **detected}
 
     @property
     def config(self) -> RadioConfig: return self._config
@@ -72,14 +104,15 @@ class PlutoSource:
 class _PyadiRx:
     """Small receive-only fallback when SPF's unrelated ML dependencies are absent."""
 
-    def __init__(self, uri: str, config: RadioConfig, block_size: int):
+    def __init__(self, uri: str, config: RadioConfig, block_size: int,
+                 serial: str | None = None):
         try:
             adi = importlib.import_module("adi")
         except (ImportError, AttributeError) as exc:
             raise ImportError(
                 "IIO capture requires pyadi-iio and a native libiio in the active environment"
             ) from exc
-        normalized_uri = uri.removeprefix("pluto://")
+        normalized_uri = _resolve_iio_uri(uri, serial)
         self.sdr = adi.ad9361(uri=normalized_uri)
         self.sdr.rx_destroy_buffer()
         self.sdr.sample_rate = round(config.sample_rate_hz)
@@ -104,6 +137,9 @@ class _PyadiRx:
     def gain_snapshot(self):
         return (float(getattr(self.sdr, f"rx_hardwaregain_chan{self._channel}")),)
 
+    def hardware_identity(self):
+        return _context_hardware_identity(self.sdr.ctx)
+
 
 class PairedPlutoSource:
     """One hardware read yielding synchronous AD9361 RX0 and RX1 blocks."""
@@ -125,14 +161,22 @@ class PairedPlutoSource:
             implementation = "injected"
         else:
             if transport != "iio": raise ImportError("paired direct_usb capture is not yet supported")
-            self._device = _PyadiPairedRx(uri, config, block_size); implementation = "pyadi.ad9361"
-        self._identity = {"kind": "plutoplus-paired", "uri": uri, "serial": serial,
+            self._device = _PyadiPairedRx(
+                uri, config, block_size, serial=serial); implementation = "pyadi.ad9361"
+        detected = _hardware_identity(self._device)
+        detected_serial = str(detected.get("serial") or "")
+        if serial and detected_serial and serial != detected_serial:
+            self.close()
+            raise ValueError(
+                f"opened Pluto serial {detected_serial}, expected {serial}")
+        self._identity = {"kind": "plutoplus-paired", "uri": uri,
+                          "serial": detected_serial or serial,
                           "transport": transport, "implementation": implementation,
                           "enabled_channels": [0, 1],
                           "timestamp_semantics": "midpoint of host UTC bracket around blocking IIO read",
                           "sample_format": sample_format,
                           "gain_mode": config.gain_mode or ("manual" if config.gain_db is not None else "slow_attack"),
-                          "configured_gain_db": config.gain_db}
+                          "configured_gain_db": config.gain_db, **detected}
         mode_reader = getattr(self._device, "gain_mode_snapshot", None)
         if mode_reader is not None:
             self._identity["gain_mode_readback"] = list(mode_reader())
@@ -193,10 +237,11 @@ class PairedPlutoSource:
 
 
 class _PyadiPairedRx:
-    def __init__(self, uri: str, config: RadioConfig, block_size: int):
+    def __init__(self, uri: str, config: RadioConfig, block_size: int,
+                 serial: str | None = None):
         try: adi = importlib.import_module("adi")
         except (ImportError, AttributeError) as exc: raise ImportError("paired capture requires pyadi-iio and libiio") from exc
-        self.sdr = adi.ad9361(uri=uri.removeprefix("pluto://")); self.sdr.rx_destroy_buffer()
+        self.sdr = adi.ad9361(uri=_resolve_iio_uri(uri, serial)); self.sdr.rx_destroy_buffer()
         self.sdr.sample_rate = round(config.sample_rate_hz); self.sdr.rx_rf_bandwidth = round(config.bandwidth_hz)
         self.sdr.rx_lo = round(config.center_frequency_hz); self.sdr.rx_buffer_size = block_size
         self.sdr.rx_enabled_channels = [0, 1]
@@ -226,3 +271,27 @@ class _PyadiPairedRx:
     def gain_mode_snapshot(self):
         return tuple(str(getattr(self.sdr, f"gain_control_mode_chan{channel}"))
                      for channel in (0, 1))
+    def hardware_identity(self):
+        return _context_hardware_identity(self.sdr.ctx)
+
+
+def _context_hardware_identity(context: object) -> dict[str, object]:
+    """Select stable Pluto provenance from libiio context attributes."""
+    attrs = dict(getattr(context, "attrs", {}) or {})
+    serial = attrs.get("hw_serial") or attrs.get("usb,serial")
+    result: dict[str, object] = {
+        "serial": serial,
+        "hardware_model": attrs.get("hw_model"),
+        "hardware_model_variant": attrs.get("hw_model_variant"),
+        "firmware_version": attrs.get("fw_version"),
+        "kernel_version": attrs.get("local,kernel"),
+        "usb_product": attrs.get("usb,product"),
+        "ad9361_model": attrs.get("ad9361-phy,model"),
+        "context_uri": attrs.get("uri"),
+    }
+    correction = attrs.get("ad9361-phy,xo_correction")
+    try:
+        result["xo_correction_hz"] = int(correction) if correction is not None else None
+    except (TypeError, ValueError):
+        result["xo_correction_hz"] = correction
+    return {key: value for key, value in result.items() if value is not None}

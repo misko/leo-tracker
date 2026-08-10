@@ -35,6 +35,10 @@ def _capture(root, name, created_ns, *, confirmed=False, decoded=False):
             "host_read_duty_fraction": .96, "read_count": 48,
             "maximum_positive_host_gap_s": .01},
         "identity": {"enabled_channels": [0, 1],
+                     "radio_id": "pluto-a", "serial": "PLUTO-SERIAL-A",
+                     "receiver_labels": ["zenith-a", "zenith-b"],
+                     "firmware_version": "v0.38-test", "kernel_version": "5.15-test",
+                     "hardware_model": "PlutoSDR Rev.C", "xo_correction_hz": 40_000_000,
                      "gain_mode_readback": ["manual", "manual"],
                      "kind": "plutoplus-paired", "implementation": "pyadi.ad9361",
                      "transport": "iio", "uri": "pluto://ip:192.168.2.1",
@@ -170,8 +174,12 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     radio = row["_statistics"]["radio_parameters"]
     assert radio["tuning"]["lnb_lo_hz"] == 9_750_000_000
     assert radio["receivers"]["gain_mode_readback"] == ["manual", "manual"]
+    assert radio["receivers"]["receiver_labels"] == ["zenith-a", "zenith-b"]
     assert radio["receivers"]["gain_readback_by_receiver"][0]["median_db"] == 50
     assert radio["hardware"]["radio_temperature_c"] == 55.25
+    assert radio["hardware"]["radio_id"] == "pluto-a"
+    assert radio["hardware"]["serial"] == "PLUTO-SERIAL-A"
+    assert radio["hardware"]["firmware_version"] == "v0.38-test"
     assert radio["signal"]["receivers"][0]["rms_magnitude"] == 91
     assert radio["stream"]["host_read_duty_fraction"] == .96
     assert radio["capture"]["captured_samples_per_receiver"] == 12_500_000
@@ -208,6 +216,9 @@ def test_beacon_dashboard_index_is_incremental_and_drives_fast_model_path(tmp_pa
     assert "Calibrated 10 Hz tracks" in DETAIL_HTML
     assert "Conditioned 750 Hz frames" in DETAIL_HTML
     assert "Held-out TLE association" in DETAIL_HTML
+    assert "Operator radio ID" in DETAIL_HTML
+    assert "Receiver / LNB labels" in DETAIL_HTML
+    assert "Firmware" in DETAIL_HTML
     assert "Fragment identity evidence" in DETAIL_HTML
     assert "production qualification" in DETAIL_HTML
 

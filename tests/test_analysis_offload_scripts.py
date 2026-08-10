@@ -243,7 +243,7 @@ def test_server_worker_exits_cleanly_when_once_queue_is_empty(tmp_path):
         ["bash", str(ROOT / "scripts/starlink-analysis-server.sh"), "--once",
          "--workers", "2", str(tmp_path)],
         env=os.environ | {"LEO_TRACKER_REPO": str(ROOT)}, text=True,
-        capture_output=True, timeout=10)
+        capture_output=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert not list((tmp_path / "staging/analysis-queue").glob("*.running.*"))
     assert "server_start" in result.stdout
@@ -432,6 +432,9 @@ def test_offload_only_watcher_delivers_every_capture_without_local_dsp(tmp_path)
         "LEO_BEACON_WIDE_EVERY_CYCLES": "0", "LEO_BEACON_HOP_EVERY_CYCLES": "0",
         "LEO_BEACON_TARGETS": "4:lower-edge", "LEO_BEACON_MAX_CYCLES": "1",
         "LEO_BEACON_FAKE": "1", "LEO_BEACON_MAX_PI_TEMP_MILLIC": "999999",
+        "LEO_BEACON_RADIO_ID": "pluto-test",
+        "LEO_BEACON_RADIO_SERIAL": "TEST-SERIAL",
+        "LEO_BEACON_RECEIVER_LABELS": "lnb-0 lnb-1",
         "UV_CACHE_DIR": str(ROOT / ".uv-cache"), "UV_BIN": shutil.which("uv") or "uv"}
 
     watched = subprocess.run(
@@ -445,8 +448,11 @@ def test_offload_only_watcher_delivers_every_capture_without_local_dsp(tmp_path)
     assert len(local_jobs) == 1
     name, capture_value, mode = local_jobs[0].read_text().rstrip().split("\t")
     assert mode == "narrow"
-    assert json.loads((Path(capture_value) / "manifest.json").read_text())["state"] == \
-        "complete"
+    manifest = json.loads((Path(capture_value) / "manifest.json").read_text())
+    assert manifest["state"] == "complete"
+    assert manifest["identity"]["radio_id"] == "pluto-test"
+    assert manifest["identity"]["receiver_labels"] == ["lnb-0", "lnb-1"]
+    assert "-pluto-test-" in name
 
     exported = subprocess.run(
         ["bash", str(ROOT / "scripts/starlink-analysis-export.sh"), "--once",

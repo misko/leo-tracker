@@ -1,0 +1,33 @@
+[Unit]
+Description=Continuous Starlink dual-RX capture on Pluto instance %i
+Documentation=file:/home/satpi01/leo-tracker/docs/multi_pluto_operations.md
+After=network-online.target mnt-leo\x2dnvme.mount
+Wants=network-online.target
+Requires=mnt-leo\x2dnvme.mount
+# Do not accidentally run the former single-radio unit beside the instances.
+Conflicts=leo-tracker-beacon-watch.service
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+WorkingDirectory=/home/satpi01/leo-tracker
+EnvironmentFile=/etc/leo-tracker/beacon-watch@%i.env
+# The preflight below enforces these safe values even if an EnvironmentFile
+# attempts to override them.
+Environment=LEO_BEACON_ANALYSIS_MODE=offload
+Environment=LEO_BEACON_PRESERVE_RAW=1
+Environment=LEO_BEACON_REQUIRE_HARDWARE_PREFLIGHT=1
+Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
+ExecStartPre=/home/satpi01/leo-tracker/scripts/validate-beacon-instance-env.sh
+ExecStart=/home/satpi01/leo-tracker/scripts/starlink-beacon-watch.sh
+Restart=always
+RestartSec=10
+SyslogIdentifier=leo-beacon-%i
+# Signal only the watcher first so its foreground checksummed capture drains.
+KillMode=mixed
+TimeoutStopSec=300
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

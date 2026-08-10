@@ -55,12 +55,15 @@ def test_hop_capture_cli_fake_e2e(tmp_path, capsys):
     assert main(["starlink-beacon-hop-capture", str(output), "--channels", "1", "3",
         "--dwell-s", ".1", "--sample-rate-hz", "1000", "--bandwidth-hz", "800",
         "--block-size", "40", "--settle-buffers", "1", "--chunk-s", ".1",
-        "--fake"]) == 0
+        "--fake", "--radio-id", "pluto-b", "--receiver-labels", "east", "west"]) == 0
 
     result = json.loads(capsys.readouterr().out)
     session = json.loads((output / "session.json").read_text())
     assert result["state"] == "complete" and result["segment_count"] == 2
+    assert result["radio_id"] == "pluto-b"
     assert session["channel_order"] == [1, 3]
+    assert session["identity"]["radio_id"] == "pluto-b"
+    assert session["identity"]["receiver_labels"] == ["east", "west"]
 
 
 @pytest.mark.parametrize("channels", [(), (1, 1), (0,), (9,)])

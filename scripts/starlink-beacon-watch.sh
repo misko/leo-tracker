@@ -72,6 +72,10 @@ read_host_temperature() {
 target_spec="${LEO_BEACON_TARGETS:-4:lower-edge}"
 maximum_cycles="${LEO_BEACON_MAX_CYCLES:-0}"
 fake_source="${LEO_BEACON_FAKE:-0}"
+radio_uri="${LEO_BEACON_RADIO_URI:-pluto://ip:192.168.2.1}"
+radio_serial="${LEO_BEACON_RADIO_SERIAL:-}"
+radio_id="${LEO_BEACON_RADIO_ID:-}"
+receiver_label_spec="${LEO_BEACON_RECEIVER_LABELS:-rx0 rx1}"
 exact_acquisition_method="${LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3}"
 agc_probability_percent="${LEO_BEACON_AGC_PERCENT:-50}"
 gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-attack-v1}"
@@ -112,10 +116,29 @@ if ! [[ "${minimum_free_gb}" =~ ^[1-9][0-9]*$ ]]; then
   echo "LEO_BEACON_MINIMUM_FREE_GB must be a positive integer" >&2
   exit 2
 fi
+if [[ -n "${radio_id}" && ! "${radio_id}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "LEO_BEACON_RADIO_ID must use letters, digits, dot, underscore, or dash" >&2
+  exit 2
+fi
+read -r -a receiver_labels <<< "${receiver_label_spec}"
+if (( ${#receiver_labels[@]} != 2 )) ||
+   [[ ! "${receiver_labels[0]}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] ||
+   [[ ! "${receiver_labels[1]}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "LEO_BEACON_RECEIVER_LABELS must contain two safe labels" >&2
+  exit 2
+fi
 source_args=()
 if [[ "${fake_source}" == "1" ]]; then
   source_args+=(--fake)
+else
+  source_args+=(--uri "${radio_uri}")
 fi
+[[ -n "${radio_serial}" ]] && source_args+=(--serial "${radio_serial}")
+[[ -n "${radio_id}" ]] && source_args+=(--radio-id "${radio_id}")
+source_args+=(--receiver-labels "${receiver_labels[0]}" "${receiver_labels[1]}")
+printf '{"radio_capture_config":true,"radio_id":"%s","serial":"%s","uri":"%s","receiver_labels":["%s","%s"]}\n' \
+  "${radio_id}" "${radio_serial}" "${radio_uri}" \
+  "${receiver_labels[0]}" "${receiver_labels[1]}"
 
 mkdir -p "${storage_root}/captures" "${storage_root}/reports" "${storage_root}/staging"
 mkdir -p "${storage_root}/hop-sessions"
@@ -146,7 +169,11 @@ capture_target() {
     channel="${target%%:*}"
     region="${target##*:}"
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-    name="ch${channel}-${region}-${mode}-${stamp}"
+    if [[ -n "${radio_id}" ]]; then
+      name="ch${channel}-${region}-${mode}-${radio_id}-${stamp}"
+    else
+      name="ch${channel}-${region}-${mode}-${stamp}"
+    fi
     capture="${storage_root}/captures/${name}"
     if read_host_temperature &&
        (( host_temperature_millic_value >= maximum_pi_temp_millic )); then
@@ -165,7 +192,7 @@ capture_target() {
     fi
     radio_temp_millic=""
     if [[ "${fake_source}" != "1" ]]; then
-      radio_temp_millic="$(iio_attr -u ip:192.168.2.1 -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
+      radio_temp_millic="$(iio_attr -u "${radio_uri#pluto://}" -c ad9361-phy temp0 2>/dev/null | sed -n "s/.*value '\([0-9-]*\)'.*/\1/p" || true)"
     fi
     temperature_args=()
     [[ -n "${pi_temp}" ]] && temperature_args=(--host-temperature-c "${pi_temp}")
@@ -214,7 +241,11 @@ capture_hop_survey() {
     local -a channel_args
     read -r -a channel_args <<< "${hop_channels}"
     stamp="${label:-$(date -u +%Y%m%dT%H%M%SZ)}"
-    session_name="hop-lower-edge-${stamp}"
+    if [[ -n "${radio_id}" ]]; then
+      session_name="hop-lower-edge-${radio_id}-${stamp}"
+    else
+      session_name="hop-lower-edge-${stamp}"
+    fi
     session_path="${storage_root}/hop-sessions/${session_name}"
     if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-hop-capture "${session_path}" \

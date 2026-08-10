@@ -289,6 +289,12 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
                                    transport="iio", serial=args.serial,
                                    sample_format=args.sample_format)
     identity = dict(source.identity)
+    if args.serial and not identity.get("serial"):
+        identity["serial"] = args.serial
+    if args.radio_id:
+        identity["radio_id"] = args.radio_id
+    if args.receiver_labels:
+        identity["receiver_labels"] = list(args.receiver_labels)
     if not args.fake and args.gain_mode != "manual" and args.agc_settle_s > 0:
         time.sleep(args.agc_settle_s)
     if args.host_temperature_c is not None:
@@ -316,7 +322,9 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
         source.close()
     print(json.dumps({"capture": str(args.output), "state": manifest["state"],
         "samples_per_receiver": manifest["captured_samples_per_receiver"],
-        "stored_bytes": manifest["stored_bytes"], "rf_center_hz": manifest["rf_center_hz"]},
+        "stored_bytes": manifest["stored_bytes"], "rf_center_hz": manifest["rf_center_hz"],
+        "radio_id": identity.get("radio_id"),
+        "radio_serial": identity.get("serial"), "radio_uri": identity.get("uri")},
         sort_keys=True))
     return 0
 
@@ -343,6 +351,13 @@ def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
         source = PairedPlutoSource(config, uri=args.uri, block_size=args.block_size,
                                    transport="iio", serial=args.serial,
                                    sample_format=args.sample_format)
+    identity = dict(source.identity)
+    if args.serial and not identity.get("serial"):
+        identity["serial"] = args.serial
+    if args.radio_id:
+        identity["radio_id"] = args.radio_id
+    if args.receiver_labels:
+        identity["receiver_labels"] = list(args.receiver_labels)
     if not args.fake and args.gain_mode != "manual" and args.agc_settle_s > 0:
         time.sleep(args.agc_settle_s)
     report = capture_hop_session(source, args.output, channels=channels,
@@ -351,10 +366,14 @@ def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
         lnb_lo_hz=args.lnb_lo_hz, settle_buffers=args.settle_buffers,
         chunk_s=args.chunk_s, gain_mode=args.gain_mode,
         configured_gain_db=configured_gain_db,
+        identity=identity,
         metadata={"command": "leo-radio starlink-beacon-hop-capture"})
     print(json.dumps({"hop_session": str(args.output), "state": report["state"],
         "segment_count": len(report["segments"]),
-        "duration_wall_s": report["duration_wall_s"]}, sort_keys=True))
+        "duration_wall_s": report["duration_wall_s"],
+        "radio_id": identity.get("radio_id"),
+        "radio_serial": identity.get("serial"), "radio_uri": identity.get("uri")},
+        sort_keys=True))
     return 0
 
 
@@ -1763,6 +1782,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="native-ci16", help="native CI16 avoids pyadi's costly complex64 round trip")
     beacon_capture.add_argument("--uri", default="pluto://ip:192.168.2.1")
     beacon_capture.add_argument("--serial")
+    beacon_capture.add_argument("--radio-id",
+        help="stable operator label for this physical Pluto")
+    beacon_capture.add_argument("--receiver-labels", nargs=2, metavar=("RX0", "RX1"),
+        help="physical LNB/feed labels connected to RX0 and RX1")
     beacon_capture.add_argument("--host-temperature-c", type=float)
     beacon_capture.add_argument("--radio-temperature-c", type=float)
     beacon_capture.add_argument("--fake", action="store_true")
@@ -1793,6 +1816,10 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_hop.add_argument("--chunk-s", type=float, default=1.0)
     beacon_hop.add_argument("--uri", default="pluto://ip:192.168.2.1")
     beacon_hop.add_argument("--serial")
+    beacon_hop.add_argument("--radio-id",
+        help="stable operator label for this physical Pluto")
+    beacon_hop.add_argument("--receiver-labels", nargs=2, metavar=("RX0", "RX1"),
+        help="physical LNB/feed labels connected to RX0 and RX1")
     beacon_hop.add_argument("--fake", action="store_true")
     beacon_hop.add_argument("--fake-start-utc-ns", type=int,
         default=1_700_000_000_000_000_000)

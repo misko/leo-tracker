@@ -590,6 +590,21 @@ def test_beacon_capture_and_analysis_cli_end_to_end(tmp_path, capsys):
     assert '"stored_bytes": 160000' in capsys.readouterr().out
 
 
+def test_beacon_capture_records_operator_radio_and_receiver_labels(tmp_path, capsys):
+    capture = tmp_path / "radio-provenance"
+    assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
+                 "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
+                 "--block-size", "100", "--chunk-s", ".02", "--fake",
+                 "--radio-id", "pluto-a", "--receiver-labels",
+                 "north-lnb", "south-lnb"]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    manifest = json.loads((capture / "manifest.json").read_text())
+    assert output["radio_id"] == "pluto-a"
+    assert manifest["identity"]["radio_id"] == "pluto-a"
+    assert manifest["identity"]["receiver_labels"] == ["north-lnb", "south-lnb"]
+
+
 def test_exact_replay_can_be_restricted_to_a_targeted_time_interval(tmp_path):
     capture = tmp_path / "beacon"
     analysis = tmp_path / "targeted.json"

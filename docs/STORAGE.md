@@ -325,8 +325,9 @@ uv run --active --no-sync leo-radio starlink-storage-regime-v2 \
 ```
 
 [`leo-tracker-storage-regime-v2.service`](../deploy/leo-tracker-storage-regime-v2.service)
-runs this on Kalman in batches of eight with the repository's existing uv virtual
-environment. A failure preserves raw and v1 and is retried; manual pins are
+runs this on Kalman with 16 workers and balanced batches of 16 archive-only plus
+16 raw records using the repository's existing uv virtual environment. A
+failure preserves raw and v1 and is retried; manual pins are
 recropped to v2 but their raw remains. Archive-only history whose raw was
 already reclaimed is recropped transitively from source-verified v1 clips; any
 gap covering a required v2 interval fails closed. Completed transaction
@@ -368,7 +369,7 @@ Its bounded automatic scope reserves the first transaction for archive-only v1
 whenever both raw and archive backlogs exist, then fills the remaining slots
 with urgent raw IQ. This prevents continuous acquisition from starving old v1
 forever. Each operational plan also stops after a small batch of eligible
-records (80 on the Pi and 64 on Kalman), so one transaction does not require a complete
+records (80 on the Pi and 128 on Kalman), so one transaction does not require a complete
 multi-thousand-record inventory.
 Unbounded CLI dry runs remain available for authoritative capacity audits.
 Kalman remains the high-throughput worker.

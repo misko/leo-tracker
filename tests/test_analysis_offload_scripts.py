@@ -68,9 +68,10 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     unit = (ROOT / "deploy/leo-tracker-storage-regime-v2.service").read_text()
     script = (ROOT / "scripts/starlink-storage-regime-v2.sh").read_text()
     assert "Environment=LEO_STORAGE_REGIME_ENABLED=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_LIMIT=8" in unit
-    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=64" in unit
-    assert "Environment=LEO_STORAGE_REGIME_WORKERS=8" in unit
+    assert "Environment=LEO_STORAGE_REGIME_LIMIT=32" in unit
+    assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=128" in unit
+    assert "Environment=LEO_STORAGE_REGIME_WORKERS=16" in unit
+    assert "Environment=LEO_STORAGE_REGIME_ARCHIVE_SLOTS=16" in unit
     assert "Environment=LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS=6" in unit
     assert "Environment=LEO_STORAGE_REGIME_ROLE=primary" in unit
     assert "Environment=LEO_STORAGE_PRIMARY_HEARTBEAT_S=30" in unit
@@ -82,6 +83,7 @@ def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():
     assert '--planning-limit "${planning_limit}"' in script
     assert "starlink-shared-transient-converge" in script
     assert "DELETE-STALE-LEO-TRANSIENTS" in script
+    assert '--archive-reserved-slots "${archive_slots}"' in script
     assert '--workers "${workers}"' in script
     assert "--confirm MIGRATE-TO-EVIDENCE-V2" in script
     assert '"${uv_bin}" run --active --no-sync' in script
@@ -112,6 +114,7 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "Environment=LEO_STORAGE_REGIME_LIMIT=10" in unit
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=80" in unit
     assert "Environment=LEO_STORAGE_REGIME_WORKERS=5" in unit
+    assert "Environment=LEO_STORAGE_REGIME_ARCHIVE_SLOTS=1" in unit
     assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
     assert "Environment=LEO_STORAGE_REGIME_ROLE=fallback" in unit
     assert "Environment=LEO_STORAGE_PRIMARY_HEARTBEAT_S=30" in unit

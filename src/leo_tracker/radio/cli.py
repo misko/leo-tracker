@@ -603,7 +603,8 @@ def _command_starlink_storage_regime_v2(
     plan = build_storage_regime_plan(args.shared_root, args.archive_root,
                                      minimum_age_hours=args.minimum_age_hours,
                                      scope=args.scope,
-                                     eligible_limit=args.planning_limit)
+                                     eligible_limit=args.planning_limit,
+                                     auto_archive_slots=args.archive_reserved_slots)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         temporary = args.output.with_name(args.output.name + ".next")
@@ -2068,6 +2069,8 @@ def build_parser() -> argparse.ArgumentParser:
     storage_regime.add_argument("--limit", type=int)
     storage_regime.add_argument("--planning-limit", type=int,
         help="stop inventory after this many eligible records (phased scopes only)")
+    storage_regime.add_argument("--archive-reserved-slots", type=int, default=1,
+        help="archive-only records placed first in each bounded automatic plan")
     storage_regime.add_argument("--workers", type=int, default=1,
         help="run this many independent deletion-last transactions concurrently")
     storage_regime.add_argument("--output", type=Path)

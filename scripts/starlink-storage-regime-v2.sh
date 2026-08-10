@@ -11,6 +11,7 @@ interval_s="${LEO_STORAGE_REGIME_INTERVAL_S:-60}"
 limit="${LEO_STORAGE_REGIME_LIMIT:-2}"
 planning_limit="${LEO_STORAGE_REGIME_PLANNING_LIMIT:-16}"
 workers="${LEO_STORAGE_REGIME_WORKERS:-1}"
+archive_slots="${LEO_STORAGE_REGIME_ARCHIVE_SLOTS:-1}"
 legacy_limit="${LEO_STORAGE_LEGACY_LIMIT:-16}"
 legacy_planning_limit="${LEO_STORAGE_LEGACY_PLANNING_LIMIT:-64}"
 minimum_age_hours="${LEO_STORAGE_REGIME_MINIMUM_AGE_HOURS:-6}"
@@ -59,6 +60,7 @@ if [[ "${role}" != "standalone" && "${role}" != "primary" &&
   exit 2
 fi
 if ! [[ "${planning_limit}" =~ ^[1-9][0-9]*$ && "${workers}" =~ ^[1-9][0-9]*$ &&
+        "${archive_slots}" =~ ^[1-9][0-9]*$ &&
         "${legacy_limit}" =~ ^[1-9][0-9]*$ &&
         "${legacy_planning_limit}" =~ ^[1-9][0-9]*$ &&
         "${audit_interval_s}" =~ ^[1-9][0-9]*$ &&
@@ -128,6 +130,7 @@ PY
   args=(starlink-storage-regime-v2 "${shared_root}" "${archive_root}"
     --minimum-age-hours "${minimum_age_hours}" --scope "${scope}"
     --planning-limit "${planning_limit}" --workers "${workers}"
+    --archive-reserved-slots "${archive_slots}"
     --limit "${limit}" --output "${plan}")
   if [[ "${enabled}" == "1" ]]; then
     args+=(--apply --confirm MIGRATE-TO-EVIDENCE-V2)

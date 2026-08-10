@@ -208,7 +208,8 @@ def _summary(entries: list[dict]) -> dict:
 def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
                               minimum_age_hours: float = 6,
                               scope: str = "all",
-                              eligible_limit: int | None = None) -> dict:
+                              eligible_limit: int | None = None,
+                              auto_archive_slots: int = 1) -> dict:
     """Inventory raw captures that can be promoted to the production v2 regime."""
     if minimum_age_hours < 0:
         raise ValueError("minimum age must be non-negative")
@@ -216,6 +217,8 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         raise ValueError("storage regime scope must be all, auto, raw, or archive")
     if eligible_limit is not None and eligible_limit < 1:
         raise ValueError("eligible planning limit must be positive")
+    if auto_archive_slots < 1:
+        raise ValueError("automatic archive slots must be positive")
     if scope == "all" and eligible_limit is not None:
         raise ValueError("eligible planning limit requires auto, raw, or archive scope")
     if scope == "auto":
@@ -224,22 +227,24 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         # slot for one archive-only record, then devote the rest to raw. The
         # unbounded audit behavior remains raw-first and only falls back after
         # raw is exhausted.
-        raw_limit = (max(1, eligible_limit - 1)
+        reserved = (min(auto_archive_slots, eligible_limit - 1)
+                    if eligible_limit is not None and eligible_limit > 1 else 0)
+        raw_limit = (max(1, eligible_limit - reserved)
                      if eligible_limit is not None else None)
         raw = build_storage_regime_plan(
             shared_root, archive_root, minimum_age_hours=minimum_age_hours,
             scope="raw", eligible_limit=raw_limit)
         if raw["summary"]["eligible_count"]:
-            if eligible_limit is not None and eligible_limit > 1:
+            if reserved:
                 archive = build_storage_regime_plan(
                     shared_root, archive_root,
                     minimum_age_hours=minimum_age_hours,
-                    scope="archive", eligible_limit=1)
+                    scope="archive", eligible_limit=reserved)
                 archive_eligible = [item for item in archive["entries"]
                     if item["status"] in {"eligible_archive_only",
                                           "eligible_archive_only_pinned"}]
                 if archive_eligible:
-                    selected = archive_eligible[:1]
+                    selected = archive_eligible[:reserved]
                     selected_ids = {item["recording_id"] for item in selected}
                     entries = [*selected, *raw["entries"],
                         *(item for item in archive["entries"]
@@ -248,7 +253,7 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
                         "configuration": {**raw["configuration"],
                             "scope": "auto",
                             "active_scope": "raw_with_archive_fairness",
-                            "archive_reserved_slots": 1,
+                            "archive_reserved_slots": len(selected),
                             "inventory_complete": False},
                         "summary": _summary(entries)}
             raw["configuration"] = {**raw["configuration"], "scope": "auto",

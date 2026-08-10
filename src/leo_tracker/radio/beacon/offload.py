@@ -604,25 +604,59 @@ def reconcile_failed_jobs(root: Path, *, pipeline_id: str,
     }
 
 
+def _read_settled(path: Path) -> set[str]:
+    """Names a pipeline has already accepted, or an empty set.
+
+    A missing or damaged ledger is not an error: it costs one full walk and is
+    rebuilt from what that walk finds.
+    """
+    try:
+        value = _read_json(path)
+    except (OSError, ValueError):
+        return set()
+    names = value.get("settled")
+    return set(names) if isinstance(names, list) else set()
+
+
 def audit_completed(root: Path, *, default_context: Path | None = None,
                     pipeline_id: str = "legacy-v1") -> dict:
-    """Requeue legacy/partial successes that lack a valid output receipt."""
+    """Requeue legacy/partial successes that lack a valid output receipt.
+
+    Acceptance is permanent: it either finds ``completion.json`` or writes one,
+    and the branch below treats that record as authoritative rather than
+    revalidating it. Re-deriving it costs one round trip per already-finished
+    recording at every start, which on a high-latency share grew past the
+    restart interval. The ledger caches that settled set per pipeline, so a
+    restart stats only what finished since the last audit.
+    """
     root = Path(root).resolve(); queue = root / "staging" / "analysis-queue"
     pipeline_id = _safe_identity(pipeline_id, "pipeline identity")
     requeued, accepted, errors = [], [], []
+    settled_path = queue / f"audit-settled-{pipeline_id}.json"
+    settled = _read_settled(settled_path)
     for marker in sorted((queue / "done").glob("*.job")):
         name = marker.stem
-        # A completion record for this pipeline is the authoritative statement
-        # that the recording is done. Revalidating it rewrites versioned
-        # outputs, which collides once a rerun has changed the derived bytes,
-        # and a collision is a healthy refusal to overwrite scientific history
-        # rather than evidence the job needs redoing. Requeueing on it sends
-        # work to a source whose archived working copy may be long reclaimed.
-        if (root / "reports" / "runs" / pipeline_id / name /
-                "completion.json").is_file():
-            accepted.append(name); continue
         try:
+            # The receipt is keyed by the job's own name, which is the first
+            # field of the marker rather than its filename: a queue marker
+            # carries an enqueue-time prefix that the run directory does not.
+            # Reading the record under the filename never matched in
+            # production, so the branch below revalidated every finished
+            # recording on every start -- the exact rewrite-and-requeue it
+            # exists to prevent.
             name, _capture, mode, job_context = parse_job(marker)
+            if name in settled:
+                accepted.append(name); continue
+            # A completion record for this pipeline is the authoritative
+            # statement that the recording is done. Revalidating it rewrites
+            # versioned outputs, which collides once a rerun has changed the
+            # derived bytes, and a collision is a healthy refusal to overwrite
+            # scientific history rather than evidence the job needs redoing.
+            # Requeueing on it sends work to a source whose archived working
+            # copy may be long reclaimed.
+            if (root / "reports" / "runs" / pipeline_id / name /
+                    "completion.json").is_file():
+                accepted.append(name); continue
             context = job_context or default_context
             if context is not None and not Path(context).is_absolute():
                 context = root / context
@@ -638,6 +672,12 @@ def audit_completed(root: Path, *, default_context: Path | None = None,
             os.replace(marker, target)
             requeued.append(marker.name)
             errors.append(f"{type(exc).__name__}: {exc}")
+    # Rebuilding from what this walk actually saw prunes names whose markers
+    # have since been requeued, so the ledger tracks done/ rather than growing
+    # without bound. Writing only on change keeps a settled restart read-only.
+    if set(accepted) != settled:
+        _atomic_json(settled_path, {"pipeline_id": pipeline_id,
+                                    "settled": sorted(set(accepted))})
     return {"accepted": accepted, "requeued": requeued, "errors": errors}
 
 

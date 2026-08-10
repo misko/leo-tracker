@@ -691,6 +691,65 @@ def test_audit_accepts_a_recording_this_pipeline_already_completed(tmp_path):
     assert other["requeued"] == ["sample.job"]
 
 
+def test_audit_reads_the_completion_record_under_the_job_name(tmp_path):
+    """The run directory is keyed by job name, not by the marker's filename.
+
+    A queue marker carries an enqueue-time prefix that the run directory does
+    not, so reading the record under the filename never matched a real queue.
+    Every finished recording was revalidated on each start, and validation
+    that cannot rewrite settled outputs requeues -- the precise failure the
+    completion record exists to prevent.
+    """
+    queue = tmp_path / "staging/analysis-queue"
+    (queue / "done").mkdir(parents=True)
+    marker = queue / "done/20260809T060603897270178Z-hop-lower-edge-b02.job"
+    marker.write_text("hop-lower-edge-b02\tcaptures/hop-lower-edge-b02\tnarrow\n")
+    completion = (tmp_path / "reports/runs/kalman-full-v1/hop-lower-edge-b02"
+                  / "completion.json")
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({"pipeline_id": "kalman-full-v1"}))
+    # Deliberately absent: the artifacts validate_outputs would demand. The
+    # completion record alone must settle it.
+
+    report = audit_completed(tmp_path, pipeline_id="kalman-full-v1")
+
+    assert report["accepted"] == ["hop-lower-edge-b02"]
+    assert report["requeued"] == []
+    assert not list(queue.glob("*.job"))
+
+
+def test_audit_does_not_restat_settled_runs_on_every_start(tmp_path, monkeypatch):
+    """Acceptance is permanent, so a restart must not re-derive it.
+
+    The walk cost one round trip per already-finished recording. On the
+    deployed share that outgrew the restart interval, and because it gated the
+    worker spawn every restart began with minutes of zero throughput.
+    """
+    queue = tmp_path / "staging/analysis-queue"
+    (queue / "done").mkdir(parents=True)
+    (queue / "done/sample.job").write_text("sample\tcaptures/sample\tnarrow\n")
+    completion = tmp_path / "reports/runs/kalman-full-v1/sample/completion.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({"pipeline_id": "kalman-full-v1"}))
+
+    first = audit_completed(tmp_path, pipeline_id="kalman-full-v1")
+    assert first["accepted"] == ["sample"]
+    assert (queue / "audit-settled-kalman-full-v1.json").is_file()
+
+    probed: list[str] = []
+    original = Path.is_file
+
+    def recording(self):
+        probed.append(str(self))
+        return original(self)
+
+    monkeypatch.setattr(Path, "is_file", recording)
+    second = audit_completed(tmp_path, pipeline_id="kalman-full-v1")
+
+    assert second["accepted"] == ["sample"]
+    assert not [path for path in probed if path.endswith("completion.json")]
+
+
 def test_audit_requeues_false_done_but_accepts_valid_negative(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     done = queue / "done"; done.mkdir(parents=True)

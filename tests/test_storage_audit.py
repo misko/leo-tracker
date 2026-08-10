@@ -63,3 +63,12 @@ def test_audit_allows_only_a_verified_current_manual_pin_as_old_raw(tmp_path):
         shared, archive, minimum_age_hours=0)
     assert audit["converged"] is True
     assert audit["violation_counts"]["old_raw"] == 0
+
+
+def test_audit_rejects_interrupted_legacy_normalization_receipt(tmp_path):
+    shared, archive = tmp_path / "shared", tmp_path / "archive"
+    receipt = shared / "reports/reclamation/legacy-layout/pending.json"
+    receipt.parent.mkdir(parents=True); receipt.write_text('{"status":"prepared"}\n')
+    audit = build_storage_regime_audit(shared, archive, minimum_age_hours=0)
+    assert audit["converged"] is False
+    assert audit["violation_counts"]["incomplete_normalizer_receipts"] == 1

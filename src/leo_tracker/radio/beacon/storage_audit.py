@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 import time
 
@@ -40,6 +41,18 @@ def _child_directories(root: Path, *, sample_limit: int) -> dict:
         paths = [path for path in root.iterdir() if path.is_dir() or path.is_symlink()]
     return {"root": str(root), "count": len(paths),
             "samples": [str(path) for path in paths[:sample_limit]]}
+
+
+def _incomplete_receipts(root: Path, *, sample_limit: int) -> dict:
+    incomplete = []
+    for path in root.glob("*.json") if root.is_dir() else []:
+        try:
+            if json.loads(path.read_text()).get("status") != "complete":
+                incomplete.append(str(path))
+        except (OSError, ValueError, AttributeError):
+            incomplete.append(str(path))
+    return {"root": str(root), "count": len(incomplete),
+            "samples": incomplete[:sample_limit]}
 
 
 def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
@@ -82,6 +95,9 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         "derived_duplicates": _tree(
             archive_root / "derived", sample_limit=sample_limit),
         "versioned_outputs": {},
+        "incomplete_normalizer_receipts": _incomplete_receipts(
+            shared_root / "reports" / "reclamation" / "legacy-layout",
+            sample_limit=sample_limit),
     }
     # Completion records and authoritative references below reports/runs are
     # current. Only physical files below an `outputs` directory are legacy.
@@ -115,6 +131,8 @@ def build_storage_regime_audit(shared_root: Path, archive_root: Path, *,
         "derived_duplicates": legacy["derived_duplicates"]["file_count"],
         "versioned_outputs": (legacy["versioned_outputs"]["directory_count"] +
                               legacy["versioned_outputs"]["file_count"]),
+        "incomplete_normalizer_receipts": legacy[
+            "incomplete_normalizer_receipts"]["count"],
     }
     return {
         "schema": AUDIT_SCHEMA,

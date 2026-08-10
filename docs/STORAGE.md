@@ -360,6 +360,21 @@ uv run --active --no-sync leo-radio starlink-storage-audit-v2 \
   --output /mnt/qnap01/mouse9911/leo/reports/retention/storage-v2-audit.json
 ```
 
+After per-record raw/v1 migration drains, normalize any remaining orphan
+`derived/` and physical `runs/.../outputs/` layouts in bounded transactions.
+Existing current reports win over obsolete copies; a missing current report is
+promoted only from a hash-verified versioned output (derived artifacts are moved
+verbatim); ambiguous hash conflicts and unreferenced files fail closed. Every
+mutation writes a receipt beneath `reports/reclamation/legacy-layout/`:
+
+```bash
+uv run --active --no-sync leo-radio starlink-storage-normalize-legacy \
+  /mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped \
+  --planning-limit 64 --limit 16 \
+  --output /mnt/qnap01/mouse9911/leo/reports/retention/legacy-layout.latest.json \
+  --apply --confirm NORMALIZE-LEGACY-LAYOUT
+```
+
 Three populations are permanently outside "archivable" and must be counted
 separately rather than left as an open gap:
 

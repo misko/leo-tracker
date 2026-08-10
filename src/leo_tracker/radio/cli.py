@@ -85,6 +85,9 @@ from .beacon.storage_regime import (CONFIRMATION as STORAGE_REGIME_CONFIRMATION,
                                     apply_storage_regime_plan,
                                     build_storage_regime_plan)
 from .beacon.storage_audit import build_storage_regime_audit
+from .beacon.legacy_normalizer import (
+    CONFIRMATION as LEGACY_LAYOUT_CONFIRMATION,
+    apply_legacy_layout_plan, build_legacy_layout_plan)
 from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
@@ -545,6 +548,29 @@ def command_starlink_storage_audit_v2(args: argparse.Namespace) -> int:
                       "converged": audit["converged"],
                       "violation_counts": audit["violation_counts"]}, sort_keys=True))
     return 0 if audit["converged"] else 1
+
+
+def command_starlink_storage_normalize_legacy(args: argparse.Namespace) -> int:
+    if args.apply:
+        with qnap_storage_mutation_lock(args.shared_root):
+            plan = build_legacy_layout_plan(
+                args.shared_root, args.archive_root,
+                eligible_limit=args.planning_limit)
+            result = apply_legacy_layout_plan(
+                plan, confirmation=args.confirm, limit=args.limit,
+                mutation_lock_held=True)
+    else:
+        plan = build_legacy_layout_plan(
+            args.shared_root, args.archive_root,
+            eligible_limit=args.planning_limit)
+        result = {"dry_run": True, **plan["summary"]}
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = args.output.with_name(args.output.name + ".next")
+        temporary.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        temporary.replace(args.output)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if not result.get("failure_count") else 1
 
 
 def command_starlink_evidence_repair_v2_summaries(args: argparse.Namespace) -> int:
@@ -1929,6 +1955,17 @@ def build_parser() -> argparse.ArgumentParser:
     storage_audit.add_argument("--sample-limit", type=int, default=20)
     storage_audit.add_argument("--output", type=Path)
     storage_audit.set_defaults(handler=command_starlink_storage_audit_v2)
+    legacy_normalize = commands.add_parser("starlink-storage-normalize-legacy",
+        help="transactionally normalize derived and versioned-output legacy layouts")
+    legacy_normalize.add_argument("shared_root", type=Path)
+    legacy_normalize.add_argument("archive_root", type=Path)
+    legacy_normalize.add_argument("--planning-limit", type=int, default=64)
+    legacy_normalize.add_argument("--limit", type=int, default=16)
+    legacy_normalize.add_argument("--output", type=Path)
+    legacy_normalize.add_argument("--apply", action="store_true")
+    legacy_normalize.add_argument("--confirm", default="",
+        help=f"required literal {LEGACY_LAYOUT_CONFIRMATION} with --apply")
+    legacy_normalize.set_defaults(handler=command_starlink_storage_normalize_legacy)
     repair_v2 = commands.add_parser("starlink-evidence-repair-v2-summaries",
         help="repair legacy v2 source-byte accounting without changing IQ clips")
     repair_v2.add_argument("qnap_root", type=Path)

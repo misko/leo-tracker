@@ -233,6 +233,15 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         manifest = _json(manifest_path); tier, reasons, evidence = _classify_recording(
             shared_root, archive_root, name)
         manifest_sha = _sha256(manifest_path) if manifest else None
+        archive_valid, _, archived_receipt = _archive_gate(
+            shared_root, archive_root, name, str(manifest_sha or ""))
+        if tier is None and archive_valid:
+            try:
+                tier = int(archived_receipt["evidence_tier"])
+                reasons = ["verified_v2_classification_fallback", *reasons]
+                evidence = {**evidence, "verified_v2_receipt": True}
+            except (KeyError, TypeError, ValueError):
+                tier = None
         status = "eligible"
         if not _capture_safe(shared_root, capture):
             status = "unsafe_shared_path"
@@ -243,7 +252,8 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
             status = "analysis_active"
         elif now - manifest_path.stat().st_mtime < minimum_age_hours * 3600:
             status = "minimum_age_not_met"
-        elif not _analysis_complete(shared_root, name, archive_root):
+        elif (not archive_valid and
+              not _analysis_complete(shared_root, name, archive_root)):
             status = "analysis_incomplete"
         elif tier is None:
             status = "classification_unavailable"

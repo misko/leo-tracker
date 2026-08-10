@@ -324,6 +324,25 @@ def test_archive_only_v1_with_invalid_derived_hash_stays_protected(tmp_path):
     assert not (archive / "evidence-v2" / name).exists()
 
 
+def test_verified_v2_allows_raw_retirement_when_legacy_success_receipt_is_missing(
+        tmp_path):
+    shared, archive, capture = _ready(tmp_path, "v2-is-authority")
+    name = capture.name
+    from leo_tracker.radio.beacon.evidence_archive import archive_evidence_v2
+    archive_evidence_v2(capture, shared / "reports", archive)
+    (shared / "reports/receipts" / f"{name}.json").unlink()
+    for completion in (shared / "reports/runs").glob(f"*/{name}/completion.json"):
+        completion.unlink()
+
+    plan = build_storage_regime_plan(shared, archive, minimum_age_hours=0)
+    entry = next(item for item in plan["entries"] if item["recording_id"] == name)
+    result = apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+    assert entry["status"] == "eligible"
+    assert result["failure_count"] == 0
+    assert not capture.exists()
+
+
 def test_storage_regime_prioritizes_raw_before_archive_only(tmp_path):
     import shutil
 

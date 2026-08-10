@@ -34,7 +34,10 @@ while true; do
     args+=(--apply --confirm DELETE-QNAP-RAW-IQ)
   fi
   [[ "${ignore_pressure}" == "1" ]] && args+=(--ignore-pressure)
-  env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
-    leo-radio "${args[@]}"
+  if ! env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
+      leo-radio "${args[@]}"; then
+    printf '[%s] qnap_lifecycle_pass_deferred; retrying after %ss\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${interval_s}" >&2
+  fi
   sleep "${interval_s}"
 done

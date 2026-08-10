@@ -249,9 +249,11 @@ SATPI01 also runs
 [`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
 as a persistent low-priority fallback. It processes four transactions with two
 independent deletion-last workers per bounded plan, followed by a ten-second
-idle interval, and shares the global migration lock
-with Kalman, so it survives Pi
-reboots without allowing two migrations to mutate the archive concurrently.
+idle interval. Kalman migration, the Pi fallback, and the six-hour QNAP raw
+lifecycle acquire one global QNAP storage lock before inventory as well as
+mutation. A competing policy defers before walking the NFS archive and retries
+on its normal interval. This survives Pi reboots without allowing two policies
+to inventory or mutate the archive concurrently.
 Its automatic scope scans only raw while an eligible raw backlog exists, then
 switches to archive-only v1 compaction. This avoids walking the multi-terabyte
 legacy archive before every urgent raw transaction. Each operational plan also

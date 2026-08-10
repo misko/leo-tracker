@@ -1,4 +1,5 @@
 import json
+import fcntl
 import os
 from pathlib import Path
 import threading
@@ -6,11 +7,14 @@ import time
 
 import pytest
 
+import leo_tracker.radio.cli as cli_module
+from leo_tracker.radio.cli import main
 from leo_tracker.radio.beacon.evidence_archive import archive_evidence
 from leo_tracker.radio.beacon.storage_regime import (
     CONFIRMATION, PLAN_SCHEMA, apply_storage_regime_plan,
     build_storage_regime_plan,
 )
+from leo_tracker.radio.beacon.qnap_lifecycle import QNAP_STORAGE_MUTATION_LOCK
 import leo_tracker.radio.beacon.storage_regime as storage_regime_module
 
 from test_evidence_archive import _capture, _reports
@@ -326,6 +330,44 @@ def test_storage_regime_runs_bounded_independent_transactions_concurrently(
     assert state["maximum"] == 2
     with pytest.raises(ValueError, match="workers must be positive"):
         apply_storage_regime_plan(plan, confirmation=CONFIRMATION, workers=0)
+
+
+def test_storage_regime_shares_mutation_lock_with_qnap_lifecycle(tmp_path):
+    shared = tmp_path / "shared"; archive = tmp_path / "archive"
+    plan = {"schema": PLAN_SCHEMA, "shared_root": str(shared),
+            "archive_root": str(archive), "entries": []}
+    lock_path = (shared / "reports" / "reclamation" /
+                 QNAP_STORAGE_MUTATION_LOCK)
+    lock_path.parent.mkdir(parents=True)
+
+    with lock_path.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(RuntimeError, match="another QNAP storage mutation"):
+            apply_storage_regime_plan(plan, confirmation=CONFIRMATION)
+
+
+def test_storage_regime_cli_apply_locks_before_inventory(
+        tmp_path, monkeypatch, capsys):
+    shared = tmp_path / "shared"; archive = tmp_path / "archive"
+    lock_path = (shared / "reports" / "reclamation" /
+                 QNAP_STORAGE_MUTATION_LOCK)
+    lock_path.parent.mkdir(parents=True)
+    called = False
+
+    def fail_if_inventory_runs(*_args, **_kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("inventory ran while the mutation lock was held")
+
+    monkeypatch.setattr(cli_module, "build_storage_regime_plan",
+                        fail_if_inventory_runs)
+    with lock_path.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert main(["starlink-storage-regime-v2", str(shared), str(archive),
+                     "--apply", "--confirm", CONFIRMATION]) == 1
+
+    assert called is False
+    assert "another QNAP storage mutation is active" in capsys.readouterr().err
 
 
 def test_archive_only_gap_fails_without_retiring_v1(tmp_path):

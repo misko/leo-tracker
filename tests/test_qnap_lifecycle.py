@@ -6,8 +6,10 @@ import shutil
 
 import pytest
 
+import leo_tracker.radio.cli as cli_module
 from leo_tracker.radio.beacon.qnap_lifecycle import (
-    CONFIRMATION, PLAN_SCHEMA, apply_qnap_lifecycle_plan,
+    CONFIRMATION, PLAN_SCHEMA, QNAP_STORAGE_MUTATION_LOCK,
+    apply_qnap_lifecycle_plan,
     build_qnap_lifecycle_plan)
 from leo_tracker.radio.cli import main
 
@@ -168,13 +170,35 @@ def test_qnap_reclaimer_lock_blocks_concurrent_apply(tmp_path):
     shared, archive = tmp_path / "qnap", tmp_path / "cropped"
     _atomic_fixture(shared, archive, "capture-0", 0)
     plan = build_qnap_lifecycle_plan(shared, archive, minimum_age_hours=0)
-    lock_path = shared / "reports/reclamation/qnap.lock"
+    lock_path = shared / "reports/reclamation" / QNAP_STORAGE_MUTATION_LOCK
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with pytest.raises(RuntimeError, match="another QNAP reclaimer"):
+        with pytest.raises(RuntimeError, match="another QNAP storage mutation"):
             apply_qnap_lifecycle_plan(plan, confirmation=CONFIRMATION,
                 trigger_free_gb=0, target_free_gb=1)
+
+
+def test_qnap_cli_apply_locks_before_inventory(tmp_path, monkeypatch, capsys):
+    shared, archive = tmp_path / "qnap", tmp_path / "cropped"
+    lock_path = shared / "reports/reclamation" / QNAP_STORAGE_MUTATION_LOCK
+    lock_path.parent.mkdir(parents=True)
+    called = False
+
+    def fail_if_inventory_runs(*_args, **_kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("inventory ran while the mutation lock was held")
+
+    monkeypatch.setattr(cli_module, "build_qnap_lifecycle_plan",
+                        fail_if_inventory_runs)
+    with lock_path.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert main(["starlink-qnap-lifecycle", str(shared), str(archive),
+                     "--apply", "--confirm", CONFIRMATION]) == 1
+
+    assert called is False
+    assert "another QNAP storage mutation is active" in capsys.readouterr().err
 
 
 def test_cli_is_dry_run_by_default(tmp_path, capsys):

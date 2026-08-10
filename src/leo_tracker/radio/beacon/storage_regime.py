@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import json
 import os
@@ -13,7 +12,8 @@ import time
 
 from .evidence_archive import (V2_RECEIPT_SCHEMA, archive_evidence_v2,
                                archive_evidence_v2_from_v1, verify_evidence)
-from .qnap_lifecycle import TIERS, classify_recording
+from .qnap_lifecycle import (TIERS, classify_recording,
+                             qnap_storage_mutation_lock)
 
 
 PLAN_SCHEMA = "leo-tracker.storage-regime-v2-plan/v1"
@@ -372,7 +372,8 @@ def _migrate_storage_item(item: dict, shared_root: Path, archive_root: Path) -> 
 
 def apply_storage_regime_plan(plan: dict, *, confirmation: str,
                               limit: int | None = None,
-                              workers: int = 1) -> dict:
+                              workers: int = 1,
+                              mutation_lock_held: bool = False) -> dict:
     """Run independent verified transactions, optionally with bounded concurrency."""
     if plan.get("schema") != PLAN_SCHEMA:
         raise ValueError("unsupported storage regime plan")
@@ -384,13 +385,11 @@ def apply_storage_regime_plan(plan: dict, *, confirmation: str,
         raise ValueError("workers must be positive")
     shared_root = Path(plan["shared_root"]).resolve()
     archive_root = Path(plan["archive_root"]).resolve()
-    lock_path = shared_root / "reports" / "reclamation" / "storage-regime-v2.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock = lock_path.open("w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError as exc:
-        lock.close(); raise RuntimeError("another v2 storage migration is active") from exc
+    if not mutation_lock_held:
+        with qnap_storage_mutation_lock(shared_root):
+            return apply_storage_regime_plan(
+                plan, confirmation=confirmation, limit=limit,
+                workers=workers, mutation_lock_held=True)
     items = [entry for entry in plan.get("entries", [])
              if entry.get("status") in {"eligible", "eligible_archive_only",
                                         "eligible_pinned_archive",
@@ -404,16 +403,13 @@ def apply_storage_regime_plan(plan: dict, *, confirmation: str,
         except (OSError, ValueError, KeyError) as exc:
             return None, {"recording_id": item["recording_id"], "error": str(exc)}
     completed = []; failures = []
-    try:
-        if items:
-            with ThreadPoolExecutor(max_workers=min(workers, len(items))) as executor:
-                for final, failure in executor.map(attempt, items):
-                    if final is not None:
-                        completed.append(final)
-                    if failure is not None:
-                        failures.append(failure)
-    finally:
-        fcntl.flock(lock, fcntl.LOCK_UN); lock.close()
+    if items:
+        with ThreadPoolExecutor(max_workers=min(workers, len(items))) as executor:
+            for final, failure in executor.map(attempt, items):
+                if final is not None:
+                    completed.append(final)
+                if failure is not None:
+                    failures.append(failure)
     return {
         "schema": "leo-tracker.storage-regime-v2-result/v1",
         "completed_count": len(completed),

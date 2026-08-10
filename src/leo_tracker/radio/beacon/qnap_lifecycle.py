@@ -1,6 +1,7 @@
 """Disabled-by-default lifecycle planning for complete raw IQ on QNAP."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -15,6 +16,31 @@ import time
 PLAN_SCHEMA = "leo-tracker.qnap-lifecycle-plan/v1"
 RECEIPT_SCHEMA = "leo-tracker.qnap-reclamation-receipt/v1"
 CONFIRMATION = "DELETE-QNAP-RAW-IQ"
+# Every operation that can retire QNAP raw or legacy evidence must serialize on
+# one filesystem lock.  In particular, storage-regime-v2 publishes its v2
+# receipt before deleting the raw source, which makes that source eligible for
+# this lifecycle reclaimer while the migration transaction is still running.
+# Separate locks therefore allow both processes to remove the same directory.
+QNAP_STORAGE_MUTATION_LOCK = "qnap-storage-mutation.lock"
+
+
+@contextmanager
+def qnap_storage_mutation_lock(shared_root: Path):
+    """Serialize QNAP inventory-and-mutation transactions across policies."""
+    lock_path = (Path(shared_root).resolve() / "reports" / "reclamation" /
+                 QNAP_STORAGE_MUTATION_LOCK)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = lock_path.open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        lock.close()
+        raise RuntimeError("another QNAP storage mutation is active") from exc
+    try:
+        yield
+    finally:
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        lock.close()
 TIERS = {
     0: "strict_negative",
     1: "weak_candidate",
@@ -239,7 +265,8 @@ def build_qnap_lifecycle_plan(shared_root: Path, archive_root: Path, *,
 def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
                               trigger_free_gb: float, target_free_gb: float,
                               limit: int | None = None,
-                              pressure_required: bool = True) -> dict:
+                              pressure_required: bool = True,
+                              mutation_lock_held: bool = False) -> dict:
     """Remove planned QNAP raw only under an explicit pressure and token gate."""
     if plan.get("schema") != PLAN_SCHEMA:
         raise ValueError("unsupported QNAP lifecycle plan schema")
@@ -251,14 +278,14 @@ def apply_qnap_lifecycle_plan(plan: dict, *, confirmation: str,
         raise ValueError("limit must be positive")
     shared_root = Path(plan["shared_root"]).resolve()
     archive_root = Path(plan["archive_root"]).resolve()
-    lock_path = shared_root / "reports" / "reclamation" / "qnap.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock = lock_path.open("w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError as exc:
-        lock.close()
-        raise RuntimeError("another QNAP reclaimer is active") from exc
+    if not mutation_lock_held:
+        with qnap_storage_mutation_lock(shared_root):
+            return apply_qnap_lifecycle_plan(
+                plan, confirmation=confirmation,
+                trigger_free_gb=trigger_free_gb,
+                target_free_gb=target_free_gb, limit=limit,
+                pressure_required=pressure_required,
+                mutation_lock_held=True)
     free_bytes = shutil.disk_usage(shared_root).free
     trigger = int(trigger_free_gb * 1e9); target = int(target_free_gb * 1e9)
     if pressure_required and free_bytes >= trigger:

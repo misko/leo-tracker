@@ -87,7 +87,8 @@ from .beacon.storage_regime import (CONFIRMATION as STORAGE_REGIME_CONFIRMATION,
 from .beacon.local_reclamation import (apply_reclamation_plan,
                                        build_reclamation_plan)
 from .beacon.qnap_lifecycle import (apply_qnap_lifecycle_plan,
-                                    build_qnap_lifecycle_plan)
+                                    build_qnap_lifecycle_plan,
+                                    qnap_storage_mutation_lock)
 
 
 def discover_pluto_serials(sysfs: str | Path = "/sys/bus/usb/devices") -> list[str]:
@@ -400,6 +401,14 @@ def command_starlink_storage_reconcile(args: argparse.Namespace) -> int:
 
 
 def command_starlink_qnap_lifecycle(args: argparse.Namespace) -> int:
+    if args.apply:
+        with qnap_storage_mutation_lock(args.shared_root):
+            return _command_starlink_qnap_lifecycle(args, mutation_lock_held=True)
+    return _command_starlink_qnap_lifecycle(args, mutation_lock_held=False)
+
+
+def _command_starlink_qnap_lifecycle(
+        args: argparse.Namespace, *, mutation_lock_held: bool) -> int:
     plan = build_qnap_lifecycle_plan(args.shared_root, args.archive_root,
         minimum_age_hours=args.minimum_age_hours,
         maximum_tier=args.maximum_tier)
@@ -410,7 +419,8 @@ def command_starlink_qnap_lifecycle(args: argparse.Namespace) -> int:
         temporary.replace(args.output)
     result = (apply_qnap_lifecycle_plan(plan, confirmation=args.confirm,
         trigger_free_gb=args.trigger_free_gb, target_free_gb=args.target_free_gb,
-        limit=args.limit, pressure_required=not args.ignore_pressure)
+        limit=args.limit, pressure_required=not args.ignore_pressure,
+        mutation_lock_held=mutation_lock_held)
         if args.apply else {"dry_run": True, **plan["summary"]})
     print(json.dumps(result, sort_keys=True))
     return 0
@@ -491,6 +501,15 @@ def command_starlink_evidence_archive_v2(args: argparse.Namespace) -> int:
 
 
 def command_starlink_storage_regime_v2(args: argparse.Namespace) -> int:
+    if args.apply:
+        with qnap_storage_mutation_lock(args.shared_root):
+            return _command_starlink_storage_regime_v2(
+                args, mutation_lock_held=True)
+    return _command_starlink_storage_regime_v2(args, mutation_lock_held=False)
+
+
+def _command_starlink_storage_regime_v2(
+        args: argparse.Namespace, *, mutation_lock_held: bool) -> int:
     plan = build_storage_regime_plan(args.shared_root, args.archive_root,
                                      minimum_age_hours=args.minimum_age_hours,
                                      scope=args.scope,
@@ -502,7 +521,9 @@ def command_starlink_storage_regime_v2(args: argparse.Namespace) -> int:
         temporary.replace(args.output)
     result = (apply_storage_regime_plan(plan, confirmation=args.confirm,
                                         limit=args.limit,
-                                        workers=args.workers) if args.apply else
+                                        workers=args.workers,
+                                        mutation_lock_held=mutation_lock_held)
+              if args.apply else
               {"dry_run": True, **plan["summary"]})
     print(json.dumps(result, sort_keys=True))
     return 0 if not result.get("failure_count") else 1

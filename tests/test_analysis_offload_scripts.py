@@ -52,6 +52,9 @@ def test_qnap_lifecycle_service_is_six_hour_verified_v2_working_set():
     assert "starlink-qnap-lifecycle" in script
     assert "--maximum-tier" in script
     assert "--ignore-pressure" in script
+    assert 'if ! env UV_CACHE_DIR="${repo_dir}/.uv-cache"' in script
+    assert "qnap_lifecycle_pass_deferred" in script
+    assert 'sleep "${interval_s}"' in script
 
 
 def test_storage_regime_service_is_bounded_verified_v2_and_uses_existing_uv():

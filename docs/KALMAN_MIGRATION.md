@@ -64,10 +64,10 @@ sudo systemctl restart leo-tracker-analysis-export.service
 existing QNAP working-copy retention pass only after the recording has an
 archive receipt. Neither setting authorizes deletion of SATPI01 NVMe sources.
 
-The deployed service uses `shadow` plus `disabled`. Cropped publication is
-working, but the historical archive is not yet complete. Do not promote either
-mode based only on the live queue reaching zero: queue completion and archive
-coverage are separate properties.
+The deployed service uses `required` plus `disabled`. Every successful new job
+must therefore publish production tiered-v2 evidence directly; queue completion
+and archive coverage remain separate properties. A server still reporting
+`shadow` or the legacy `evidence_archive` stage is stale and must be updated.
 
 ## Install on Kalman
 
@@ -91,9 +91,16 @@ Graceful updates:
 ```bash
 sudo systemctl stop leo-tracker-analysis-server.service
 git pull --ff-only origin main
+sudo systemctl daemon-reload
 sudo systemctl start leo-tracker-analysis-server.service
 systemctl status leo-tracker-analysis-server.service --no-pager -l
+cat /mnt/qnap01/mouse9911/leo/reports/runtime/analysis-server.json
 ```
+
+The runtime document must report `state: running`,
+`producer_contract_valid: true`, `archive_mode: required`, and
+`evidence_policy: tiered-v2`. The storage convergence audit uses the same
+contract when invoked with `--require-producer-contract`.
 
 A normal `systemctl stop` sends `SIGTERM`; the server converts it into a drain
 request and gives claimed jobs up to 30 minutes to finish.

@@ -492,7 +492,8 @@ def command_starlink_evidence_archive_v2(args: argparse.Namespace) -> int:
 def command_starlink_storage_regime_v2(args: argparse.Namespace) -> int:
     plan = build_storage_regime_plan(args.shared_root, args.archive_root,
                                      minimum_age_hours=args.minimum_age_hours,
-                                     scope=args.scope)
+                                     scope=args.scope,
+                                     eligible_limit=args.planning_limit)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         temporary = args.output.with_name(args.output.name + ".next")
@@ -1864,6 +1865,8 @@ def build_parser() -> argparse.ArgumentParser:
     storage_regime.add_argument("--scope", choices=("all", "auto", "raw", "archive"),
                                 default="all")
     storage_regime.add_argument("--limit", type=int)
+    storage_regime.add_argument("--planning-limit", type=int,
+        help="stop inventory after this many eligible records (phased scopes only)")
     storage_regime.add_argument("--output", type=Path)
     storage_regime.add_argument("--apply", action="store_true")
     storage_regime.add_argument("--confirm", default="",

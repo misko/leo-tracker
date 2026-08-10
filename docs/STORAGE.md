@@ -253,8 +253,11 @@ with Kalman, so it survives Pi
 reboots without allowing two migrations to mutate the archive concurrently.
 Its automatic scope scans only raw while an eligible raw backlog exists, then
 switches to archive-only v1 compaction. This avoids walking the multi-terabyte
-legacy archive before every urgent raw transaction. Kalman remains the
-high-throughput worker.
+legacy archive before every urgent raw transaction. Each operational plan also
+stops after a small batch of eligible records (16 on the Pi, 32 on Kalman), so
+one transaction does not require a complete multi-thousand-record inventory.
+Unbounded CLI dry runs remain available for authoritative capacity audits.
+Kalman remains the high-throughput worker.
 
 Analysis completion records no longer copy immutable outputs beneath
 `reports/runs/.../outputs/`; they store hashes and authoritative references to

@@ -94,28 +94,34 @@ def _source_bytes(manifest: dict) -> int:
 
 def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
                               minimum_age_hours: float = 6,
-                              scope: str = "all") -> dict:
+                              scope: str = "all",
+                              eligible_limit: int | None = None) -> dict:
     """Inventory raw captures that can be promoted to the production v2 regime."""
     if minimum_age_hours < 0:
         raise ValueError("minimum age must be non-negative")
     if scope not in {"all", "auto", "raw", "archive"}:
         raise ValueError("storage regime scope must be all, auto, raw, or archive")
+    if eligible_limit is not None and eligible_limit < 1:
+        raise ValueError("eligible planning limit must be positive")
+    if scope == "all" and eligible_limit is not None:
+        raise ValueError("eligible planning limit requires auto, raw, or archive scope")
     if scope == "auto":
         raw = build_storage_regime_plan(
             shared_root, archive_root, minimum_age_hours=minimum_age_hours,
-            scope="raw")
+            scope="raw", eligible_limit=eligible_limit)
         if raw["summary"]["eligible_count"]:
-            raw["configuration"] = {"minimum_age_hours": minimum_age_hours,
-                                    "scope": "auto", "active_scope": "raw"}
+            raw["configuration"] = {**raw["configuration"], "scope": "auto",
+                                    "active_scope": "raw"}
             return raw
         archive = build_storage_regime_plan(
             shared_root, archive_root, minimum_age_hours=minimum_age_hours,
-            scope="archive")
-        archive["configuration"] = {"minimum_age_hours": minimum_age_hours,
-                                    "scope": "auto", "active_scope": "archive"}
+            scope="archive", eligible_limit=eligible_limit)
+        archive["configuration"] = {**archive["configuration"], "scope": "auto",
+                                    "active_scope": "archive"}
         return archive
     shared_root = Path(shared_root).resolve(); archive_root = Path(archive_root).resolve()
     active = _active_jobs(shared_root); now = time.time(); entries = []
+    eligible_seen = 0; inventory_complete = True
     captures = shared_root / "captures"
     raw_names = set()
     for capture in sorted(captures.iterdir() if captures.is_dir() else []):
@@ -151,6 +157,11 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
             "classification_reasons": reasons, "evidence": evidence,
             "status": status,
         })
+        if status in {"eligible", "eligible_pinned_archive"}:
+            eligible_seen += 1
+            if eligible_limit is not None and eligible_seen >= eligible_limit:
+                inventory_complete = False
+                break
     v1_receipts = archive_root / "catalog" / "receipts"
     for receipt_path in sorted(v1_receipts.glob("*.json") if
                                v1_receipts.is_dir() and scope != "raw" else []):
@@ -179,6 +190,11 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
             "classification_reasons": reasons, "evidence": evidence,
             "status": status,
         })
+        if status in {"eligible_archive_only", "eligible_archive_only_pinned"}:
+            eligible_seen += 1
+            if eligible_limit is not None and eligible_seen >= eligible_limit:
+                inventory_complete = False
+                break
     # Free the bounded raw working set before spending bandwidth compacting
     # archive-only v1 bundles. Both paths are safe, but only the former returns
     # the large raw-IQ allocation the operator is actively trying to reclaim.
@@ -197,7 +213,9 @@ def build_storage_regime_plan(shared_root: Path, archive_root: Path, *,
         "schema": PLAN_SCHEMA,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "shared_root": str(shared_root), "archive_root": str(archive_root),
-        "configuration": {"minimum_age_hours": minimum_age_hours, "scope": scope},
+        "configuration": {"minimum_age_hours": minimum_age_hours, "scope": scope,
+                          "eligible_limit": eligible_limit,
+                          "inventory_complete": inventory_complete},
         "summary": {
             "recording_count": len(entries), "status_counts": statuses,
             "tier_counts": tiers,

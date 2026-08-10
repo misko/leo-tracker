@@ -269,6 +269,27 @@ def test_storage_regime_auto_scans_raw_then_falls_back_to_archive(tmp_path):
     assert archive_plan["entries"][0]["status"] == "eligible_archive_only"
 
 
+def test_storage_regime_bounded_inventory_stops_after_eligible_limit(tmp_path):
+    first_shared, first_archive, first = _ready(tmp_path / "first", "a-first")
+    second_shared, second_archive, second = _ready(tmp_path / "second", "b-second")
+    import shutil
+    shutil.copytree(second, first_shared / "captures" / second.name)
+    shutil.copytree(second_shared / "reports", first_shared / "reports",
+                    dirs_exist_ok=True)
+
+    plan = build_storage_regime_plan(
+        first_shared, first_archive, minimum_age_hours=0, scope="raw",
+        eligible_limit=1)
+
+    assert plan["summary"]["eligible_count"] == 1
+    assert plan["configuration"]["inventory_complete"] is False
+    assert plan["entries"][0]["recording_id"] == first.name
+    with pytest.raises(ValueError, match="requires auto, raw, or archive"):
+        build_storage_regime_plan(first_shared, first_archive,
+                                  minimum_age_hours=0, scope="all",
+                                  eligible_limit=1)
+
+
 def test_archive_only_gap_fails_without_retiring_v1(tmp_path):
     shared, archive, capture = _ready(tmp_path, "archive-only-gap")
     name = capture.name

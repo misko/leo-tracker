@@ -561,6 +561,16 @@ worker() {
       else
         emit "retention_skipped worker=${worker_id} job=${name} mode=${retention_mode} archive_required=true"
       fi
+      # Publish this recording's listing row. The analysis server writes the
+      # reports, so it is the only producer that can keep a listing current;
+      # the capture watcher could not, which is how the index fell thousands
+      # of recordings behind. One small write-once file per job means sixteen
+      # workers need no lock, and a failure here must never fail the job.
+      if radio starlink-beacon-dashboard-row "${root}" "${name}" >/dev/null 2>&1; then
+        emit "dashboard_row worker=${worker_id} job=${name}"
+      else
+        emit "dashboard_row_failed worker=${worker_id} job=${name}"
+      fi
       emit "job_done worker=${worker_id} job=${name} mode=${mode} elapsed=$(human_duration "${elapsed}") report=${reports}/${name}.json"
     else
       failed="${queue}/failed/$(basename "${marker}")"

@@ -938,3 +938,18 @@ def test_provider_comparison_is_additive_and_never_fails_a_job():
     assert "|| return 1" not in block
     # The receipted association still comes from the context bundle.
     assert '--catalog "${job_context}/tle-catalog.json" \\' in source
+
+
+def test_analysis_server_publishes_the_dashboard_listing_row():
+    """The analysis server writes the reports, so only it can keep a listing current.
+
+    Coupling the index to the capture watcher left it thousands of recordings
+    behind, because the watcher does not produce most reports. Publication must
+    also never fail a job: a listing is a view, not evidence.
+    """
+    source = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
+    assert "starlink-beacon-dashboard-row" in source
+    assert "dashboard_row_failed" in source
+    block = source.split("starlink-beacon-dashboard-row")[1].split("job_done")[0]
+    assert "run_stage" not in block
+    assert "|| return 1" not in block

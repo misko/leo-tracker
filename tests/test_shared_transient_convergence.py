@@ -3,6 +3,7 @@ import os
 
 import pytest
 
+from leo_tracker.radio.beacon import shared_transient_convergence as module
 from leo_tracker.radio.beacon.shared_transient_convergence import (
     CONFIRMATION, apply_shared_transient_plan, build_shared_transient_plan,
     inventory_stale_shared_transients)
@@ -59,3 +60,21 @@ def test_changed_transient_is_deferred(tmp_path):
     stale.write_text("changed")
     result = apply_shared_transient_plan(plan, confirmation=CONFIRMATION)
     assert result["status"] == "deferred" and stale.exists()
+
+
+def test_partial_promoted_during_planning_is_skipped(tmp_path, monkeypatch):
+    shared, archive = tmp_path / "shared", tmp_path / "archive"
+    incoming = shared / "staging/incoming"; incoming.mkdir(parents=True)
+    partial = incoming / "active.partial"; partial.mkdir()
+    original = module._identity
+
+    def promoted(path):
+        result = original(path)
+        path.rmdir()
+        return result
+
+    monkeypatch.setattr(module, "_identity", promoted)
+
+    plan = build_shared_transient_plan(shared, archive, minimum_age_s=0)
+
+    assert plan["entries"] == []

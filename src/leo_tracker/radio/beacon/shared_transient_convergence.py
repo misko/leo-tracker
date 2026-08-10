@@ -109,12 +109,18 @@ def build_shared_transient_plan(shared_root: Path, archive_root: Path, *,
     queue = shared / "staging/analysis-queue"
     for path in sorted(queue.glob("*.next.*")) if queue.is_dir() else []:
         status = "minimum_age_not_met"
-        if (path.is_symlink() or not path.is_file() or
-                not _ATOMIC_NEXT.fullmatch(path.name)):
-            status = "unsafe_transient"
-        elif path.stat().st_mtime < cutoff:
-            status = "eligible"
-        bytes_, digest = _identity(path) if status != "unsafe_transient" else (0, None)
+        try:
+            mtime = path.stat().st_mtime
+            if (path.is_symlink() or not path.is_file() or
+                    not _ATOMIC_NEXT.fullmatch(path.name)):
+                status = "unsafe_transient"
+            elif mtime < cutoff:
+                status = "eligible"
+            bytes_, digest = (_identity(path) if status != "unsafe_transient"
+                              else (0, None))
+            path.stat()
+        except FileNotFoundError:
+            continue
         entries.append({"kind": "stale_atomic_next", "path": str(path),
             "relative_path": str(path.relative_to(shared)), "bytes": bytes_,
             "sha256": digest, "status": status, "authority": None})
@@ -122,10 +128,15 @@ def build_shared_transient_plan(shared_root: Path, archive_root: Path, *,
     incoming = shared / "staging/incoming"
     for path in sorted(incoming.glob("*.partial")) if incoming.is_dir() else []:
         status = "minimum_age_not_met"; authority = None
-        try: bytes_, digest = _identity(path)
+        try:
+            mtime = path.stat().st_mtime
+            bytes_, digest = _identity(path)
+            path.stat()
+        except FileNotFoundError:
+            continue
         except (OSError, ValueError):
             bytes_, digest, status = 0, None, "unsafe_transient"
-        if status != "unsafe_transient" and path.stat().st_mtime < cutoff:
+        if status != "unsafe_transient" and mtime < cutoff:
             authority = _capture_authority(shared / "captures" / path.name.removesuffix(".partial"))
             status = "eligible" if authority else "resumable_upload_partial"
         entries.append({"kind": "incoming_upload_partial", "path": str(path),
@@ -135,10 +146,15 @@ def build_shared_transient_plan(shared_root: Path, archive_root: Path, *,
     evidence = archive / "evidence-v2"
     for path in sorted(evidence.glob("*.partial")) if evidence.is_dir() else []:
         status = "minimum_age_not_met"; authority = None
-        try: bytes_, digest = _identity(path)
+        try:
+            mtime = path.stat().st_mtime
+            bytes_, digest = _identity(path)
+            path.stat()
+        except FileNotFoundError:
+            continue
         except (OSError, ValueError):
             bytes_, digest, status = 0, None, "unsafe_transient"
-        if status != "unsafe_transient" and path.stat().st_mtime < cutoff:
+        if status != "unsafe_transient" and mtime < cutoff:
             name = path.name.removesuffix(".partial")
             receipt_path = archive / "catalog/v2/receipts" / f"{name}.json"
             try: receipt = json.loads(receipt_path.read_text())

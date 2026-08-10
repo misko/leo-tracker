@@ -391,22 +391,77 @@ def write_receipt(root: Path, receipt: dict) -> Path:
                 return {key: (artifact.get("bytes"), artifact.get("sha256"))
                         for key, artifact in outputs.items()}
 
+            same_identity = (
+                existing.get("schema") == RECEIPT_SCHEMA and
+                existing.get("job") == receipt["job"] and
+                existing.get("pipeline_id") == pipeline_id)
+            same_science = (
+                scientific_identity(existing.get("outputs", {})) ==
+                scientific_identity(receipt.get("outputs", {})))
+
+            def outputs_are_valid(outputs: dict) -> bool:
+                if not isinstance(outputs, dict) or not outputs:
+                    return False
+                try:
+                    return all(
+                        (path := Path(artifact["path"])).is_file() and
+                        path.stat().st_size == int(artifact["bytes"]) and
+                        _sha256(path) == artifact["sha256"]
+                        for artifact in outputs.values())
+                except (OSError, KeyError, TypeError, ValueError):
+                    return False
+
+            def incoming_matches_v2_sources() -> bool:
+                archive = receipt.get("archive_receipt")
+                if (not isinstance(archive, dict) or
+                        archive.get("schema") !=
+                        "leo-tracker.evidence-archive-receipt/v2" or
+                        archive.get("status") != "verified" or
+                        not archive.get("source_verified") or
+                        not archive.get("required_event_replay_valid")):
+                    return False
+                source_hashes = {
+                    str(artifact.get("path")): artifact.get("sha256")
+                    for artifact in archive.get("source_artifacts", [])
+                    if isinstance(artifact, dict)
+                }
+                reports_root = (Path(root) / "reports").resolve()
+                try:
+                    return all(
+                        source_hashes.get(
+                            Path(artifact["path"]).resolve().relative_to(
+                                reports_root).as_posix()) == artifact["sha256"]
+                        for artifact in receipt.get("outputs", {}).values())
+                except (OSError, KeyError, TypeError, ValueError):
+                    return False
+
             # Pre-v2 completions copied the same immutable bytes under
             # runs/.../outputs. Upgrade only the storage metadata when the
-            # complete scientific output set is byte-identical; a genuine
-            # rerun collision must still fail closed.
-            if (existing.get("schema") != RECEIPT_SCHEMA or
-                    existing.get("job") != receipt["job"] or
-                    existing.get("pipeline_id") != pipeline_id or
-                    scientific_identity(existing.get("outputs", {})) !=
-                    scientific_identity(receipt.get("outputs", {}))):
+            # complete scientific output set is byte-identical. A stale
+            # completion may also be superseded when none of its referenced
+            # outputs remain valid and every replacement output is explicitly
+            # authenticated by replay-verified V2 source metadata. A still
+            # valid divergent run remains a genuine collision and fails closed.
+            stale_v2_supersession = (
+                same_identity and not same_science and
+                not outputs_are_valid(existing.get("versioned_outputs") or
+                                      existing.get("outputs", {})) and
+                incoming_matches_v2_sources())
+            if not (same_identity and same_science) and not stale_v2_supersession:
                 raise ValueError(
                     f"pipeline completion collision for {pipeline_id}/{receipt['job']}")
             original_completed = existing.get("completed_utc")
             if original_completed:
                 versioned_receipt["completed_utc"] = original_completed
-            versioned_receipt["storage_layout_upgraded_utc"] = (
-                datetime.now(timezone.utc).isoformat())
+            upgraded_utc = datetime.now(timezone.utc).isoformat()
+            if stale_v2_supersession:
+                versioned_receipt["superseded_invalid_completion"] = {
+                    "sha256": _sha256(versioned),
+                    "reason": "referenced_outputs_invalid_and_v2_authenticated",
+                    "superseded_utc": upgraded_utc,
+                }
+            else:
+                versioned_receipt["storage_layout_upgraded_utc"] = upgraded_utc
             _atomic_json(versioned, versioned_receipt)
     else:
         _atomic_json(versioned, versioned_receipt)

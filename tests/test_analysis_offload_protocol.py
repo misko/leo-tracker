@@ -193,6 +193,81 @@ def test_receipt_does_not_upgrade_different_scientific_output(tmp_path):
         write_receipt(tmp_path, receipt)
 
 
+def test_receipt_supersedes_invalid_completion_with_v2_authenticated_outputs(
+        tmp_path):
+    report = tmp_path / "reports/sample.json"
+    report.parent.mkdir(parents=True); report.write_bytes(b"current")
+    current_digest = hashlib.sha256(report.read_bytes()).hexdigest()
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "job": "sample", "pipeline_id": "kalman-v1",
+        "status": "success", "completed_utc": "2026-08-10T00:00:00+00:00",
+        "outputs": {"analysis": {"path": str(report), "bytes": 7,
+                                  "sha256": current_digest}},
+        "archive_receipt": {
+            "schema": "leo-tracker.evidence-archive-receipt/v2",
+            "status": "verified", "source_verified": True,
+            "required_event_replay_valid": True,
+            "source_artifacts": [{"path": "sample.json",
+                                  "sha256": current_digest}],
+        },
+    }
+    completion = tmp_path / "reports/runs/kalman-v1/sample/completion.json"
+    completion.parent.mkdir(parents=True)
+    completion.write_text(json.dumps({
+        **receipt, "archive_receipt": None,
+        "outputs": {"analysis": {"path": str(report), "bytes": 3,
+                                  "sha256": hashlib.sha256(b"old").hexdigest()}},
+        "versioned_outputs": {
+            "analysis": {"path": str(report), "bytes": 3,
+                         "sha256": hashlib.sha256(b"old").hexdigest()}},
+    }))
+    old_completion_digest = hashlib.sha256(completion.read_bytes()).hexdigest()
+
+    write_receipt(tmp_path, receipt)
+
+    upgraded = json.loads(completion.read_text())
+    assert upgraded["versioned_outputs"]["analysis"]["sha256"] == current_digest
+    assert upgraded["archive_receipt"]["required_event_replay_valid"] is True
+    assert upgraded["superseded_invalid_completion"]["sha256"] == \
+        old_completion_digest
+    assert upgraded["superseded_invalid_completion"]["reason"] == \
+        "referenced_outputs_invalid_and_v2_authenticated"
+
+
+def test_receipt_preserves_valid_divergent_completion_despite_v2(tmp_path):
+    report = tmp_path / "reports/sample.json"
+    report.parent.mkdir(parents=True); report.write_bytes(b"current")
+    current_digest = hashlib.sha256(report.read_bytes()).hexdigest()
+    receipt = {
+        "schema": RECEIPT_SCHEMA, "job": "sample", "pipeline_id": "kalman-v1",
+        "status": "success",
+        "outputs": {"analysis": {"path": str(report), "bytes": 7,
+                                  "sha256": current_digest}},
+        "archive_receipt": {
+            "schema": "leo-tracker.evidence-archive-receipt/v2",
+            "status": "verified", "source_verified": True,
+            "required_event_replay_valid": True,
+            "source_artifacts": [{"path": "sample.json",
+                                  "sha256": current_digest}],
+        },
+    }
+    completion = tmp_path / "reports/runs/kalman-v1/sample/completion.json"
+    legacy = completion.parent / "outputs/analysis.json"
+    legacy.parent.mkdir(parents=True); legacy.write_bytes(b"old")
+    old_digest = hashlib.sha256(legacy.read_bytes()).hexdigest()
+    completion.write_text(json.dumps({
+        **receipt, "archive_receipt": None,
+        "outputs": {"analysis": {"path": str(legacy), "bytes": 3,
+                                  "sha256": old_digest}},
+        "versioned_outputs": {
+            "analysis": {"path": str(legacy), "bytes": 3,
+                         "sha256": old_digest}},
+    }))
+
+    with pytest.raises(ValueError, match="pipeline completion collision"):
+        write_receipt(tmp_path, receipt)
+
+
 def test_analysis_status_reports_queue_age_versioned_runs_and_archives(tmp_path):
     queue = tmp_path / "staging/analysis-queue"
     (queue / "done").mkdir(parents=True)

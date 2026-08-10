@@ -253,7 +253,9 @@ idle interval. Kalman migration, the Pi fallback, and the six-hour QNAP raw
 lifecycle acquire one global QNAP storage lock before inventory as well as
 mutation. A competing policy defers before walking the NFS archive and retries
 on its normal interval. This survives Pi reboots without allowing two policies
-to inventory or mutate the archive concurrently.
+to inventory or mutate the archive concurrently. Current workers also honor
+the former `qnap.lock` and `storage-regime-v2.lock` names, preserving exclusion
+while Kalman or the Pi rolls forward from an older commit.
 Its automatic scope scans only raw while an eligible raw backlog exists, then
 switches to archive-only v1 compaction. This avoids walking the multi-terabyte
 legacy archive before every urgent raw transaction. Each operational plan also

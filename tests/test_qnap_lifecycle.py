@@ -8,7 +8,8 @@ import pytest
 
 import leo_tracker.radio.cli as cli_module
 from leo_tracker.radio.beacon.qnap_lifecycle import (
-    CONFIRMATION, PLAN_SCHEMA, QNAP_STORAGE_MUTATION_LOCK,
+    CONFIRMATION, LEGACY_QNAP_STORAGE_LOCKS, PLAN_SCHEMA,
+    QNAP_STORAGE_MUTATION_LOCK,
     apply_qnap_lifecycle_plan,
     build_qnap_lifecycle_plan)
 from leo_tracker.radio.cli import main
@@ -166,11 +167,14 @@ def test_ignore_pressure_reclaims_verified_identity_but_never_manual_pin(tmp_pat
     assert pin.exists()
 
 
-def test_qnap_reclaimer_lock_blocks_concurrent_apply(tmp_path):
+@pytest.mark.parametrize(
+    "lock_name", (QNAP_STORAGE_MUTATION_LOCK, *LEGACY_QNAP_STORAGE_LOCKS))
+def test_qnap_reclaimer_lock_blocks_concurrent_and_rolling_apply(
+        tmp_path, lock_name):
     shared, archive = tmp_path / "qnap", tmp_path / "cropped"
     _atomic_fixture(shared, archive, "capture-0", 0)
     plan = build_qnap_lifecycle_plan(shared, archive, minimum_age_hours=0)
-    lock_path = shared / "reports/reclamation" / QNAP_STORAGE_MUTATION_LOCK
+    lock_path = shared / "reports/reclamation" / lock_name
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

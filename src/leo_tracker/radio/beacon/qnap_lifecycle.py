@@ -22,25 +22,39 @@ CONFIRMATION = "DELETE-QNAP-RAW-IQ"
 # this lifecycle reclaimer while the migration transaction is still running.
 # Separate locks therefore allow both processes to remove the same directory.
 QNAP_STORAGE_MUTATION_LOCK = "qnap-storage-mutation.lock"
+LEGACY_QNAP_STORAGE_LOCKS = ("qnap.lock", "storage-regime-v2.lock")
 
 
 @contextmanager
 def qnap_storage_mutation_lock(shared_root: Path):
     """Serialize QNAP inventory-and-mutation transactions across policies."""
-    lock_path = (Path(shared_root).resolve() / "reports" / "reclamation" /
-                 QNAP_STORAGE_MUTATION_LOCK)
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock = lock_path.open("w")
+    lock_root = Path(shared_root).resolve() / "reports" / "reclamation"
+    lock_root.mkdir(parents=True, exist_ok=True)
+    # Keep taking the two historical locks during rolling deployment.  An old
+    # Kalman worker knows only storage-regime-v2.lock and an old Pi lifecycle
+    # knows only qnap.lock; honoring both prevents either version from
+    # overlapping a current inventory/mutation transaction.
+    locks = []
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for name in (QNAP_STORAGE_MUTATION_LOCK, *LEGACY_QNAP_STORAGE_LOCKS):
+            lock = (lock_root / name).open("w")
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                lock.close()
+                raise
+            locks.append(lock)
     except BlockingIOError as exc:
-        lock.close()
+        for lock in reversed(locks):
+            fcntl.flock(lock, fcntl.LOCK_UN)
+            lock.close()
         raise RuntimeError("another QNAP storage mutation is active") from exc
     try:
         yield
     finally:
-        fcntl.flock(lock, fcntl.LOCK_UN)
-        lock.close()
+        for lock in reversed(locks):
+            fcntl.flock(lock, fcntl.LOCK_UN)
+            lock.close()
 TIERS = {
     0: "strict_negative",
     1: "weak_candidate",

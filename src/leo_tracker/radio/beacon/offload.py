@@ -732,7 +732,7 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
                                 if analysis_receipt_path.is_file() else {})
             analysis_complete = (analysis_receipt.get("status") == "success" and
                                  analysis_receipt.get("job") == name)
-            if shared_capture.is_dir() and (completion.is_file() or analysis_complete):
+            if shared_capture.is_dir() and analysis_complete:
                 skipped.append(name); continue
             if completion.is_file():
                 if archive_root is None:

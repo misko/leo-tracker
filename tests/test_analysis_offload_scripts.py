@@ -115,7 +115,7 @@ def test_pi_storage_regime_fallback_is_persistent_low_priority_and_bounded():
     assert "Environment=LEO_STORAGE_REGIME_PLANNING_LIMIT=80" in unit
     assert "Environment=LEO_STORAGE_REGIME_WORKERS=5" in unit
     assert "Environment=LEO_STORAGE_REGIME_ARCHIVE_SLOTS=1" in unit
-    assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=10" in unit
+    assert "Environment=LEO_STORAGE_REGIME_INTERVAL_S=60" in unit
     assert "Environment=LEO_STORAGE_REGIME_ROLE=fallback" in unit
     assert "Environment=LEO_STORAGE_PRIMARY_HEARTBEAT_S=30" in unit
     assert "Environment=LEO_STORAGE_PRIMARY_LEASE_MAX_AGE_S=120" in unit

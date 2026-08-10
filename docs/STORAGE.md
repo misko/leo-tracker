@@ -351,7 +351,11 @@ SATPI01 also runs
 [`leo-tracker-storage-regime-v2-fallback.service`](../deploy/systemd/leo-tracker-storage-regime-v2-fallback.service)
 as a persistent low-priority fallback. On the wired 1 GbE deployment it
 processes ten transactions with five independent deletion-last workers per
-bounded plan, followed by a ten-second idle interval. `Nice=10`,
+bounded plan, followed by a sixty-second idle interval. The idle window lets
+Kalman's NFS-backed analysis workers drain queue claims between write-heavy
+migration batches; field measurements showed nine live jobs clearing in under
+one minute while reducing raw-migration throughput by only about five percent.
+`Nice=10`,
 `CPUWeight=20`, and `IOWeight=20` continue to give capture priority. Kalman
 migration, the Pi fallback, and the six-hour QNAP raw
 lifecycle acquire one global QNAP storage lock before inventory as well as

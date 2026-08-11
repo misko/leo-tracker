@@ -23,6 +23,11 @@ leo-gps = "leo_tracker.gps.cli:main"
 leo-replay = "leo_tracker.replay_cli:main"
 
 [project.optional-dependencies]
+# Analysis only. The capture hosts must never fail to start because a query
+# library is missing, so nothing on the capture path may import this eagerly.
+analysis = [
+  "duckdb>=1.0",
+]
 dev = [
   "pytest>=8",
   "pytest-cov>=5",

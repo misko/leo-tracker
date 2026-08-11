@@ -918,6 +918,30 @@ def command_starlink_beacon_dashboard_row(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_probe_index(args: argparse.Namespace) -> int:
+    """Build, inspect or query the per-probe projection."""
+    from .beacon.probe_index import (ProbeIndexUnavailable, build,
+                                     partition_status, query)
+    try:
+        if args.action == "build":
+            print(json.dumps(build(args.root, pattern=args.pattern,
+                                   rebuild=args.rebuild, limit=args.limit),
+                             indent=2, sort_keys=True))
+        elif args.action == "status":
+            print(json.dumps(partition_status(args.root, pattern=args.pattern),
+                             indent=2, sort_keys=True))
+        else:
+            if not args.sql:
+                print("--sql is required for query", file=sys.stderr)
+                return 2
+            for row in query(args.root, args.sql):
+                print(json.dumps(list(row), default=str))
+    except ProbeIndexUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
+    return 0
+
+
 def command_starlink_lnb_calibration(args: argparse.Namespace) -> int:
     """Measure LNB mismatch, and report anything that moved since last time."""
     from .beacon.lnb_calibration import (compare_calibration, load_calibration,
@@ -2383,6 +2407,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=["space-track", "huggingface"],
         help="catalog providers whose per-source fit to record")
     dashboard_row.set_defaults(handler=command_starlink_beacon_dashboard_row)
+    probe_index = commands.add_parser("starlink-probe-index",
+        help="project per-probe facts into day-partitioned parquet")
+    probe_index.add_argument("action", choices=("build", "status", "query"))
+    probe_index.add_argument("root", type=Path)
+    probe_index.add_argument("--sql", help="query to run against the probes view")
+    probe_index.add_argument("--pattern", default="*narrow*")
+    probe_index.add_argument("--rebuild", action="store_true")
+    probe_index.add_argument("--limit", type=int)
+    probe_index.set_defaults(handler=command_starlink_probe_index)
     lnb_calibration = commands.add_parser("starlink-lnb-calibration",
         help="measure the LNB local-oscillator mismatch on each radio")
     lnb_calibration.add_argument("root", type=Path)

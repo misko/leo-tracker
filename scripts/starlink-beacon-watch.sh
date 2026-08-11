@@ -107,7 +107,10 @@ learned_beacon="${LEO_BEACON_LEARNED_BEACON:-${storage_root}/reports/learned-bea
 # Two LNBs on one radio have independent references and the pair share a tuner,
 # so each receiver's acquisition search is centred on its own oscillator. The
 # measurement lives with the reports it was taken from.
-calibration_root="${LEO_BEACON_CALIBRATION_ROOT:-${storage_root}}"
+# The calibration is written beside the shared reports, not on the capture
+# volume, so defaulting this to storage_root sends the lookup to a filesystem
+# the artifact is never written to and silently yields no correction.
+calibration_root="${LEO_BEACON_CALIBRATION_ROOT:-/mnt/qnap01/mouse9911/leo}"
 read -r -a targets <<< "${target_spec}"
 if (( ${#targets[@]} == 0 )); then
   echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2

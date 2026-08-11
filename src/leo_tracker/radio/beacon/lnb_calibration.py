@@ -161,11 +161,47 @@ def receiver_centers(calibration: dict, radio_id: str) -> tuple[float, float]:
     entry = ((calibration or {}).get("radios") or {}).get(radio_id) or {}
     if not entry.get("measured"):
         return (0.0, 0.0)
+    # A direct sweep of each receiver's own search centre locates both ports
+    # absolutely, which beats deriving them from the difference: the difference
+    # alone cannot say which port carries the error, so anchoring one at zero
+    # leaves the other's residual wherever the anchor happened to sit.
+    direct = entry.get("measured_centers_hz")
+    if direct and len(direct) == 2:
+        return (float(direct[0]), float(direct[1]))
     mismatch = float(entry["mismatch_hz"])
     hits = entry.get("receiver_candidate_counts") or [0, 0]
     if hits[1] >= hits[0]:
         return (mismatch, 0.0)      # receiver 1 detects more, so it anchors
     return (0.0, -mismatch)
+
+
+def calibration_status(root: Path, radio_id: str) -> dict:
+    """Centres for one radio, and why, so an absent correction is not silent.
+
+    Falling back to zero is right for a radio that has never been calibrated
+    and wrong for one that has, and the two produce identical output. Naming
+    the reason turns a missing artifact into something a report can carry and
+    an operator can see, rather than detections quietly failing to appear.
+    """
+    calibration = load_calibration(root)
+    if not calibration:
+        return {"applied": False, "centers_hz": [0.0, 0.0],
+                "reason": "no calibration artifact at this root",
+                "root": str(root)}
+    entry = (calibration.get("radios") or {}).get(radio_id)
+    if entry is None:
+        return {"applied": False, "centers_hz": [0.0, 0.0],
+                "reason": "radio not present in the calibration",
+                "root": str(root)}
+    if not entry.get("measured"):
+        return {"applied": False, "centers_hz": [0.0, 0.0],
+                "reason": "calibration present but not measured",
+                "root": str(root)}
+    centers = receiver_centers(calibration, radio_id)
+    return {"applied": True, "centers_hz": [float(centers[0]), float(centers[1])],
+            "reason": "measured", "root": str(root),
+            "measured_under_fw": entry.get("measured_under_fw"),
+            "created_utc": calibration.get("created_utc")}
 
 
 def write_calibration(root: Path, value: dict) -> Path:

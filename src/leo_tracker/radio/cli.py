@@ -388,6 +388,34 @@ def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def _calibration_status_for(args: argparse.Namespace) -> dict:
+    """Why this capture was, or was not, frequency-corrected.
+
+    Recorded in the report so an uncorrected run is visible in its own output.
+    A missing artifact and a correctly-zero calibration are otherwise identical
+    downstream, which is how a wrong lookup path went unnoticed in the field.
+    """
+    explicit = getattr(args, "receiver_center_offsets_hz", None)
+    if explicit:
+        return {"applied": True, "reason": "explicit override",
+                "centers_hz": [float(explicit[0]), float(explicit[1])]}
+    root = getattr(args, "calibration_root", None)
+    if root is None:
+        return {"applied": False, "reason": "no calibration root given",
+                "centers_hz": [0.0, 0.0]}
+    from .beacon.lnb_calibration import calibration_status
+    try:
+        manifest = json.loads((Path(args.capture) / "manifest.json").read_text())
+    except (OSError, ValueError):
+        return {"applied": False, "reason": "capture manifest unreadable",
+                "centers_hz": [0.0, 0.0]}
+    radio = (manifest.get("identity") or {}).get("radio_id")
+    if not radio:
+        return {"applied": False, "reason": "capture declares no radio",
+                "centers_hz": [0.0, 0.0]}
+    return {**calibration_status(root, radio), "radio_id": radio}
+
+
 def _receiver_centers_for(args: argparse.Namespace) -> tuple[float, float]:
     """Acquisition search centres for this capture's two receivers.
 
@@ -421,6 +449,8 @@ def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
         exact_start_s=args.exact_start_s, exact_stop_s=args.exact_stop_s,
         learned_beacon_path=args.beacon_template,
         receiver_center_offsets_hz=_receiver_centers_for(args))
+    report["lnb_calibration"] = _calibration_status_for(args)
+    Path(args.output).write_text(json.dumps(report, sort_keys=True))
     if args.plot:
         plot_beacon_report(report, args.plot)
     print(json.dumps({"analysis": str(args.output), **report["summary"]}, sort_keys=True))

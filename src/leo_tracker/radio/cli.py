@@ -854,7 +854,8 @@ def command_starlink_beacon_dashboard_row(args: argparse.Namespace) -> int:
     record = capture_dashboard_record(args.root, args.name)
     if record is None:
         raise ValueError(f"no dashboard record for {args.name}")
-    path = write_listing_row(args.root, args.name, record)
+    path = write_listing_row(args.root, args.name, record,
+                             tuple(args.sources or ()))
     print(json.dumps({"dashboard_row": str(path), "recording_id": args.name},
                      sort_keys=True))
     return 0
@@ -866,7 +867,8 @@ def command_starlink_dashboard_shards(args: argparse.Namespace) -> int:
     if args.action == "migrate":
         if args.index is None:
             raise ValueError("migrate needs --index")
-        result = migrate_index(args.index, args.root)
+        result = migrate_index(args.index, args.root,
+                               tuple(args.sources or ()))
     else:
         result = compact_shards(args.root)
     print(json.dumps({"action": args.action, "root": str(args.root), **result},
@@ -2293,6 +2295,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="publish one recording's compact dashboard listing row")
     dashboard_row.add_argument("root", type=Path)
     dashboard_row.add_argument("name")
+    dashboard_row.add_argument("--sources", nargs="*",
+        default=["space-track", "huggingface"],
+        help="catalog providers whose per-source fit to record")
     dashboard_row.set_defaults(handler=command_starlink_beacon_dashboard_row)
     dashboard_shards = commands.add_parser("starlink-dashboard-shards",
         help="publish and compact the date-sharded dashboard listing")
@@ -2300,6 +2305,9 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_shards.add_argument("root", type=Path)
     dashboard_shards.add_argument("--index", type=Path,
         help="existing monolithic index to project, for migrate")
+    dashboard_shards.add_argument("--sources", nargs="*",
+        default=["space-track", "huggingface"],
+        help="catalog providers whose per-source fit to record")
     dashboard_shards.set_defaults(handler=command_starlink_dashboard_shards)
     beacon_dashboard_index = commands.add_parser("starlink-beacon-dashboard-index",
         help="incrementally build the lightweight beacon dashboard index")

@@ -49,8 +49,59 @@ LISTING_FIELDS = (
     "if_center_hz", "rf_center_hz", "radio_id", "candidate_count",
     "dual_candidate_count", "beacon_detected_count", "continuous_track_count",
     "longest_track_duration_s", "qualified_tle_association_count",
-    "fingerprint_family", "detail_url",
+    "fingerprint_family", "detail_url", "satellite_name", "satellite_norad_id",
+    "source_fit_hz", "source_identity_agreement",
 )
+
+
+def _qualified_identity(path: Path) -> dict | None:
+    """Best qualified identity in one association artifact, if any."""
+    value = _read_json(path)
+    if value is None:
+        return None
+    for association in value.get("associations", []):
+        if not association.get("qualified"):
+            continue
+        primary = (association.get("stability") or {}).get("primary") or {}
+        return {"norad_id": primary.get("best_norad_id"),
+                "name": (primary.get("best_name") or "").strip() or None,
+                "holdout_residual_rms_hz": primary.get("holdout_residual_rms_hz")}
+    return None
+
+
+def identity_fields(root: Path, name: str, sources: tuple[str, ...] = ()) -> dict:
+    """Which satellite a recording identified, and how well each provider fitted it.
+
+    A count of qualified associations does not say which spacecraft was found,
+    which is the result the whole pipeline exists to produce. Providers are
+    reported side by side because a shared identity across independently
+    retrieved catalogs is far stronger evidence than either alone.
+
+    Reading these costs one small file per provider, so callers should ask only
+    for recordings already known to have qualified.
+    """
+    reports = Path(root) / "reports"
+    fields: dict = {}
+    primary = _qualified_identity(reports / "associations" / f"{name}.json")
+    identities = {}
+    fits = {}
+    for source in sources:
+        found = _qualified_identity(reports / "associations" / source / f"{name}.json")
+        if found is None:
+            continue
+        identities[source] = found.get("norad_id")
+        if found.get("holdout_residual_rms_hz") is not None:
+            fits[source] = round(float(found["holdout_residual_rms_hz"]), 1)
+        primary = primary or found
+    if primary:
+        fields["satellite_name"] = primary.get("name")
+        fields["satellite_norad_id"] = primary.get("norad_id")
+    if fits:
+        fields["source_fit_hz"] = fits
+    if len(identities) > 1:
+        # Only meaningful when more than one provider actually qualified it.
+        fields["source_identity_agreement"] = len(set(identities.values())) == 1
+    return {key: value for key, value in fields.items() if value is not None}
 
 
 def recording_date(name: str) -> str | None:
@@ -81,11 +132,14 @@ def _atomic_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def write_listing_row(root: Path, name: str, record: dict) -> Path:
+def write_listing_row(root: Path, name: str, record: dict,
+                      sources: tuple[str, ...] = ()) -> Path:
     """Publish one recording's listing row. Safe from concurrent producers."""
     path = Path(root) / "reports" / ROWS_DIRECTORY / f"{name}.json"
     row = listing_row(record)
     row.setdefault("recording_id", name)
+    if record.get("qualified_tle_association_count"):
+        row.update(identity_fields(root, name, sources))
     _atomic_json(path, row)
     return path
 
@@ -199,7 +253,8 @@ def read_listing(root: Path, *, limit: int = 100) -> list[dict]:
     return rows[:limit]
 
 
-def migrate_index(index_path: Path, root: Path) -> dict:
+def migrate_index(index_path: Path, root: Path,
+                  sources: tuple[str, ...] = ()) -> dict:
     """Build shards from an already-rebuilt monolithic index.
 
     Parsing the reports is what makes a rebuild expensive, and the monolithic
@@ -229,6 +284,11 @@ def migrate_index(index_path: Path, root: Path) -> dict:
             continue
         row = listing_row(record)
         row.setdefault("recording_id", name)
+        # Roughly one recording in a hundred qualifies, so reading association
+        # artifacts for the rest would cost thousands of pointless round trips
+        # for a field that would be empty anyway.
+        if record.get("qualified_tle_association_count"):
+            row.update(identity_fields(root, name, sources))
         by_date.setdefault(date, {})[name] = row
 
     for date, rows in sorted(by_date.items()):
@@ -248,3 +308,92 @@ def migrate_index(index_path: Path, root: Path) -> dict:
     return {"migrated_rows": sum(len(rows) for rows in by_date.values()),
             "shards_written": len(by_date), "undated_rows": undated,
             **write_summary(root)}
+
+
+ACTIVITY_SCHEMA = "leo-tracker.dashboard-activity/v1"
+ACTIVITY_WINDOWS_HOURS = (6, 12, 24)
+
+
+def _window_stats(rows: list[dict], seconds: float) -> dict:
+    """Aggregate one group over one window.
+
+    Duty is RF time over wall time, which is only meaningful for a single
+    receiver chain: a radio records one thing at a time, and a dual-RX capture
+    occupies both of its LNB ports for its whole duration.
+    """
+    rf = sum(float(row.get("duration_s") or 0) for row in rows)
+    satellites = {row.get("satellite_norad_id") for row in rows
+                  if row.get("satellite_norad_id") is not None}
+    qualified = sum(int(row.get("qualified_tle_association_count") or 0)
+                    for row in rows)
+    return {
+        "recordings": len(rows),
+        "rf_seconds": round(rf, 1),
+        "duty_fraction": round(rf / seconds, 4) if seconds > 0 else None,
+        "confirmed": sum(1 for row in rows if row.get("confirmed")),
+        "beacons_detected": sum(int(row.get("beacon_detected_count") or 0)
+                                for row in rows),
+        "qualified_associations": qualified,
+        # Distinct spacecraft are only knowable where a row carries an identity;
+        # older rows predate that field and report the association count instead.
+        "satellites_tracked": len(satellites) or None,
+    }
+
+
+def activity_summary(rows: list[dict], *, now: datetime | None = None,
+                     windows_hours: tuple[int, ...] = ACTIVITY_WINDOWS_HOURS) -> dict:
+    """Recent activity overall, per radio, and per LNB port.
+
+    Kept as a function of rows rather than of storage so the same aggregate can
+    be built from the shard listing or from any other row source, and so it can
+    be tested without a filesystem.
+    """
+    moment = now or datetime.now(timezone.utc)
+    groups: dict[str, dict[str, list[dict]]] = {"all": {}, "radio": {}, "lnb": {}}
+    for row in rows:
+        start = row.get("start_utc")
+        if not start:
+            continue
+        try:
+            when = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        age = (moment - when).total_seconds()
+        if age < 0 or age > max(windows_hours) * 3600:
+            continue
+        entry = dict(row, _age_s=age)
+        groups["all"].setdefault("all", []).append(entry)
+        radio = row.get("radio_id")
+        if radio:
+            groups["radio"].setdefault(str(radio), []).append(entry)
+        for label in row.get("receiver_labels") or ():
+            # A dual-RX capture occupies both ports for its full duration, so
+            # it counts once against each rather than being split between them.
+            groups["lnb"].setdefault(str(label), []).append(entry)
+
+    def build(collected: dict[str, list[dict]], radios: bool) -> dict:
+        built = {}
+        for key, entries in sorted(collected.items()):
+            windows = {}
+            for hours in windows_hours:
+                span = hours * 3600
+                inside = [e for e in entries if e["_age_s"] <= span]
+                stats = _window_stats(inside, span)
+                if radios and key == "all":
+                    # Two radios record at once, so a single wall clock would
+                    # report over 100%. Normalise by the radios that appear.
+                    count = len({e.get("radio_id") for e in inside
+                                 if e.get("radio_id")}) or 1
+                    stats["duty_fraction"] = round(
+                        stats["rf_seconds"] / (span * count), 4)
+                    stats["radios"] = count
+                windows[f"{hours}h"] = stats
+            built[key] = windows
+        return built
+
+    return {"schema": ACTIVITY_SCHEMA,
+            "created_utc": moment.isoformat().replace("+00:00", "Z"),
+            "windows_hours": list(windows_hours),
+            "overall": build(groups["all"], True).get("all", {}),
+            "by_radio": build(groups["radio"], False),
+            "by_lnb": build(groups["lnb"], False)}

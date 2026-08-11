@@ -159,3 +159,169 @@ def test_summary_counts_only_what_a_header_shows(tmp_path):
     assert summary["confirmed_count"] == 2
     assert summary["qualified_association_count"] == 2
     assert summary["by_date"] == {"2026-08-10": 3}
+
+
+def _association(path, *, qualified, norad=57622, name="STARLINK-30056", rms=120.0):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"associations": [
+        {"track_id": "track-000", "qualified": qualified,
+         **({"stability": {"primary": {
+             "best_norad_id": norad, "best_name": name,
+             "holdout_residual_rms_hz": rms}}} if qualified else {})}]}))
+
+
+def test_listing_row_names_the_satellite_and_each_provider_fit(tmp_path):
+    """A count of qualified associations does not say which spacecraft was found.
+
+    Providers appear side by side because a shared identity across
+    independently retrieved catalogs is stronger evidence than either alone.
+    """
+    from leo_tracker.radio.beacon.dashboard_shards import identity_fields
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    reports = tmp_path / "reports" / "associations"
+    _association(reports / f"{name}.json", qualified=True)
+    _association(reports / "space-track" / f"{name}.json", qualified=True, rms=67.5)
+    _association(reports / "huggingface" / f"{name}.json", qualified=True, rms=57.8)
+
+    fields = identity_fields(tmp_path, name, ("space-track", "huggingface"))
+
+    assert fields["satellite_name"] == "STARLINK-30056"
+    assert fields["satellite_norad_id"] == 57622
+    assert fields["source_fit_hz"] == {"space-track": 67.5, "huggingface": 57.8}
+    assert fields["source_identity_agreement"] is True
+
+
+def test_listing_row_flags_when_providers_name_different_satellites(tmp_path):
+    from leo_tracker.radio.beacon.dashboard_shards import identity_fields
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    reports = tmp_path / "reports" / "associations"
+    _association(reports / "space-track" / f"{name}.json", qualified=True, norad=57622)
+    _association(reports / "huggingface" / f"{name}.json", qualified=True,
+                 norad=11111, name="STARLINK-OTHER")
+
+    fields = identity_fields(tmp_path, name, ("space-track", "huggingface"))
+
+    assert fields["source_identity_agreement"] is False
+
+
+def test_agreement_is_absent_when_only_one_provider_qualified(tmp_path):
+    """Agreement between one provider and nothing is not agreement."""
+    from leo_tracker.radio.beacon.dashboard_shards import identity_fields
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    reports = tmp_path / "reports" / "associations"
+    _association(reports / "space-track" / f"{name}.json", qualified=True)
+    _association(reports / "huggingface" / f"{name}.json", qualified=False)
+
+    fields = identity_fields(tmp_path, name, ("space-track", "huggingface"))
+
+    assert "source_identity_agreement" not in fields
+    assert fields["source_fit_hz"] == {"space-track": 120.0}
+
+
+def test_unqualified_recordings_never_read_association_artifacts(tmp_path, monkeypatch):
+    """Roughly one recording in a hundred qualifies; the rest must cost nothing."""
+    import leo_tracker.radio.beacon.dashboard_shards as shards
+    calls = []
+    monkeypatch.setattr(shards, "identity_fields",
+                        lambda *a, **k: calls.append(a) or {})
+    name = "ch4-lower-edge-narrow-20260810T000000Z"
+    shards.write_listing_row(tmp_path, name, {
+        "recording_id": name, "start_utc": "2026-08-10T00:00:00Z",
+        "qualified_tle_association_count": 0}, ("space-track",))
+
+    assert calls == []
+
+
+def _activity_row(hours_ago, **extra):
+    """A row that started `hours_ago` before a fixed reference moment."""
+    from datetime import timedelta
+    when = _ACTIVITY_NOW - timedelta(hours=hours_ago)
+    return {"start_utc": when.isoformat().replace("+00:00", "Z"),
+            "duration_s": 120.0, **extra}
+
+
+from datetime import datetime, timezone  # noqa: E402
+
+_ACTIVITY_NOW = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def test_activity_windows_are_nested_not_disjoint():
+    """The 24 h window reports everything, not only what the 12 h one excluded."""
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a"), _activity_row(8, radio_id="pluto-a"),
+            _activity_row(20, radio_id="pluto-a")]
+
+    summary = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]
+
+    assert summary["6h"]["recordings"] == 1
+    assert summary["12h"]["recordings"] == 2
+    assert summary["24h"]["recordings"] == 3
+
+
+def test_duty_is_recorded_time_over_wall_time_for_one_radio():
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    # Three 120 s captures in six hours is 360 s of 21600 s.
+    rows = [_activity_row(hour, radio_id="pluto-a") for hour in (1, 2, 3)]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]["6h"]
+
+    assert stats["rf_seconds"] == 360.0
+    assert stats["duty_fraction"] == pytest.approx(360 / 21600, abs=1e-4)
+
+
+def test_a_dual_receiver_capture_counts_in_full_against_both_ports():
+    """Splitting one capture between its two ports would halve each port's duty.
+
+    Both LNBs are occupied for the whole capture, so both were busy for it.
+    """
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a", receiver_labels=["lnb-a", "lnb-b"])]
+
+    by_lnb = activity_summary(rows, now=_ACTIVITY_NOW)["by_lnb"]
+
+    assert by_lnb["lnb-a"]["6h"]["rf_seconds"] == 120.0
+    assert by_lnb["lnb-b"]["6h"]["rf_seconds"] == 120.0
+
+
+def test_global_duty_is_normalised_by_the_radios_that_recorded():
+    """Two radios recording at once would otherwise report over 100% busy."""
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a"), _activity_row(1, radio_id="pluto-b")]
+
+    overall = activity_summary(rows, now=_ACTIVITY_NOW)["overall"]["6h"]
+
+    assert overall["radios"] == 2
+    assert overall["rf_seconds"] == 240.0
+    assert overall["duty_fraction"] == pytest.approx(240 / (21600 * 2), abs=1e-4)
+
+
+def test_activity_ignores_rows_outside_the_widest_window_and_bad_stamps():
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a"), _activity_row(30, radio_id="pluto-a"),
+            {"start_utc": "not-a-time", "duration_s": 120.0, "radio_id": "pluto-a"},
+            {"duration_s": 120.0, "radio_id": "pluto-a"},
+            # A clock skew that puts a row in the future must not count as recent.
+            _activity_row(-2, radio_id="pluto-a")]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]
+
+    assert stats["24h"]["recordings"] == 1
+
+
+def test_activity_counts_detections_beacons_and_distinct_satellites():
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a", confirmed=True,
+                          beacon_detected_count=3, satellite_norad_id=57622,
+                          qualified_tle_association_count=1),
+            _activity_row(2, radio_id="pluto-a", confirmed=True,
+                          beacon_detected_count=2, satellite_norad_id=57622,
+                          qualified_tle_association_count=1),
+            _activity_row(3, radio_id="pluto-a", confirmed=False,
+                          beacon_detected_count=0)]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]["6h"]
+
+    assert stats["confirmed"] == 2 and stats["beacons_detected"] == 5
+    assert stats["qualified_associations"] == 2
+    # The same spacecraft seen twice is one satellite tracked.
+    assert stats["satellites_tracked"] == 1

@@ -16,6 +16,7 @@ import numpy as np
 
 from .physics import doppler_radial_acceleration_m_s2
 from .tuning_dither import dither_phase_locked
+from .beacon.dashboard_shards import activity_summary
 from .beacon.fingerprint import render_fingerprint_svg
 from .beacon.dashboard_index import (capture_dashboard_record,
                                      capture_radio_parameters,
@@ -29,6 +30,19 @@ def _utc(value: str) -> datetime:
 
 def _iso_from_ns(value: int) -> str:
     return datetime.fromtimestamp(value / 1e9, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _row_identity(item: dict) -> dict:
+    """Radio and LNB identity for a persisted row, wherever it was recorded.
+
+    Older rows carry it only inside the saved radio parameters; newer rows
+    promote it to the top level.
+    """
+    radio = (item.get("_statistics", {}) or {}).get("radio_parameters", {}) or {}
+    return {"radio_id": item.get("radio_id") or (
+                radio.get("hardware", {}) or {}).get("radio_id"),
+            "receiver_labels": item.get("receiver_labels") or (
+                radio.get("receivers", {}) or {}).get("receiver_labels")}
 
 
 def _pass_rows(catalog: dict) -> list[dict]:
@@ -946,11 +960,23 @@ class DashboardModel:
         """Return a lightweight, image-free index of recent recording artifacts."""
         limit = max(1, min(int(limit), 200))
         rows = []
+        activity: dict = {}
         persisted = self._beacon_recording_index()
         if persisted.get("schema") in {
                 "leo-tracker.beacon-dashboard-index/v2",
                 "leo-tracker.beacon-dashboard-index/v3"}:
             persisted_rows = persisted.get("recordings", [])
+            # Aggregated over every persisted row rather than the rendered page,
+            # so the headline windows are not truncated by the table limit.
+            activity = activity_summary([{
+                "start_utc": item.get("start_utc"),
+                "duration_s": item.get("duration_s"),
+                "confirmed": item.get("confirmed"),
+                "beacon_detected_count": item.get("beacon_detected_count"),
+                "qualified_tle_association_count": item.get(
+                    "qualified_tle_association_count"),
+                "satellite_norad_id": item.get("satellite_norad_id"),
+                **_row_identity(item)} for item in persisted_rows])
             for item in persisted_rows[:limit]:
                 public = {key: value for key, value in item.items()
                           if not key.startswith("_")}
@@ -1101,6 +1127,7 @@ class DashboardModel:
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "summary": {**beacon.get("inventory", {}),
                     "fingerprint_count": beacon.get("fingerprints", {}).get("count", 0)},
+                "activity": activity,
                 "recordings": rows[:limit]}
 
     def recording_detail(self, kind: str, recording_id: str) -> dict | None:
@@ -1294,7 +1321,7 @@ main{max-width:1900px;margin:auto;padding:20px}.top{display:flex;align-items:end
 @media(max-width:700px){main{padding:12px}.top{align-items:start;flex-direction:column}h1{font-size:23px}}
 </style></head><body><main>
 <div class="top"><div><h1>LEO / Starlink recordings</h1><div class="muted">Click any recording for statistics, artifacts, and plots. “Beacons detected” counts distinct confirmed time intervals, not unique satellite identities.</div><div id="totals" class="muted">Counting beacon observations…</div></div><div id="stamp" class="muted">loading…</div></div>
-<div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Radio</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Dual / single candidates</th><th>Beacons detected</th><th>Strongest drift</th><th>TLE overlaps</th><th>Confirmed</th><th>Decoded</th><th>Frames</th><th>Pilot accuracy</th><th>Confidence</th><th>EVM</th><th>Fingerprint family</th></tr></thead><tbody><tr><td colspan="21" class="empty">Loading recordings…</td></tr></tbody></table></div>
+<section class="panel"><h2>Recent activity</h2><div class="muted" style="margin-bottom:10px">Duty is recorded RF time over wall-clock time. A dual-receiver capture occupies both of its LNB ports, so it counts in full against each.</div><div class="table-wrap"><table id="activity"><thead><tr><th rowspan="2">Scope</th><th colspan="4">past 6 h</th><th colspan="4">past 12 h</th><th colspan="4">past 24 h</th></tr><tr><th>Duty</th><th>Recordings</th><th>Beacons</th><th>Satellites</th><th>Duty</th><th>Recordings</th><th>Beacons</th><th>Satellites</th><th>Duty</th><th>Recordings</th><th>Beacons</th><th>Satellites</th></tr></thead><tbody><tr><td colspan="13" class="empty">Loading…</td></tr></tbody></table></div></section><div class="table-wrap"><table id="recordings"><thead><tr><th>Recorded</th><th>Radio</th><th>Status</th><th>Mode</th><th>Channel</th><th>IF</th><th>Sample rate</th><th>RF BW</th><th>Gain</th><th>Duration</th><th>Dual / single candidates</th><th>Beacons detected</th><th>Strongest drift</th><th>TLE overlaps</th><th>Satellite</th><th>Fit ST / HF</th><th>Confirmed</th><th>Decoded</th><th>Frames</th><th>Pilot accuracy</th><th>Confidence</th><th>EVM</th><th>Fingerprint family</th></tr></thead><tbody><tr><td colspan="23" class="empty">Loading recordings…</td></tr></tbody></table></div>
 </main><script>
 const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const f=(v,n=2)=>Number.isFinite(v)?Number(v).toFixed(n):'—';
@@ -1303,7 +1330,8 @@ let refreshing=false;
 async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/recordings',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()});const rows=d.recordings||[];
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString()+' · '+rows.length+' recordings';
 const s=d.summary||{};document.querySelector('#totals').textContent=`${s.analyzed_capture_count||0} capture windows analyzed · ${s.temporally_confirmed_capture_count||0} temporally confirmed beacon observations · ${s.decoded_capture_count||0} decoded · ${s.retained_iq_capture_count||0} IQ captures retained · ${s.fingerprint_count||0} fingerprints`;
-document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.radio_id||'—')}</td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.dual_candidate_count)} / ${esc(x.single_receiver_candidate_count)}</td><td class="${x.beacon_detected_count?'yes':''}">${x.beacon_detected_count===null||x.beacon_detected_count===undefined?'—':esc(x.beacon_detected_count)}</td><td>${Number.isFinite(x.strongest_drift_hz_s)?f(x.strongest_drift_hz_s/1000,2)+' kHz/s':'—'}</td><td>${esc(x.tle_overlap_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${esc(x.decode_frame_count)}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_confidence)?f(100*x.pilot_confidence,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_evm)?f(x.pilot_evm,3):'—'}</td><td>${x.fingerprint_family?esc(x.fingerprint_family)+' ('+esc(x.fingerprint_family_size)+')':'—'}</td></tr>`).join(''):'<tr><td colspan="21" class="empty">No recordings available.</td></tr>';
+const act=d.activity||{},pct=v=>Number.isFinite(v)?f(100*v,1)+'%':'\u2014',cells=w=>{const g=w||{};return `<td>${pct(g.duty_fraction)}</td><td>${g.recordings??0}</td><td>${g.beacons_detected??0}</td><td>${g.satellites_tracked??(g.qualified_associations??0)}</td>`},actRow=(label,g,cls)=>`<tr class="${cls||''}"><td>${esc(label)}</td>${cells((g||{})['6h'])}${cells((g||{})['12h'])}${cells((g||{})['24h'])}</tr>`;if(act.overall){document.querySelector('#activity tbody').innerHTML=actRow('All receivers',{'6h':act.overall['6h'],'12h':act.overall['12h'],'24h':act.overall['24h']},'live')+Object.entries(act.by_radio||{}).map(([k,v])=>actRow(k,v)).join('')+Object.entries(act.by_lnb||{}).map(([k,v])=>actRow('\u2003'+k,v)).join('')}
+document.querySelector('#recordings tbody').innerHTML=rows.length?rows.map(x=>`<tr data-href="${esc(x.detail_url)}"><td>${esc(when(x.start_utc))}</td><td>${esc(x.radio_id||'—')}</td><td class="${x.status==='capturing'||x.status==='analyzing'?'live':x.confirmed?'yes':''}">${esc(x.status)}</td><td>${esc(x.mode)}</td><td>${esc(x.channel??'—')}${x.region?' '+esc(x.region):''}</td><td>${Number.isFinite(x.if_center_hz)?f(x.if_center_hz/1e6,3)+' MHz':'—'}</td><td>${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'}</td><td>${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'}</td><td>${esc(x.gain)}</td><td>${Number.isFinite(x.duration_s)?f(x.duration_s,1)+' s':'—'}</td><td>${esc(x.dual_candidate_count)} / ${esc(x.single_receiver_candidate_count)}</td><td class="${x.beacon_detected_count?'yes':''}">${x.beacon_detected_count===null||x.beacon_detected_count===undefined?'—':esc(x.beacon_detected_count)}</td><td>${Number.isFinite(x.strongest_drift_hz_s)?f(x.strongest_drift_hz_s/1000,2)+' kHz/s':'—'}</td><td>${x.satellite_name?esc(x.satellite_name)+' ('+esc(x.satellite_norad_id)+')'+(x.source_identity_agreement===false?' <span class="muted">\u26a0 sources differ</span>':''):'\u2014'}</td><td>${(()=>{const s=x.source_fit_hz||{},a=s['space-track'],b=s['huggingface'];return (a===undefined&&b===undefined)?'\u2014':(a===undefined?'\u2014':f(a,1))+' / '+(b===undefined?'\u2014':f(b,1))+' Hz'})()}</td><td>${esc(x.tle_overlap_count)}</td><td>${x.confirmed===null?'—':x.confirmed?'yes':'no'}</td><td>${x.decoded===null?'—':x.decoded?'yes':'no'}</td><td>${esc(x.decode_frame_count)}</td><td>${Number.isFinite(x.pilot_accuracy)?f(100*x.pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_confidence)?f(100*x.pilot_confidence,1)+'%':'—'}</td><td>${Number.isFinite(x.pilot_evm)?f(x.pilot_evm,3):'—'}</td><td>${x.fingerprint_family?esc(x.fingerprint_family)+' ('+esc(x.fingerprint_family_size)+')':'—'}</td></tr>`).join(''):'<tr><td colspan="23" class="empty">No recordings available.</td></tr>';
 document.querySelectorAll('tr[data-href]').forEach(row=>row.addEventListener('click',event=>{if(event.target.closest('a'))return;location.href=row.dataset.href}));
 }catch(error){document.querySelector('#stamp').textContent='offline';console.error(error)}finally{refreshing=false}}
 refresh();setInterval(refresh,10000);

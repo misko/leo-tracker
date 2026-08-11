@@ -190,18 +190,58 @@ def test_the_survey_profile_is_not_the_dwell_profile():
 
 
 def test_cost_model_reproduces_the_measured_dwell_profile():
-    """Measured 314 ms per tuning on a Pi 5; the model must not drift from it."""
+    """Measured 314 ms per tuning discarding two buffers on a Pi 5.
+
+    The profile declares three, because two does not drain a depth-four queue,
+    so the model is correspondingly one buffer dearer than that measurement.
+    The field figure was cheap precisely because it was reading stale samples.
+    """
     from leo_tracker.radio.beacon.fast_scan import DWELL_PROFILE
     cost = DWELL_PROFILE.cost_ms(2_500_000.0)
-    assert cost["total_ms"] == pytest.approx(324.0, abs=15.0)
-    assert cost["settle_ms"] == pytest.approx(209.7, abs=1.0)
+    buffer_ms = 1000 * DWELL_PROFILE.block_size / 2_500_000.0
+    assert cost["settle_ms"] == pytest.approx(3 * buffer_ms, abs=1.0)
+    assert cost["total_ms"] - buffer_ms == pytest.approx(324.0, abs=15.0)
 
 
 def test_cost_model_reproduces_the_measured_survey_profile():
-    """Measured 39 ms per tuning for the same eight tunings."""
+    """Measured 43.5 ms per tuning for the same eight tunings."""
     from leo_tracker.radio.beacon.fast_scan import SURVEY_PROFILE
     cost = SURVEY_PROFILE.cost_ms(2_500_000.0)
-    assert cost["total_ms"] == pytest.approx(44.0, abs=12.0)
+    assert cost["total_ms"] == pytest.approx(37.0, abs=15.0)
+
+
+def test_settle_must_drain_the_kernel_queue():
+    """The driver pre-fills its queue, so a shallow settle reads stale samples.
+
+    Measured with a 44 dB gain step: a depth-4 queue leaves three buffers
+    holding the previous tuning's samples. Discarding one of them and keeping
+    the rest reports the old tuning's signal as the new one's, which is a
+    wrong answer rather than a slow one.
+    """
+    from leo_tracker.radio.beacon.fast_scan import ScanProfile
+    with pytest.raises(ValueError, match="cannot drain"):
+        ScanProfile(block_size=32_768, settle_buffers=1, kernel_buffers=4)
+
+
+def test_a_shallow_queue_needs_no_settle_at_all():
+    """At depth one nothing is pre-filled, so there is nothing to discard."""
+    from leo_tracker.radio.beacon.fast_scan import ScanProfile
+    profile = ScanProfile(kernel_buffers=1, settle_buffers=0)
+    assert profile.cost_ms()["settle_ms"] == 0.0
+
+
+def test_the_survey_reads_exactly_the_signal_it_wants():
+    """Sizing the block to the probe removes the quantisation waste entirely."""
+    from leo_tracker.radio.beacon.fast_scan import SURVEY_PROFILE
+    cost = SURVEY_PROFILE.cost_ms(2_500_000.0)
+    assert cost["buffers_listened"] == 1
+    assert cost["signal_used_fraction"] == pytest.approx(1.0, abs=0.01)
+
+
+def test_the_dwell_profile_declares_a_settle_that_drains_its_own_queue():
+    """The capture path keeps a deep queue for throughput and must pay for it."""
+    from leo_tracker.radio.beacon.fast_scan import DWELL_PROFILE
+    assert DWELL_PROFILE.settle_buffers >= DWELL_PROFILE.kernel_buffers - 1
 
 
 def test_listening_is_quantised_by_the_buffer():
@@ -220,14 +260,14 @@ def test_listening_is_quantised_by_the_buffer():
 
 def test_a_finer_block_wastes_less_of_what_it_pays_for():
     from leo_tracker.radio.beacon.fast_scan import ScanProfile
-    coarse = ScanProfile(block_size=262_144).cost_ms()
-    fine = ScanProfile(block_size=32_768).cost_ms()
+    # Same shallow queue on both, so only the block size differs.
+    coarse = ScanProfile(block_size=262_144, kernel_buffers=1,
+                         settle_buffers=0).cost_ms()
+    fine = ScanProfile(block_size=50_000, kernel_buffers=1,
+                       settle_buffers=0).cost_ms()
 
     assert fine["signal_used_fraction"] > coarse["signal_used_fraction"] * 3
-    # Like for like, at one settle buffer each, the finer block is 4.5x cheaper.
-    # The 8x measured in the field also folds in the dwell profile's second
-    # settle buffer, which is a separate saving.
-    assert fine["total_ms"] < coarse["total_ms"] / 4
+    assert fine["total_ms"] < coarse["total_ms"] / 3
 
 
 @pytest.mark.parametrize("kwargs", [

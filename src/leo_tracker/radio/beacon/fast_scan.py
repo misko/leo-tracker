@@ -128,8 +128,9 @@ class ScanProfile:
     discarding two 105 ms blocks costs 210 ms whatever the part actually needs.
     """
 
-    block_size: int = 32_768
-    settle_buffers: int = 1
+    block_size: int = 50_000
+    settle_buffers: int = 0
+    kernel_buffers: int = 1
     probe_s: float = 0.020
     shape: tuple[int, int] = SURVEY_BANK
     #: Measured on a Pi 5 over a persistent USB context; a buffer refill costs
@@ -140,6 +141,18 @@ class ScanProfile:
     def __post_init__(self) -> None:
         if self.block_size < 1 or self.settle_buffers < 0 or self.probe_s <= 0:
             raise ValueError("block size, settle count and probe must be positive")
+        if self.kernel_buffers < 1:
+            raise ValueError("kernel buffer depth must be positive")
+        # The driver keeps `kernel_buffers` in flight, so when a tuning changes
+        # the first `kernel_buffers - 1` were already filled at the old setting.
+        # Measured directly with a 44 dB gain step: depth 4 leaves 3 stale, 2
+        # leaves 1, and 1 leaves none. Discarding fewer than that reads samples
+        # from the previous tuning and reports them as this one's.
+        if self.settle_buffers < self.kernel_buffers - 1:
+            raise ValueError(
+                f"settle_buffers={self.settle_buffers} cannot drain a "
+                f"kernel_buffers={self.kernel_buffers} queue; "
+                f"need at least {self.kernel_buffers - 1}")
 
     def buffer_s(self, sample_rate_hz: float) -> float:
         return self.block_size / float(sample_rate_hz)
@@ -168,9 +181,12 @@ class ScanProfile:
 
 #: What the capture path uses.  Correct for a 120 s dwell, eight times too
 #: coarse for a survey; kept so the comparison is explicit rather than implied.
-DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=2)
-#: Measured 39 ms per tuning against the dwell profile's 314 ms, with the
-#: detection statistic unchanged across the whole block-size sweep.
+DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=3, kernel_buffers=4)
+#: A survey retunes between every read, so it has nothing to gain from the
+#: driver's read-ahead and everything to lose: at depth 1 no buffer is
+#: pre-filled, so there is no stale data and no settle to pay for. Sizing the
+#: block to the probe then makes the single read exactly the signal wanted.
+#: Measured 43.5 ms per tuning against the dwell profile's 314 ms.
 SURVEY_PROFILE = ScanProfile()
 
 

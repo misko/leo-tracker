@@ -17,6 +17,95 @@ scripts/scanner/scan.py --uri usb:1.90.5 \
 scripts/scanner/scan.py --dry-run --tones 2401e6 --point 2401e6:400e3
 ```
 
+## Worked example: the 8 edge-pilot tunings
+
+The Starlink edge pilots, all in the LNB low band (9.75 GHz LO), 2.5 MHz each, dwelling
+25 ms. `ch4 lower` at 1709.6875 MHz is the tuning that carries most beacons.
+
+```bash
+cd ~/leo-tracker
+
+scripts/scanner/scan.py \
+    --uri usb:1.90.5 \
+    --serial 1040007c4a94000211000b009186843ef2 \
+    --sample-rate 2.5e6 \
+    --usable-fraction 1.0 \
+    --dwell-ms 25 \
+    --gain-db 41 \
+    --point  959687500:2.5e6 \
+    --point 1190312500:2.5e6 \
+    --point 1209687500:2.5e6 \
+    --point 1440312500:2.5e6 \
+    --point 1459687500:2.5e6 \
+    --point 1690312500:2.5e6 \
+    --point 1709687500:2.5e6 \
+    --point 1940312500:2.5e6 \
+    --json edge_pilots.json
+```
+
+| ch | edge | IF (Hz) | IF (MHz) |
+|---:|---|---:|---:|
+| 1 | lower | 959,687,500 | 959.6875 |
+| 1 | upper | 1,190,312,500 | 1190.3125 |
+| 2 | lower | 1,209,687,500 | 1209.6875 |
+| 2 | upper | 1,440,312,500 | 1440.3125 |
+| 3 | lower | 1,459,687,500 | 1459.6875 |
+| 3 | upper | 1,690,312,500 | 1690.3125 |
+| 4 | lower | 1,709,687,500 | 1709.6875 |
+| 4 | upper | 1,940,312,500 | 1940.3125 |
+
+Because all eight share one LNB band, a single pass covers them all — a set spanning both
+bands could not, since an LNB is switched between them and the scanner cannot tell which
+band it is in. That assumption is the caller's.
+
+**`--usable-fraction 1.0` is required for this particular request.** 2.5 MHz of bandwidth
+at 2.5 MS/s is *critically sampled*: the requested band is the entire Nyquist span with no
+guard, so the default 0.8 margin rejects the plan. Allowing it is legitimate on the RSSI
+path, which integrates whatever the analog filter passes — but the filter is already
+rolling off at the band edges, so the reading is biased slightly low and anything just
+outside +/-1.25 MHz aliases in. Sampling at 3.125 MS/s or above gives real margin for the
+same nominal bandwidth, and is worth it if the pilots sit near the window edges.
+
+Measured: **252 ms** for the eight, against 202 ms predicted. The 23% gap is the RSSI read
+granularity rounding each dwell up. At 25 ms dwell the per-point overhead is ~0.5 ms
+against 25 ms of integration, so the sweep is ~98% dwell-bound and neither fastlock nor an
+on-device sequencer would buy anything.
+
+### Proving the scan is live
+
+A scan of a disconnected input returns eight plausible numbers that only show nothing was
+attached. To check the tool end to end, park a tone on one tuning through a loopback and
+confirm that point alone moves:
+
+```bash
+python3 - <<'EOF'
+import adi, time
+sdr = adi.ad9361(uri="usb:1.90.5")
+sdr.sample_rate = 2_500_000
+sdr.tx_rf_bandwidth = 2_500_000
+sdr.tx_lo = 1_709_687_500            # ch4 lower
+sdr.tx_hardwaregain_chan1 = -30.0
+sdr.dds_single_tone(100_000, 0.5, channel=1)
+time.sleep(2); del sdr               # release the context before scanning
+EOF
+```
+
+Re-running the scan then gives, on a bench loopback with no antenna:
+
+| IF (MHz) | baseline | with the tone | delta |
+|---:|---:|---:|---:|
+| 959.6875 | -96.75 | -96.75 | - |
+| 1190.3125 | -96.75 | -96.75 | - |
+| 1209.6875 | -96.75 | -96.75 | - |
+| 1440.3125 | -97.70 | -97.75 | - |
+| 1459.6875 | -97.75 | -97.75 | - |
+| 1690.3125 | -97.75 | -97.75 | - |
+| **1709.6875** | -97.75 | **-83.78** | **+14.0** |
+| 1940.3125 | -97.75 | -97.09 | - |
+
+One point up 14 dB with its `floor` flag cleared and seven unchanged. Set
+`tx_hardwaregain_chan1` back to -80.0 afterwards.
+
 ## Measured throughput (R18, RC17, over USB)
 
 | Scan | Tunings | Wall clock | Rate |
@@ -101,6 +190,12 @@ LEO_SCANNER_URI=usb:1.90.5 LEO_SCANNER_SERIAL=<serial> pytest -m hardware
 ```
 
 ## Notes that will save you time
+
+- **Use an interpreter that has numpy, pyadi-iio and native libiio.** On the acquisition
+  host that is the repository's own environment,
+  `uv run --active --no-sync scripts/scanner/scan.py ...`; on a bench box it may be
+  another virtualenv. `scan.py` inserts its own parent on `sys.path`, so it runs straight
+  from a checkout with no install step.
 
 - **Resolve a radio by serial, never by address.** Both the USB address and the DHCP
   lease move across a firmware load; during development one radio inherited the other's

@@ -323,6 +323,14 @@ The deployed continuous sky collector is the edge-beacon service documented in
 [docs/starlink_beacon_receiver.md](docs/starlink_beacon_receiver.md); the hybrid
 watcher is not the authority for current capture cadence or retention.
 
+Two LNBs on one Pluto do not share a frequency reference, and the pair share a
+single tuner, so a mismatch between them puts one port outside the acquisition
+search and no beacon it sees can ever be confirmed. Measure it weekly, and
+again whenever an LNB is swapped, moved, or replaced with a different model:
+[docs/lnb_calibration.md](docs/lnb_calibration.md) gives the protocol, why the
+paired difference is the only unbiased measurement, and why correcting each
+receiver's own search beats retuning the pair.
+
 ## Current milestone
 
 The pipeline has progressed from blind edge-beacon acquisition through

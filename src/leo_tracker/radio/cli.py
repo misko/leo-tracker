@@ -277,7 +277,11 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
                              args.lnb_lo_hz))
     center_hz = args.center_frequency_hz
     if center_hz is None:
-        center_hz = nominal_center_hz
+        # Two LNBs on one radio have independent references, and the pair share
+        # a single tuner, so neither can be centred alone.  Offsetting the
+        # common tuning by half their disagreement keeps both inside the
+        # acquisition search instead of leaving one outside it.
+        center_hz = nominal_center_hz + args.tuning_offset_hz
     configured_gain_db = args.gain_db if args.gain_mode == "manual" else None
     config = RadioConfig(center_hz, args.sample_rate_hz, args.bandwidth_hz,
                          configured_gain_db, gain_mode=args.gain_mode)
@@ -1863,6 +1867,9 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_capture.add_argument("output", type=Path)
     beacon_capture.add_argument("--duration-s", type=float, required=True)
     beacon_capture.add_argument("--channel-number", type=int, choices=range(1, 9), default=3)
+    beacon_capture.add_argument("--tuning-offset-hz", type=float, default=0.0,
+                                help="shift the published centre, to sit between "
+                                     "two LNB local oscillators")
     beacon_capture.add_argument("--region", choices=("lower-edge", "upper-edge", "center"),
         default="lower-edge", help="published pilot band to capture; center is the pilot-free gutter control")
     beacon_capture.add_argument("--center-frequency-hz", type=float,

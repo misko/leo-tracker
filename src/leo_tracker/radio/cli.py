@@ -388,6 +388,28 @@ def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def _receiver_centers_for(args: argparse.Namespace) -> tuple[float, float]:
+    """Acquisition search centres for this capture's two receivers.
+
+    An explicit pair wins so a replay can test a hypothesis; otherwise the
+    stored calibration is looked up by the capture's own radio, which keeps a
+    re-analysis consistent with what production would do.
+    """
+    explicit = getattr(args, "receiver_center_offsets_hz", None)
+    if explicit:
+        return (float(explicit[0]), float(explicit[1]))
+    root = getattr(args, "calibration_root", None)
+    if root is None:
+        return (0.0, 0.0)
+    from .beacon.lnb_calibration import load_calibration, receiver_centers
+    try:
+        manifest = json.loads((Path(args.capture) / "manifest.json").read_text())
+    except (OSError, ValueError):
+        return (0.0, 0.0)
+    radio = (manifest.get("identity") or {}).get("radio_id")
+    return receiver_centers(load_calibration(root), radio) if radio else (0.0, 0.0)
+
+
 def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
     report = analyze_beacon_capture(args.capture, args.output, window_s=args.window_s,
         maximum_analysis_rate_hz=args.maximum_analysis_rate_hz,
@@ -397,7 +419,8 @@ def command_starlink_beacon_analyze(args: argparse.Namespace) -> int:
         exact_subband_rate_hz=args.exact_subband_rate_hz,
         exact_acquisition_method=args.exact_acquisition_method,
         exact_start_s=args.exact_start_s, exact_stop_s=args.exact_stop_s,
-        learned_beacon_path=args.beacon_template)
+        learned_beacon_path=args.beacon_template,
+        receiver_center_offsets_hz=_receiver_centers_for(args))
     if args.plot:
         plot_beacon_report(report, args.plot)
     print(json.dumps({"analysis": str(args.output), **report["summary"]}, sort_keys=True))
@@ -1974,6 +1997,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="begin exact-code replay at this capture offset")
     beacon_analyze.add_argument("--exact-stop-s", type=float,
         help="stop exact-code replay at this capture offset")
+    beacon_analyze.add_argument("--receiver-center-offsets-hz", nargs=2, type=float,
+        metavar=("RX0", "RX1"),
+        help="acquisition search centre per receiver; overrides the calibration")
+    beacon_analyze.add_argument("--calibration-root", type=Path,
+        help="storage root holding reports/lnb-calibration.json")
     beacon_analyze.add_argument("--beacon-template", type=Path,
         help="qualified learned full-frame template used as an independent dual-RX gate")
     beacon_analyze.add_argument("--plot", type=Path,

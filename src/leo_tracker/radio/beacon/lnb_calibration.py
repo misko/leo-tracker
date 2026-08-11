@@ -50,6 +50,16 @@ def _paired_differences(report: dict) -> list[float]:
     return differences
 
 
+def _receiver_hits(report: dict) -> tuple[int, int]:
+    """How often each receiver independently matched, used to pick an anchor."""
+    counts = [0, 0]
+    for check in report.get("exact_checks") or []:
+        flags = check.get("receiver_candidates") or [False, False]
+        for index in (0, 1):
+            counts[index] += 1 if flags[index] else 0
+    return counts[0], counts[1]
+
+
 def measure_mismatch(reports: Path, *, limit: int = 900,
                      minimum_samples: int = MINIMUM_SAMPLES) -> dict:
     """Measure per-radio LNB mismatch from recent narrow reports."""
@@ -58,6 +68,7 @@ def measure_mismatch(reports: Path, *, limit: int = 900,
                    key=lambda item: item.stat().st_mtime, reverse=True)[:limit]
     samples: dict[str, list[float]] = {}
     labels: dict[str, list[str]] = {}
+    counts: dict[str, list[int]] = {}
     for path in paths:
         try:
             report = json.loads(path.read_text())
@@ -70,9 +81,14 @@ def measure_mismatch(reports: Path, *, limit: int = 900,
         if not radio or len(ports) < 2:
             continue
         found = _paired_differences(report)
+        hits = _receiver_hits(report)
+        if found or any(hits):
+            labels[radio] = list(ports[:2])
         if found:
             samples.setdefault(radio, []).extend(found)
-            labels[radio] = list(ports[:2])
+        tally = counts.setdefault(radio, [0, 0])
+        tally[0] += hits[0]
+        tally[1] += hits[1]
     radios = {}
     for radio, values in sorted(samples.items()):
         values.sort()
@@ -88,6 +104,7 @@ def measure_mismatch(reports: Path, *, limit: int = 900,
             "p10_hz": round(percentile(0.1), 1),
             "p90_hz": round(percentile(0.9), 1),
             "spread_hz": round(percentile(0.9) - percentile(0.1), 1),
+            "receiver_candidate_counts": counts.get(radio, [0, 0]),
         }
     return {"schema": CALIBRATION_SCHEMA,
             "created_utc": datetime.now(timezone.utc).isoformat().replace(
@@ -133,16 +150,22 @@ def compare_calibration(previous: dict, current: dict, *,
 def receiver_centers(calibration: dict, radio_id: str) -> tuple[float, float]:
     """Search centres for one radio's two receivers, in Hz.
 
-    The mismatch is split across the pair rather than assigned wholly to one
-    port, because only the difference is measurable: which port carries the
-    error is not knowable from this data, and splitting keeps either
-    interpretation inside the search.
+    Only the difference between the ports is measurable, so one of them has to
+    serve as the reference. The port that detects more often is chosen, because
+    a port whose offset falls outside the search only matches when Doppler
+    happens to carry it inside, which biases its own estimate toward the search
+    boundary; the port that matches freely does not suffer that. Anchoring on
+    it and placing the other by the measured difference beats splitting the
+    difference between them, which leaves the offset port half-corrected.
     """
     entry = ((calibration or {}).get("radios") or {}).get(radio_id) or {}
     if not entry.get("measured"):
         return (0.0, 0.0)
-    half = float(entry["mismatch_hz"]) / 2.0
-    return (half, -half)
+    mismatch = float(entry["mismatch_hz"])
+    hits = entry.get("receiver_candidate_counts") or [0, 0]
+    if hits[1] >= hits[0]:
+        return (mismatch, 0.0)      # receiver 1 detects more, so it anchors
+    return (0.0, -mismatch)
 
 
 def write_calibration(root: Path, value: dict) -> Path:

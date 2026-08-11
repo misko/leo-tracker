@@ -49,6 +49,10 @@ wide_acquisition_span_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ:-3500000}"
 # Provider comparison runs the same track against each independently retrieved
 # catalog. Empty disables it. The receipt never depends on these outputs.
 catalog_store_root="${LEO_CATALOG_STORE_ROOT:-/mnt/qnap01/mouse9911/tle}"
+# Two LNBs on one radio have independent references and the pair share a tuner,
+# so each receiver's acquisition search is centred on its own oscillator. The
+# measurement lives beside the reports it was taken from.
+calibration_root="${LEO_ANALYSIS_CALIBRATION_ROOT:-/mnt/qnap01/mouse9911/leo}"
 association_compare_sources="${LEO_ASSOCIATION_COMPARE_SOURCES:-space-track huggingface}"
 association_compare_scope="${LEO_ASSOCIATION_COMPARE_SCOPE:-starlink}"
 wide_acquisition_step_hz="${LEO_ANALYSIS_WIDE_ACQUISITION_STEP_HZ:-2000000}"
@@ -391,6 +395,7 @@ process_job() {
   [[ -f "${job_context}/passes.json" ]] && passes_args=(--passes "${job_context}/passes.json")
   run_stage "${worker_id}" "${name}" acquire radio starlink-beacon-analyze "${capture}" "${report}" --window-s 1 \
     --maximum-analysis-rate-hz 50000 --exact-acquisition-method pilot_symbolwise_v3 \
+    --calibration-root "${calibration_root}" \
     "${analysis_args[@]}" "${template_args[@]}" --plot "${plot}" || return 1
   run_stage "${worker_id}" "${name}" followup radio starlink-beacon-followup "${capture}" "${report}" "${followup}" \
     --radius-s .5 --interval-s .1 --window-s .01 "${passes_args[@]}" \

@@ -67,12 +67,37 @@ def test_too_few_pairs_is_reported_rather_than_guessed(tmp_path):
     assert entry["sample_count"] < 40
 
 
-def test_centres_split_the_mismatch_across_the_pair():
-    """Only the difference is measurable, so neither port is blamed for it."""
-    calibration = {"radios": {"pluto-a": {"measured": True,
-                                          "mismatch_hz": 435_000.0}}}
+def test_centring_anchors_on_the_port_that_detects_more():
+    """The freely-detecting port is the trustworthy reference.
 
-    assert receiver_centers(calibration, "pluto-a") == (217_500.0, -217_500.0)
+    A port outside the search only matches when Doppler carries it inside, so
+    its own estimate is biased toward the boundary. Anchoring on its healthy
+    twin and placing it by the measured difference corrects it fully, where
+    splitting the difference would leave it half outside.
+    """
+    calibration = {"radios": {"pluto-a": {
+        "measured": True, "mismatch_hz": 435_000.0,
+        "receiver_candidate_counts": [184, 1631]}}}
+
+    assert receiver_centers(calibration, "pluto-a") == (435_000.0, 0.0)
+
+
+def test_centring_follows_whichever_port_is_healthier():
+    """The offset port can be either one; the rule must not assume an index."""
+    calibration = {"radios": {"pluto-a": {
+        "measured": True, "mismatch_hz": -435_000.0,
+        "receiver_candidate_counts": [1631, 184]}}}
+
+    assert receiver_centers(calibration, "pluto-a") == (0.0, 435_000.0)
+
+
+def test_a_matched_pair_is_left_alone():
+    """Two ports that agree need no correction beyond their small difference."""
+    calibration = {"radios": {"pluto-a": {
+        "measured": True, "mismatch_hz": 3_755.0,
+        "receiver_candidate_counts": [1239, 960]}}}
+
+    assert receiver_centers(calibration, "pluto-a") == (0.0, -3_755.0)
 
 
 def test_an_unmeasured_radio_gets_no_correction():

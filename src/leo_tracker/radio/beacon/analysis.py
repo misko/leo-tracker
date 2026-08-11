@@ -215,8 +215,16 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                     exact_acquisition_method: str = "coherent_grid_v1",
                     exact_start_s: float = 0,
                     exact_stop_s: float | None = None,
-                    learned_beacon_path: Path | None = None) -> dict:
-    """Analyze independent windows without loading a complete long capture into RAM."""
+                    learned_beacon_path: Path | None = None,
+                    receiver_center_offsets_hz: tuple[float, float] =
+                        (0.0, 0.0)) -> dict:
+    """Analyze independent windows without loading a complete long capture into RAM.
+
+    ``receiver_center_offsets_hz`` shifts each receiver's acquisition search to
+    its own local oscillator. Two LNBs on one radio have independent references
+    and the pair share a tuner, so without it the offset port sits outside the
+    search for most of a pass.
+    """
     if min(window_s, maximum_analysis_rate_hz, exact_interval_s, exact_window_s,
            acquisition_step_hz, exact_subband_rate_hz) <= 0:
         raise ValueError("window lengths, intervals, and analysis rate must be positive")
@@ -273,7 +281,8 @@ def analyze_capture(capture_path: Path, output: Path, *, window_s: float = 1.0,
                 exact_subband_rate_hz=exact_subband_rate_hz,
                 acquisition_method=exact_acquisition_method,
                 learned_templates=learned_templates,
-                learned_template_source=learned_template_source))
+                learned_template_source=learned_template_source,
+                receiver_center_offsets_hz=receiver_center_offsets_hz))
             next_exact_sample += round(exact_interval_s * source_rate)
         selected = values[::decimation]
         combined = np.concatenate((carry, selected), axis=0)

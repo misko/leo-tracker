@@ -104,6 +104,10 @@ observer_lon="${LEO_BEACON_OBSERVER_LON:--122.48567658142287}"
 observer_alt_m="${LEO_BEACON_OBSERVER_ALT_M:-0}"
 tle_catalog="${LEO_BEACON_TLE_CATALOG:-/mnt/qnap01/mouse9911/satellites/leo-tracker/tle-history/latest.json}"
 learned_beacon="${LEO_BEACON_LEARNED_BEACON:-${storage_root}/reports/learned-beacons/active.json}"
+# Two LNBs on one radio have independent references and the pair share a tuner,
+# so each receiver's acquisition search is centred on its own oscillator. The
+# measurement lives with the reports it was taken from.
+calibration_root="${LEO_BEACON_CALIBRATION_ROOT:-${storage_root}}"
 read -r -a targets <<< "${target_spec}"
 if (( ${#targets[@]} == 0 )); then
   echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2
@@ -442,6 +446,7 @@ process_capture() {
       starlink-beacon-analyze "${capture}" "${report}" \
       --window-s 1 --maximum-analysis-rate-hz 50000 \
       --exact-acquisition-method "${analysis_method}" \
+      --calibration-root "${calibration_root}" \
       "${analysis_args[@]}" "${template_analysis_args[@]}" "${plot_args[@]}"
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-followup "${capture}" "${report}" "${followup}" \

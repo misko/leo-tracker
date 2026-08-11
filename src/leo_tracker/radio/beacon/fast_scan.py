@@ -135,8 +135,14 @@ class KernelBank:
 @lru_cache(maxsize=16)
 def build_bank(edge: str = "lower", sample_rate_hz: float = 2_500_000.0,
                shape: tuple[int, int] = FULL_BANK,
-               offset_span_hz: float = DEFAULT_OFFSET_SPAN_HZ) -> KernelBank:
-    """Build (and cache) the kernel bank for one edge and search shape."""
+               offset_span_hz: float = DEFAULT_OFFSET_SPAN_HZ,
+               center_hz: float = 0.0) -> KernelBank:
+    """Build (and cache) the kernel bank for one edge and search shape.
+
+    ``center_hz`` places the search about a receiver's own local oscillator
+    rather than about zero, which is what lets a port whose LNB disagrees with
+    its twin be searched at all.
+    """
     offset_count, anchor_count = shape
     if offset_count < 1 or anchor_count < 1:
         raise ValueError("bank shape entries must be positive")
@@ -145,7 +151,7 @@ def build_bank(edge: str = "lower", sample_rate_hz: float = 2_500_000.0,
     template = _edge_pilot_frame_cached(float(sample_rate_hz), edge, 0)
     symbol_period = sample_rate_hz * OFDM_SYMBOL_DURATION_S
     taps = max(2, round(symbol_period))
-    offsets = np.linspace(-offset_span_hz, offset_span_hz, offset_count)
+    offsets = np.linspace(-offset_span_hz, offset_span_hz, offset_count) + center_hz
     anchors = np.unique(np.rint(np.linspace(2, 301, anchor_count)).astype(int))
     lag = np.arange(taps) / sample_rate_hz
     kernels, starts = [], []

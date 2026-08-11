@@ -70,6 +70,12 @@ read_host_temperature() {
   fi
 }
 target_spec="${LEO_BEACON_TARGETS:-4:lower-edge}"
+# "all" captures every target each cycle; "random" draws one uniformly.  A
+# fixed march through the band would sample each tuning at a constant period
+# and could beat against the satellites' own channel rotation, so an unbiased
+# survey draws instead of marching.  Two radios run separate processes with
+# separate seeds, so their draws are independent and spread further.
+target_selection="${LEO_BEACON_TARGET_SELECTION:-all}"
 maximum_cycles="${LEO_BEACON_MAX_CYCLES:-0}"
 fake_source="${LEO_BEACON_FAKE:-0}"
 radio_uri="${LEO_BEACON_RADIO_URI:-pluto://ip:192.168.2.1}"
@@ -103,6 +109,18 @@ if (( ${#targets[@]} == 0 )); then
   echo "LEO_BEACON_TARGETS must contain at least one channel:region target" >&2
   exit 2
 fi
+if [[ "${target_selection}" != "all" && "${target_selection}" != "random" ]]; then
+  echo "LEO_BEACON_TARGET_SELECTION must be all or random" >&2
+  exit 2
+fi
+cycle_targets() {
+  # Emit the targets to capture this cycle, one per line.
+  if [[ "${target_selection}" == "random" ]]; then
+    printf '%s\n' "${targets[RANDOM % ${#targets[@]}]}"
+  else
+    printf '%s\n' "${targets[@]}"
+  fi
+}
 if ! [[ "${agc_probability_percent}" =~ ^[0-9]+$ ]] ||
    (( agc_probability_percent < 0 || agc_probability_percent > 100 )); then
   echo "LEO_BEACON_AGC_PERCENT must be an integer from 0 through 100" >&2
@@ -717,7 +735,8 @@ fi
 
 cycle=0
 while true; do
-  for target in "${targets[@]}"; do
+  mapfile -t cycle_list < <(cycle_targets)
+  for target in "${cycle_list[@]}"; do
     capture_target "${target}" narrow
     enqueue_pending_analysis
   done
@@ -730,13 +749,15 @@ while true; do
   fi
   if (( (oversample_on_startup == 1 && cycle == 1) ||
         (oversample_every_cycles > 0 && cycle % oversample_every_cycles == 0) )); then
-    for target in "${targets[@]}"; do
+    mapfile -t cycle_list < <(cycle_targets)
+    for target in "${cycle_list[@]}"; do
       capture_target "${target}" oversample
       enqueue_pending_analysis
     done
   fi
   if (( wide_every_cycles > 0 && cycle % wide_every_cycles == 0 )); then
-    for target in "${targets[@]}"; do
+    mapfile -t cycle_list < <(cycle_targets)
+    for target in "${cycle_list[@]}"; do
       capture_target "${target}" wide
       enqueue_pending_analysis
     done

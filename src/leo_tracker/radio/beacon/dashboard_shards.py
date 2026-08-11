@@ -308,3 +308,92 @@ def migrate_index(index_path: Path, root: Path,
     return {"migrated_rows": sum(len(rows) for rows in by_date.values()),
             "shards_written": len(by_date), "undated_rows": undated,
             **write_summary(root)}
+
+
+ACTIVITY_SCHEMA = "leo-tracker.dashboard-activity/v1"
+ACTIVITY_WINDOWS_HOURS = (6, 12, 24)
+
+
+def _window_stats(rows: list[dict], seconds: float) -> dict:
+    """Aggregate one group over one window.
+
+    Duty is RF time over wall time, which is only meaningful for a single
+    receiver chain: a radio records one thing at a time, and a dual-RX capture
+    occupies both of its LNB ports for its whole duration.
+    """
+    rf = sum(float(row.get("duration_s") or 0) for row in rows)
+    satellites = {row.get("satellite_norad_id") for row in rows
+                  if row.get("satellite_norad_id") is not None}
+    qualified = sum(int(row.get("qualified_tle_association_count") or 0)
+                    for row in rows)
+    return {
+        "recordings": len(rows),
+        "rf_seconds": round(rf, 1),
+        "duty_fraction": round(rf / seconds, 4) if seconds > 0 else None,
+        "confirmed": sum(1 for row in rows if row.get("confirmed")),
+        "beacons_detected": sum(int(row.get("beacon_detected_count") or 0)
+                                for row in rows),
+        "qualified_associations": qualified,
+        # Distinct spacecraft are only knowable where a row carries an identity;
+        # older rows predate that field and report the association count instead.
+        "satellites_tracked": len(satellites) or None,
+    }
+
+
+def activity_summary(rows: list[dict], *, now: datetime | None = None,
+                     windows_hours: tuple[int, ...] = ACTIVITY_WINDOWS_HOURS) -> dict:
+    """Recent activity overall, per radio, and per LNB port.
+
+    Kept as a function of rows rather than of storage so the same aggregate can
+    be built from the shard listing or from any other row source, and so it can
+    be tested without a filesystem.
+    """
+    moment = now or datetime.now(timezone.utc)
+    groups: dict[str, dict[str, list[dict]]] = {"all": {}, "radio": {}, "lnb": {}}
+    for row in rows:
+        start = row.get("start_utc")
+        if not start:
+            continue
+        try:
+            when = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        age = (moment - when).total_seconds()
+        if age < 0 or age > max(windows_hours) * 3600:
+            continue
+        entry = dict(row, _age_s=age)
+        groups["all"].setdefault("all", []).append(entry)
+        radio = row.get("radio_id")
+        if radio:
+            groups["radio"].setdefault(str(radio), []).append(entry)
+        for label in row.get("receiver_labels") or ():
+            # A dual-RX capture occupies both ports for its full duration, so
+            # it counts once against each rather than being split between them.
+            groups["lnb"].setdefault(str(label), []).append(entry)
+
+    def build(collected: dict[str, list[dict]], radios: bool) -> dict:
+        built = {}
+        for key, entries in sorted(collected.items()):
+            windows = {}
+            for hours in windows_hours:
+                span = hours * 3600
+                inside = [e for e in entries if e["_age_s"] <= span]
+                stats = _window_stats(inside, span)
+                if radios and key == "all":
+                    # Two radios record at once, so a single wall clock would
+                    # report over 100%. Normalise by the radios that appear.
+                    count = len({e.get("radio_id") for e in inside
+                                 if e.get("radio_id")}) or 1
+                    stats["duty_fraction"] = round(
+                        stats["rf_seconds"] / (span * count), 4)
+                    stats["radios"] = count
+                windows[f"{hours}h"] = stats
+            built[key] = windows
+        return built
+
+    return {"schema": ACTIVITY_SCHEMA,
+            "created_utc": moment.isoformat().replace("+00:00", "Z"),
+            "windows_hours": list(windows_hours),
+            "overall": build(groups["all"], True).get("all", {}),
+            "by_radio": build(groups["radio"], False),
+            "by_lnb": build(groups["lnb"], False)}

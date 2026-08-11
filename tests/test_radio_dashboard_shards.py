@@ -230,3 +230,98 @@ def test_unqualified_recordings_never_read_association_artifacts(tmp_path, monke
         "qualified_tle_association_count": 0}, ("space-track",))
 
     assert calls == []
+
+
+def _activity_row(hours_ago, **extra):
+    """A row that started `hours_ago` before a fixed reference moment."""
+    from datetime import timedelta
+    when = _ACTIVITY_NOW - timedelta(hours=hours_ago)
+    return {"start_utc": when.isoformat().replace("+00:00", "Z"),
+            "duration_s": 120.0, **extra}
+
+
+from datetime import datetime, timezone  # noqa: E402
+
+_ACTIVITY_NOW = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def test_activity_windows_are_nested_not_disjoint():
+    """The 24 h window reports everything, not only what the 12 h one excluded."""
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a"), _activity_row(8, radio_id="pluto-a"),
+            _activity_row(20, radio_id="pluto-a")]
+
+    summary = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]
+
+    assert summary["6h"]["recordings"] == 1
+    assert summary["12h"]["recordings"] == 2
+    assert summary["24h"]["recordings"] == 3
+
+
+def test_duty_is_recorded_time_over_wall_time_for_one_radio():
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    # Three 120 s captures in six hours is 360 s of 21600 s.
+    rows = [_activity_row(hour, radio_id="pluto-a") for hour in (1, 2, 3)]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]["6h"]
+
+    assert stats["rf_seconds"] == 360.0
+    assert stats["duty_fraction"] == pytest.approx(360 / 21600, abs=1e-4)
+
+
+def test_a_dual_receiver_capture_counts_in_full_against_both_ports():
+    """Splitting one capture between its two ports would halve each port's duty.
+
+    Both LNBs are occupied for the whole capture, so both were busy for it.
+    """
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a", receiver_labels=["lnb-a", "lnb-b"])]
+
+    by_lnb = activity_summary(rows, now=_ACTIVITY_NOW)["by_lnb"]
+
+    assert by_lnb["lnb-a"]["6h"]["rf_seconds"] == 120.0
+    assert by_lnb["lnb-b"]["6h"]["rf_seconds"] == 120.0
+
+
+def test_global_duty_is_normalised_by_the_radios_that_recorded():
+    """Two radios recording at once would otherwise report over 100% busy."""
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a"), _activity_row(1, radio_id="pluto-b")]
+
+    overall = activity_summary(rows, now=_ACTIVITY_NOW)["overall"]["6h"]
+
+    assert overall["radios"] == 2
+    assert overall["rf_seconds"] == 240.0
+    assert overall["duty_fraction"] == pytest.approx(240 / (21600 * 2), abs=1e-4)
+
+
+def test_activity_ignores_rows_outside_the_widest_window_and_bad_stamps():
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a"), _activity_row(30, radio_id="pluto-a"),
+            {"start_utc": "not-a-time", "duration_s": 120.0, "radio_id": "pluto-a"},
+            {"duration_s": 120.0, "radio_id": "pluto-a"},
+            # A clock skew that puts a row in the future must not count as recent.
+            _activity_row(-2, radio_id="pluto-a")]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]
+
+    assert stats["24h"]["recordings"] == 1
+
+
+def test_activity_counts_detections_beacons_and_distinct_satellites():
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a", confirmed=True,
+                          beacon_detected_count=3, satellite_norad_id=57622,
+                          qualified_tle_association_count=1),
+            _activity_row(2, radio_id="pluto-a", confirmed=True,
+                          beacon_detected_count=2, satellite_norad_id=57622,
+                          qualified_tle_association_count=1),
+            _activity_row(3, radio_id="pluto-a", confirmed=False,
+                          beacon_detected_count=0)]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_radio"]["pluto-a"]["6h"]
+
+    assert stats["confirmed"] == 2 and stats["beacons_detected"] == 5
+    assert stats["qualified_associations"] == 2
+    # The same spacecraft seen twice is one satellite tracked.
+    assert stats["satellites_tracked"] == 1

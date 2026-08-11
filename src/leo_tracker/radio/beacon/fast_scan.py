@@ -133,10 +133,15 @@ class ScanProfile:
     kernel_buffers: int = 1
     probe_s: float = 0.020
     shape: tuple[int, int] = SURVEY_BANK
-    #: Measured on a Pi 5 over a persistent USB context; a buffer refill costs
-    #: its nominal duration to within 0.1 ms, so only these two are constants.
-    tune_ms: float = 0.5
-    compute_ms_per_probe_s: float = 450.0
+    #: Measured on a Pi 5 over a persistent USB context, writing a *different*
+    #: frequency each time.  Rewriting the same value costs 0.5 ms because the
+    #: driver skips the reprogram, which flatters a benchmark that hops nowhere.
+    tune_ms: float = 6.1
+    #: A refill costs its nominal duration once the queue is deep enough to
+    #: prefetch.  At depth one nothing is prefetched, so each refill also pays
+    #: the transfer it can no longer overlap.
+    shallow_refill_ms: float = 12.8
+    compute_ms_per_probe_s: float = 400.0
 
     def __post_init__(self) -> None:
         if self.block_size < 1 or self.settle_buffers < 0 or self.probe_s <= 0:
@@ -167,6 +172,8 @@ class ScanProfile:
         listens = max(1, math.ceil(self.probe_s / buffer_s))
         settle = self.settle_buffers * buffer_s * 1000.0
         listen = listens * buffer_s * 1000.0
+        if self.kernel_buffers < 2:
+            listen += listens * self.shallow_refill_ms
         compute = self.probe_s * self.compute_ms_per_probe_s
         return {"tune_ms": self.tune_ms, "settle_ms": settle,
                 "listen_ms": listen, "compute_ms": compute,
@@ -370,6 +377,89 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
                         "rf_center_hz": centre + lnb_lo_hz})
     results.sort(key=lambda item: item["peak_to_median"], reverse=True)
     return results
+
+
+def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
+               sample_rate_hz: float = 2_500_000.0,
+               lnb_lo_hz: float = 9_750_000_000.0,
+               threads: int = DEFAULT_THREADS) -> dict:
+    """Survey several tunings on one radio, reporting where the time went.
+
+    The radio is configured from the profile rather than from whatever the
+    capture path left behind: a survey wants a shallow queue and a block the
+    size of its probe, which is the opposite of what a long dwell wants.
+
+    Timing is returned split by what the radio charges for, because the parts
+    are not comparable to each other: retuning and draining are radio time that
+    no amount of arithmetic can recover, while scoring is host time that can be
+    overlapped with the next tuning.
+    """
+    import iio                                    # kept local: host-only import
+
+    phy = context.find_device("ad9361-phy")
+    lo = next(c for c in phy.channels
+              if c.id == "altvoltage0" and c.output)
+    receivers = [next(c for c in phy.channels
+                      if c.id == f"voltage{index}" and not c.output)
+                 for index in (0, 1)]
+    for channel in receivers:
+        channel.attrs["sampling_frequency"].value = str(int(sample_rate_hz))
+        channel.attrs["rf_bandwidth"].value = str(int(sample_rate_hz))
+        break
+    stream = context.find_device("cf-ad9361-lpc")
+    for channel in stream.channels:
+        channel.enabled = True
+    stream.set_kernel_buffers_count(profile.kernel_buffers)
+    buffer = iio.Buffer(stream, profile.block_size, False)
+    wanted = int(profile.probe_s * sample_rate_hz)
+    results, timing = [], {"tune": 0.0, "settle": 0.0, "listen": 0.0,
+                           "compute": 0.0}
+    try:
+        for channel_number, edge in tunings:
+            centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
+            bank = build_bank(edge, sample_rate_hz, profile.shape)
+
+            mark = time.perf_counter()
+            lo.attrs["frequency"].value = str(int(centre))
+            timing["tune"] += time.perf_counter() - mark
+
+            mark = time.perf_counter()
+            for _ in range(profile.settle_buffers):
+                buffer.refill()
+            timing["settle"] += time.perf_counter() - mark
+
+            mark = time.perf_counter()
+            pieces, remaining = [], wanted
+            while remaining > 0:
+                buffer.refill()
+                raw = np.frombuffer(buffer.read(), dtype=np.int16)
+                piece = (raw[0::4].astype(np.float32)
+                         + 1j * raw[1::4].astype(np.float32))
+                pieces.append(piece)
+                remaining -= piece.size
+            samples = np.ascontiguousarray(
+                np.concatenate(pieces)[:wanted].astype(np.complex64))
+            timing["listen"] += time.perf_counter() - mark
+
+            mark = time.perf_counter()
+            scored = probe(samples, bank, threads=threads)
+            timing["compute"] += time.perf_counter() - mark
+
+            results.append({**scored, "channel": channel_number,
+                            "region": f"{edge}-edge", "if_center_hz": centre,
+                            "rf_center_hz": centre + lnb_lo_hz})
+    finally:
+        del buffer
+    results.sort(key=lambda item: item["peak_to_median"], reverse=True)
+    total = sum(timing.values())
+    return {"results": results, "tunings": len(tunings),
+            "timing_ms": {k: v * 1000 for k, v in timing.items()},
+            "total_ms": total * 1000,
+            "per_tuning_ms": total * 1000 / max(len(tunings), 1),
+            "profile": {"block_size": profile.block_size,
+                        "kernel_buffers": profile.kernel_buffers,
+                        "settle_buffers": profile.settle_buffers,
+                        "probe_s": profile.probe_s}}
 
 
 def verify_presence(samples: np.ndarray, bank: KernelBank, *,

@@ -200,14 +200,14 @@ def test_cost_model_reproduces_the_measured_dwell_profile():
     cost = DWELL_PROFILE.cost_ms(2_500_000.0)
     buffer_ms = 1000 * DWELL_PROFILE.block_size / 2_500_000.0
     assert cost["settle_ms"] == pytest.approx(3 * buffer_ms, abs=1.0)
-    assert cost["total_ms"] - buffer_ms == pytest.approx(324.0, abs=15.0)
+    assert cost["total_ms"] == pytest.approx(427.6, abs=25.0)
 
 
 def test_cost_model_reproduces_the_measured_survey_profile():
     """Measured 43.5 ms per tuning for the same eight tunings."""
     from leo_tracker.radio.beacon.fast_scan import SURVEY_PROFILE
     cost = SURVEY_PROFILE.cost_ms(2_500_000.0)
-    assert cost["total_ms"] == pytest.approx(37.0, abs=15.0)
+    assert cost["total_ms"] == pytest.approx(46.6, abs=6.0)
 
 
 def test_settle_must_drain_the_kernel_queue():
@@ -267,7 +267,8 @@ def test_a_finer_block_wastes_less_of_what_it_pays_for():
                        settle_buffers=0).cost_ms()
 
     assert fine["signal_used_fraction"] > coarse["signal_used_fraction"] * 3
-    assert fine["total_ms"] < coarse["total_ms"] / 3
+    # 2.8x once the shallow-queue refill penalty is charged to both.
+    assert fine["total_ms"] < coarse["total_ms"] / 2.5
 
 
 @pytest.mark.parametrize("kwargs", [

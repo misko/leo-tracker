@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import math
+import statistics
 import os
 from pathlib import Path
 import re
@@ -51,6 +53,9 @@ LISTING_FIELDS = (
     "longest_track_duration_s", "qualified_tle_association_count",
     "fingerprint_family", "detail_url", "satellite_name", "satellite_norad_id",
     "source_fit_hz", "source_identity_agreement",
+    "receiver_probe_count", "receiver_candidate_counts",
+    "receiver_qualified_counts", "receiver_rms_magnitude",
+    "receiver_near_full_scale", "receiver_gain_db", "receiver_labels",
 )
 
 
@@ -314,6 +319,96 @@ ACTIVITY_SCHEMA = "leo-tracker.dashboard-activity/v1"
 ACTIVITY_WINDOWS_HOURS = (6, 12, 24)
 
 
+def lnb_position(label: str) -> str | None:
+    """Map a receiver label to its physical position, "lnb-c" -> "R2A1".
+
+    Ports were lettered in installation order, two per radio, and no LNB has
+    been moved since. The letter therefore encodes the position directly: pairs
+    advance the radio, and the offset inside a pair selects the antenna. Naming
+    the position rather than the label keeps a report readable against the
+    hardware in front of you.
+    """
+    name = str(label or "").strip().lower()
+    if not name.startswith("lnb-") or len(name) != 5:
+        return None
+    offset = ord(name[4]) - ord("a")
+    if not 0 <= offset < 26:
+        return None
+    return f"R{offset // 2 + 1}A{offset % 2 + 1}"
+
+
+def _receiver_stats(rows: list[dict]) -> dict:
+    """Score one LNB on what it independently saw.
+
+    Detection is counted per receiver rather than per capture: a dual-RX
+    confirmation says the pair agreed, not that both chains are healthy. Rates
+    are taken over probes rather than recordings so ports stay comparable when
+    capture lengths and probe budgets differ.
+
+    Power is referred back to the input because the AGC regulates output level;
+    without removing the gain, a saturated chain and a healthy one look alike.
+    """
+    probes = candidates = qualified = 0
+    powers: list[float] = []
+    clipping: list[float] = []
+    for row in rows:
+        index = row.get("_rx_index")
+        if index is None:
+            continue
+        probes += int(row.get("receiver_probe_count") or 0)
+        for field, target in (("receiver_candidate_counts", "candidates"),
+                              ("receiver_qualified_counts", "qualified")):
+            values = row.get(field) or []
+            if index < len(values) and values[index] is not None:
+                if target == "candidates":
+                    candidates += int(values[index])
+                else:
+                    qualified += int(values[index])
+        rms = row.get("receiver_rms_magnitude") or []
+        gains = row.get("receiver_gain_db") or []
+        if index < len(rms) and rms[index]:
+            level = 20 * math.log10(max(float(rms[index]), 1e-6) / 2048.0)
+            if index < len(gains) and gains[index] is not None:
+                level -= float(gains[index])
+            powers.append(level)
+        near = row.get("receiver_near_full_scale") or []
+        if index < len(near) and near[index] is not None:
+            clipping.append(float(near[index]))
+    return {
+        "probe_count": probes,
+        "receiver_candidate_count": candidates,
+        "receiver_qualified_count": qualified,
+        "detection_rate": round(candidates / probes, 5) if probes else None,
+        "referred_input_dbfs": (round(statistics.median(powers), 2)
+                                if powers else None),
+        "maximum_near_full_scale": (round(max(clipping), 6)
+                                    if clipping else None),
+    }
+
+
+def tuning_key(row: dict) -> str | None:
+    """Name the observation point a row was recorded at, as "ch4-lower".
+
+    A channel alone is not an observation point: its two edge pilots are
+    230.625 MHz apart and a 2.5 MHz capture reaches only one of them, so they
+    are surveyed and detected on independently.
+    """
+    channel = row.get("channel")
+    if channel is None:
+        return None
+    edge = str(row.get("region") or "").removesuffix("-edge") or "unknown"
+    return f"ch{channel}-{edge}"
+
+
+def _tuning_order(key: str) -> tuple:
+    """Sort tunings by channel then edge, so the band reads in frequency order."""
+    try:
+        channel = int(key.split("-", 1)[0].removeprefix("ch"))
+    except ValueError:
+        return (99, key)
+    return (channel, 0 if key.endswith("lower") else 1)
+
+
 def _window_stats(rows: list[dict], seconds: float) -> dict:
     """Aggregate one group over one window.
 
@@ -349,7 +444,8 @@ def activity_summary(rows: list[dict], *, now: datetime | None = None,
     be tested without a filesystem.
     """
     moment = now or datetime.now(timezone.utc)
-    groups: dict[str, dict[str, list[dict]]] = {"all": {}, "radio": {}, "lnb": {}}
+    groups: dict[str, dict[str, list[dict]]] = {
+        "all": {}, "radio": {}, "lnb": {}, "tuning": {}}
     for row in rows:
         start = row.get("start_utc")
         if not start:
@@ -366,14 +462,23 @@ def activity_summary(rows: list[dict], *, now: datetime | None = None,
         radio = row.get("radio_id")
         if radio:
             groups["radio"].setdefault(str(radio), []).append(entry)
-        for label in row.get("receiver_labels") or ():
+        for index, label in enumerate(row.get("receiver_labels") or ()):
             # A dual-RX capture occupies both ports for its full duration, so
             # it counts once against each rather than being split between them.
-            groups["lnb"].setdefault(str(label), []).append(entry)
+            # The index is kept so each port can also be scored on what it
+            # independently saw, which is what distinguishes a degraded chain
+            # from a quiet sky.
+            groups["lnb"].setdefault(str(label), []).append(
+                dict(entry, _rx_index=index))
+        tuning = tuning_key(row)
+        if tuning:
+            groups["tuning"].setdefault(tuning, []).append(entry)
 
     def build(collected: dict[str, list[dict]], radios: bool) -> dict:
         built = {}
-        for key, entries in sorted(collected.items()):
+        order = _tuning_order if collected is groups["tuning"] else None
+        for key, entries in sorted(collected.items(), key=order and (
+                lambda item: order(item[0]))):
             windows = {}
             for hours in windows_hours:
                 span = hours * 3600
@@ -391,9 +496,24 @@ def activity_summary(rows: list[dict], *, now: datetime | None = None,
             built[key] = windows
         return built
 
+    def build_lnb(collected: dict[str, list[dict]]) -> dict:
+        built = {}
+        for key, entries in sorted(collected.items()):
+            windows = {}
+            for hours in windows_hours:
+                span = hours * 3600
+                inside = [e for e in entries if e["_age_s"] <= span]
+                stats = _window_stats(inside, span)
+                stats.update(_receiver_stats(inside))
+                stats["position"] = lnb_position(key)
+                windows[f"{hours}h"] = stats
+            built[key] = windows
+        return built
+
     return {"schema": ACTIVITY_SCHEMA,
             "created_utc": moment.isoformat().replace("+00:00", "Z"),
             "windows_hours": list(windows_hours),
             "overall": build(groups["all"], True).get("all", {}),
             "by_radio": build(groups["radio"], False),
-            "by_lnb": build(groups["lnb"], False)}
+            "by_lnb": build_lnb(groups["lnb"]),
+            "by_tuning": build(groups["tuning"], False)}

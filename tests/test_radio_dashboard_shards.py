@@ -325,3 +325,73 @@ def test_activity_counts_detections_beacons_and_distinct_satellites():
     assert stats["qualified_associations"] == 2
     # The same spacecraft seen twice is one satellite tracked.
     assert stats["satellites_tracked"] == 1
+
+
+@pytest.mark.parametrize("label,expected", [
+    ("lnb-a", "R1A1"), ("lnb-b", "R1A2"),
+    ("lnb-c", "R2A1"), ("lnb-d", "R2A2"),
+    ("lnb-e", "R3A1"),
+])
+def test_lnb_label_maps_to_its_physical_position(label, expected):
+    """Ports were lettered in installation order, two per radio."""
+    from leo_tracker.radio.beacon.dashboard_shards import lnb_position
+    assert lnb_position(label) == expected
+
+
+@pytest.mark.parametrize("label", ["rx0", "", None, "lnb-", "lnb-ab", "LNB"])
+def test_an_unrecognised_receiver_label_has_no_position(label):
+    """Guessing a position for an unknown label would mislabel real hardware."""
+    from leo_tracker.radio.beacon.dashboard_shards import lnb_position
+    assert lnb_position(label) is None
+
+
+def test_each_port_is_scored_on_what_it_alone_saw():
+    """A dual-receiver confirmation needs both ports.
+
+    Scoring a port by the pair's outcome hides a degraded chain behind its
+    healthy twin, which is exactly the failure this panel exists to surface.
+    """
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a",
+                          receiver_labels=["lnb-a", "lnb-b"],
+                          receiver_probe_count=100,
+                          receiver_candidate_counts=[40, 2],
+                          receiver_qualified_counts=[10, 0],
+                          receiver_rms_magnitude=[204.8, 204.8],
+                          receiver_gain_db=[50.0, 50.0],
+                          receiver_near_full_scale=[0.0, 0.0])]
+
+    by_lnb = activity_summary(rows, now=_ACTIVITY_NOW)["by_lnb"]
+
+    assert by_lnb["lnb-a"]["6h"]["detection_rate"] == 0.4
+    assert by_lnb["lnb-b"]["6h"]["detection_rate"] == 0.02
+    assert by_lnb["lnb-a"]["6h"]["position"] == "R1A1"
+    assert by_lnb["lnb-b"]["6h"]["position"] == "R1A2"
+
+
+def test_input_level_is_referred_back_through_the_gain():
+    """AGC regulates output, so an unreferred level hides a hot front end."""
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    # 204.8 counts of 2048 full scale is -20 dBFS at the ADC; at 50 dB of gain
+    # the input that produced it was 70 dB lower.
+    rows = [_activity_row(1, radio_id="pluto-a", receiver_labels=["lnb-a"],
+                          receiver_probe_count=10,
+                          receiver_candidate_counts=[1],
+                          receiver_qualified_counts=[0],
+                          receiver_rms_magnitude=[204.8],
+                          receiver_gain_db=[50.0])]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_lnb"]["lnb-a"]["6h"]
+
+    assert stats["referred_input_dbfs"] == pytest.approx(-70.0, abs=0.05)
+
+
+def test_a_port_with_no_receiver_detail_reports_no_rate():
+    """Older rows predate per-receiver counts; they must not read as zero."""
+    from leo_tracker.radio.beacon.dashboard_shards import activity_summary
+    rows = [_activity_row(1, radio_id="pluto-a", receiver_labels=["lnb-a"])]
+
+    stats = activity_summary(rows, now=_ACTIVITY_NOW)["by_lnb"]["lnb-a"]["6h"]
+
+    assert stats["detection_rate"] is None
+    assert stats["referred_input_dbfs"] is None

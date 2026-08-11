@@ -157,6 +157,16 @@ def capture_radio_parameters(manifest: dict) -> dict:
     }
 
 
+def _median(values: list) -> float | None:
+    """Median of the present values, or None when nothing was reported."""
+    present = sorted(value for value in values if value is not None)
+    if not present:
+        return None
+    middle = len(present) // 2
+    return float(present[middle] if len(present) % 2 else
+                 (present[middle - 1] + present[middle]) / 2)
+
+
 def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
     report_path = root / "reports" / f"{name}.json"
     followup_path = root / "reports" / "followups" / f"{name}.json"
@@ -185,6 +195,16 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
                                         _json(linked_association_path))
     fragment_diagnostic = _json(fragment_diagnostic_path)
     confirmation = followup.get("confirmation", {})
+    # Per-receiver evidence, indexed to match identity.receiver_labels.
+    checks = report.get("exact_checks") or []
+    sample_receivers = ((manifest.get("sample_statistics") or {})
+                        .get("receivers") or [])
+    gain_entries = ((manifest.get("gain_telemetry") or {}).get("entries") or [])
+    receiver_gain_db = [
+        _median([(entry.get("rx_gain_db") or [None, None])[index]
+                 for entry in gain_entries
+                 if (entry.get("rx_gain_db") or [None, None])[index] is not None])
+        for index in (0, 1)]
     combined = decode.get("combined", {})
     pilot = (combined.get("soft_dual_rx") or {}).get("pilot") or {}
     links = (confirmation.get("cross_receiver_links", []) +
@@ -254,6 +274,25 @@ def _capture_row(root: Path, name: str, fingerprint_index: dict) -> dict | None:
             summary.get("single_receiver_candidate_count", 0) or 0),
         "confirmed": bool(confirmation.get("confirmed")),
         "beacon_detected_count": len(beacon_events),
+        # Per-receiver detection, indexed to match receiver_labels.  A dual-RX
+        # capture confirms across both, but each port sees the sky through its
+        # own LNB, cable and connector, so a chain that has degraded shows up
+        # only when the receivers are counted apart.  Normalising by the probe
+        # count makes ports comparable across captures of differing length.
+        "receiver_probe_count": len(checks),
+        "receiver_candidate_counts": [
+            sum(1 for check in checks
+                if (check.get("receiver_candidates") or [False, False])[index])
+            for index in (0, 1)],
+        "receiver_qualified_counts": [
+            sum(1 for check in checks
+                if (check.get("receiver_qualified") or [False, False])[index])
+            for index in (0, 1)],
+        "receiver_rms_magnitude": [
+            item.get("rms_magnitude") for item in sample_receivers],
+        "receiver_near_full_scale": [
+            item.get("near_full_scale_fraction") for item in sample_receivers],
+        "receiver_gain_db": receiver_gain_db,
         "decoded": decode.get("schema") == "leo-tracker.starlink-edge-decode/v1",
         "pilot_accuracy": pilot_accuracy,
         "pilot_confidence": pilot.get("soft_mean_confidence"),

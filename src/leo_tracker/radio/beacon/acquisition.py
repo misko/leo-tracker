@@ -71,6 +71,7 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
                            acquisition_span_hz: float = 0,
                            acquisition_step_hz: float = 500_000,
                            subband_rate_hz: float = 2_500_000,
+                           frequency_center_hz: float = 0.0,
                            symbolwise_prefilter_margin: float = .008,
                            method: str = "coherent_grid_v1") -> dict:
     """Search LNB frequency uncertainty, then evaluate exact pilot codes.
@@ -89,23 +90,37 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
     requested_span = float(acquisition_span_hz)
     span = min(requested_span, usable_acquisition_span_hz(source_rate_hz, output_rate))
     centers = acquisition_centers(span, acquisition_step_hz)
-    frequency_offsets = tuple(np.arange(-350_000, 350_001, 25_000, dtype=float))
+    # Every frequency grid is built about this receiver's own centre.  Two LNBs
+    # on one radio have independent references and the pair share a tuner, so a
+    # grid centred on zero leaves the offset port outside the search for most of
+    # a pass however the tuner is placed.  Shifting the search, not the tuner,
+    # lets each receiver cover the whole Doppler span.
+    centre = float(frequency_center_hz)
+    frequency_offsets = tuple(
+        np.arange(-350_000, 350_001, 25_000, dtype=float) + centre)
     banks = []
     for center in centers:
         subband = extract_complex_subband(samples, source_rate_hz, center, output_rate)
         if method in ("pss_symbolwise_v2", "pilot_symbolwise_v3"):
             pss_search = acquire_pss_epoch(subband, output_rate, edge=edge,
                 maximum_candidates=4,
-                frequency_offsets_hz=(-300_000.0, -150_000.0, 0.0,
-                                      150_000.0, 300_000.0))
+                frequency_offsets_hz=tuple(
+                    value + centre for value in
+                    (-300_000.0, -150_000.0, 0.0, 150_000.0, 300_000.0)))
             timing_search = (pss_search if method == "pss_symbolwise_v2" else
-                             acquire_pilot_epoch(subband, output_rate, edge=edge,
-                                                 maximum_candidates=4))
+                             acquire_pilot_epoch(
+                                 subband, output_rate, edge=edge,
+                                 maximum_candidates=4,
+                                 frequency_offsets_hz=tuple(
+                                     np.arange(-300_000, 300_001, 100_000,
+                                               dtype=float) + centre)))
             hypotheses = []
             for rank, candidate in enumerate(timing_search["candidate_epochs"]):
                 initial_cfo = candidate["frequency_offset_hz"]
-                coarse_offsets = tuple(sorted({float(np.clip(initial_cfo + delta,
-                    -350_000.0, 350_000.0)) for delta in (-100_000.0, 0.0, 100_000.0)}))
+                coarse_offsets = tuple(sorted({
+                    float(np.clip(initial_cfo + delta,
+                                  centre - 350_000.0, centre + 350_000.0))
+                    for delta in (-100_000.0, 0.0, 100_000.0)}))
                 pilot = track_edge_pilots(subband, output_rate,
                     candidate["epoch_sample"], edge=edge,
                     coarse_frequency_offsets_hz=coarse_offsets)

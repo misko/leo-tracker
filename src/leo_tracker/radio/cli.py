@@ -865,6 +865,25 @@ def command_starlink_beacon_dashboard_row(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_lnb_calibration(args: argparse.Namespace) -> int:
+    """Measure LNB mismatch, and report anything that moved since last time."""
+    from .beacon.lnb_calibration import (compare_calibration, load_calibration,
+                                         measure_mismatch, receiver_centers,
+                                         write_calibration)
+    previous = load_calibration(args.root)
+    current = measure_mismatch(args.root / "reports", limit=args.limit)
+    alerts = compare_calibration(previous, current)
+    current["alerts"] = alerts
+    current["receiver_centers_hz"] = {
+        radio: list(receiver_centers(current, radio))
+        for radio, entry in current["radios"].items() if entry.get("measured")}
+    if args.apply:
+        current["stored"] = str(write_calibration(args.root, current))
+    print(json.dumps(current, indent=2, sort_keys=True))
+    # A moved cable earns a non-zero exit so a timer surfaces it.
+    return 1 if alerts else 0
+
+
 def command_starlink_dashboard_shards(args: argparse.Namespace) -> int:
     from leo_tracker.radio.beacon.dashboard_shards import (compact_shards,
                                                            migrate_index)
@@ -2306,6 +2325,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=["space-track", "huggingface"],
         help="catalog providers whose per-source fit to record")
     dashboard_row.set_defaults(handler=command_starlink_beacon_dashboard_row)
+    lnb_calibration = commands.add_parser("starlink-lnb-calibration",
+        help="measure the LNB local-oscillator mismatch on each radio")
+    lnb_calibration.add_argument("root", type=Path)
+    lnb_calibration.add_argument("--limit", type=int, default=900,
+        help="most recent narrow reports to examine")
+    lnb_calibration.add_argument("--apply", action="store_true",
+        help="store the measurement, replacing the previous one")
+    lnb_calibration.set_defaults(handler=command_starlink_lnb_calibration)
     dashboard_shards = commands.add_parser("starlink-dashboard-shards",
         help="publish and compact the date-sharded dashboard listing")
     dashboard_shards.add_argument("action", choices=("migrate", "compact"))

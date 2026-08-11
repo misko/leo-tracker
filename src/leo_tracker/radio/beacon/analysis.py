@@ -75,7 +75,9 @@ def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str
                          exact_subband_rate_hz: float = 2_500_000,
                          acquisition_method: str = "coherent_grid_v1",
                          learned_templates: tuple[np.ndarray, np.ndarray] | None = None,
-                         learned_template_source: str | None = None) -> dict:
+                         learned_template_source: str | None = None,
+                         receiver_center_offsets_hz: tuple[float, float] =
+                             (0.0, 0.0)) -> dict:
     """Apply all exact/control gates to one paired-IQ window."""
     paired = np.asarray(values, np.complex64)
     if paired.ndim != 2 or paired.shape[1] != 2:
@@ -86,7 +88,8 @@ def analyze_exact_window(values: np.ndarray, source_rate_hz: float, *, edge: str
         exact = acquire_exact_receiver(paired[:, receiver], source_rate_hz,
             edge=edge, acquisition_span_hz=acquisition_span_hz,
             acquisition_step_hz=acquisition_step_hz,
-            subband_rate_hz=exact_subband_rate_hz, method=acquisition_method)
+            subband_rate_hz=exact_subband_rate_hz, method=acquisition_method,
+            frequency_center_hz=float(receiver_center_offsets_hz[receiver]))
         receivers.append({"receiver": receiver, **exact})
     exact_rate = receivers[0]["acquisition"]["subband_rate_hz"]
     period = exact_rate / 750

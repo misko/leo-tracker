@@ -176,3 +176,79 @@ def test_verifier_rejects_a_nonpositive_cadence():
     bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
     with pytest.raises(ValueError, match="must be positive"):
         dwell_verifier(bank, analyse_every=0)
+
+
+def test_the_survey_profile_is_not_the_dwell_profile():
+    """A survey inheriting the capture path's block size is the whole bug.
+
+    A 120 s dwell is indifferent to a 105 ms block; a survey pays it three
+    times per tuning to look at 20 ms.
+    """
+    from leo_tracker.radio.beacon.fast_scan import DWELL_PROFILE, SURVEY_PROFILE
+    assert SURVEY_PROFILE.block_size < DWELL_PROFILE.block_size
+    assert SURVEY_PROFILE.sweep_ms() < DWELL_PROFILE.sweep_ms() / 4
+
+
+def test_cost_model_reproduces_the_measured_dwell_profile():
+    """Measured 314 ms per tuning on a Pi 5; the model must not drift from it."""
+    from leo_tracker.radio.beacon.fast_scan import DWELL_PROFILE
+    cost = DWELL_PROFILE.cost_ms(2_500_000.0)
+    assert cost["total_ms"] == pytest.approx(324.0, abs=15.0)
+    assert cost["settle_ms"] == pytest.approx(209.7, abs=1.0)
+
+
+def test_cost_model_reproduces_the_measured_survey_profile():
+    """Measured 39 ms per tuning for the same eight tunings."""
+    from leo_tracker.radio.beacon.fast_scan import SURVEY_PROFILE
+    cost = SURVEY_PROFILE.cost_ms(2_500_000.0)
+    assert cost["total_ms"] == pytest.approx(44.0, abs=12.0)
+
+
+def test_listening_is_quantised_by_the_buffer():
+    """A probe shorter than a buffer still costs a whole buffer.
+
+    This quantisation, not arithmetic, is what dominates a survey.
+    """
+    from leo_tracker.radio.beacon.fast_scan import ScanProfile
+    coarse = ScanProfile(block_size=262_144, settle_buffers=0, probe_s=0.020)
+    cost = coarse.cost_ms(2_500_000.0)
+
+    assert cost["buffers_listened"] == 1
+    # 20 ms wanted out of a 104.9 ms buffer
+    assert cost["signal_used_fraction"] == pytest.approx(0.191, abs=0.01)
+
+
+def test_a_finer_block_wastes_less_of_what_it_pays_for():
+    from leo_tracker.radio.beacon.fast_scan import ScanProfile
+    coarse = ScanProfile(block_size=262_144).cost_ms()
+    fine = ScanProfile(block_size=32_768).cost_ms()
+
+    assert fine["signal_used_fraction"] > coarse["signal_used_fraction"] * 3
+    # Like for like, at one settle buffer each, the finer block is 4.5x cheaper.
+    # The 8x measured in the field also folds in the dwell profile's second
+    # settle buffer, which is a separate saving.
+    assert fine["total_ms"] < coarse["total_ms"] / 4
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"block_size": 0}, {"settle_buffers": -1}, {"probe_s": 0.0},
+])
+def test_an_impossible_profile_is_refused(kwargs):
+    from leo_tracker.radio.beacon.fast_scan import ScanProfile
+    with pytest.raises(ValueError, match="must be positive"):
+        ScanProfile(**kwargs)
+
+
+def test_warming_the_kernel_moves_the_compile_out_of_the_survey():
+    """The first probe compiles the kernel; a survey must not pay that."""
+    from leo_tracker.radio.beacon.fast_scan import (SURVEY_PROFILE, build_bank,
+                                                    probe, warm_kernel)
+    import time as _time
+
+    warm_kernel(SURVEY_PROFILE)
+
+    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_PROFILE.shape)
+    started = _time.perf_counter()
+    probe(_noise(50_000, 5), bank)
+    # Post-warm probes ran at 9 ms on a Pi 5; the compile alone was 833 ms.
+    assert _time.perf_counter() - started < 0.4

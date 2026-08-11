@@ -33,8 +33,11 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 import numpy as np
+
+import math
 
 from .channels import starlink_edge_pilot_if_hz
 from .pilots import OFDM_SYMBOL_DURATION_S, _edge_pilot_frame_cached
@@ -48,6 +51,8 @@ FULL_BANK = (7, 24)
 DEFAULT_OFFSET_SPAN_HZ = 300_000.0
 #: Threads for the fused kernel.  Three leaves a core for the capture reader.
 DEFAULT_THREADS = 3
+#: Frames a probe must contain for the epoch fold to mean anything.
+MINIMUM_PROBE_FRAMES = 4
 
 #: Peak-to-median at the 99th percentile of pure noise, measured per bank over
 #: 60 realisations.  A smaller bank folds fewer independent scores together, so
@@ -106,6 +111,67 @@ def _load_kernel():
         f32, f32, ctypes.c_int, f32, f32, ctypes.c_int, ctypes.c_int,
         f32, f32, i32, i32, ctypes.c_int, ctypes.c_int, f64, ctypes.c_int]
     return library
+
+
+@dataclass(frozen=True)
+class ScanProfile:
+    """How a survey trades radio time for sensitivity.
+
+    A survey is not a short dwell.  A dwell sizes its buffers for throughput
+    over two minutes, where a 105 ms block costs nothing; a survey pays that
+    block three times per tuning to look at 20 ms, so the same setting that is
+    right for one is eight times too coarse for the other.  Keeping the choice
+    here, with its cost model, stops a survey from silently inheriting the
+    capture path's block size again.
+
+    Settle is expressed in buffers because that is what the radio charges for:
+    discarding two 105 ms blocks costs 210 ms whatever the part actually needs.
+    """
+
+    block_size: int = 32_768
+    settle_buffers: int = 1
+    probe_s: float = 0.020
+    shape: tuple[int, int] = SURVEY_BANK
+    #: Measured on a Pi 5 over a persistent USB context; a buffer refill costs
+    #: its nominal duration to within 0.1 ms, so only these two are constants.
+    tune_ms: float = 0.5
+    compute_ms_per_probe_s: float = 450.0
+
+    def __post_init__(self) -> None:
+        if self.block_size < 1 or self.settle_buffers < 0 or self.probe_s <= 0:
+            raise ValueError("block size, settle count and probe must be positive")
+
+    def buffer_s(self, sample_rate_hz: float) -> float:
+        return self.block_size / float(sample_rate_hz)
+
+    def cost_ms(self, sample_rate_hz: float = 2_500_000.0) -> dict:
+        """Predicted per-tuning cost, split into what the radio charges for.
+
+        Listening is quantised: a probe shorter than one buffer still costs a
+        whole buffer, which is the entire reason block size dominates.
+        """
+        buffer_s = self.buffer_s(sample_rate_hz)
+        listens = max(1, math.ceil(self.probe_s / buffer_s))
+        settle = self.settle_buffers * buffer_s * 1000.0
+        listen = listens * buffer_s * 1000.0
+        compute = self.probe_s * self.compute_ms_per_probe_s
+        return {"tune_ms": self.tune_ms, "settle_ms": settle,
+                "listen_ms": listen, "compute_ms": compute,
+                "total_ms": self.tune_ms + settle + listen + compute,
+                "buffers_listened": listens,
+                "signal_used_fraction": self.probe_s / (listens * buffer_s)}
+
+    def sweep_ms(self, tunings: int = 8,
+                 sample_rate_hz: float = 2_500_000.0) -> float:
+        return tunings * self.cost_ms(sample_rate_hz)["total_ms"]
+
+
+#: What the capture path uses.  Correct for a 120 s dwell, eight times too
+#: coarse for a survey; kept so the comparison is explicit rather than implied.
+DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=2)
+#: Measured 39 ms per tuning against the dwell profile's 314 ms, with the
+#: detection statistic unchanged across the whole block-size sweep.
+SURVEY_PROFILE = ScanProfile()
 
 
 @dataclass(frozen=True)
@@ -243,6 +309,25 @@ def probe(samples: np.ndarray, bank: KernelBank, *,
             "folded_score": float(folded[best]), "folded_median": median,
             "peak_to_median": float(folded[best] / max(median, 1e-20)),
             "kernel_count": bank.size, "edge": bank.edge}
+
+
+def warm_kernel(profile: ScanProfile = SURVEY_PROFILE,
+                sample_rate_hz: float = 2_500_000.0, edge: str = "lower") -> float:
+    """Compile the kernel and build the bank before anything is timed.
+
+    The fused kernel is built on first use, so the first probe in a process
+    pays the compile.  Measured at 833 ms against 9 ms for every probe after
+    it, which is enough to swamp a whole survey if it lands inside one.
+    Returns the seconds spent, so a caller can log it rather than attribute it
+    to the radio.
+    """
+    started = time.perf_counter()
+    bank = build_bank(edge, sample_rate_hz, profile.shape)
+    frames = max(MINIMUM_PROBE_FRAMES,
+                 math.ceil(profile.probe_s / STARLINK_FRAME_DURATION_S))
+    count = int(frames * STARLINK_FRAME_DURATION_S * sample_rate_hz) + bank.taps
+    probe(np.zeros(count, np.complex64), bank)
+    return time.perf_counter() - started
 
 
 def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,

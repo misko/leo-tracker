@@ -16,7 +16,7 @@ import numpy as np
 
 from .physics import doppler_radial_acceleration_m_s2
 from .tuning_dither import dither_phase_locked
-from .beacon.dashboard_shards import activity_summary
+from .beacon.dashboard_shards import activity_summary, read_listing
 from .beacon.fingerprint import render_fingerprint_svg
 from .beacon.dashboard_index import (capture_dashboard_record,
                                      capture_radio_parameters,
@@ -30,6 +30,14 @@ def _utc(value: str) -> datetime:
 
 def _iso_from_ns(value: int) -> str:
     return datetime.fromtimestamp(value / 1e9, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+#: Rows to read from the day shards.  The table itself renders at most a couple
+#: of hundred, but the activity panel aggregates a full day, and both radios
+#: together have exceeded 5,000 recordings in 24 h.  Sizing this to the widest
+#: activity window rather than to the table keeps the headline counts honest;
+#: reading fewer would silently under-report duty and beacon totals.
+LISTING_READ_LIMIT = 12_000
 
 
 def _row_identity(item: dict) -> dict:
@@ -149,16 +157,37 @@ class DashboardModel:
     def _beacon_recording_index(self) -> dict:
         if self.beacon_root is None:
             return {}
-        path = self.beacon_root / "reports" / "dashboard-index.json"
+        reports = self.beacon_root / "reports"
+        shards = sorted((reports / "dashboard-index").glob("2*.json"))
+        path = reports / "dashboard-index.json"
+        # Day shards are written by whichever analysis host finishes a
+        # recording, so they lead the monolithic index whenever that index is
+        # not being rebuilt.  Prefer whichever source is actually newer rather
+        # than pinning to one, so neither a stalled compactor nor a stalled
+        # index rebuild can silently hide recent recordings.
         try:
-            stat = path.stat()
-            signature = (stat.st_mtime_ns, stat.st_size)
+            index_stat = path.stat()
+            index_mtime, signature = index_stat.st_mtime_ns, (
+                index_stat.st_mtime_ns, index_stat.st_size)
         except OSError:
+            index_mtime, signature = -1, None
+        shard_mtime = max((item.stat().st_mtime_ns for item in shards),
+                          default=-1)
+        if shard_mtime < 0 and signature is None:
             return {}
+        if shard_mtime > index_mtime:
+            signature = ("shards", shard_mtime, len(shards))
         with self._beacon_cache_lock:
             if signature == self._recording_index_signature:
                 return self._recording_index_cache
-            value = self._json(path, {})
+            if shard_mtime > index_mtime:
+                value = {"schema": "leo-tracker.beacon-dashboard-index/v3",
+                         "recordings": read_listing(
+                             self.beacon_root, limit=LISTING_READ_LIMIT),
+                         "summary": self._json(
+                             reports / "dashboard-index" / "summary.json", {})}
+            else:
+                value = self._json(path, {})
             self._recording_index_signature = signature
             self._recording_index_cache = value
             return value

@@ -253,6 +253,58 @@ digesting each run's documents over NFS. The full corpus is therefore roughly a
 ten-hour backfill. It is resumable and idempotent, so that is a wall-clock cost
 rather than a risk, but it wants a `tmux` and not an afternoon.
 
+### Parity against the probe index
+
+The two projections are derived from the same reports by different code, so
+agreement between them is real evidence rather than a self-check. Comparing the
+`probes` view over this projection with `reports/probe-index`, per probe per
+receiver, across the six partitions built so far:
+
+| date | shared recordings | rows compared | index→probe | probe→index |
+|---|---|---|---|---|
+| 2026-08-05 | 8 | 1,290 | 0 | 0 |
+| 2026-08-06 | 51 | 9,810 | 0 | 0 |
+| 2026-08-07 | 217 | 51,930 | 0 | 0 |
+| 2026-08-08 | 234 | 56,130 | 0 | 0 |
+| 2026-08-09 | 528 | 126,720 | 0 | 0 |
+| 2026-08-10 | 630 | 148,848 | 0 | 0 |
+| **total** | **1,668** | **394,728** | **0** | **0** |
+
+Bidirectional `EXCEPT` on `(report, start_s, rx, candidate, qualified,
+cfo_difference_hz, frequency_offset_hz)`, floats rounded to 3 dp. Every shared
+probe is identical.
+
+Two alignments are needed before the comparison means anything, and both are
+differences of convention rather than of fact: the probe index keeps the `.json`
+extension in `report` where this projection uses the bare `recording_id`, and it
+indexes only `narrow` mode where this one carries wide, channel-hop and
+oversample too.
+
+### Coverage differs by construction, and it is worth knowing how
+
+Parity holds on shared recordings; the two do not share the same *set*. The
+probe index is report-driven — it globs `reports/*narrow*.json`. This projection
+is receipt-driven, and deliberately "never discovers scientific inputs by
+globbing a directory". Where a report has no completion receipt, it is invisible
+here and visible there:
+
+| date | narrow reports | with a receipt | without |
+|---|---|---|---|
+| 2026-08-05 | 355 | 8 | **347** |
+| 2026-08-06 | 491 | 155 | **336** |
+| 2026-08-07 | 534 | 391 | **143** |
+| 2026-08-08 onward | 3,142 | 3,142 | 0 |
+| **total** | **4,522** | **3,696** | **826 (18%)** |
+
+Receipts came into use around 2026-08-08; before that, reports were produced
+without them. So 826 recordings on the first three days can never appear in this
+projection, and no rebuild will change that — the authentication those runs would
+need does not exist. It is the intended trade, but it means the probe index
+remains the more complete answer for that window.
+
+The one gap on 2026-08-10 is different in kind and fully accounted for: a single
+recording, and `partition.json` names it in `excluded` with its reason.
+
 ### The corpus changed shape mid-flight
 
 That build returned `receiver_label` as NULL for every row, which looked like a

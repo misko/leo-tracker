@@ -1,0 +1,40 @@
+[Unit]
+Description=Project authenticated analysis runs into partitioned parquet
+After=network-online.target remote-fs.target
+Wants=network-online.target
+RequiresMountsFor=/mnt/qnap01/mouse9911/leo
+# The projection is derived from completion receipts on shared storage. Without
+# the mount there is nothing to project, and a run that "succeeded" against an
+# absent directory would report zero partitions rather than a missing
+# filesystem.
+ConditionPathIsDirectory=/mnt/qnap01/mouse9911/leo/reports/runs
+
+[Service]
+Type=oneshot
+User=mouse9911
+Group=mouse9911
+WorkingDirectory=/home/mouse9911/gits/leo-tracker
+Environment=VIRTUAL_ENV=/home/mouse9911/gits/leo-tracker/.venv
+Environment=UV_CACHE_DIR=/home/mouse9911/gits/leo-tracker/.uv-cache
+# Each partition is assembled in a throwaway DuckDB so the declared schema
+# still enforces types and foreign keys. That database commits once per run and
+# so carries the same block slack the retired live store did: about 9 MB per
+# run against 0.35 MB of parquet out. The largest partition here is 3,785 runs,
+# so this wants tens of gigabytes of local scratch, and must never be pointed
+# at a tmpfs. CacheDirectory puts it under /var/cache on local disk and lets
+# systemd clean it up.
+CacheDirectory=leo-tracker-analysis-index
+ExecStart=/home/mouse9911/.local/bin/uv run --active --no-sync leo-radio \
+  starlink-analysis-index build /mnt/qnap01/mouse9911/leo \
+  --work-dir /var/cache/leo-tracker-analysis-index
+# Sixteen DSP workers on this host are doing work that matters more than a
+# projection which is explicitly not authoritative.
+Nice=10
+IOSchedulingClass=idle
+# Steady state rebuilds only the current day. The first run projects the whole
+# corpus, which is hours, and killing it halfway would simply be repeated.
+TimeoutStartSec=43200
+
+# No [Install]: the timer activates this. Enabling the service itself would run
+# one build at boot and then never again, which looks like a working
+# installation right up until someone asks why the projection is a day behind.

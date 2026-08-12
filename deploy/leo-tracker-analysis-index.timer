@@ -1,0 +1,18 @@
+[Unit]
+Description=Rebuild drifted analysis partitions every half hour
+
+[Timer]
+# Half-hourly rather than the probe index's quarter-hour. Deciding there is
+# nothing to do costs about ninety seconds here, nearly all of it walking
+# twenty-four thousand receipt directories over NFS; at fifteen minutes that is
+# a tenth of the host's wall clock spent asking. The projection is not
+# authoritative, so half an hour of staleness costs nothing that matters.
+OnBootSec=20min
+OnUnitActiveSec=30min
+AccuracySec=5min
+# A host that was down through several firings should catch up once, not once
+# per missed period.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

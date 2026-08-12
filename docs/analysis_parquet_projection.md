@@ -316,7 +316,13 @@ From the 100 runs already ingested, exported to ZSTD Parquet:
 |---|---|---|
 | DuckDB file as written | 17.89 MB | ~400 GB |
 | Parquet, all tables | 1.31 MB | 32 GB |
-| **Parquet as designed** (payloads referenced) | **0.82 MB** | **20 GB** |
+| Parquet, payloads referenced (estimate) | 0.82 MB | 20 GB |
+| **Measured on real partitions** | **0.35 MB** | **~9 GB** |
+
+The last row is what the implementation actually writes, from building
+`date=2026-08-05` and `date=2026-08-06` off the live corpus. It beats the
+estimate because dropping the payloads also removed the column that compressed
+worst, leaving relational rows that ZSTD handles far better than JSON text.
 
 Ongoing growth at the observed ~720 runs/day is roughly 0.6 GB/day, about
 215 GB/year against 1.3 TB free on QNAP. The historical corpus is denser than
@@ -348,9 +354,33 @@ rows, at which point it is a 1.79 GB file with no readers.
 
 ## How it runs
 
-A systemd timer, matching `leo-tracker-probe-index.timer`. Each firing walks the
-receipts, groups them by `(pipeline, date)`, and rebuilds only those partitions
-whose recorded source set no longer matches what the receipts say.
+`deploy/leo-tracker-analysis-index.{service,timer}` on Kalman, matching
+`leo-tracker-probe-index.timer`. Each firing walks the receipts, groups them by
+`(pipeline, date)`, and rebuilds only those partitions whose recorded source set
+no longer matches what the receipts say.
+
+Half-hourly rather than the probe index's quarter-hour, because deciding there
+is nothing to do costs about ninety seconds here — nearly all of it walking
+twenty-four thousand receipt directories over NFS. At fifteen minutes that is a
+tenth of the host's wall clock spent asking a question whose answer is almost
+always no.
+
+The service carries no `[Install]` section: the timer activates it. Enabling the
+service directly would run one build at boot and then never again, which looks
+like a working installation right up until someone asks why the projection is a
+day behind.
+
+`CacheDirectory=` gives the build a local scratch directory, and this matters
+more than it looks. Each partition is assembled in a throwaway DuckDB so the
+schema still enforces types and foreign keys, and that database commits once per
+run — so it carries the same block slack the retired live store did, about
+**9 MB per run against 0.35 MB of Parquet out**. The largest partition here is
+3,785 runs, so a build wants tens of gigabytes of scratch and must never be
+pointed at a tmpfs. It is thrown away either way.
+
+The unit also runs `Nice=10` and `IOSchedulingClass=idle`: sixteen DSP workers
+on that host are doing work that matters more than a projection which is
+explicitly not authoritative.
 
 Not triggered per completion. Because the rebuild unit is a whole partition,
 completion-triggered builds would rewrite the same ~1.2 GB partition hundreds of

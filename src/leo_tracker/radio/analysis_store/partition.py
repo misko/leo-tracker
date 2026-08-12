@@ -295,6 +295,10 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
                     nulls[table] = arrived_null
         finally:
             connection.close()
+        # Reported so an operator can size the scratch a large partition needs.
+        # The build database still commits once per run, so it carries the same
+        # block slack the retired live store did; it is simply thrown away.
+        work_bytes = database.stat().st_size if database.is_file() else 0
 
         for temporary, final in staged:
             os.replace(temporary, final)
@@ -308,7 +312,7 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
                   "nulls": nulls, "tables": list(PROJECTED_TABLES),
                   "built_utc": datetime.now(timezone.utc).isoformat()}
         _atomic_json(manifest_path(root, pipeline, date), record)
-        return {**record, "built": True}
+        return {**record, "built": True, "work_bytes": work_bytes}
     finally:
         for temporary, _ in staged:
             Path(temporary).unlink(missing_ok=True)

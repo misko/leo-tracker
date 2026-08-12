@@ -494,6 +494,55 @@ def test_the_index_can_be_written_beside_the_reports_it_reads(tmp_path):
     assert not (tmp_path / "reports" / "analysis-index").exists()
 
 
+# ----------------------------------------------------------------- deployment
+
+UNIT = Path("deploy/leo-tracker-analysis-index.service")
+TIMER = Path("deploy/leo-tracker-analysis-index.timer")
+
+
+def test_the_builder_service_is_activated_only_by_its_timer():
+    """An [Install] section here would run one build at boot and never again.
+
+    That looks like a working installation right up until someone asks why the
+    projection is a day behind.
+    """
+    sections = [line.strip() for line in UNIT.read_text().splitlines()
+                if line.strip().startswith("[")]
+    assert "[Install]" not in sections, sections
+    assert "WantedBy=timers.target" in TIMER.read_text()
+
+
+def test_the_build_scratch_is_local_and_not_a_tmpfs():
+    """The throwaway build database is about 9 MB per run against 0.35 MB of
+    parquet out, so the largest partition needs tens of gigabytes. On a tmpfs
+    that is RAM."""
+    text = UNIT.read_text()
+    assert "CacheDirectory=leo-tracker-analysis-index" in text
+    assert "--work-dir /var/cache/leo-tracker-analysis-index" in text
+    assert "--work-dir /tmp" not in text
+    assert "--work-dir /mnt" not in text
+
+
+def test_the_builder_refuses_to_run_without_the_receipts():
+    """A build that 'succeeded' against an absent mount would report zero
+    partitions rather than a missing filesystem."""
+    assert ("ConditionPathIsDirectory=/mnt/qnap01/mouse9911/leo/reports/runs"
+            in UNIT.read_text())
+
+
+def test_the_builder_yields_to_the_dsp_workers():
+    """Sixteen analysis workers on this host matter more than a projection that
+    is explicitly not authoritative."""
+    text = UNIT.read_text()
+    assert "Nice=10" in text and "IOSchedulingClass=idle" in text
+
+
+def test_a_host_that_was_down_catches_up_once():
+    text = TIMER.read_text()
+    assert "Persistent=true" in text
+    assert "OnUnitActiveSec=30min" in text
+
+
 def test_the_capture_path_does_not_import_duckdb():
     """A capture host must not fail to start because analysis tooling is absent."""
     source = open("src/leo_tracker/radio/analysis_store/partition.py").read()

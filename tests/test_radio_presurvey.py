@@ -263,6 +263,77 @@ def test_the_record_keeps_the_score_that_produced_the_verdict(fake_iio):
         assert "frequency_offset_hz" in item and "epoch_s" in item
 
 
+def test_anchor_agreement_is_zero_on_noise_and_positive_on_a_pilot(fake_iio):
+    """Corroboration, not another view of the same fold.
+
+    Each anchor symbol picks an epoch independently. A pilot repeats at every
+    anchor so several land on the same one; noise has no reason to agree with
+    itself, so its count sits at zero with the occasional coincidence, against
+    several for a pilot. Measured over 30 noise realisations the 95th
+    percentile is 0.55, which is what makes two a separating count rather than
+    a marginal one.
+    """
+    from leo_tracker.radio.beacon.fast_scan import build_bank, probe
+
+    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
+    quiet = sorted(probe(_noise(50_000, 800 + s), bank)["anchor_agreement"]
+                   for s in range(8))
+    loud = [probe(_beacon(-6, seed=810 + s), bank)["anchor_agreement"]
+            for s in range(8)]
+
+    assert quiet[len(quiet) // 2] == 0 and max(quiet) <= 1
+    assert min(loud) >= 2
+
+
+def test_offset_contrast_separates_narrowband_from_broadband(fake_iio):
+    """What peak-to-median structurally cannot see.
+
+    A pilot is localised to one frequency hypothesis. Anything that lifts every
+    hypothesis together divides out of a peak-to-median ratio, because it
+    raises the peak and the median alike.
+    """
+    from leo_tracker.radio.beacon.fast_scan import build_bank, probe
+
+    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
+    localised = np.median([probe(_beacon(-6, seed=820 + s), bank)["offset_contrast"]
+                           for s in range(8)])
+    flat = np.median([probe(_noise(50_000, 830 + s), bank)["offset_contrast"]
+                      for s in range(8)])
+
+    assert localised > flat
+
+
+def test_mean_power_is_the_one_absolute_quantity(fake_iio):
+    """Every ratio divides gain away, so none can see a dead or clipping port."""
+    from leo_tracker.radio.beacon.fast_scan import build_bank, probe
+
+    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
+    samples = _beacon(-6, seed=840)
+
+    quiet = probe(samples, bank)
+    loud = probe((samples * 2).astype(np.complex64), bank)
+
+    assert loud["mean_power"] == pytest.approx(4 * quiet["mean_power"], rel=1e-6)
+    assert loud["peak_to_median"] == pytest.approx(quiet["peak_to_median"],
+                                                   rel=1e-6)
+
+
+def test_every_corroborating_field_reaches_the_record(fake_iio):
+    """They are useless unless they survive to the corpus."""
+    from leo_tracker.radio.beacon.presurvey import CORROBORATION_FIELDS
+
+    payloads, quiet = _tuning_payloads()
+    outcome = scan_radio(_context(payloads, quiet), LOW_BAND_TUNINGS,
+                         sample_rate_hz=SAMPLE_RATE_HZ)
+
+    record = summarise(outcome, dwell_channel=4, dwell_region="lower-edge")
+
+    for entry in record["tunings"]:
+        for item in entry["receivers"]:
+            for field in CORROBORATION_FIELDS:
+                assert field in item, field
+
+
 def test_the_record_is_json_serialisable(fake_iio):
     """It travels inside the capture manifest, which is written as JSON."""
     payloads, quiet = _tuning_payloads()

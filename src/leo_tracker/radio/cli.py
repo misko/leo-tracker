@@ -288,14 +288,14 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
     # Before the capture claims the radio, not while it holds it: a USB context
     # is an exclusive claim, and the two want opposite configurations. Roughly
     # half a second against a dwell of two minutes.
-    survey = None
+    survey = survey_samples = None
     if getattr(args, "survey_before_dwell", False):
         from .beacon.presurvey import run_survey
-        survey = run_survey(uri=args.uri, serial=args.serial,
-                            sample_rate_hz=args.sample_rate_hz,
-                            lnb_lo_hz=args.lnb_lo_hz,
-                            dwell_channel=args.channel_number,
-                            dwell_region=args.region)
+        survey, survey_samples = run_survey(
+            uri=args.uri, serial=args.serial,
+            sample_rate_hz=args.sample_rate_hz, lnb_lo_hz=args.lnb_lo_hz,
+            dwell_channel=args.channel_number, dwell_region=args.region,
+            keep_samples=args.keep_survey_iq)
     if args.fake:
         count = round(args.duration_s * args.sample_rate_hz)
         period = max(1, round(args.sample_rate_hz / 750))
@@ -338,7 +338,8 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
                       "configured_tuning_offset_hz": center_hz - nominal_center_hz,
                       "tuning_basis": "published Starlink channel and edge-pilot geometry",
                       **({"pre_dwell_survey": survey} if survey else {}),
-                      **experiment_metadata})
+                      **experiment_metadata},
+            survey_samples=survey_samples)
     finally:
         if "queued" in locals():
             queued.close()
@@ -2106,6 +2107,10 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_capture.add_argument("--survey-before-dwell", action="store_true",
         help="survey the eight low-band edge tunings once before recording, and "
              "file the verdict in the manifest; observational, never gating")
+    beacon_capture.add_argument("--keep-survey-iq", action="store_true",
+        help="also store the survey's raw ci16 beside the capture, so a later "
+             "analysis can re-decide from the signal rather than the verdict; "
+             "about 12.8 MB per capture at an 80 ms probe")
     beacon_capture.add_argument("--host-temperature-c", type=float)
     beacon_capture.add_argument("--radio-temperature-c", type=float)
     beacon_capture.add_argument("--fake", action="store_true")

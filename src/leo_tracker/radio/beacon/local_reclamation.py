@@ -90,7 +90,14 @@ def _verify_empty_terminal(path: Path) -> tuple[bool, str, str | None]:
         return False, "local_source_missing", None
     if manifest.get("state") != "interrupted" or manifest.get("chunks"):
         return False, "local_capture_incomplete", None
-    if any(item.name != "manifest.json" or not item.is_file() for item in children):
+    # A survey is written before the dwell, so an interrupted capture holds one
+    # even though it holds no IQ. Refusing it here would not protect anything;
+    # it would only leave these directories unreclaimable for good.
+    allowed = {"manifest.json"}
+    declared = (manifest.get("survey_iq") or {}).get("path")
+    if isinstance(declared, str) and Path(declared).name == declared:
+        allowed.add(declared)
+    if any(item.name not in allowed or not item.is_file() for item in children):
         return False, "unmanifested_local_payload", None
     return True, "eligible", _sha256(manifest_path)
 

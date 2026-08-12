@@ -189,6 +189,31 @@ def test_empty_interrupted_metadata_is_reclaimed_but_unmanifested_payload_is_not
     assert unsafe.exists()
 
 
+def test_an_interrupted_capture_keeping_its_survey_is_still_reclaimable(tmp_path):
+    """The survey is written before the dwell, so an interrupted capture has one.
+
+    Treating it as unmanifested payload would protect nothing and leave these
+    directories on the disk for good, which is a leak rather than a safeguard.
+    An undeclared file of the same kind must still be refused.
+    """
+    local, shared = tmp_path / "nvme", tmp_path / "qnap"
+    surveyed = local / "captures/surveyed"; surveyed.mkdir(parents=True)
+    (surveyed / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "chunks": [],
+        "survey_iq": {"path": "survey.ci16", "bytes": 7}}))
+    (surveyed / "survey.ci16").write_bytes(b"probes!")
+    undeclared = local / "quarantine/undeclared"; undeclared.mkdir(parents=True)
+    (undeclared / "manifest.json").write_text(json.dumps({
+        "state": "interrupted", "chunks": []}))
+    (undeclared / "survey.ci16").write_bytes(b"probes!")
+
+    plan = build_reclamation_plan(local, shared, minimum_age_s=0)
+
+    by_name = {item["recording_id"]: item for item in plan["entries"]}
+    assert by_name["surveyed"]["status"] == "eligible"
+    assert by_name["undeclared"]["status"] == "unmanifested_local_payload"
+
+
 def test_v2_fallback_accepts_analyzed_interrupted_prefix_but_rejects_stale_receipt(
         tmp_path):
     local, shared, archive = (tmp_path / "nvme", tmp_path / "qnap",

@@ -514,6 +514,66 @@ def test_stale_capture_recovery_refuses_corrupt_or_unexpected_content(tmp_path):
     assert json.loads(manifest.read_text())["state"] == "capturing"
 
 
+def _stale_capture_with_survey(tmp_path, *, survey_payload, declared=None):
+    source = tmp_path / "source"
+    capture = source / "captures/stale"; capture.mkdir(parents=True)
+    payload = b"abcdefgh"
+    (capture / "chunk-000000.ci16").write_bytes(payload)
+    (capture / "survey.ci16").write_bytes(survey_payload)
+    manifest = capture / "manifest.json"
+    manifest.write_text(json.dumps({
+        "state": "capturing", "sample_rate_hz": 1, "receiver_count": 2,
+        "chunk_samples": 1,
+        "survey_iq": declared if declared is not None else {
+            "path": "survey.ci16", "bytes": len(survey_payload),
+            "sha256": hashlib.sha256(survey_payload).hexdigest()},
+        "chunks": [{
+            "path": "chunk-000000.ci16", "first_sample_index": 0,
+            "sample_count": 1, "first_utc_ns": 100, "last_utc_ns": 200,
+            "sha256": hashlib.sha256(payload).hexdigest(), "bytes": 8}]}))
+    os.utime(manifest, (1, 1))
+    return source, manifest
+
+
+def test_a_declared_survey_is_not_an_unexpected_file(tmp_path):
+    """The survey rides the capture to the analysis host or it is not kept.
+
+    Without this the allowlist rejects every surveyed capture, and the failure
+    is the whole offload rather than the survey it was meant to carry.
+    """
+    source, manifest = _stale_capture_with_survey(tmp_path, survey_payload=b"12345678")
+
+    result = recover_stale_recordings(source, minimum_age_s=0)
+
+    assert result["errors"] == []
+    assert json.loads(manifest.read_text())["state"] != "capturing"
+
+
+def test_a_survey_that_does_not_match_its_digest_stops_the_offload(tmp_path):
+    """Declared is not the same as verified; a corrupt probe must not travel."""
+    source, manifest = _stale_capture_with_survey(
+        tmp_path, survey_payload=b"12345678",
+        declared={"path": "survey.ci16", "bytes": 8,
+                  "sha256": hashlib.sha256(b"different").hexdigest()})
+
+    result = recover_stale_recordings(source, minimum_age_s=0)
+
+    assert len(result["errors"]) == 1
+    assert "survey checksum mismatch" in result["errors"][0]
+
+
+def test_a_survey_path_escaping_the_capture_is_refused(tmp_path):
+    """A declared name is attacker-shaped input if a manifest is ever edited."""
+    source, manifest = _stale_capture_with_survey(
+        tmp_path, survey_payload=b"12345678",
+        declared={"path": "../escape.ci16", "bytes": 8, "sha256": "x"})
+
+    result = recover_stale_recordings(source, minimum_age_s=0)
+
+    assert len(result["errors"]) == 1
+    assert "unsafe declared survey path" in result["errors"][0]
+
+
 def test_stale_capture_recovery_leaves_fresh_writer_untouched(tmp_path):
     source = tmp_path / "source"
     capture = source / "captures/fresh"; capture.mkdir(parents=True)

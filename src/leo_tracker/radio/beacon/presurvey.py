@@ -139,8 +139,13 @@ def run_survey(*, uri: str, serial: str | None = None,
                sample_rate_hz: float = 2_500_000.0,
                lnb_lo_hz: float = 9_750_000_000.0,
                dwell_channel: int | None = None,
-               dwell_region: str | None = None) -> dict:
+               dwell_region: str | None = None,
+               keep_samples: bool = False) -> tuple[dict, object]:
     """Survey the low band on its own context, then hand the radio back.
+
+    Returns the record and, when ``keep_samples`` is set, the raw ci16 the
+    scores were computed from. Both are returned always, the samples as None
+    when not kept, so a caller cannot accidentally treat a record as a pair.
 
     The context is opened and closed around the survey rather than shared with
     the capture, because the two want opposite radio configurations — a survey
@@ -163,21 +168,23 @@ def run_survey(*, uri: str, serial: str | None = None,
         context = _open_context(uri, serial)
         _verify_serial(context, serial)
         outcome = scan_radio(context, list(tunings), profile=profile,
-                             sample_rate_hz=sample_rate_hz, lnb_lo_hz=lnb_lo_hz)
-        return summarise(outcome, dwell_channel=dwell_channel,
-                         dwell_region=dwell_region, profile=profile,
-                         warm_s=warm_s, started_utc_ns=started_utc_ns)
+                             sample_rate_hz=sample_rate_hz, lnb_lo_hz=lnb_lo_hz,
+                             keep_samples=keep_samples)
+        record = summarise(outcome, dwell_channel=dwell_channel,
+                           dwell_region=dwell_region, profile=profile,
+                           warm_s=warm_s, started_utc_ns=started_utc_ns)
+        return record, outcome.get("samples")
     # Deliberately not BaseException: an operator interrupting the run must
     # still stop it, rather than have the interrupt filed as a survey fault.
     except Exception as exc:                       # noqa: BLE001 - fail open
-        return {"schema": SURVEY_SCHEMA, "state": "failed",
-                "started_utc_ns": started_utc_ns,
-                "error": f"{type(exc).__name__}: {exc}",
-                "dwell": ({"channel": dwell_channel, "region": dwell_region}
-                          if dwell_channel is not None else None),
-                "active": None, "tunings": None,
-                "note": ("the survey is observational; its failure is recorded "
-                         "and the capture proceeds")}
+        return ({"schema": SURVEY_SCHEMA, "state": "failed",
+                 "started_utc_ns": started_utc_ns,
+                 "error": f"{type(exc).__name__}: {exc}",
+                 "dwell": ({"channel": dwell_channel, "region": dwell_region}
+                           if dwell_channel is not None else None),
+                 "active": None, "tunings": None,
+                 "note": ("the survey is observational; its failure is recorded "
+                          "and the capture proceeds")}, None)
     finally:
         # libiio's Python binding frees a context when the last reference goes,
         # so dropping it here is what hands the radio back before the capture

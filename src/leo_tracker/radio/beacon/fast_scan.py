@@ -209,8 +209,18 @@ DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=3, kernel_buffers
 #: driver's read-ahead and everything to lose: at depth 1 no buffer is
 #: pre-filled, so there is no stale data and no settle to pay for. Sizing the
 #: block to the probe then makes the single read exactly the signal wanted.
-#: Measured 43.5 ms per tuning against the dwell profile's 314 ms.
-SURVEY_PROFILE = ScanProfile()
+#:
+#: The probe is 80 ms rather than the 20 ms this was first measured at. The
+#: fold is incoherent across frames, so sensitivity improves as roughly the
+#: square root of their number: 15 frames become 60, which is about a factor
+#: of two, for about three times the sweep. That trade was taken because a
+#: 20 ms probe measured no separation at all between tunings whose dwell
+#: qualified something and tunings whose dwell did not.
+SURVEY_PROFILE = ScanProfile(probe_s=0.080, block_size=200_000)
+#: The profile the model was validated against on hardware, kept because the
+#: measurement belongs to a specific configuration rather than to whichever
+#: one is currently deployed: 43.5 ms per tuning across eight tunings.
+MEASURED_PROFILE_20MS = ScanProfile(probe_s=0.020, block_size=50_000)
 
 
 @dataclass(frozen=True)
@@ -459,8 +469,15 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
 def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
                sample_rate_hz: float = 2_500_000.0,
                lnb_lo_hz: float = 9_750_000_000.0,
-               threads: int = DEFAULT_THREADS) -> dict:
+               threads: int = DEFAULT_THREADS,
+               keep_samples: bool = False) -> dict:
     """Survey several tunings on one radio, reporting where the time went.
+
+    With ``keep_samples`` the raw ci16 is returned under ``samples``, shaped
+    ``(tuning, sample, receiver, component)`` — the capture path's own layout
+    with a tuning axis in front. Kept as the driver delivered it rather than
+    as the complex64 the detector works in, so a later analysis is re-deciding
+    from the signal rather than from this one's conversion of it.
 
     The radio is configured from the profile rather than from whatever the
     capture path left behind: a survey wants a shallow queue and a block the
@@ -502,8 +519,8 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     stream.set_kernel_buffers_count(profile.kernel_buffers)
     buffer = iio.Buffer(stream, profile.block_size, False)
     wanted = int(profile.probe_s * sample_rate_hz)
-    results, timing = [], {"tune": 0.0, "settle": 0.0, "listen": 0.0,
-                           "compute": 0.0}
+    results, retained = [], []
+    timing = {"tune": 0.0, "settle": 0.0, "listen": 0.0, "compute": 0.0}
     try:
         for channel_number, edge in tunings:
             centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
@@ -523,12 +540,14 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             while remaining > 0:
                 buffer.refill()
                 raw = np.frombuffer(buffer.read(), dtype=np.int16)
-                # i0 q0 i1 q1 per sample: one read carries both receivers.
-                piece = np.stack([raw[0::4] + 1j * raw[1::4],
-                                  raw[2::4] + 1j * raw[3::4]]).astype(np.complex64)
-                pieces.append(piece)
-                remaining -= piece.shape[1]
-            samples = np.concatenate(pieces, axis=1)[:, :wanted]
+                pieces.append(raw)
+                remaining -= raw.size // 4
+            # i0 q0 i1 q1 per sample: one read carries both receivers.
+            raw = np.concatenate(pieces).reshape(-1, 2, 2)[:wanted]
+            samples = np.stack([raw[:, 0, 0] + 1j * raw[:, 0, 1],
+                                raw[:, 1, 0] + 1j * raw[:, 1, 1]]).astype(np.complex64)
+            if keep_samples:
+                retained.append(raw.copy())
             timing["listen"] += time.perf_counter() - mark
 
             mark = time.perf_counter()
@@ -551,9 +570,14 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
         # reference goes, and a leaked one holds the context so that whatever
         # opens the radio next fails with EBUSY.
         del buffer
+    # Sorted for reading; the retained IQ stays in the order it was collected
+    # and is indexed by ``sample_order``, so the two cannot be mismatched.
+    order = [(item["channel"], item["region"]) for item in results]
     results.sort(key=lambda item: item["peak_to_median"], reverse=True)
     total = sum(timing.values())
     return {"results": results, "tunings": len(tunings),
+            "samples": np.stack(retained) if retained else None,
+            "sample_order": order,
             "timing_ms": {k: v * 1000 for k, v in timing.items()},
             "total_ms": total * 1000,
             "per_tuning_ms": total * 1000 / max(len(tunings), 1),

@@ -107,8 +107,24 @@ def recover_stale_recordings(source_root: Path, *, minimum_age_s: float = 3600,
                     raise ValueError("declared chunks are not contiguous")
                 expected_index += int(chunk.get("sample_count", 0))
                 previous_utc = int(chunk.get("last_utc_ns", previous_utc or 0))
+            # The pre-dwell survey's probes, when the capture kept them. Held
+            # to the same standard as a chunk rather than exempted: the
+            # allowlist exists so that an unexplained file stops the offload,
+            # and a file explained only by its name would not be explained.
+            survey_names = set()
+            survey = manifest.get("survey_iq") or {}
+            relative = survey.get("path")
+            if relative is not None:
+                if not isinstance(relative, str) or Path(relative).name != relative:
+                    raise ValueError("unsafe declared survey path")
+                path = capture / relative
+                if path.stat().st_size != int(survey.get("bytes", -1)):
+                    raise ValueError(f"declared survey size mismatch: {relative}")
+                if _sha256(path) != survey.get("sha256"):
+                    raise ValueError(f"declared survey checksum mismatch: {relative}")
+                survey_names.add(relative)
             children = {item.name for item in capture.iterdir() if item.is_file()}
-            extras = children - declared_names - {"manifest.json"}
+            extras = children - declared_names - survey_names - {"manifest.json"}
             expected_extra_names = []
             index = len(chunks)
             while f"chunk-{index:06d}.ci16" in extras:

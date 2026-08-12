@@ -181,12 +181,16 @@ def test_verifier_rejects_a_nonpositive_cadence():
 def test_the_survey_profile_is_not_the_dwell_profile():
     """A survey inheriting the capture path's block size is the whole bug.
 
-    A 120 s dwell is indifferent to a 105 ms block; a survey pays it three
-    times per tuning to look at 20 ms.
+    The invariant is that a survey uses what it pays for, not that it is
+    cheap: a longer probe legitimately costs more radio time, while reading a
+    fifth of a block it paid for in full is waste at any probe length.
     """
     from leo_tracker.radio.beacon.fast_scan import DWELL_PROFILE, SURVEY_PROFILE
     assert SURVEY_PROFILE.block_size < DWELL_PROFILE.block_size
-    assert SURVEY_PROFILE.sweep_ms() < DWELL_PROFILE.sweep_ms() / 4
+    assert SURVEY_PROFILE.cost_ms()["signal_used_fraction"] == pytest.approx(1.0)
+    assert (SURVEY_PROFILE.cost_ms()["signal_used_fraction"]
+            > 4 * DWELL_PROFILE.cost_ms()["signal_used_fraction"])
+    assert SURVEY_PROFILE.cost_ms()["settle_ms"] == 0.0
 
 
 def test_cost_model_reproduces_the_measured_dwell_profile():
@@ -204,9 +208,14 @@ def test_cost_model_reproduces_the_measured_dwell_profile():
 
 
 def test_cost_model_reproduces_the_measured_survey_profile():
-    """Measured 43.5 ms per tuning for the same eight tunings."""
-    from leo_tracker.radio.beacon.fast_scan import SURVEY_PROFILE
-    cost = SURVEY_PROFILE.cost_ms(2_500_000.0)
+    """Measured 43.5 ms per tuning for the same eight tunings.
+
+    Pinned to the profile that measurement was taken on rather than to
+    whichever profile is deployed, so lengthening the probe cannot quietly
+    invalidate a field number by moving what it refers to.
+    """
+    from leo_tracker.radio.beacon.fast_scan import MEASURED_PROFILE_20MS
+    cost = MEASURED_PROFILE_20MS.cost_ms(2_500_000.0)
     assert cost["total_ms"] == pytest.approx(46.6, abs=6.0)
 
 

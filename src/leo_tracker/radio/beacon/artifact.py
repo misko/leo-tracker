@@ -116,6 +116,42 @@ def _block_to_ci16(block: PairedSampleBlock | PairedCI16Block, count: int) -> np
     return output
 
 
+#: The survey's IQ, one file per capture, named so it can never be mistaken
+#: for a dwell chunk: readers enumerate ``manifest["chunks"]`` and would
+#: otherwise fold a probe into the recording it merely preceded.
+SURVEY_IQ_FILENAME = "survey.ci16"
+
+
+def _write_survey_iq(destination: Path, samples: np.ndarray) -> dict:
+    """Commit the probes the survey scored, with a digest, before the dwell.
+
+    Written here rather than after the capture because this is the moment the
+    directory exists and nothing else is competing for the disk; a capture
+    that is later interrupted still keeps the survey that preceded it.
+
+    Same ci16 layout as a chunk with a tuning axis in front, so existing
+    tooling reads it with a reshape rather than a new decoder.
+    """
+    values = np.ascontiguousarray(samples, dtype="<i2")
+    if values.ndim != 4 or values.shape[2:] != (2, 2):
+        raise ValueError(
+            "survey IQ must be (tuning, sample, receiver, component), "
+            f"got {values.shape}")
+    partial = destination / (SURVEY_IQ_FILENAME + ".partial")
+    final = destination / SURVEY_IQ_FILENAME
+    digest = hashlib.sha256()
+    with partial.open("wb", buffering=0) as stream:
+        payload = memoryview(values).cast("B")
+        stream.write(payload); digest.update(payload); os.fsync(stream.fileno())
+    os.replace(partial, final)
+    return {"path": SURVEY_IQ_FILENAME, "dtype": "ci16_le",
+            "layout": "tuning,sample,receiver,component; " + LAYOUT,
+            "tunings": int(values.shape[0]),
+            "samples_per_tuning": int(values.shape[1]),
+            "sha256": digest.hexdigest(),
+            "bytes": final.stat().st_size}
+
+
 def capture_beacon_iq(blocks: Iterable[PairedSampleBlock | PairedCI16Block],
                       destination: Path, *,
                       sample_rate_hz: float, center_frequency_hz: float,
@@ -123,7 +159,8 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock | PairedCI16Block],
                       lnb_lo_hz: float | None = None, chunk_s: float = 5.0,
                       identity: dict | None = None, gain_mode: str = "manual",
                       configured_gain_db: float | None = None,
-                      metadata: dict | None = None) -> dict:
+                      metadata: dict | None = None,
+                      survey_samples: np.ndarray | None = None) -> dict:
     """Write raw ci16 chunks, committing each chunk atomically with a checksum."""
     if min(sample_rate_hz, center_frequency_hz, bandwidth_hz, duration_s, chunk_s) <= 0:
         raise ValueError("capture frequencies, rates, duration, and chunk length must be positive")
@@ -147,6 +184,8 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock | PairedCI16Block],
             "note": "gain readback is sampled after a blocking IQ refill; it is diagnostic, not sample-synchronous"},
         "metadata": metadata or {},
         "created_utc_ns": started_ns, "chunks": []}
+    if survey_samples is not None:
+        manifest["survey_iq"] = _write_survey_iq(destination, survey_samples)
     _atomic_json(manifest_path, manifest)
     pending: list[np.ndarray] = []
     pending_count = total = 0

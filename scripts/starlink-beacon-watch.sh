@@ -92,6 +92,7 @@ gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-a
 # dwell, and it never gates the capture: a survey that fails is recorded as
 # having failed and the recording proceeds.
 survey_before_dwell="${LEO_BEACON_SURVEY_BEFORE_DWELL:-1}"
+keep_survey_iq="${LEO_BEACON_KEEP_SURVEY_IQ:-1}"
 # The all-epoch v3 search is deliberately more expensive than the legacy
 # coherent grid.  These cadences keep analysis inside the following 120 s
 # capture on the Pi while retaining enough temporal samples to trigger the
@@ -295,6 +296,11 @@ capture_target() {
     if [[ "${survey_before_dwell}" == "1" && "${mode}" == "narrow" &&
           "${fake_source}" != "1" ]]; then
       survey_args=(--survey-before-dwell)
+      # The probes the scores came from, so a later analysis can re-decide
+      # rather than inherit this one's threshold. About 12.8 MB against the
+      # capture's 2.3 GB, and it shares the capture's lifecycle: retention
+      # removes the directory whole, so this is not a durable archive.
+      [[ "${keep_survey_iq}" == "1" ]] && survey_args+=(--keep-survey-iq)
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \

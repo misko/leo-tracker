@@ -599,12 +599,12 @@ def test_beacon_capture_files_the_pre_dwell_survey_in_the_manifest(
     """
     from leo_tracker.radio.beacon import presurvey
 
-    monkeypatch.setattr(presurvey, "run_survey", lambda **kwargs: {
+    monkeypatch.setattr(presurvey, "run_survey", lambda **kwargs: ({
         "schema": presurvey.SURVEY_SCHEMA, "state": "complete",
         "active_count": 1, "total_ms": 372.0,
         "dwell": {"channel": kwargs["dwell_channel"],
                   "region": kwargs["dwell_region"]},
-        "active": [{"channel": 4, "region": "lower-edge", "receiver": 0}]})
+        "active": [{"channel": 4, "region": "lower-edge", "receiver": 0}]}, None))
     capture = tmp_path / "surveyed"
 
     assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
@@ -619,6 +619,57 @@ def test_beacon_capture_files_the_pre_dwell_survey_in_the_manifest(
                                  "receiver": 0}]
     assert survey["dwell"] == {"channel": 4, "region": "lower-edge"}
     assert json.loads(capsys.readouterr().out)["survey_active"] == 1
+
+
+def test_the_survey_iq_is_written_before_the_dwell_and_digested(tmp_path):
+    """A capture interrupted later still keeps the probes that preceded it."""
+    import numpy as np
+    from leo_tracker.radio.beacon.artifact import (SURVEY_IQ_FILENAME,
+                                                   _write_survey_iq)
+
+    samples = np.arange(8 * 5 * 2 * 2, dtype="<i2").reshape(8, 5, 2, 2)
+    tmp_path.mkdir(parents=True, exist_ok=True)
+
+    record = _write_survey_iq(tmp_path, samples)
+
+    written = (tmp_path / SURVEY_IQ_FILENAME).read_bytes()
+    assert np.frombuffer(written, dtype="<i2").reshape(8, 5, 2, 2).tolist() \
+        == samples.tolist()
+    assert record["tunings"] == 8 and record["samples_per_tuning"] == 5
+    assert record["bytes"] == len(written)
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_survey_iq_of_the_wrong_shape_is_refused(tmp_path):
+    """Silently writing a mis-shaped buffer would make it undecodable later."""
+    import numpy as np
+    from leo_tracker.radio.beacon.artifact import _write_survey_iq
+
+    with pytest.raises(ValueError, match="tuning, sample, receiver"):
+        _write_survey_iq(tmp_path, np.zeros((8, 5, 3), dtype="<i2"))
+
+
+def test_the_survey_iq_is_not_mistaken_for_a_dwell_chunk(tmp_path, monkeypatch):
+    """Readers enumerate the chunk list, so the probe must not join it."""
+    import numpy as np
+    from leo_tracker.radio.beacon import presurvey
+
+    monkeypatch.setattr(presurvey, "run_survey", lambda **kw: (
+        {"schema": presurvey.SURVEY_SCHEMA, "state": "complete",
+         "active_count": 0, "total_ms": 1.0, "active": [], "dwell": None},
+        np.zeros((8, 5, 2, 2), dtype="<i2")))
+    capture = tmp_path / "with-iq"
+
+    assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
+                 "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
+                 "--block-size", "100", "--chunk-s", ".02", "--fake",
+                 "--survey-before-dwell", "--keep-survey-iq"]) == 0
+
+    manifest = json.loads((capture / "manifest.json").read_text())
+    assert manifest["survey_iq"]["path"] == "survey.ci16"
+    assert (capture / "survey.ci16").is_file()
+    assert all(not item["path"].startswith("survey")
+               for item in manifest["chunks"])
 
 
 def test_a_capture_without_the_flag_carries_no_survey(tmp_path):

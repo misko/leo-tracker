@@ -206,13 +206,20 @@ def test_re_centring_the_survey_bank_does_not_rescue_the_offset_port(fake_iio):
 
 
 def test_one_listen_serves_both_receivers(fake_iio):
-    """Both receivers ride the same capture, so listening is charged once."""
+    """Both receivers ride the same capture, so listening is charged once.
+
+    Stated as samples read rather than as a refill count, because the number
+    of refills depends on how much this fixture returns per read while the
+    invariant does not: what must never double is the radio time.
+    """
     payloads, quiet = _tuning_payloads()
     context = _context(payloads, quiet)
+    per_read = 50_000                       # samples in the fixture's payload
 
     scan_radio(context, LOW_BAND_TUNINGS, sample_rate_hz=SAMPLE_RATE_HZ)
 
-    assert context.refills == len(LOW_BAND_TUNINGS)
+    wanted = int(SURVEY_PROFILE.probe_s * SAMPLE_RATE_HZ)
+    assert context.refills * per_read == len(LOW_BAND_TUNINGS) * wanted
 
 
 def test_a_tuning_is_ranked_by_its_best_receiver(fake_iio):
@@ -345,6 +352,54 @@ def test_the_record_is_json_serialisable(fake_iio):
     assert json.loads(json.dumps(record))["schema"].startswith("leo-tracker.")
 
 
+def test_the_probe_is_eighty_milliseconds(fake_iio):
+    """Sixty frames folded rather than fifteen, and the block sized to match."""
+    assert SURVEY_PROFILE.probe_s == 0.080
+    cost = SURVEY_PROFILE.cost_ms(SAMPLE_RATE_HZ)
+    assert cost["buffers_listened"] == 1
+    assert cost["signal_used_fraction"] == pytest.approx(1.0)
+
+
+def test_the_retained_iq_is_what_the_driver_delivered(fake_iio):
+    """Raw ci16, not the detector's complex64 view of it.
+
+    A later analysis re-deciding from this one's conversion would inherit its
+    choices; the point of keeping the signal is that it does not have to.
+    """
+    payloads, quiet = _tuning_payloads()
+    context = _context(payloads, quiet)
+
+    outcome = scan_radio(context, LOW_BAND_TUNINGS, sample_rate_hz=SAMPLE_RATE_HZ,
+                         keep_samples=True)
+
+    samples = outcome["samples"]
+    assert samples.dtype == np.int16
+    assert samples.shape[0] == len(LOW_BAND_TUNINGS)
+    assert samples.shape[2:] == (2, 2)          # receiver, component
+
+
+def test_the_iq_is_not_retained_unless_asked(fake_iio):
+    """Twelve megabytes a capture is a choice, not a default of the scan."""
+    payloads, quiet = _tuning_payloads()
+
+    outcome = scan_radio(_context(payloads, quiet), LOW_BAND_TUNINGS,
+                         sample_rate_hz=SAMPLE_RATE_HZ)
+
+    assert outcome["samples"] is None
+
+
+def test_the_retained_iq_keeps_collection_order_not_score_order(fake_iio):
+    """Results are sorted by score; the IQ cannot be, or they would mismatch."""
+    payloads, quiet = _tuning_payloads()
+
+    outcome = scan_radio(_context(payloads, quiet), LOW_BAND_TUNINGS,
+                         sample_rate_hz=SAMPLE_RATE_HZ, keep_samples=True)
+
+    assert outcome["sample_order"] == [(c, f"{e}-edge") for c, e in LOW_BAND_TUNINGS]
+    assert [r["peak_to_median"] for r in outcome["results"]] == sorted(
+        (r["peak_to_median"] for r in outcome["results"]), reverse=True)
+
+
 def test_a_survey_failure_never_costs_the_capture(monkeypatch):
     """A delayed capture is gone for good; a missing survey is an annotation."""
     def explode(*args, **kwargs):
@@ -353,8 +408,9 @@ def test_a_survey_failure_never_costs_the_capture(monkeypatch):
     monkeypatch.setattr("leo_tracker.radio.beacon.presurvey._open_context",
                         explode)
 
-    record = run_survey(uri="usb:9.9.9", serial=None)
+    record, samples = run_survey(uri="usb:9.9.9", serial=None)
 
+    assert samples is None
     assert record["state"] == "failed"
     assert "no radio here" in record["error"]
     assert json.loads(json.dumps(record))

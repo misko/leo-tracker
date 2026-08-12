@@ -1,13 +1,16 @@
 import json
+import os
 
 import pytest
 
 from leo_tracker.radio.beacon.probe_index import (PROBE_COLUMNS,
                                                   PROBE_INDEX_SCHEMA,
-                                                  build, build_partition,
+                                                  build, build_lock,
+                                                  build_partition,
                                                   partition_is_current,
                                                   partition_path,
                                                   partition_status, query,
+                                                  temporary_path,
                                                   report_date, source_reports)
 
 duckdb = pytest.importorskip("duckdb", reason="probe index needs the analysis extra")
@@ -205,3 +208,81 @@ def test_the_capture_path_does_not_import_duckdb():
     for module in ("analysis.py", "artifact.py", "acquisition.py"):
         text = open(f"src/leo_tracker/radio/beacon/{module}").read()
         assert "duckdb" not in text
+
+
+def test_a_second_builder_skips_rather_than_failing(tmp_path):
+    """A refresh firing while one is still running is normal, not an error.
+
+    The timer fires on a fixed period and a build takes as long as the day is
+    long, so overlap is expected. Reporting failure for a condition that
+    resolves itself teaches everyone to ignore the failure.
+    """
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z")
+
+    with build_lock(tmp_path) as held:
+        assert held is True
+        result = build(tmp_path)
+
+    assert result["skipped_locked"] is True
+    assert result["built"] == []
+
+
+def test_the_lock_is_released_for_the_next_run(tmp_path):
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z")
+    with build_lock(tmp_path) as held:
+        assert held is True
+
+    assert build(tmp_path)["built"] != []
+
+
+def test_concurrent_builders_stage_to_separate_files(tmp_path, monkeypatch):
+    """Correctness must not rest on the lock.
+
+    The index lives on an NFS mount that another host also mounts, and
+    cross-host advisory locking is not something we can rely on. Two builders
+    must therefore be merely wasteful, not destructive, which holds only if
+    each stages to its own file before the atomic rename.
+    """
+    target = partition_path(tmp_path, "2026-08-11")
+
+    monkeypatch.setattr(os, "getpid", lambda: 111)
+    first = temporary_path(target)
+    monkeypatch.setattr(os, "getpid", lambda: 222)
+    second = temporary_path(target)
+
+    assert first != second
+    assert first.parent == second.parent == target.parent
+
+
+def test_a_failed_rebuild_leaves_the_good_partition_intact(tmp_path):
+    """A day that breaks must keep answering with what it last knew.
+
+    Truncating a partition on a bad ingest would turn one unreadable report
+    into a whole day reading as zero detections.
+    """
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z", probes=4)
+    build_partition(tmp_path, "2026-08-11")
+    before = partition_path(tmp_path, "2026-08-11").read_bytes()
+
+    broken = tmp_path / "reports" / "ch4-lower-edge-narrow-20260811T130000Z.json"
+    broken.write_text('{"capture_manifest": {"identity": {"radio_id": 7}},'
+                      ' "exact_checks": [{"start_s": "not-a-number"}]}')
+    with pytest.raises(Exception):
+        build_partition(tmp_path, "2026-08-11")
+
+    assert partition_path(tmp_path, "2026-08-11").read_bytes() == before
+    assert query(tmp_path, "SELECT count(*) FROM probes")[0][0] == 8
+
+
+def test_a_failed_rebuild_leaves_no_staged_file_behind(tmp_path):
+    """Otherwise every failure leaks a file the size of the partition."""
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z")
+    broken = tmp_path / "reports" / "ch4-lower-edge-narrow-20260811T130000Z.json"
+    broken.write_text('{"capture_manifest": {"identity": {"radio_id": 7}},'
+                      ' "exact_checks": [{"start_s": "not-a-number"}]}')
+
+    with pytest.raises(Exception):
+        build_partition(tmp_path, "2026-08-11")
+
+    staged = list(partition_path(tmp_path, "2026-08-11").parent.glob("*.next*"))
+    assert staged == []

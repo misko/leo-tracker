@@ -22,13 +22,24 @@ nulls that look like an absence of detections.
 Partitions record what they were built from. A derived table that silently
 disagrees with its source is worse than no derived table, because both produce
 plausible answers and only one is right.
+
+Two builders can overlap: a periodic refresh can fire while the previous one is
+still going, and the index lives on shared storage that a second host also
+mounts. Correctness therefore rests on staging to a private file and renaming
+atomically, never on the advisory lock, because cross-host locking over NFS is
+not something we can rely on. The lock only spares the common case the wasted
+work, and a builder that cannot take it reports that it skipped rather than
+failing.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
+import fcntl
 import json
 import os
 from pathlib import Path
+import platform
 import re
 
 PROBE_INDEX_SCHEMA = "leo-tracker.probe-index/v1"
@@ -137,6 +148,40 @@ def _manifest_path(root: Path, date: str) -> Path:
     return partition_path(root, date).with_name("partition.json")
 
 
+def temporary_path(target: Path) -> Path:
+    """Where one builder stages its output before the atomic rename.
+
+    Named for this host and process, so two builders never write the same
+    file. This is what makes an overlap wasteful rather than destructive, and
+    it holds whether or not the advisory lock did its job.
+    """
+    node = platform.node().split(".")[0] or "unknown"
+    return target.with_suffix(f".parquet.{node}.{os.getpid()}.next")
+
+
+@contextmanager
+def build_lock(root: Path):
+    """Advisory, non-blocking: yields whether this caller may build.
+
+    An optimisation, not a guarantee. It stops a periodic refresh from
+    duplicating work already in flight on this host; it is not relied on for
+    correctness, because the partitions sit on an NFS mount shared with the
+    analysis host and cross-host locking is not dependable.
+    """
+    path = Path(root) / "reports" / PARTITION_DIRECTORY / ".build.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, "w")
+    try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            yield False
+            return
+        yield True
+    finally:
+        handle.close()
+
+
 def source_reports(root: Path, date: str, pattern: str = "*narrow*") -> list[Path]:
     """Reports belonging to one UTC day, by recording stamp."""
     reports = Path(root) / "reports"
@@ -173,12 +218,19 @@ def build_partition(root: Path, date: str, *, pattern: str = "*narrow*",
     connection = _connect(memory_limit, threads)
     columns = "{" + ", ".join(f"'{k}': '{v}'" for k, v in PROBE_COLUMNS.items()) + "}"
     query = _PROJECTION.replace("$columns", columns)
-    temporary = target.with_suffix(".parquet.next")
-    connection.execute(
-        f"COPY ({query}) TO '{temporary}' (FORMAT parquet, COMPRESSION zstd)",
-        [[str(path) for path in sources]])
-    rows = connection.execute("SELECT count(*) FROM read_parquet(?)",
-                              [str(temporary)]).fetchone()[0]
+    temporary = temporary_path(target)
+    try:
+        connection.execute(
+            f"COPY ({query}) TO '{temporary}' (FORMAT parquet, COMPRESSION zstd)",
+            [[str(path) for path in sources]])
+        rows = connection.execute("SELECT count(*) FROM read_parquet(?)",
+                                  [str(temporary)]).fetchone()[0]
+    except Exception:
+        # The day keeps answering with what it last knew. Truncating here
+        # would turn one unreadable report into a whole day of zero
+        # detections, which reads downstream as a quiet night on the sky.
+        temporary.unlink(missing_ok=True)
+        raise
     os.replace(temporary, target)
     manifest = {"schema": PROBE_INDEX_SCHEMA, "date": date,
                 "source_count": len(sources), "rows": int(rows),
@@ -197,16 +249,24 @@ def build(root: Path, *, pattern: str = "*narrow*", rebuild: bool = False,
     dates = sorted({report_date(path.name)
                     for path in reports.glob(f"{pattern}.json")} - {None})
     built, skipped = [], []
-    for date in dates:
-        sources = source_reports(root, date, pattern)
-        if not rebuild and partition_is_current(root, date, sources):
-            skipped.append(date)
-            continue
-        built.append(build_partition(root, date, pattern=pattern))
-        if limit is not None and len(built) >= limit:
-            break
+    with build_lock(root) as held:
+        if not held:
+            # Not a failure: the refresh period is fixed and a build takes as
+            # long as the day is full, so overlap is ordinary. Whatever is
+            # already running will produce the same partitions.
+            return {"schema": PROBE_INDEX_SCHEMA, "dates": len(dates),
+                    "built": [], "skipped": [], "rows": 0,
+                    "skipped_locked": True}
+        for date in dates:
+            sources = source_reports(root, date, pattern)
+            if not rebuild and partition_is_current(root, date, sources):
+                skipped.append(date)
+                continue
+            built.append(build_partition(root, date, pattern=pattern))
+            if limit is not None and len(built) >= limit:
+                break
     return {"schema": PROBE_INDEX_SCHEMA, "dates": len(dates),
-            "built": built, "skipped": skipped,
+            "built": built, "skipped": skipped, "skipped_locked": False,
             "rows": sum(item["rows"] for item in built)}
 
 

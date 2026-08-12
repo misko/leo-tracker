@@ -92,6 +92,13 @@ def summarise(outcome: dict, *, dwell_channel: int | None = None,
             "tunings": tunings,
             "sample_rate_hz": outcome.get("sample_rate_hz"),
             "offset_span_hz": outcome.get("offset_span_hz"),
+            # The tunings above are sorted for reading; the retained IQ is in
+            # the order it was collected. These coincide for the current tuning
+            # list and would stop coinciding the moment it changes — one edge
+            # per channel, say — so the mapping is recorded rather than
+            # inferred. Without it a later analysis silently scores one tuning's
+            # samples against another tuning's label.
+            "sample_order": outcome.get("sample_order"),
             "quiet_verdict_caveat": (
                 "a port whose LNB sits near the edge of the search scores close "
                 "to threshold on a beacon that is plainly there; quiet on such a "

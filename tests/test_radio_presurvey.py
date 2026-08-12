@@ -341,6 +341,23 @@ def test_every_corroborating_field_reaches_the_record(fake_iio):
                 assert field in item, field
 
 
+def test_the_record_carries_the_iq_ordering(fake_iio):
+    """The record sorts its tunings; the IQ does not. The map must be stored.
+
+    These two orders coincide for the current tuning list, so a reader that
+    infers one from the other works today and would silently score one tuning's
+    samples against another's label the moment the list changes.
+    """
+    payloads, quiet = _tuning_payloads()
+    outcome = scan_radio(_context(payloads, quiet), LOW_BAND_TUNINGS,
+                         sample_rate_hz=SAMPLE_RATE_HZ, keep_samples=True)
+
+    record = summarise(outcome, dwell_channel=4, dwell_region="lower-edge")
+
+    assert record["sample_order"] == [(c, f"{e}-edge") for c, e in LOW_BAND_TUNINGS]
+    assert len(record["sample_order"]) == outcome["samples"].shape[0]
+
+
 def test_the_record_is_json_serialisable(fake_iio):
     """It travels inside the capture manifest, which is written as JSON."""
     payloads, quiet = _tuning_payloads()

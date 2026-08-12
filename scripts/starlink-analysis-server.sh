@@ -41,6 +41,9 @@ full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
 archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
 archive_root="${LEO_ANALYSIS_ARCHIVE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
 retention_mode="${LEO_ANALYSIS_RETENTION_MODE:-disabled}"
+# Optional shadow projection. Workers publish only immutable input manifests;
+# the separate Kalman store service is the sole DuckDB writer.
+analysis_store_root="${LEO_ANALYSIS_STORE_ROOT:-}"
 full_exact_interval_s="${LEO_ANALYSIS_FULL_EXACT_INTERVAL_S:-1}"
 wide_exact_interval_s="${LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S:-2}"
 # Wide captures are recorded at 10 MS/s, so 2.5 MHz subbands can only be tuned
@@ -575,6 +578,17 @@ worker() {
         emit "dashboard_row worker=${worker_id} job=${name}"
       else
         emit "dashboard_row_failed worker=${worker_id} job=${name}"
+      fi
+      if [[ -n "${analysis_store_root}" ]]; then
+        if radio starlink-analysis-store enqueue "${analysis_store_root}" \
+            --shared-root "${root}" --recording-id "${name}" \
+            --pipeline-id "${pipeline_id}" >/dev/null 2>&1; then
+          emit "analysis_store_enqueued worker=${worker_id} job=${name}"
+        else
+          # Shadow indexing must not invalidate an authenticated scientific
+          # completion. Reconciliation can enqueue it again from the receipt.
+          emit "analysis_store_enqueue_failed worker=${worker_id} job=${name}"
+        fi
       fi
       emit "job_done worker=${worker_id} job=${name} mode=${mode} elapsed=$(human_duration "${elapsed}") report=${reports}/${name}.json"
     else

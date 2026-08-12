@@ -39,6 +39,12 @@ active claims, and completed Kalman receipts are skipped idempotently.
 The Pi-hosted dashboard is read-only and uses the shared QNAP root, so new rows
 appear from Kalman's authoritative reports rather than from retired local DSP.
 
+The later transactional DuckDB projection has its own staged deployment and
+rollback runbook in
+[`KALMAN_ANALYSIS_STORE_DEPLOYMENT.md`](KALMAN_ANALYSIS_STORE_DEPLOYMENT.md).
+Its Kalman rollout does not restart SATPI01 radio or export workers and does not
+authorize report or evidence retirement.
+
 Install or refresh both Pi units after changing this contract:
 
 ```bash

@@ -80,12 +80,22 @@ class DashboardModel:
 
     def __init__(self, observation_dir: Path, passes_path: Path | None = None, *,
                  beacon_root: Path | None = None,
+                 analysis_store_pointer: Path | None = None,
+                 analysis_store_cache: Path | None = None,
                  samples_per_snapshot: int = 262_144,
                  sample_rate_hz: float = 30_720_000,
                  snapshots_per_chunk: int = 4096):
         self.root = Path(observation_dir).resolve()
         self.passes_path = (Path(passes_path).resolve() if passes_path else self.root / "passes.json")
         self.beacon_root = None if beacon_root is None else Path(beacon_root).resolve()
+        self._analysis_repository = None
+        if analysis_store_pointer is not None:
+            if analysis_store_cache is None:
+                raise ValueError("analysis store pointer needs a local cache directory")
+            # Lazy and optional: capture-only installations do not need DuckDB.
+            from .analysis_store.repository import DuckDBAnalysisRepository
+            self._analysis_repository = DuckDBAnalysisRepository(
+                pointer=analysis_store_pointer, cache_dir=analysis_store_cache)
         self.samples_per_snapshot = int(samples_per_snapshot)
         self.sample_rate_hz = float(sample_rate_hz)
         self.snapshots_per_chunk = int(snapshots_per_chunk)
@@ -157,6 +167,17 @@ class DashboardModel:
     def _beacon_recording_index(self) -> dict:
         if self.beacon_root is None:
             return {}
+        if self._analysis_repository is not None:
+            try:
+                return {"schema": "leo-tracker.beacon-dashboard-index/v3",
+                        "recordings": self._analysis_repository.recent_recordings(
+                            limit=LISTING_READ_LIMIT),
+                        "summary": self._analysis_repository.summary()}
+            except (OSError, ValueError, RuntimeError):
+                # Initial rollout and QNAP outages retain the proven JSON path.
+                # SnapshotCache itself returns its last verified local copy
+                # before this fallback is reached.
+                pass
         reports = self.beacon_root / "reports"
         shards = sorted((reports / "dashboard-index").glob("2*.json"))
         path = reports / "dashboard-index.json"
@@ -1028,11 +1049,20 @@ class DashboardModel:
                 "fingerprints": {"count": persisted.get("summary", {}).get(
                     "fingerprint_count", 0)}, "captures": [], "active": None,
                 "active_captures": []}
+            persisted_recording_ids = {
+                item.get("recording_id") for item in persisted_rows
+            }
             manifest_paths = self._recent_capture_manifests(
                 self.beacon_root / "captures", limit=20)
             for manifest_path in manifest_paths:
                 manifest = self._json(manifest_path, {})
                 name = manifest_path.parent.name
+                # A committed snapshot is authoritative for historical state.
+                # Once source-sidecar retirement is enabled, the absence of a
+                # report JSON must not turn an already stored run back into an
+                # apparently active analysis.
+                if name in persisted_recording_ids:
+                    continue
                 report_exists = (self.beacon_root / "reports" / f"{name}.json").is_file()
                 if manifest.get("state") == "capturing" or (
                         manifest.get("state") == "complete" and not report_exists):
@@ -1169,6 +1199,17 @@ class DashboardModel:
     def recording_detail(self, kind: str, recording_id: str) -> dict | None:
         """Return one recording's statistics and plot links on demand."""
         if kind == "beacon":
+            if self._analysis_repository is not None:
+                try:
+                    complete = self._analysis_repository.recording_detail(recording_id)
+                except (OSError, ValueError, RuntimeError):
+                    complete = None
+                if complete is not None:
+                    return {"kind": kind, "recording_id": recording_id,
+                            "active": False,
+                            "statistics": complete.get("_statistics", {}),
+                            "plots": complete.get("_plots", []),
+                            "artifacts": complete.get("_artifacts", [])}
             persisted = self._beacon_recording_index()
             if persisted.get("schema") in {
                     "leo-tracker.beacon-dashboard-index/v2",
@@ -1542,10 +1583,14 @@ def make_handler(model: DashboardModel):
 def serve_dashboard(observation_dir: Path, *, host: str = "127.0.0.1", port: int = 8765,
                     passes_path: Path | None = None,
                     beacon_root: Path | None = None,
+                    analysis_store_pointer: Path | None = None,
+                    analysis_store_cache: Path | None = None,
                     samples_per_snapshot: int = 262_144,
                     sample_rate_hz: float = 30_720_000,
                     snapshots_per_chunk: int = 4096):
     model = DashboardModel(observation_dir, passes_path, beacon_root=beacon_root,
+        analysis_store_pointer=analysis_store_pointer,
+        analysis_store_cache=analysis_store_cache,
         samples_per_snapshot=samples_per_snapshot, sample_rate_hz=sample_rate_hz,
         snapshots_per_chunk=snapshots_per_chunk)
     server = ThreadingHTTPServer((host, port), make_handler(model))

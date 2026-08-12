@@ -9,9 +9,15 @@ Type=exec
 User=satpi01
 Group=users
 WorkingDirectory=/home/satpi01/leo-tracker
+CacheDirectory=leo-tracker-analysis-store
 Environment=VIRTUAL_ENV=/home/satpi01/leo-tracker/.venv
 Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
-ExecStart=/home/satpi01/.local/bin/uv run --active --no-sync leo-radio starlink-dashboard artifacts/starlink_hybrid_watch --beacon-root /mnt/qnap01/mouse9911/leo --host 0.0.0.0 --port 8765
+ExecStart=/home/satpi01/.local/bin/uv run --active --no-sync leo-radio \
+  starlink-dashboard artifacts/starlink_hybrid_watch \
+  --beacon-root /mnt/qnap01/mouse9911/leo \
+  --analysis-store-pointer /mnt/qnap01/mouse9911/leo/database/current.json \
+  --analysis-store-cache /var/cache/leo-tracker-analysis-store \
+  --host 0.0.0.0 --port 8765
 Restart=always
 RestartSec=5s
 

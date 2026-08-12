@@ -1,7 +1,7 @@
 [Unit]
 Description=LEO tracker full-coverage Kalman analysis
-After=network-online.target remote-fs.target
-Wants=network-online.target
+After=network-online.target remote-fs.target leo-tracker-analysis-store.service
+Wants=network-online.target leo-tracker-analysis-store.service
 RequiresMountsFor=/mnt/qnap01/mouse9911/leo /mnt/qnap01/mouse9911/leo-cropped
 
 [Service]
@@ -15,6 +15,7 @@ Environment=LEO_ANALYSIS_FULL_COVERAGE=1
 Environment=LEO_ANALYSIS_ARCHIVE_MODE=required
 Environment=LEO_ANALYSIS_ARCHIVE_ROOT=/mnt/qnap01/mouse9911/leo-cropped
 Environment=LEO_ANALYSIS_RETENTION_MODE=disabled
+Environment=LEO_ANALYSIS_STORE_ROOT=/var/lib/leo-tracker-analysis-store
 Environment=LEO_ANALYSIS_FULL_EXACT_INTERVAL_S=1
 Environment=LEO_ANALYSIS_WIDE_EXACT_INTERVAL_S=2
 Environment=LEO_ANALYSIS_WIDE_ACQUISITION_SPAN_HZ=3500000

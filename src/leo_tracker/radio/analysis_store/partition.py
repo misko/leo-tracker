@@ -31,6 +31,14 @@ from .schema import initialize
 PARTITION_SCHEMA = "leo-tracker.analysis-index/v1"
 PARTITION_DIRECTORY = "analysis-index"
 
+#: Exporting a partition is where memory peaks, not ingesting it. A 16 GB build
+#: database of JSON-heavy columns died on ``COPY ... TO parquet`` under a 2 GB
+#: limit after eight hours of successful ingest, throwing all of it away. This
+#: host defaults DuckDB to about 150 GB, which would starve the sixteen DSP
+#: workers sharing it, so the limit is generous rather than absent.
+BUILD_MEMORY_LIMIT = "16GB"
+QUERY_MEMORY_LIMIT = "8GB"
+
 #: Tables written to Parquet, named rather than discovered so that a schema
 #: change is a deliberate edit here. ``structured_documents`` is deliberately
 #: absent: its payloads duplicate report files that ``source_documents`` already
@@ -248,7 +256,8 @@ def partition_is_current(root: Path, pipeline: str, date: str, signatures: dict,
 
 
 def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
-                    work_dir: Path | None = None, memory_limit: str = "2GB",
+                    work_dir: Path | None = None,
+                    memory_limit: str = BUILD_MEMORY_LIMIT,
                     threads: int = 2) -> dict:
     """Project one ``(pipeline, date)`` into Parquet.
 
@@ -275,6 +284,10 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
         try:
             connection.execute(f"SET memory_limit='{memory_limit}'")
             connection.execute(f"SET threads={int(threads)}")
+            # The export holds a whole table in flight otherwise. probe_index.py
+            # has always set this; omitting it here is what made a 16 GB
+            # partition unexportable.
+            connection.execute("SET preserve_insertion_order=false")
             initialize(connection)
             excluded = []
             for recording_id in sorted(sources):
@@ -345,6 +358,7 @@ SCRATCH_PREFIX = "analysis-index-"
 STALE_SCRATCH_S = 6 * 3600
 
 
+
 def sweep_stale_scratch(work_dir: Path | None, *,
                         older_than_s: float = STALE_SCRATCH_S) -> list[str]:
     """Remove build scratch abandoned by an interrupted build.
@@ -372,7 +386,8 @@ def sweep_stale_scratch(work_dir: Path | None, *,
     return swept
 
 
-def read_connection(root: Path, *, memory_limit: str = "2GB", threads: int = 2):
+def read_connection(root: Path, *, memory_limit: str = QUERY_MEMORY_LIMIT,
+                    threads: int = 2):
     """A DuckDB connection with a view per table spanning every partition.
 
     In memory and read-only in effect: it opens no database file and takes no
@@ -384,6 +399,7 @@ def read_connection(root: Path, *, memory_limit: str = "2GB", threads: int = 2):
     connection = duckdb.connect()
     connection.execute(f"SET memory_limit='{memory_limit}'")
     connection.execute(f"SET threads={int(threads)}")
+    connection.execute("SET preserve_insertion_order=false")
     base = Path(root) / "reports" / PARTITION_DIRECTORY
     for table in PROJECTED_TABLES:
         glob = f"{base}/pipeline=*/date=*/{table}.parquet"
@@ -446,7 +462,8 @@ def partition_status(root: Path, shared_root: Path) -> dict:
 
 
 def build(root: Path, shared_root: Path, *, rebuild: bool = False,
-          limit: int | None = None, work_dir: Path | None = None) -> dict:
+          limit: int | None = None, work_dir: Path | None = None,
+          memory_limit: str | None = None) -> dict:
     """Rebuild every partition whose receipts no longer match what was built.
 
     A refresh firing while one is still running is normal rather than an error:
@@ -456,9 +473,9 @@ def build(root: Path, shared_root: Path, *, rebuild: bool = False,
     with build_lock(root) as held:
         if not held:
             return {"schema": PARTITION_SCHEMA, "built": [], "current": [],
-                    "partition_count": 0, "skipped_locked": True}
+                    "failed": [], "partition_count": 0, "skipped_locked": True}
         swept = sweep_stale_scratch(work_dir)
-        results, skipped = [], []
+        results, skipped, failed = [], [], []
         for (pipeline, date), signatures in sorted(
                 signatures_by_unit(shared_root).items()):
             if limit is not None and len(results) >= limit:
@@ -468,8 +485,22 @@ def build(root: Path, shared_root: Path, *, rebuild: bool = False,
                 skipped.append({"pipeline": pipeline, "date": date,
                                 "run_count": len(signatures)})
                 continue
-            results.append(build_partition(root, shared_root, pipeline, date,
-                                           work_dir=work_dir))
+            try:
+                results.append(build_partition(
+                    root, shared_root, pipeline, date, work_dir=work_dir,
+                    memory_limit=memory_limit or BUILD_MEMORY_LIMIT))
+            except Exception as exc:
+                # The same containment the run loop already has, one level up.
+                # Letting a partition abort the sweep is what turned one
+                # partition's out-of-memory export into eight hours of work
+                # thrown away and every later partition never attempted. A
+                # failure leaves the previous partition intact and is retried on
+                # the next pass, so recording it and moving on loses nothing.
+                failed.append({"pipeline": pipeline, "date": date,
+                               "run_count": len(signatures),
+                               "error_type": type(exc).__name__,
+                               "error": str(exc)[:200]})
         return {"schema": PARTITION_SCHEMA, "built": results, "current": skipped,
-                "partition_count": len(results) + len(skipped),
+                "failed": failed,
+                "partition_count": len(results) + len(skipped) + len(failed),
                 "swept_scratch": swept, "skipped_locked": False}

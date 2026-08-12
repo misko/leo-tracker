@@ -965,7 +965,8 @@ def command_starlink_analysis_index(args: argparse.Namespace) -> int:
     try:
         if args.action == "build":
             print(json.dumps(build(root, args.root, rebuild=args.rebuild,
-                                   limit=args.limit, work_dir=args.work_dir),
+                                   limit=args.limit, work_dir=args.work_dir,
+                                   memory_limit=args.memory_limit),
                              indent=2, sort_keys=True, default=str))
         elif args.action == "status":
             print(json.dumps(partition_status(root, args.root),
@@ -2541,6 +2542,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="stop after this many partitions are rebuilt")
     analysis_index.add_argument("--work-dir", type=Path,
         help="local scratch for the per-partition build database")
+    analysis_index.add_argument("--memory-limit", default=None,
+        help="DuckDB memory limit for a partition build; the export peaks, "
+             "not the ingest (default 16GB)")
     analysis_index.set_defaults(handler=command_starlink_analysis_index)
     analysis_store = commands.add_parser("starlink-analysis-store",
         help="ingest authenticated Kalman outputs into a single-owner DuckDB store")

@@ -9,7 +9,8 @@ duckdb = pytest.importorskip("duckdb",
                              reason="the analysis index needs the analysis extra")
 
 from leo_tracker.radio.analysis_store import partition as partition_module
-from leo_tracker.radio.analysis_store.partition import (PARTITION_SCHEMA,
+from leo_tracker.radio.analysis_store.partition import (BUILD_MEMORY_LIMIT,
+                                                        PARTITION_SCHEMA,
                                                         PROJECTED_TABLES,
                                                         build, build_lock,
                                                         build_partition,
@@ -547,6 +548,65 @@ def test_the_index_can_be_written_beside_the_reports_it_reads(tmp_path):
     assert (partition_dir(elsewhere, KALMAN, "2026-08-11")
             / "analysis_runs.parquet").is_file()
     assert not (tmp_path / "reports" / "analysis-index").exists()
+
+
+# --------------------------------------------------------- resource limits
+
+def test_a_partition_that_fails_does_not_abort_the_others(tmp_path, monkeypatch):
+    """One partition's failure must not cost every partition after it.
+
+    An out-of-memory export threw away eight hours of successful ingest and
+    left the eight later partitions unattempted, because the exception escaped
+    the sweep. A failure leaves the previous partition intact and is retried on
+    the next pass, so recording it and moving on loses nothing.
+    """
+    _run(tmp_path, name=AUGUST_10)
+    _run(tmp_path, name=AUGUST_11)
+    real = partition_module.build_partition
+
+    def flaky(root, shared, pipeline, date, **kwargs):
+        if date == "2026-08-10":
+            raise MemoryError("failed to allocate data of size 128.0 MiB")
+        return real(root, shared, pipeline, date, **kwargs)
+
+    monkeypatch.setattr(partition_module, "build_partition", flaky)
+    result = build(tmp_path, tmp_path)
+
+    assert [entry["date"] for entry in result["failed"]] == ["2026-08-10"]
+    assert result["failed"][0]["error_type"] == "MemoryError"
+    assert [entry["date"] for entry in result["built"]] == ["2026-08-11"]
+    assert (partition_dir(tmp_path, KALMAN, "2026-08-11")
+            / "analysis_runs.parquet").is_file()
+
+
+def test_a_failed_partition_is_retried_on_the_next_pass(tmp_path, monkeypatch):
+    """Recording a failure must not mark the partition done."""
+    _run(tmp_path, name=AUGUST_11)
+    real = partition_module.build_partition
+    monkeypatch.setattr(partition_module, "build_partition",
+                        lambda *a, **k: (_ for _ in ()).throw(MemoryError("boom")))
+    assert build(tmp_path, tmp_path)["failed"] != []
+
+    monkeypatch.setattr(partition_module, "build_partition", real)
+    assert build(tmp_path, tmp_path)["built"] != []
+
+
+def test_the_build_memory_limit_leaves_room_to_export(tmp_path):
+    """A 2 GB limit is what killed a 16 GB partition on COPY ... TO parquet.
+
+    Exporting peaks memory, not ingesting: the failure came after eight hours
+    of successful inserts, at the first table export.
+    """
+    assert BUILD_MEMORY_LIMIT.endswith("GB")
+    assert int(BUILD_MEMORY_LIMIT.removesuffix("GB")) >= 8
+
+
+def test_the_build_does_not_preserve_insertion_order(tmp_path):
+    """probe_index.py has always set this; omitting it here is what made a
+    large partition unexportable."""
+    source = Path("src/leo_tracker/radio/analysis_store/partition.py").read_text()
+    assert source.count("SET preserve_insertion_order=false") >= 2, \
+        "both the builder and the reader must disable it"
 
 
 # -------------------------------------------------------------- build scratch

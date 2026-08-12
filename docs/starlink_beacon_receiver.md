@@ -292,6 +292,14 @@ Data live under `/mnt/leo-nvme/leo-tracker`:
 
 - `captures/<session>/manifest.json`: versioned parameters, timing, chunk hashes, and state.
 - `captures/<session>/chunk-*.ci16`: atomic five-second, dual-RX IQ chunks.
+- `plots/<session>-survey.png` and `.json`: the pre-dwell survey of all eight
+  low-band edge tunings on both receivers, and every metric it computed.
+  Written outside the capture directory because retention removes that within
+  days, after which this is the only surviving evidence of what the receiver
+  was looking at when it chose where to dwell. The dashboard serves these only
+  when told where they are: `starlink-dashboard --survey-plot-dir`, which
+  defaults to `BEACON_ROOT/plots` and so has to be set explicitly wherever
+  captures stage locally and the dashboard reads the archive.
 - `reports/<session>.json`: structural, PSS, exact-pilot, control, CFO, and confidence evidence.
 - `reports/plots/<session>.png`: PSS, pilot/control margin, and CFO evidence.
 - `reports/followups/<session>.json`: dense replay and temporal-confirmation evidence.

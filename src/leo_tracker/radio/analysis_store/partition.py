@@ -20,6 +20,7 @@ from pathlib import Path
 import platform
 import shutil
 import tempfile
+import time
 import uuid
 
 from ..beacon.probe_index import report_date
@@ -265,7 +266,7 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
 
     target_dir = partition_dir(root, pipeline, date)
     target_dir.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(dir=work_dir, prefix="analysis-index-"))
+    work = Path(tempfile.mkdtemp(dir=work_dir, prefix=SCRATCH_PREFIX))
     staged: list[tuple[Path, Path]] = []
     try:
         database = work / "partition.duckdb"
@@ -334,6 +335,41 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
         for temporary, _ in staged:
             Path(temporary).unlink(missing_ok=True)
         shutil.rmtree(work, ignore_errors=True)
+
+
+#: A build database is discarded on the way out, but a build that is killed
+#: rather than raised leaves it behind, at roughly 10 MB per run of the
+#: partition it was assembling. Under systemd that accumulates in the cache
+#: directory until something reclaims it.
+SCRATCH_PREFIX = "analysis-index-"
+STALE_SCRATCH_S = 6 * 3600
+
+
+def sweep_stale_scratch(work_dir: Path | None, *,
+                        older_than_s: float = STALE_SCRATCH_S) -> list[str]:
+    """Remove build scratch abandoned by an interrupted build.
+
+    Age rather than liveness decides, because a pid can be reused and the
+    advisory lock does not stop a second builder. The largest partition here
+    assembles in about ninety minutes, so anything untouched for six hours
+    belonged to a process that is not coming back, and a concurrent builder's
+    directory is never old enough to qualify.
+    """
+    base = Path(work_dir) if work_dir is not None else Path(tempfile.gettempdir())
+    swept = []
+    now = time.time()
+    for path in sorted(base.glob(f"{SCRATCH_PREFIX}*")):
+        if not path.is_dir():
+            continue
+        try:
+            if now - path.stat().st_mtime < older_than_s:
+                continue
+            shutil.rmtree(path, ignore_errors=True)
+        except OSError:
+            continue
+        if not path.exists():
+            swept.append(str(path))
+    return swept
 
 
 def read_connection(root: Path, *, memory_limit: str = "2GB", threads: int = 2):
@@ -421,6 +457,7 @@ def build(root: Path, shared_root: Path, *, rebuild: bool = False,
         if not held:
             return {"schema": PARTITION_SCHEMA, "built": [], "current": [],
                     "partition_count": 0, "skipped_locked": True}
+        swept = sweep_stale_scratch(work_dir)
         results, skipped = [], []
         for (pipeline, date), signatures in sorted(
                 signatures_by_unit(shared_root).items()):
@@ -435,4 +472,4 @@ def build(root: Path, shared_root: Path, *, rebuild: bool = False,
                                            work_dir=work_dir))
         return {"schema": PARTITION_SCHEMA, "built": results, "current": skipped,
                 "partition_count": len(results) + len(skipped),
-                "skipped_locked": False}
+                "swept_scratch": swept, "skipped_locked": False}

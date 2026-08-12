@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,7 @@ from leo_tracker.radio.analysis_store.partition import (PARTITION_SCHEMA,
                                                         partition_status,
                                                         partition_units,
                                                         read_connection,
+                                                        sweep_stale_scratch,
                                                         temporary_path)
 from leo_tracker.radio.cli import main as radio_main
 
@@ -545,6 +547,71 @@ def test_the_index_can_be_written_beside_the_reports_it_reads(tmp_path):
     assert (partition_dir(elsewhere, KALMAN, "2026-08-11")
             / "analysis_runs.parquet").is_file()
     assert not (tmp_path / "reports" / "analysis-index").exists()
+
+
+# -------------------------------------------------------------- build scratch
+
+def test_scratch_from_an_interrupted_build_is_swept(tmp_path):
+    """A build that is killed rather than raised leaves its database behind.
+
+    At roughly 10 MB per run of the partition it was assembling, and under
+    systemd in a cache directory nothing else reclaims, that accumulates until
+    it matters. Two killed builds left 6 GB behind in practice.
+    """
+    work = tmp_path / "scratch"
+    work.mkdir()
+    orphan = work / "analysis-index-deadbeef"
+    orphan.mkdir()
+    (orphan / "partition.duckdb").write_bytes(b"x" * 1024)
+    old = time.time() - 12 * 3600
+    os.utime(orphan, (old, old))
+
+    swept = sweep_stale_scratch(work)
+
+    assert swept == [str(orphan)]
+    assert not orphan.exists()
+
+
+def test_a_concurrent_builders_scratch_is_never_swept(tmp_path):
+    """The advisory lock does not stop a second builder, so the sweep must not
+    depend on being the only one running.
+
+    Age decides rather than liveness: a pid can be reused, and deleting a live
+    builder's database mid-partition would be far worse than leaking one.
+    """
+    work = tmp_path / "scratch"
+    work.mkdir()
+    live = work / "analysis-index-inflight"
+    live.mkdir()
+    (live / "partition.duckdb").write_bytes(b"x" * 1024)
+
+    assert sweep_stale_scratch(work) == []
+    assert live.is_dir()
+
+
+def test_a_build_sweeps_before_it_starts(tmp_path):
+    _run(tmp_path)
+    work = tmp_path / "scratch"
+    work.mkdir()
+    orphan = work / "analysis-index-stale"
+    orphan.mkdir()
+    old = time.time() - 12 * 3600
+    os.utime(orphan, (old, old))
+
+    result = build(tmp_path, tmp_path, work_dir=work)
+
+    assert result["swept_scratch"] == [str(orphan)]
+    assert result["built"] != []
+
+
+def test_a_finished_build_leaves_no_scratch(tmp_path):
+    _run(tmp_path)
+    work = tmp_path / "scratch"
+    work.mkdir()
+
+    build(tmp_path, tmp_path, work_dir=work)
+
+    assert list(work.glob("analysis-index-*")) == []
 
 
 # ----------------------------------------------------------------- deployment

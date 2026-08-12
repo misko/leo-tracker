@@ -275,12 +275,28 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
             connection.execute(f"SET memory_limit='{memory_limit}'")
             connection.execute(f"SET threads={int(threads)}")
             initialize(connection)
+            excluded = []
             for recording_id in sorted(sources):
-                manifest = build_input_manifest(shared_root, recording_id, pipeline)
-                manifest, completion, documents = load_authenticated(
-                    manifest, shared_root)
-                rows = relational_rows(manifest, completion, documents, shared_root)
-                store.commit_run(connection, manifest, completion, rows)
+                try:
+                    manifest = build_input_manifest(shared_root, recording_id,
+                                                    pipeline)
+                    manifest, completion, documents = load_authenticated(
+                        manifest, shared_root)
+                    rows = relational_rows(manifest, completion, documents,
+                                           shared_root)
+                    store.commit_run(connection, manifest, completion, rows)
+                except Exception as exc:
+                    # A report is one mutable path shared by every pipeline and
+                    # every re-analysis, while receipts are per-pipeline and
+                    # immutable. Re-analysing a recording therefore leaves older
+                    # receipts attesting to a file that no longer exists, and
+                    # roughly a tenth of this corpus is in that state
+                    # permanently. Aborting would mean the projection can never
+                    # be built at all; excluding the run keeps it buildable, and
+                    # naming the run keeps the loss visible rather than silent.
+                    excluded.append({"recording_id": recording_id,
+                                     "error_type": type(exc).__name__,
+                                     "error": str(exc)[:200]})
             counts, nulls = {}, {}
             for table in PROJECTED_TABLES:
                 final = target_dir / f"{table}.parquet"
@@ -308,7 +324,8 @@ def build_partition(root: Path, shared_root: Path, pipeline: str, date: str, *,
         # newer data, which reads as not-current and rebuilds.
         record = {"schema": PARTITION_SCHEMA, "pipeline": pipeline, "date": date,
                   "run_count": len(sources), "sources": sources, "rows": counts,
-                  "signatures": signatures,
+                  "signatures": signatures, "excluded": excluded,
+                  "excluded_count": len(excluded),
                   "nulls": nulls, "tables": list(PROJECTED_TABLES),
                   "built_utc": datetime.now(timezone.utc).isoformat()}
         _atomic_json(manifest_path(root, pipeline, date), record)
@@ -377,13 +394,19 @@ def partition_status(root: Path, shared_root: Path) -> dict:
             entry["built"] = recorded.get("run_count")
             entry["built_utc"] = recorded.get("built_utc")
             entry["rows"] = recorded.get("rows", {}).get("analysis_runs")
+            # Surfaced here because a partition that projected a tenth of its
+            # receipts is still "current"; without a number, that reads as
+            # completeness.
+            entry["excluded"] = recorded.get("excluded_count", 0)
             if recorded.get("nulls"):
                 entry["null_columns"] = {
                     table: sorted(columns)
                     for table, columns in recorded["nulls"].items()}
         partitions.append(entry)
     return {"schema": PARTITION_SCHEMA, "partitions": partitions,
-            "partition_count": len(partitions), "stale_count": stale}
+            "partition_count": len(partitions), "stale_count": stale,
+            "excluded_total": sum(entry.get("excluded") or 0
+                                  for entry in partitions)}
 
 
 def build(root: Path, shared_root: Path, *, rebuild: bool = False,

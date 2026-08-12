@@ -439,18 +439,71 @@ def test_an_empty_partition_is_reported_rather_than_written(tmp_path):
     assert not partition_dir(tmp_path, KALMAN, "2026-08-11").exists()
 
 
-def test_a_receipt_whose_shape_drifted_fails_the_build(tmp_path):
-    """A drifted report must fail loudly rather than yield nulls.
+def test_a_superseded_report_excludes_its_run_rather_than_failing(tmp_path):
+    """One unauthenticatable run must not cost the whole projection.
 
-    Nulls read downstream as an absence of detections, which is the same shape
-    as a working pipeline finding nothing.
+    A report is a single mutable path shared by every pipeline and every
+    re-analysis, while receipts are per-pipeline and immutable. Re-analysing a
+    recording leaves older receipts attesting to a file that no longer exists,
+    and roughly a tenth of the real corpus is in that state permanently.
+    Aborting the build would mean it can never complete at all.
     """
+    _run(tmp_path, name=AUGUST_11)
+    _run(tmp_path, name="ch4-lower-edge-narrow-20260811T170000Z")
+    analysis = tmp_path / "reports" / f"{AUGUST_11}.json"
+    analysis.write_text(analysis.read_text() + " ")  # same JSON, new digest
+
+    result = build_partition(tmp_path, tmp_path, KALMAN, "2026-08-11")
+
+    assert result["built"] is True
+    assert result["rows"]["analysis_runs"] == 1, "the healthy run still projects"
+    assert result["excluded_count"] == 1
+    assert result["excluded"][0]["recording_id"] == AUGUST_11
+    assert "changed" in result["excluded"][0]["error"]
+
+
+def test_an_excluded_run_does_not_provoke_an_endless_rebuild(tmp_path):
+    """The exclusion is permanent, so the partition must settle as current.
+
+    Treating a superseded report as drift would rebuild its partition on every
+    firing of the timer, forever, and never fix anything.
+    """
+    _run(tmp_path)
+    analysis = tmp_path / "reports" / f"{AUGUST_11}.json"
+    analysis.write_text(analysis.read_text() + " ")
+    build_partition(tmp_path, tmp_path, KALMAN, "2026-08-11")
+
+    assert partition_is_current(tmp_path, KALMAN, "2026-08-11",
+                                partition_signatures(tmp_path, KALMAN, "2026-08-11"))
+    assert build(tmp_path, tmp_path)["built"] == []
+
+
+def test_status_counts_what_was_excluded(tmp_path):
+    """A partition that projected a tenth of its receipts is still current;
+    without a number that reads as completeness."""
+    _run(tmp_path)
+    analysis = tmp_path / "reports" / f"{AUGUST_11}.json"
+    analysis.write_text(analysis.read_text() + " ")
+    build(tmp_path, tmp_path)
+
+    status = partition_status(tmp_path, tmp_path)
+
+    assert status["partitions"][0]["excluded"] == 1
+    assert status["excluded_total"] == 1
+
+
+def test_a_structurally_broken_report_is_named_not_swallowed(tmp_path):
+    """Exclusion is not silence: the run and its reason are both recorded."""
     _run(tmp_path)
     analysis = tmp_path / "reports" / f"{AUGUST_11}.json"
     analysis.write_text(json.dumps({"schema": "leo-tracker.starlink-beacon-analysis/v1"}))
 
-    with pytest.raises(Exception):
-        build_partition(tmp_path, tmp_path, KALMAN, "2026-08-11")
+    result = build_partition(tmp_path, tmp_path, KALMAN, "2026-08-11")
+
+    assert result["excluded_count"] == 1
+    excluded = result["excluded"][0]
+    assert excluded["recording_id"] == AUGUST_11
+    assert excluded["error_type"] and excluded["error"]
 
 
 def test_the_cli_builds_reports_and_queries(tmp_path, capsys):

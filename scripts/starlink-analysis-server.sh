@@ -39,6 +39,10 @@ duration_window="${LEO_ANALYSIS_DURATION_WINDOW:-200}"
 pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
 archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
+# Survey probes are 12.8 MB each and live inside capture directories that
+# retention removes whole. On by default while detector work is under way.
+survey_corpus_mode="${LEO_ANALYSIS_SURVEY_CORPUS_MODE:-on}"
+survey_corpus_random_fraction="${LEO_ANALYSIS_SURVEY_CORPUS_FRACTION:-0.05}"
 archive_root="${LEO_ANALYSIS_ARCHIVE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
 retention_mode="${LEO_ANALYSIS_RETENTION_MODE:-disabled}"
 # Optional shadow projection. Workers publish only immutable input manifests;
@@ -511,6 +515,18 @@ process_job() {
       return 1
     else
       emit "archive_deferred worker=${worker_id} job=${name} mode=shadow"
+    fi
+  fi
+  # Preserve this capture's survey probe before retention removes the whole
+  # directory. Measured on the live system a probe survives about three hours,
+  # and every detector measurement planned depends on probes outliving that.
+  # Shadow: a corpus that failed to grow is a slower experiment, while a job
+  # that failed because of one is a capture nobody analysed.
+  if [[ "${survey_corpus_mode:-on}" != off ]]; then
+    if ! run_stage "${worker_id}" "${name}" survey_corpus radio \
+        starlink-survey-corpus sample "${root}" \
+        --random-fraction "${survey_corpus_random_fraction:-0.05}"; then
+      emit "shadow_stage_failed worker=${worker_id} job=${name} stage=survey_corpus production_affected=false"
     fi
   fi
   emit "coverage_result worker=${worker_id} job=${name} full_coverage=${full_coverage} has_checks=${has_checks} archived=${archived}"

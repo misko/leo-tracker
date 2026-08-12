@@ -950,6 +950,20 @@ def command_starlink_beacon_dashboard_row(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_survey_corpus(args: argparse.Namespace) -> int:
+    """Preserve survey probes before retention removes their captures."""
+    from .beacon.survey_corpus import corpus_status, sample
+    corpus = args.corpus_root or (Path(args.root) / "surveys" / "corpus")
+    if args.action == "status":
+        print(json.dumps(corpus_status(args.root, corpus), indent=2, sort_keys=True))
+        return 0
+    print(json.dumps(sample(args.root, corpus,
+                            random_fraction=args.random_fraction,
+                            budget_bytes=args.budget_bytes, seed=args.seed),
+                     indent=2, sort_keys=True))
+    return 0
+
+
 def command_starlink_probe_index(args: argparse.Namespace) -> int:
     """Build, inspect or query the per-probe projection."""
     from .beacon.probe_index import (ProbeIndexUnavailable, build,
@@ -2546,6 +2560,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=["space-track", "huggingface"],
         help="catalog providers whose per-source fit to record")
     dashboard_row.set_defaults(handler=command_starlink_beacon_dashboard_row)
+    survey_corpus = commands.add_parser("starlink-survey-corpus",
+        help="preserve survey probes before retention removes their captures")
+    survey_corpus.add_argument("action", choices=("sample", "status"))
+    survey_corpus.add_argument("root", type=Path,
+        help="shared root holding captures/")
+    survey_corpus.add_argument("--corpus-root", type=Path,
+        help="where probes are preserved; defaults to ROOT/surveys/corpus")
+    survey_corpus.add_argument("--random-fraction", type=float, default=0.05,
+        help="share of probes kept regardless of what the detector thought; "
+             "the only stratum unbiased by construction")
+    survey_corpus.add_argument("--budget-bytes", type=int,
+        default=64 * 1024 ** 3,
+        help="ceiling on the whole corpus; about 5000 probes at 12.8 MB each")
+    survey_corpus.add_argument("--seed", type=int,
+        help="fix the random draw, for a reproducible sample")
+    survey_corpus.set_defaults(handler=command_starlink_survey_corpus)
     probe_index = commands.add_parser("starlink-probe-index",
         help="project per-probe facts into day-partitioned parquet")
     probe_index.add_argument("action", choices=("build", "status", "query"))

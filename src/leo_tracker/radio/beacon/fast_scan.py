@@ -347,7 +347,68 @@ def probe(samples: np.ndarray, bank: KernelBank, *,
             "frequency_offset_hz": float(bank.offsets_hz[chosen[best]]),
             "folded_score": float(folded[best]), "folded_median": median,
             "peak_to_median": float(folded[best] / max(median, 1e-20)),
-            "kernel_count": bank.size, "edge": bank.edge}
+            "kernel_count": bank.size, "edge": bank.edge,
+            **_corroboration(folded, per_offset, scored, chosen, best, power)}
+
+
+#: Samples either side of the winning epoch treated as the same detection.
+#: A pilot smears across a few lags, so a neighbour is the same evidence rather
+#: than a second, independent one.
+EPOCH_GUARD_SAMPLES = 8
+
+
+def _corroboration(folded, per_offset, scored, chosen, best, power) -> dict:
+    """Evidence about the peak beyond how far it stands above the median.
+
+    All of it comes from arrays the correlation already produced, so it costs
+    about six percent on top of a probe and no radio time at all.
+
+    Peak-to-median asks one question — is the winner large — and answers it
+    from the same fold that produced the winner. These ask different ones:
+
+    ``anchor_agreement`` counts how many of the anchor symbols independently
+    pick the winning epoch. A pilot repeats at every anchor; a fluctuation does
+    not, and on noise this is zero rather than merely small. It is
+    corroboration rather than another view of the same number.
+
+    ``offset_contrast`` is how much the winning frequency hypothesis beats the
+    worst. A narrowband pilot is localised in frequency and a broadband
+    disturbance lifts every hypothesis together, which peak-to-median cannot
+    distinguish because it divides that lift out of both terms.
+
+    ``peak_to_p99`` and ``peak_to_second`` re-normalise against the tail rather
+    than the middle.  The median is insensitive to a heavy tail, so
+    peak-to-median flatters a distribution that has one.
+
+    ``mean_power`` is the only absolute quantity here, and the only one that
+    can see a port that has gone dead or is saturating — a ratio divides that
+    away by construction.
+    """
+    guard = EPOCH_GUARD_SAMPLES
+    peak = float(folded[best])
+    ordered = np.sort(folded)
+    p99 = float(ordered[int(0.99 * (ordered.size - 1))])
+
+    without_peak = folded.copy()
+    without_peak[max(0, best - guard):best + guard + 1] = -np.inf
+    second = float(without_peak.max())
+
+    profile = per_offset[:, best]
+    weakest = float(profile.min())
+
+    per_anchor = scored[int(chosen[best])]           # (anchors, epochs)
+    agreement = int((np.abs(per_anchor.argmax(axis=1) - best) <= guard).sum())
+
+    return {"folded_p99": p99,
+            "peak_to_p99": peak / max(p99, 1e-20),
+            "second_score": second,
+            "peak_to_second": peak / max(second, 1e-20),
+            "offset_profile": [float(value) for value in profile],
+            "offset_contrast": float(profile.max() / max(weakest, 1e-20)),
+            "anchor_agreement": agreement,
+            "anchor_count": int(per_anchor.shape[0]),
+            "mean_power": float(power.mean()),
+            "peak_amplitude": float(np.sqrt(power.max()))}
 
 
 def warm_kernel(profile: ScanProfile = SURVEY_PROFILE,

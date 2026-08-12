@@ -30,6 +30,17 @@ SURVEY_SCHEMA = "leo-tracker.pre-dwell-survey/v1"
 LOW_BAND_TUNINGS: tuple[tuple[int, str], ...] = tuple(
     (channel, edge) for channel in (1, 2, 3, 4) for edge in ("lower", "upper"))
 
+#: Evidence carried alongside the verdict without being used to reach it.
+#: The threshold currently rests on peak-to-median alone, characterised
+#: against synthetic Gaussian noise; the field distribution sits close enough
+#: to it that the intended false-alarm rate is doubtful. These are what a
+#: later answer would be built from, and they can only be recovered from
+#: probes that stored them, so they are stored from the start.
+CORROBORATION_FIELDS = ("peak_to_p99", "peak_to_second", "offset_contrast",
+                        "offset_profile", "anchor_agreement", "anchor_count",
+                        "folded_p99", "second_score", "mean_power",
+                        "peak_amplitude")
+
 
 def summarise(outcome: dict, *, dwell_channel: int | None = None,
               dwell_region: str | None = None,
@@ -55,7 +66,12 @@ def summarise(outcome: dict, *, dwell_channel: int | None = None,
                 "frequency_offset_hz": scored["frequency_offset_hz"],
                 "epoch_s": scored["epoch_s"],
                 "folded_score": scored["folded_score"],
-                "folded_median": scored["folded_median"]})
+                "folded_median": scored["folded_median"],
+                # Recorded but not yet used to decide anything. Which of these
+                # separates a pilot from field interference better than
+                # peak-to-median is a question for the corpus, and it can only
+                # be asked of probes that kept them.
+                **{key: scored[key] for key in CORROBORATION_FIELDS}})
             if verdict:
                 active.append({"channel": entry["channel"],
                                "region": entry["region"],

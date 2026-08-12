@@ -17,5 +17,6 @@ WorkingDirectory=/home/satpi01/leo-tracker
 ExecStart=/home/satpi01/leo-tracker/scripts/starlink-probe-index-sync.sh /mnt/qnap01/mouse9911/leo
 TimeoutStartSec=3600
 
-[Install]
-WantedBy=multi-user.target
+# No [Install]: the timer activates this. Enabling the service itself would
+# run one conversion at boot and then never again, which looks like a working
+# installation until someone asks why the index is a day behind.

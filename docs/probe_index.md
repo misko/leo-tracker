@@ -28,8 +28,9 @@ can never fail to start because analysis tooling is absent. The cost is that
 the analysis host has to ask for it; `--check` reports whether it is present
 before anything else runs.
 
-To keep it fresh, install `deploy/systemd/leo-tracker-probe-index.{service,timer}`
-and `systemctl enable --now leo-tracker-probe-index.timer`.
+Step-by-step setup for the analysis host, including the systemd units and what
+to edit in them, is in
+[probe_index_kalman_setup.md](probe_index_kalman_setup.md).
 
 ## Why it is shaped this way
 

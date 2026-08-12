@@ -590,6 +590,65 @@ def test_beacon_capture_and_analysis_cli_end_to_end(tmp_path, capsys):
     assert '"stored_bytes": 160000' in capsys.readouterr().out
 
 
+def test_beacon_capture_files_the_pre_dwell_survey_in_the_manifest(
+        tmp_path, capsys, monkeypatch):
+    """What the scanner called active must travel with what the dwell recorded.
+
+    The manifest is embedded whole in the report, so filing it here is what
+    makes the two comparable later without a join on wall time.
+    """
+    from leo_tracker.radio.beacon import presurvey
+
+    monkeypatch.setattr(presurvey, "run_survey", lambda **kwargs: {
+        "schema": presurvey.SURVEY_SCHEMA, "state": "complete",
+        "active_count": 1, "total_ms": 372.0,
+        "dwell": {"channel": kwargs["dwell_channel"],
+                  "region": kwargs["dwell_region"]},
+        "active": [{"channel": 4, "region": "lower-edge", "receiver": 0}]})
+    capture = tmp_path / "surveyed"
+
+    assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
+                 "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
+                 "--block-size", "100", "--chunk-s", ".02", "--fake",
+                 "--channel-number", "4", "--region", "lower-edge",
+                 "--survey-before-dwell"]) == 0
+
+    manifest = json.loads((capture / "manifest.json").read_text())
+    survey = manifest["metadata"]["pre_dwell_survey"]
+    assert survey["active"] == [{"channel": 4, "region": "lower-edge",
+                                 "receiver": 0}]
+    assert survey["dwell"] == {"channel": 4, "region": "lower-edge"}
+    assert json.loads(capsys.readouterr().out)["survey_active"] == 1
+
+
+def test_a_capture_without_the_flag_carries_no_survey(tmp_path):
+    """The flag is the whole switch, so an absent survey stays absent."""
+    capture = tmp_path / "unsurveyed"
+
+    assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
+                 "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
+                 "--block-size", "100", "--chunk-s", ".02", "--fake"]) == 0
+
+    manifest = json.loads((capture / "manifest.json").read_text())
+    assert "pre_dwell_survey" not in manifest["metadata"]
+
+
+def test_a_failed_survey_still_yields_a_capture(tmp_path, capsys):
+    """A delayed capture is gone for good; a missing survey is an annotation."""
+    capture = tmp_path / "survey-failed"
+
+    # No radio is reachable under --fake, so the survey fails for real here
+    # rather than being made to fail.
+    assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
+                 "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
+                 "--block-size", "100", "--chunk-s", ".02", "--fake",
+                 "--survey-before-dwell"]) == 0
+
+    manifest = json.loads((capture / "manifest.json").read_text())
+    assert manifest["state"] == "complete"
+    assert manifest["metadata"]["pre_dwell_survey"]["state"] == "failed"
+
+
 def test_beacon_capture_records_operator_radio_and_receiver_labels(tmp_path, capsys):
     capture = tmp_path / "radio-provenance"
     assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",

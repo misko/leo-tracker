@@ -285,6 +285,17 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
     configured_gain_db = args.gain_db if args.gain_mode == "manual" else None
     config = RadioConfig(center_hz, args.sample_rate_hz, args.bandwidth_hz,
                          configured_gain_db, gain_mode=args.gain_mode)
+    # Before the capture claims the radio, not while it holds it: a USB context
+    # is an exclusive claim, and the two want opposite configurations. Roughly
+    # half a second against a dwell of two minutes.
+    survey = None
+    if getattr(args, "survey_before_dwell", False):
+        from .beacon.presurvey import run_survey
+        survey = run_survey(uri=args.uri, serial=args.serial,
+                            sample_rate_hz=args.sample_rate_hz,
+                            lnb_lo_hz=args.lnb_lo_hz,
+                            dwell_channel=args.channel_number,
+                            dwell_region=args.region)
     if args.fake:
         count = round(args.duration_s * args.sample_rate_hz)
         period = max(1, round(args.sample_rate_hz / 750))
@@ -326,6 +337,7 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
                       "nominal_rf_hz": nominal_center_hz + args.lnb_lo_hz,
                       "configured_tuning_offset_hz": center_hz - nominal_center_hz,
                       "tuning_basis": "published Starlink channel and edge-pilot geometry",
+                      **({"pre_dwell_survey": survey} if survey else {}),
                       **experiment_metadata})
     finally:
         if "queued" in locals():
@@ -334,6 +346,9 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
     print(json.dumps({"capture": str(args.output), "state": manifest["state"],
         "samples_per_receiver": manifest["captured_samples_per_receiver"],
         "stored_bytes": manifest["stored_bytes"], "rf_center_hz": manifest["rf_center_hz"],
+        **({"survey_state": survey["state"],
+            "survey_active": survey.get("active_count"),
+            "survey_ms": survey.get("total_ms")} if survey else {}),
         "radio_id": identity.get("radio_id"),
         "radio_serial": identity.get("serial"), "radio_uri": identity.get("uri")},
         sort_keys=True))
@@ -2087,6 +2102,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="stable operator label for this physical Pluto")
     beacon_capture.add_argument("--receiver-labels", nargs=2, metavar=("RX0", "RX1"),
         help="physical LNB/feed labels connected to RX0 and RX1")
+    beacon_capture.add_argument("--survey-before-dwell", action="store_true",
+        help="survey the eight low-band edge tunings once before recording, and "
+             "file the verdict in the manifest; observational, never gating")
     beacon_capture.add_argument("--host-temperature-c", type=float)
     beacon_capture.add_argument("--radio-temperature-c", type=float)
     beacon_capture.add_argument("--fake", action="store_true")

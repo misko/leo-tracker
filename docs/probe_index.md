@@ -45,10 +45,20 @@ More importantly it is a contract: a report whose shape has drifted fails the
 ingest instead of quietly yielding nulls, which read downstream as an absence
 of detections rather than as a broken pipeline.
 
-**Partitions record what they were built from.** A day that gains reports is
-rebuilt rather than answering from a stale projection. A derived table that
-silently disagrees with its source is worse than no derived table, because both
-produce plausible answers and only one is right.
+**Partitions record what they were built from**, as a signature per report —
+size and mtime — not as a count. A day that gains reports is rebuilt, and so is
+a day whose reports were *rewritten*: re-analysis replaces a report in place
+without changing how many there are, so a count cannot see it and the day would
+answer with the superseded analysis for as long as it exists. Backfills do
+exactly this. A derived table that silently disagrees with its source is worse
+than no derived table, because both produce plausible answers and only one is
+right.
+
+Stat rather than a digest: reports here are written once by the analysis host
+and never re-copied, so nothing produces a changed mtime without changed
+content. Checking a full day costs 0.23 s against a 96.5 s rebuild. The sibling
+projection in `docs/analysis_parquet_projection.md` needs a second digest tier
+because its receipts *are* re-copied; this one does not.
 
 **Overlapping builders are safe.** Each stages to a file named for its host and
 process and renames atomically, so correctness never rests on the advisory

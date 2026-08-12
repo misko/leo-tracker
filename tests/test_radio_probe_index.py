@@ -146,6 +146,38 @@ def test_a_day_that_gained_reports_is_no_longer_current(tmp_path):
                                     source_reports(tmp_path, "2026-08-11"))
 
 
+def test_a_reanalysed_report_makes_its_day_stale(tmp_path):
+    """Re-analysis rewrites a report without changing how many there are.
+
+    A count alone cannot see this, and the failure is silent: the projection
+    keeps answering with the superseded analysis for as long as the day exists.
+    Backfills rewrite reports in place, so this is the expected path, not an
+    exotic one.
+    """
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z")
+    build_partition(tmp_path, "2026-08-11")
+    assert partition_is_current(tmp_path, "2026-08-11",
+                                source_reports(tmp_path, "2026-08-11"))
+
+    # Same name, same day, same count: only the content is newer.
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z", probes=5)
+
+    assert not partition_is_current(tmp_path, "2026-08-11",
+                                    source_reports(tmp_path, "2026-08-11"))
+
+
+def test_a_rebuild_after_reanalysis_carries_the_new_content(tmp_path):
+    """The point of noticing: the projection must actually change."""
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z")
+    before = build_partition(tmp_path, "2026-08-11")
+
+    _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z", probes=5)
+    after = build(tmp_path)
+
+    assert [item["date"] for item in after["built"]] == ["2026-08-11"]
+    assert after["built"][0]["rows"] != before["rows"]
+
+
 def test_build_skips_days_that_are_already_current(tmp_path):
     _report(tmp_path, "ch4-lower-edge-narrow-20260810T120000Z")
     _report(tmp_path, "ch4-lower-edge-narrow-20260811T120000Z")

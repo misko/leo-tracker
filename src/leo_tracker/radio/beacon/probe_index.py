@@ -189,21 +189,52 @@ def source_reports(root: Path, date: str, pattern: str = "*narrow*") -> list[Pat
                   if report_date(path.name) == date)
 
 
+def source_signatures(sources: list[Path]) -> dict:
+    """Each report as ``{name: [bytes, mtime_ns]}``.
+
+    Identity is a signature rather than a count on purpose: re-analysis
+    rewrites a report in place without changing how many there are, so a count
+    cannot see it and the projection would keep answering with the superseded
+    analysis for as long as the day exists. Backfills do exactly this, which
+    makes it the expected path rather than an exotic one.
+
+    Stat rather than a digest, because reports on this share are written once
+    by the analysis host and never re-copied, so there is nothing to produce a
+    changed mtime without changed content. The cost argues the same way:
+    digesting a day of reports is comparable to rebuilding it outright.
+    """
+    signatures = {}
+    for path in sources:
+        try:
+            stat = path.stat()
+        except OSError:                     # vanished mid-scan: treat as changed
+            signatures[path.name] = None
+            continue
+        signatures[path.name] = [stat.st_size, stat.st_mtime_ns]
+    return signatures
+
+
 def partition_is_current(root: Path, date: str, sources: list[Path]) -> bool:
     """Whether a built partition still matches the reports it came from.
 
-    Compares the source count rather than trusting the file to exist. A day
-    that gained reports after being built would otherwise answer questions
-    from a stale projection, which is the failure this whole module exists to
-    avoid reproducing.
+    Compares recorded signatures rather than trusting the file to exist. A day
+    that gained *or rewrote* reports after being built would otherwise answer
+    questions from a stale projection, which is the failure this whole module
+    exists to avoid reproducing.
     """
     try:
         recorded = json.loads(_manifest_path(root, date).read_text())
     except (OSError, ValueError):
         return False
-    return (partition_path(root, date).is_file()
-            and recorded.get("source_count") == len(sources)
-            and recorded.get("schema") == PROBE_INDEX_SCHEMA)
+    if not (partition_path(root, date).is_file()
+            and recorded.get("schema") == PROBE_INDEX_SCHEMA):
+        return False
+    signatures = recorded.get("source_signatures")
+    if signatures is None:
+        # Built before signatures were recorded. Rebuild once rather than
+        # trust a count, which is what this replaced.
+        return False
+    return signatures == source_signatures(sources)
 
 
 def build_partition(root: Path, date: str, *, pattern: str = "*narrow*",
@@ -233,7 +264,9 @@ def build_partition(root: Path, date: str, *, pattern: str = "*narrow*",
         raise
     os.replace(temporary, target)
     manifest = {"schema": PROBE_INDEX_SCHEMA, "date": date,
-                "source_count": len(sources), "rows": int(rows),
+                "source_count": len(sources),
+                "source_signatures": source_signatures(sources),
+                "rows": int(rows),
                 "built_utc": datetime.now(timezone.utc).isoformat().replace(
                     "+00:00", "Z"),
                 "pattern": pattern}

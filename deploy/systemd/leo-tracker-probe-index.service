@@ -1,6 +1,9 @@
 [Unit]
-Description=Project per-probe beacon facts into day-partitioned parquet
+Description=Convert beacon reports into the queryable probe index
 After=network-online.target
+# The projection is derived from reports on shared storage. Without the mount
+# there is nothing to convert, and a run that "succeeds" against an absent
+# directory would report an empty index rather than a missing filesystem.
 ConditionPathIsDirectory=/mnt/qnap01/mouse9911/leo/reports
 
 [Service]
@@ -8,9 +11,11 @@ Type=oneshot
 User=satpi01
 WorkingDirectory=/home/satpi01/leo-tracker
 # Only days whose report count has moved are rebuilt, so in steady state this
-# touches today alone. Niced and idle-IO because it shares a three-gigabyte
-# host with two continuous captures.
-Nice=19
-IOSchedulingClass=idle
-ExecStart=/home/satpi01/leo-tracker/.venv/bin/leo-radio starlink-probe-index build /mnt/qnap01/mouse9911/leo
+# touches the current day alone and stops touching it once the day closes.
+# The script nices itself; both hosts that might run it are doing work that
+# matters more, capture on one and DSP on the other.
+ExecStart=/home/satpi01/leo-tracker/scripts/starlink-probe-index-sync.sh /mnt/qnap01/mouse9911/leo
 TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

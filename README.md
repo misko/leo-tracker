@@ -331,6 +331,13 @@ again whenever an LNB is swapped, moved, or replaced with a different model:
 paired difference is the only unbiased measurement, and why correcting each
 receiver's own search beats retuning the pair.
 
+Asking what the corpus shows means reading thousands of reports totalling tens
+of gigabytes, which pushes most analysis into sampling. The analysis host keeps
+a projection of the per-probe columns as day-partitioned Parquet, some five
+hundred times smaller, so those questions are answered in milliseconds against
+SQL: [docs/probe_index.md](docs/probe_index.md). The reports remain the system
+of record, and the index can be deleted and rebuilt from them at any time.
+
 ## Current milestone
 
 The pipeline has progressed from blind edge-beacon acquisition through

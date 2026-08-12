@@ -8,6 +8,7 @@ import argparse
 from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -344,12 +345,27 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
         if "queued" in locals():
             queued.close()
         source.close()
+    waterfall = None
+    if survey and args.survey_waterfall_dir:
+        # After the dwell, with the radio idle and the samples still in hand.
+        # The capture directory this came from will be removed by retention;
+        # the picture and its numbers are written where retention does not
+        # reach, because after that they are the only surviving evidence of
+        # what the receiver was looking at.
+        from .beacon.survey_waterfall import write as write_waterfall
+        waterfall = write_waterfall(
+            survey_samples, survey, Path(args.survey_waterfall_dir),
+            Path(args.output).name, sample_rate_hz=args.sample_rate_hz,
+            receiver_labels=identity.get("receiver_labels"))
     print(json.dumps({"capture": str(args.output), "state": manifest["state"],
         "samples_per_receiver": manifest["captured_samples_per_receiver"],
         "stored_bytes": manifest["stored_bytes"], "rf_center_hz": manifest["rf_center_hz"],
         **({"survey_state": survey["state"],
             "survey_active": survey.get("active_count"),
             "survey_ms": survey.get("total_ms")} if survey else {}),
+        **({"survey_waterfall": waterfall.get("state"),
+            "survey_waterfall_bytes": waterfall.get("bytes")}
+           if waterfall else {}),
         "radio_id": identity.get("radio_id"),
         "radio_serial": identity.get("serial"), "radio_uri": identity.get("uri")},
         sort_keys=True))
@@ -2111,6 +2127,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="also store the survey's raw ci16 beside the capture, so a later "
              "analysis can re-decide from the signal rather than the verdict; "
              "about 12.8 MB per capture at an 80 ms probe")
+    beacon_capture.add_argument("--survey-waterfall-dir", type=Path,
+        default=os.environ.get("LEO_BEACON_SURVEY_WATERFALL_DIR") or None,
+        help="write the survey waterfall and its full metrics here, outside "
+             "the capture so both outlive it; the dashboard's plots/ directory "
+             "is the intended home. About 2.5 MB per capture")
     beacon_capture.add_argument("--host-temperature-c", type=float)
     beacon_capture.add_argument("--radio-temperature-c", type=float)
     beacon_capture.add_argument("--fake", action="store_true")

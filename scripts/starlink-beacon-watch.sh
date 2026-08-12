@@ -93,6 +93,13 @@ gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-a
 # having failed and the recording proceeds.
 survey_before_dwell="${LEO_BEACON_SURVEY_BEFORE_DWELL:-1}"
 keep_survey_iq="${LEO_BEACON_KEEP_SURVEY_IQ:-1}"
+# A waterfall per survey, plus every metric it computed, written outside the
+# capture so both outlive it. On while scanning reliability is being worked
+# out: a number cannot show a detection sitting on the edge of the search, a
+# band lifted by interference, or a port saturating, and once retention has
+# removed the capture the picture is the only evidence left. About 2.5 MB per
+# capture, so roughly 1.9 GB a day across both radios.
+survey_waterfall_dir="${LEO_BEACON_SURVEY_WATERFALL_DIR:-${storage_root}/plots}"
 # The all-epoch v3 search is deliberately more expensive than the legacy
 # coherent grid.  These cadences keep analysis inside the following 120 s
 # capture on the Pi while retaining enough temporal samples to trigger the
@@ -301,6 +308,10 @@ capture_target() {
       # capture's 2.3 GB, and it shares the capture's lifecycle: retention
       # removes the directory whole, so this is not a durable archive.
       [[ "${keep_survey_iq}" == "1" ]] && survey_args+=(--keep-survey-iq)
+      # Needs the samples, so the picture follows whether they were kept.
+      if [[ "${keep_survey_iq}" == "1" && -n "${survey_waterfall_dir}" ]]; then
+        survey_args+=(--survey-waterfall-dir "${survey_waterfall_dir}")
+      fi
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \

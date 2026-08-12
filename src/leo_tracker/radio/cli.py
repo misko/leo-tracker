@@ -942,6 +942,31 @@ def command_starlink_probe_index(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_analysis_index(args: argparse.Namespace) -> int:
+    """Build, inspect or query the partitioned analysis projection."""
+    from .analysis_store.partition import (build, partition_status, query)
+    from .analysis_store.ingest import AnalysisStoreUnavailable
+    root = args.root if args.index_root is None else args.index_root
+    try:
+        if args.action == "build":
+            print(json.dumps(build(root, args.root, rebuild=args.rebuild,
+                                   limit=args.limit, work_dir=args.work_dir),
+                             indent=2, sort_keys=True, default=str))
+        elif args.action == "status":
+            print(json.dumps(partition_status(root, args.root),
+                             indent=2, sort_keys=True, default=str))
+        else:
+            if not args.sql:
+                print("--sql is required for query", file=sys.stderr)
+                return 2
+            for row in query(root, args.sql):
+                print(json.dumps(list(row), default=str))
+    except AnalysisStoreUnavailable as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
+    return 0
+
+
 def command_starlink_analysis_store(args: argparse.Namespace) -> int:
     """Operate the Kalman-owned transactional analysis store."""
     from .analysis_store.queue import StoreQueue, enqueue_backfill, owner_lock
@@ -2485,6 +2510,20 @@ def build_parser() -> argparse.ArgumentParser:
     probe_index.add_argument("--rebuild", action="store_true")
     probe_index.add_argument("--limit", type=int)
     probe_index.set_defaults(handler=command_starlink_probe_index)
+    analysis_index = commands.add_parser("starlink-analysis-index",
+        help="project authenticated analysis runs into partitioned parquet")
+    analysis_index.add_argument("action", choices=("build", "status", "query"))
+    analysis_index.add_argument("root", type=Path,
+        help="shared analysis root holding reports and completion receipts")
+    analysis_index.add_argument("--index-root", type=Path,
+        help="where partitions are written; defaults to ROOT")
+    analysis_index.add_argument("--sql", help="query to run against the projection")
+    analysis_index.add_argument("--rebuild", action="store_true")
+    analysis_index.add_argument("--limit", type=int,
+        help="stop after this many partitions are rebuilt")
+    analysis_index.add_argument("--work-dir", type=Path,
+        help="local scratch for the per-partition build database")
+    analysis_index.set_defaults(handler=command_starlink_analysis_index)
     analysis_store = commands.add_parser("starlink-analysis-store",
         help="ingest authenticated Kalman outputs into a single-owner DuckDB store")
     analysis_store.add_argument("action", choices=(

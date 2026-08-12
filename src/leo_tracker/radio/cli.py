@@ -1558,6 +1558,7 @@ def command_starlink_dashboard(args: argparse.Namespace) -> int:
     serve_dashboard(args.observation_dir, host=args.host, port=args.port,
                     passes_path=args.passes,
                     beacon_root=args.beacon_root,
+                    survey_plot_dir=args.survey_plot_dir,
                     analysis_store_pointer=args.analysis_store_pointer,
                     analysis_store_cache=args.analysis_store_cache,
                     samples_per_snapshot=args.samples_per_snapshot,
@@ -2896,6 +2897,10 @@ def build_parser() -> argparse.ArgumentParser:
                            help="expected-pass catalog; defaults to OBSERVATION_DIR/passes.json")
     dashboard.add_argument("--beacon-root", type=Path,
                            help="continuous exact-beacon storage root")
+    dashboard.add_argument("--survey-plot-dir", type=Path,
+        help="pre-dwell survey waterfalls written by starlink-beacon-capture; "
+             "defaults to BEACON_ROOT/plots, which is right only when the "
+             "capture host and the dashboard read the same storage root")
     dashboard.add_argument("--analysis-store-pointer", type=Path,
         help="verified shared analysis-store current.json pointer")
     dashboard.add_argument("--analysis-store-cache", type=Path,

@@ -203,10 +203,22 @@ def enqueue_manifest(store_root: Path, manifest: dict) -> Path:
 
 
 def validate_input_manifest(path: Path, shared_root: Path) -> tuple[dict, dict, dict]:
-    """Authenticate a queued manifest and return it, completion and documents."""
+    """Authenticate a queued manifest file and return it, completion and documents."""
     manifest = _json(Path(path))
+    if Path(path).stem != run_id_for_manifest(manifest):
+        raise ValueError("analysis-store run identity mismatch")
+    return load_authenticated(manifest, shared_root)
+
+
+def load_authenticated(manifest: dict, shared_root: Path) -> tuple[dict, dict, dict]:
+    """Authenticate an in-memory manifest against the sources it names.
+
+    The same checks as :func:`validate_input_manifest` minus the queue file, so
+    a projection builder can go from receipt to rows without a round trip
+    through a manifest on disk.
+    """
     expected = run_id_for_manifest(manifest)
-    if manifest.get("run_id") != expected or Path(path).stem != expected:
+    if manifest.get("run_id") != expected:
         raise ValueError("analysis-store run identity mismatch")
     root = Path(shared_root).resolve()
     completion_entry = manifest.get("completion") or {}

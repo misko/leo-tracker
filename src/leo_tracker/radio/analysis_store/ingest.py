@@ -104,10 +104,26 @@ class AnalysisStore:
         manifest, completion, documents = validate_input_manifest(
             Path(manifest_path), self.shared_root)
         rows = relational_rows(manifest, completion, documents, self.shared_root)
-        run_id = manifest["run_id"]
         connection = connect(self.database)
         try:
             initialize(connection)
+            return self.commit_run(connection, manifest, completion, rows,
+                                   fail_after=fail_after)
+        finally:
+            connection.close()
+
+
+    def commit_run(self, connection, manifest: dict, completion: dict,
+                   rows: dict, *, fail_after: str | None = None) -> dict:
+        """Commit one authenticated run through an already-open connection.
+
+        Split out so a projection builder can commit a whole partition on one
+        connection. Opening a connection per run is what leaves a live database
+        half free blocks: every commit lands a fresh set of 256 KB blocks
+        holding a handful of rows. The caller owns the connection and closes it.
+        """
+        run_id = manifest["run_id"]
+        try:
             if connection.execute("SELECT 1 FROM analysis_runs WHERE run_id = ?",
                                   [run_id]).fetchone():
                 return {"run_id": run_id, "inserted": False,
@@ -195,8 +211,6 @@ class AnalysisStore:
             except Exception:
                 pass
             raise
-        finally:
-            connection.close()
 
     def status(self) -> dict:
         if not self.database.is_file():

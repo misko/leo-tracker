@@ -68,6 +68,22 @@ def detection_threshold(shape: tuple[int, int]) -> float:
     """Peak-to-median a probe must beat for this bank shape."""
     return NOISE_CEILING.get(tuple(shape), FALLBACK_NOISE_CEILING)
 
+
+#: Median peak-to-median of the survey bank against a beacon carrying a fixed
+#: frequency offset, over six realisations at each point.  The bank spreads
+#: three hypotheses across +/-300 kHz and its matched filter is one OFDM symbol
+#: wide, so it tolerates a signal between the hypotheses but degrades sharply
+#: past the outermost one.
+#:
+#: The consequence matters more than the numbers: a receiver whose LNB sits
+#: about 436 kHz from its twin scores 1.38 at -6 dB against a 1.33 threshold,
+#: where the same beacon on-centre scores 2.58.  **A quiet verdict on an
+#: offset port is therefore not evidence of a quiet sky.**  Widening to five
+#: hypotheses over +/-500 kHz measured 2.09 at the same point and is the fix,
+#: but it needs its own noise-ceiling characterisation and a re-measured
+#: compute constant, so it is deliberately not folded in here.
+OFFSET_SENSITIVITY_DB6 = {0: 2.58, 200_000: 1.78, 436_000: 1.38}
+
 _SOURCE = Path(__file__).with_name("_scan_kernel.c")
 _CFLAGS = ["-O3", "-march=native", "-ffast-math", "-funroll-loops",
            "-fopenmp", "-fPIC", "-shared"]
@@ -389,6 +405,19 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     capture path left behind: a survey wants a shallow queue and a block the
     size of its probe, which is the opposite of what a long dwell wants.
 
+    Both receivers are scored from the same capture.  They arrive interleaved
+    whether or not anyone looks at the second one, so the only extra cost is
+    the arithmetic, and the capture this survey precedes keeps both — a survey
+    of one port cannot be set beside what that capture found.
+
+    Both are scored against the *same* bank, centred on zero.  Re-centring a
+    port's search on its own local oscillator is what the analysis path had to
+    do, and it does not transfer here: this bank spreads three hypotheses over
+    the whole span, so moving them onto the signal raises the median as much as
+    the peak and the ratio falls.  Measured on a 436 kHz offset at -3 dB, 1.41
+    centred against 1.61 as it stands.  :data:`OFFSET_SENSITIVITY_DB6` records
+    what that leaves uncovered.
+
     Timing is returned split by what the radio charges for, because the parts
     are not comparable to each other: retuning and draining are radio time that
     no amount of arithmetic can recover, while scoring is host time that can be
@@ -433,22 +462,33 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             while remaining > 0:
                 buffer.refill()
                 raw = np.frombuffer(buffer.read(), dtype=np.int16)
-                piece = (raw[0::4].astype(np.float32)
-                         + 1j * raw[1::4].astype(np.float32))
+                # i0 q0 i1 q1 per sample: one read carries both receivers.
+                piece = np.stack([raw[0::4] + 1j * raw[1::4],
+                                  raw[2::4] + 1j * raw[3::4]]).astype(np.complex64)
                 pieces.append(piece)
-                remaining -= piece.size
-            samples = np.ascontiguousarray(
-                np.concatenate(pieces)[:wanted].astype(np.complex64))
+                remaining -= piece.shape[1]
+            samples = np.concatenate(pieces, axis=1)[:, :wanted]
             timing["listen"] += time.perf_counter() - mark
 
             mark = time.perf_counter()
-            scored = probe(samples, bank, threads=threads)
+            scored = [{"receiver": index,
+                       **probe(np.ascontiguousarray(samples[index]), bank,
+                               threads=threads)}
+                      for index in range(samples.shape[0])]
             timing["compute"] += time.perf_counter() - mark
 
-            results.append({**scored, "channel": channel_number,
+            results.append({"channel": channel_number,
                             "region": f"{edge}-edge", "if_center_hz": centre,
-                            "rf_center_hz": centre + lnb_lo_hz})
+                            "rf_center_hz": centre + lnb_lo_hz,
+                            "edge": edge, "receivers": scored,
+                            # Either port seeing a pilot makes the channel
+                            # worth dwelling on, so a tuning ranks by its best.
+                            "peak_to_median": max(item["peak_to_median"]
+                                                  for item in scored)})
     finally:
+        # The binding has no explicit close: the buffer is freed when its last
+        # reference goes, and a leaked one holds the context so that whatever
+        # opens the radio next fails with EBUSY.
         del buffer
     results.sort(key=lambda item: item["peak_to_median"], reverse=True)
     total = sum(timing.values())
@@ -456,10 +496,13 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             "timing_ms": {k: v * 1000 for k, v in timing.items()},
             "total_ms": total * 1000,
             "per_tuning_ms": total * 1000 / max(len(tunings), 1),
+            "sample_rate_hz": float(sample_rate_hz),
+            "offset_span_hz": DEFAULT_OFFSET_SPAN_HZ,
             "profile": {"block_size": profile.block_size,
                         "kernel_buffers": profile.kernel_buffers,
                         "settle_buffers": profile.settle_buffers,
-                        "probe_s": profile.probe_s}}
+                        "probe_s": profile.probe_s,
+                        "shape": list(profile.shape)}}
 
 
 def verify_presence(samples: np.ndarray, bank: KernelBank, *,

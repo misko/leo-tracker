@@ -85,6 +85,13 @@ receiver_label_spec="${LEO_BEACON_RECEIVER_LABELS:-rx0 rx1}"
 exact_acquisition_method="${LEO_BEACON_EXACT_ACQUISITION_METHOD:-pilot_symbolwise_v3}"
 agc_probability_percent="${LEO_BEACON_AGC_PERCENT:-50}"
 gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-attack-v1}"
+# One survey of all eight low-band edge tunings immediately before each dwell,
+# filed in the capture manifest.  Without it a capture that found nothing is
+# indistinguishable from a sky that had nothing in it, and the channel choice
+# cannot be scored after the fact.  Roughly half a second against a 120 s
+# dwell, and it never gates the capture: a survey that fails is recorded as
+# having failed and the recording proceeds.
+survey_before_dwell="${LEO_BEACON_SURVEY_BEFORE_DWELL:-1}"
 # The all-epoch v3 search is deliberately more expensive than the legacy
 # coherent grid.  These cadences keep analysis inside the following 120 s
 # capture on the Pi while retaining enough temporal samples to trigger the
@@ -198,7 +205,7 @@ capture_target() {
     local target="$1" mode="$2" channel region stamp name capture name_attempt
     local pi_temp_millic pi_temp radio_temp_millic radio_temp
     local gain_draw gain_bucket gain_probability gain_mode
-    local -a temperature_args capture_args gain_args
+    local -a temperature_args capture_args gain_args survey_args
     while [[ "${preserve_raw}" == "1" ]] &&
           (( $(df -Pk "${storage_root}" | awk 'NR==2 {print $4}') < minimum_free_gb * 1024 * 1024 )); do
       printf '{"storage_backoff":true,"preserve_raw":true,"minimum_free_gb":%d}\n' \
@@ -282,10 +289,17 @@ capture_target() {
       capture_args=(--duration-s "${duration_s}" --sample-rate-hz 2500000
         --bandwidth-hz 2500000 --block-size 262144)
     fi
+    survey_args=()
+    # Only for the narrow dwell: a wide or oversampled capture is not a choice
+    # between the eight edge tunings, so a survey of them says nothing about it.
+    if [[ "${survey_before_dwell}" == "1" && "${mode}" == "narrow" &&
+          "${fake_source}" != "1" ]]; then
+      survey_args=(--survey-before-dwell)
+    fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \
       --channel-number "${channel}" --region "${region}" \
-      --observation-mode "${mode}" \
+      --observation-mode "${mode}" "${survey_args[@]}" \
       "${gain_args[@]}" --chunk-s 5 --queue-blocks 16 \
       "${temperature_args[@]}" "${source_args[@]}"
     pending_name="${name}"

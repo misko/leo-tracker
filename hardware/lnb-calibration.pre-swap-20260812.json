@@ -1,0 +1,50 @@
+{
+  "alerts": [],
+  "created_utc": "2026-08-12T19:01:53.291118Z",
+  "radios": {
+    "pluto-19f2": {
+      "measured": true,
+      "mismatch_hz": 434408.4,
+      "p10_hz": 431533.4,
+      "p90_hz": 441711.7,
+      "receiver_candidate_counts": [
+        527,
+        3835
+      ],
+      "receiver_labels": [
+        "lnb-c",
+        "lnb-d"
+      ],
+      "sample_count": 230,
+      "spread_hz": 10178.2
+    },
+    "pluto-5d4d": {
+      "measured": true,
+      "mismatch_hz": 4362.4,
+      "p10_hz": -4472.2,
+      "p90_hz": 9350.5,
+      "receiver_candidate_counts": [
+        4416,
+        3568
+      ],
+      "receiver_labels": [
+        "lnb-a",
+        "lnb-b"
+      ],
+      "sample_count": 2977,
+      "spread_hz": 13822.8
+    }
+  },
+  "receiver_centers_hz": {
+    "pluto-19f2": [
+      434408.4,
+      0.0
+    ],
+    "pluto-5d4d": [
+      0.0,
+      -4362.4
+    ]
+  },
+  "reports_examined": 900,
+  "schema": "leo-tracker.lnb-calibration/v1"
+}

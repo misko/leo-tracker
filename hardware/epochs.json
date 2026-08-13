@@ -1,0 +1,40 @@
+{
+  "schema": "leo-tracker.hardware-epochs/v1",
+  "note": "Receiver labels are reused across hardware changes: reports and corpus entries before and after a swap both say 'lnb-c'. These boundaries are the only way to separate them. Split on capture start time, not on label.",
+  "epochs": [
+    {
+      "id": "pluto-19f2.lnb-cd.gen1",
+      "radio_id": "pluto-19f2",
+      "receiver_labels": ["lnb-c", "lnb-d"],
+      "until_utc": "2026-08-13T04:38:23Z",
+      "uncertain_until_utc": "2026-08-13T04:46:20Z",
+      "measured": {
+        "lnb-c": {"absolute_offset_hz": 430700, "source": "lo_sweep corrected, 240 probes, n=13, SE 12600"},
+        "lnb-d": {"absolute_offset_hz": 20000, "source": "lo_sweep corrected, 240 probes, n=61, SE 5800"},
+        "mismatch_hz": 434408.4,
+        "mismatch_source": "lnb-calibration.json 2026-08-12T19:01:53Z, sample_count 230",
+        "survey_active_fraction": {"lnb-c": 0.065, "lnb-d": 0.212},
+        "survey_active_basis": "351 probes / 2808 tunings per receiver over 23.5 h before the swap"
+      },
+      "fault": "lnb-c detected 3.3x less often than lnb-d. Its +430 kHz LO offset costs only ~10% of survey score (the survey spans +/-700 kHz centred on zero and does not use receiver_centers), so the offset does not explain the deficit. The unit had a separate hardware fault."
+    },
+    {
+      "id": "pluto-19f2.lnb-cd.gen2",
+      "radio_id": "pluto-19f2",
+      "receiver_labels": ["lnb-c", "lnb-d"],
+      "from_utc": "2026-08-13T04:46:20Z",
+      "hardware_note": "Both units replaced at once and are identical to each other. Identical model does not imply identical LO: free-running crystals, no shared 10 MHz reference in the chain, so the two offsets are independent draws.",
+      "measured": null,
+      "pending": "absolute offsets unknown; measure with lo_sweep once ~40 post-swap corpus probes exist, then write measured_centers_hz"
+    }
+  ],
+  "unchanged": {
+    "radio_id": "pluto-5d4d",
+    "receiver_labels": ["lnb-a", "lnb-b"],
+    "note": "not touched by this swap; calibration entry remains valid"
+  },
+  "backups": [
+    "/mnt/qnap01/mouse9911/leo/reports/lnb-calibration.json.pre-swap-20260812T2144",
+    "hardware/lnb-calibration.pre-swap-20260812.json"
+  ]
+}

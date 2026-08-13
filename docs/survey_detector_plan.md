@@ -1,10 +1,10 @@
 # Survey detector: a staged plan
 
-Revision 4. Revisions 1–3 argued about the design. This one is mostly measured:
-three parallel investigations produced 63 million satellite-instants of geometry,
-14,608 injected trials across a CFO×SNR surface, and 18,250 trials across frame
-occupancy. Most of what those measurements found was not what the earlier
-revisions predicted.
+Revision 5. Revision 4 replaced the design arguments with measurements and kept
+one assumption: that the 300-symbol coherent detector was the destination and its
+search cost was the remaining problem. External work has since challenged that,
+and the architecture section is rewritten as a bake-off rather than a decision.
+The measured sections are unchanged.
 
 Status: proposed. Nothing here has changed the capture host.
 
@@ -12,13 +12,15 @@ Status: proposed. Nothing here has changed the capture host.
 
 ## The finding that reframes everything
 
-**The deployed detector cannot detect a single transmitted frame — at any
-strength.** With exactly one ON frame among 59 slots in an 80 ms probe, its
-detection probability is ≤0.012 at −21, −18, −15, −12, −9 *and* −6 dB. The
+**The deployed detector cannot detect a single transmitted frame anywhere in the
+tested range.** With exactly one ON frame among 59 slots in an 80 ms probe, its
+detection probability is ≤0.012 at every strength tested — −21, −18, −15, −12, −9
+and −6 dB. Untested outside that range; the claim is bounded by the experiment. The
 coherent full-frame detector finds that same frame with **Pd 0.94 at −21 dB**.
 
 The deployed statistic folds ~60 frame slots non-coherently and needs roughly
-**12–30 transmitted frames** in one probe to fire. Starlink occupancy runs as low
+**12–30 transmitted frames** in one probe to fire, at −9 to −6 dB against its own
+1% false-alarm threshold. Starlink occupancy runs as low
 as 2%. At that rate the fold sits at its false-alarm floor even on probes that do
 contain a transmission.
 
@@ -30,7 +32,7 @@ to replacing it.
 
 ## What is now measured
 
-### Span — ±320 kHz, and we already have ±350
+### Span — ±320 kHz before absolute-LO uncertainty, and we already have ±350
 
 From a 3-day, 2-second sweep of the whole catalogue against our own site,
 **63,035,467 satellite-instants**, with a vectorised propagator validated against
@@ -58,13 +60,15 @@ frequency — the 172 → 175.4 kHz fix an earlier revision made — addressed a
 error while a 19% one remained.
 
 **Doppler rate** bounds coherent integration at T ≤ 15.2 ms (all-sky p99.9),
-13.4 ms gated, **8.0 ms worst case**. Our frame is 1.33 ms, safe by 6×. Note that
+13.4 ms gated, **8.0 ms worst case**, under the criterion that the offset must not
+walk one frequency bin across the integration: `R·T ≤ 1/T`, so `T ≤ 1/√R`. Our frame is 1.33 ms, safe by 6×. Note that
 gating at 40° *multiplies* the rate 4.7×: high elevation is the fast part.
 
 ### Spacing — ≤125 kHz, and the requirement is SNR-dependent
 
-From 14,608 injected trials over CFO 0–900 kHz × SNR −16…−4 dB. Largest mismatch
-still holding Pd ≥ 0.9:
+From 14,608 injected trials over CFO 0–900 kHz × SNR −16…−4 dB. The table gives
+**hypothesis-to-hypothesis spacing**; worst residual mismatch to the nearest
+hypothesis is half of it. Largest spacing still holding Pd ≥ 0.9 everywhere:
 
 | SNR | max spacing |
 |---|---|
@@ -78,7 +82,7 @@ costs 6.6 dB at every SNR — what shrinks is the headroom. So ≤125 kHz is rig
 not because 125 is special but because it is the first step below what −12 dB
 demands, and −12 dB is where the detector stops working at all.
 
-`Pd < 0.5 at worst CFO`: **A −5.4 dB, E −13.3 dB** — a 7.5 dB gap.
+`Pd < 0.5 at worst CFO`: **A −5.4 dB, E −13.3 dB** — a 7.9 dB gap.
 
 ### Occupancy — the loss is real but it is not where anyone said
 
@@ -104,9 +108,11 @@ probe length becomes irrelevant entirely and **revisit spacing is the only lever
 
 ### Thresholds — the current one is not what it claims
 
-Calibrated on windows that are signal-free **by construction**: a *lower*-edge
+Calibrated on windows that are **target-pilot-free by construction**: a *lower*-edge
 bank scored on an *upper*-edge tuning, whose pilot codes sit 230 MHz away. No
-screening on the statistic being calibrated, so no circularity.
+screening on the statistic being calibrated, so no circularity. It is free of the
+*target pilot*, not of RF energy in general, and 230 MHz away the interference
+environment is not matched — hence the second null below.
 
 | | A | E | G |
 |---|---|---|---|
@@ -161,10 +167,14 @@ spacing come from independent measurements and both point here. Roughly 2× the
 scoring compute, ~50 ms per 80 ms probe. Deploy in shadow: the survey never gates
 a capture.
 
-**Adopt the cross-edge null** as the calibration method throughout. Getting
-signal-free windows by construction rather than by screening is better than
-anything currently in the repo, and it is what exposed the contaminated
-thresholds.
+**Adopt two nulls, not one.** The cross-edge null is target-pilot-free by
+construction, which is what exposed the contaminated thresholds — but it sits
+230 MHz away, so its interference environment is not ours. Pair it with a
+**same-tuning wrong-code null**: score the *rolled* pilot sequence on the *same*
+raw IQ, same tuning, same gain, same CFO search, same interference. The repository
+already computes exactly this (`control_symbol_roll=17`). One null is independent,
+the other is distribution-matched; agreement between them is a far stronger
+false-alarm argument than either alone.
 
 ---
 
@@ -176,43 +186,152 @@ was never determined. `measured_centers_hz` is absent from the calibration
 artifact. Every span above is centred on an imperfectly located origin. Only a
 direct absolute sweep closes this, and it needs radio time.
 
-**The timing stage searches ±300 kHz** (`acquisition.py:105-116`), below the
-298.4 kHz that Doppler-p99.9 + bias requires — and every later stage inherits its
-candidate CFO from there. That is the tight link in the chain, not the ±350 kHz
-grid.
+**The timing stage searches ±300 kHz** (`acquisition.py:105-116`). That clears
+Doppler-p99.9 + bias (298.4 kHz) by 1.6 kHz but falls **below the ±320 kHz the
+margin terms require** — and every later stage inherits its candidate CFO from
+there. It is the tight link in the chain, not the ±350 kHz grid.
 
-**The coherent detector's search cost.** Its full-frame template tolerates only
-~±375 Hz residual CFO, so covering the span needs on the order of 800 hypotheses
-against the deployed bank's 3. Its occupancy immunity is free; its search is not.
-This is the whole of the remaining problem.
+**Whether the expensive coherent detector is needed at all.** Its full-frame
+template tolerates ~±375 Hz residual CFO, so a brute-force search over the span
+would need ~800 hypotheses against the deployed bank's 3. That is the cost of *one
+implementation*, not a property of the signal — see the relative-phase section.
+
+---
+
+## Relative phase — external, unverified, and the reason Stage 3 is now a bake-off
+
+**Provenance: this work was not done in this repository and none of it has been
+verified here.** It arrived as a handoff describing experiments on 96 real
+tuning/receiver observations — 26 previously sequence-confirmed against 70
+unconfirmed. Its own author states the caveat plainly: the positive group was
+labelled using the previous coherent detector, so these are *exploratory
+separation ratios on a corpus with a contaminated label source*, not Pd/FAR
+measurements. The referenced artifacts are not reachable from this machine. It is
+recorded here as hypotheses with claimed support, and the injection harness is how
+they get settled.
+
+### The algebra, which needs no experiment
+
+For frame `m` and pilot symbol `i`, `z_{m,i} ≈ A_{m,i}·exp(j(φ_m + 2π·Δf·t_i))`.
+The differential product
+
+```
+d_{m,i} = z_{m,i+1} · conj(z_{m,i}) ≈ A_{m,i+1}·A_{m,i}·exp(j·2π·Δf·T_sym)
+```
+
+**cancels φ_m exactly.** Equivalently `S(f) = |Σ_i z_i·exp(-j2π f t_i)|²` is
+invariant to a common phase on all `z_i`. This is why the old blanket rule was too
+blunt, and it is checkable on paper rather than by measurement.
+
+Two consequences follow directly. Evidence *can* be accumulated across frames with
+unrelated absolute phases, provided the phase is cancelled first. And residual CFO
+can be *estimated* in symbol space — `Δf = ∠D / (2π·T_sym)` over ~32 complex
+values — rather than *searched* over ~800 hypotheses in sample space. If that
+holds, the coherent detector's search cost stops being the architectural problem
+revision 4 called it.
+
+The ambiguity is the catch: adjacent-symbol phase is sampled every 4.4 µs, so the
+estimate is periodic at 227.3 kHz and unique only within **±113.6 kHz**. A coarse
+stage remains mandatory. Config E's 116.7 kHz spacing gives a worst nearest-bin
+residual of **58.3 kHz**, comfortably inside that window — so E is a good front end
+for relative phase, which is a second and independent reason to adopt it.
+
+### Claimed results, unverified
+
+Exploratory separation (lowest confirmed ÷ highest unconfirmed) on those 96
+observations:
+
+| candidate | claimed gap | claimed 26/70 split |
+|---|---:|---|
+| current 3×8 | 0.97× (overlap) | 23/26, 12/70 |
+| config E 13×8 | 0.96× (overlap) | 25/26, 9/70 |
+| **8-anchor relative phase** | **1.77×** | 26/26, 0/70 |
+| differential 16 + control | 2.91× | 26/26, 0/70 |
+| differential 32 + control | 3.58× | 26/26, 0/70 |
+| **GLRT32 + control** | **11.6×** | 26/26, 3/70 above one ceiling |
+| all-pair 32 + control | 16.3× | — |
+| GLRT64 + control | 21.7× | — |
+| 300-symbol coherent | 2.80× | 26/26, 1/70 |
+| withheld 300-symbol | 3.43× | 26/26, 0/70 |
+
+Also claimed: symbol count mostly drives the *noise* population down rather than
+lifting the signal (highest unconfirmed 0.147 → 0.106 → 0.064 → 0.018 at 8 → 16 →
+32 → 300 symbols), which is why 16–32 may suffice; amplitude weighting beats
+phase-only; and all-pair-32 CFO agrees with the existing refiner to ~91 Hz median.
+
+Reported as *not* promising, and worth not rediscovering: multiple epoch
+candidates, epoch dithering, periodicity as a primary detector, per-subcarrier
+differential processing, and phase-only weighting.
+
 
 ---
 
 ## Next steps
 
-Ordered by evidence, not by appetite.
-
 **1 — Repair what is deployed.** Config E with a cross-edge-calibrated
-`NOISE_CEILING`; widen the timing stage past ±320 kHz. Both are small, both are
-backed by a measured 3–4× on real sky, and neither waits on anything.
+`NOISE_CEILING`; widen the timing stage past ±320 kHz. Small, backed by a measured
+3–4× on real sky, waits on nothing. E is now doubly justified: it is also the right
+coarse front end for anything relative-phase, since its worst residual sits inside
+the ±113.6 kHz ambiguity window.
 
-**2 — Measure the absolute LO error.** The one gap that cannot be closed from
-stored data. Until it exists, every span is a width about an unknown centre.
+**2 — Measure the absolute LO error.** The one gap no stored data can close. Until
+it exists, every span is a width about an unknown centre.
 
-**3 — Price the coherent search.** The only open question that decides the
-architecture. Measure, on the corpus: how many CFO hypotheses are actually needed
-once a coarse stage narrows the range; how well a cheap first pass *ranks* the
-true epoch into a shortlist, which is a far weaker requirement than winning; and
-what the phase-ramp estimator costs given it is ambiguous outside ±113.6 kHz and
-therefore needs a coarse stage in front of it.
+**3 — Run the architecture bake-off.** This replaces revision 4's assumption that
+the destination is a 300-symbol full-frame detector. The question is no longer
+*"how do we afford 300-symbol coherent acquisition?"* but:
 
-**4 — Then build it**, if and only if (3) says it fits: coarse bank → epoch
-shortlist → phase-ramp CFO → full-frame coherent confirmation. Gated on agreeing
-with a slow reference implementation of the same algorithm.
+> **What is the cheapest phase-invariant known-code statistic that reaches the
+> required Pd at fixed whole-search false-alarm rate?**
 
-**5 — Revisit cadence, not probe length.** If occupancy really is mode-driven on a
-15 s cadence, the lever is how often we return to a channel, not how long we look.
-That is a scheduler question and it has not been asked yet.
+All candidates share the config-E coarse stage and are scored on the injection
+harness — known epoch, CFO, SNR and occupancy — at a *common* whole-search FAR,
+with CPU milliseconds per 80 ms probe recorded beside every number:
+
+```
+                        13×8 coarse bank
+                                |
+                      candidate epoch + CFO
+                                |
+        +-----------+-----------+-----------+-----------+
+        v           v           v           v           v
+   8-anchor    differential  differential  GLRT 32   64-symbol
+   relative     16 + ctrl     32 + ctrl    + ctrl    ordinary
+      phase                                          coherent
+        +-----------+-----------+-----------+-----------+
+                                |
+                   fixed-FAR comparison, Pd per ms
+                                |
+                    borderline candidates only
+                                v
+                 300-symbol withheld confirmation
+```
+
+The coarse stage's success criterion changes with it. Do not ask whether its score
+crosses a detection threshold; ask **whether the true epoch and CFO land in the top
+K candidates closely enough for the confirmation stage to recover them.** That is a
+much weaker and much cheaper requirement.
+
+Two candidates are worth naming as priors, on the external evidence above:
+`8-anchor relative phase` because it reuses anchors the survey already computes and
+its only structural change is *not* replacing each complex correlation with its
+magnitude; and `GLRT32 + wrong-code control` as the claimed performance/cost
+leader. Both remain hypotheses until the harness says otherwise.
+
+**4 — Build the winner**, gated on agreeing with a slow reference implementation of
+the same algorithm. The 300-symbol detector becomes the slow reference and optional
+final validator rather than the presumed production detector.
+
+**5 — Test whether relative phase attacks sparse occupancy directly.** The
+hypothesis: differential phasors from transmitted frames add directionally while
+noise-only opportunities have random phase and partially cancel — unlike the `Σ|z|²`
+fold, where noise can only add. If true, sparse occupancy is addressable
+algorithmically rather than only through revisit cadence, which would change
+conclusion (5) below. The occupancy harness already exists and can settle it.
+
+**6 — Revisit cadence, not probe length**, if (5) fails. At a 15 s mode cadence the
+lever is how often we return to a channel, not how long we look. That is a
+scheduler question and it has not been asked yet.
 
 Stage 0 is complete: the corpus samples automatically, geometry priors and
 injection ground truth both exist, and every measurement above came from them.
@@ -247,16 +366,21 @@ Differential against a reference; known-answer (the replica against itself score
 under gain, global phase and circular shift; null calibration at whole-search FAR
 using the cross-edge construction; injection at non-zero Doppler **in both signs**,
 because this repository carries an unresolved positive-slope sign bug and a
-convention only ever tested at zero is not tested; a frame-period regression
-pinning **3333.333 samples, not 3333**; an order-mapping regression on
+convention only ever tested at zero is not tested; frame-period shift invariance on a wrapped or guarded synthetic capture and joint
+signal/epoch translation away from the boundaries — a finite `valid` correlation is
+*not* invariant to an arbitrary circular shift; a frame-period regression pinning
+**3333.333 samples, not 3333**; an order-mapping regression on
 `sample_order`; and a corpus regression against frozen expectations.
 
 ---
 
 ## Deliberately not doing
 
-No coherent integration across frames — the per-frame phase is unmodelled in the
-literature. No PSS/SSS acquisition — at 2.5 MHz we capture ~1% of its energy. No
+No **direct complex-amplitude** integration across frames — absolute inter-frame
+carrier phase is unmodelled, so raw frame amplitudes must not be summed.
+Phase-invariant statistics are explicitly permitted: normalised coherent energy,
+differential products and other relative-phase quantities cancel the unknown frame
+phase and may be accumulated across frame opportunities. No PSS/SSS acquisition — at 2.5 MHz we capture ~1% of its energy. No
 T-codes — they need all 1024 subcarriers. No 5 MS/s — aliasing costs 0.02 dB, the
 door stays open only if the fractional-epoch loss survives. No per-subcarrier
 equalisation — 0.0–0.4 dB measured ceiling. No 40° elevation gate on the corpus —

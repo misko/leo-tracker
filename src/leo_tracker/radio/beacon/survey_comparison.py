@@ -29,10 +29,21 @@ wrong-code    the same code rolled 17, epoch **pinned**   nulls where the epoch
                                                           was not searched
 ============  ==========================================  =====================
 
-A searcher over 43,342 cells and a confirmer over one do not share a threshold:
-for an exponential-tailed statistic at 1% the two sit 5.2 dB apart.  Pooling them
-is the mistake this layout exists to prevent, and ``search_cells`` travels with
-every row so the reader can see which is which.
+A searcher over 43,342 cells and a confirmer over one do not share a threshold.
+The gap is **2.2 dB measured** — 0.02575 searched against 0.02000 conditioned
+over a bounded 3,333 x 11 search — not the 5.2 dB an exponential tail implies:
+that tail belongs to a single-frame power statistic, while a score averaged over
+~59 frames has a nearly Gaussian null and a Gaussian maximum grows with the root
+of the log of the cell count.  Smaller than advertised, still strictly in the
+confirmer's favour, and the flattering number is not used.  Pooling the two
+populations is the mistake this layout exists to prevent, and ``search_cells``
+travels with every row so the reader can see which is which.
+
+The larger advantage is recoverable with a different frame combiner: a
+max-over-frames statistic keeps the exponential tail and handles sparse
+occupancy better, so ``frame_max`` is carried beside every conditioned score and
+the adjudicated verdict keeps its whole per-frame array.  That comparison is
+open, not made here.
 
 **The two nulls are not co-equal, and the cross-edge one is primary.**  Rolling
 the pilot codes by 17 symbols displaces the waveform by 17 symbol periods, so a
@@ -45,11 +56,12 @@ says ``control_epoch == "pinned"``; this file drops the rest rather than trustin
 the producer, and reports the gap between the two modes as its own section, since
 documenting the trap is worth more than quietly stepping around it.
 
-Thresholds are quantiles of a finite null, so the finest false-alarm rate a
-population can support is bounded by its size.  Every threshold reports how many
-null realisations produced it and whether the requested rate is inside what they
-can carry; a 1% threshold from 40 samples is a number, not a measurement, and it
-is labelled ``unsupported`` rather than printed as though it were one.
+**A threshold from a finite null bounds a false-alarm rate; it does not pin
+one.**  600 null draws support a claim of ">= 0.5%" and 960 support ">= 0.31%";
+nothing available here supports 0.1%.  Every threshold therefore reports the
+number of realisations behind it, the finest rate that many can bound, and the
+rate it actually realises on them — and a 1% threshold drawn from 40 samples is
+labelled ``unsupported`` rather than printed as though it were a measurement.
 
 **Thresholds are probe-length dependent** and nothing else in the codebase
 tracks it: a clean null reaches p99 1.310 / 1.189 / 1.137 at 20 / 40 / 80 ms.
@@ -75,11 +87,22 @@ REVIEW_SCHEMA = "leo-tracker.survey-detector-review/v1"
 #: needs the whole-search harness of stage 0.4.
 DEFAULT_FALSE_ALARM_RATE = 0.01
 
-#: A quantile is only worth quoting when enough null realisations sit above it.
-#: Five is the usual floor for a count to stop being dominated by its own
-#: Poisson noise, so a rate finer than ``5 / samples`` is reported unsupported
-#: rather than quietly extrapolated.
-MINIMUM_EXCEEDANCES = 5
+#: A quantile is only worth quoting when this many null realisations sit above
+#: it, so ``MINIMUM_EXCEEDANCES / samples`` is the finest rate a population can
+#: bound: 0.5% at 600 draws, 0.31% at 960.  Anything finer is reported
+#: unsupported rather than quietly extrapolated.
+MINIMUM_EXCEEDANCES = 3
+
+#: A cross-edge null and a real-corpus null agree to 0.1% in the mean, which is
+#: what makes the cross-edge construction usable at all.  Both sit **above** a
+#: synthetic Gaussian null — p99 +6.6%, extreme +14%, in a statistic whose whole
+#: spread is 7% — so a threshold calibrated on synthetic noise is optimistic and
+#: every threshold here is drawn from real sky instead.
+REAL_VERSUS_SYNTHETIC_NULL = {
+    "cross_edge_vs_real_corpus_mean": 0.001,
+    "real_over_synthetic_p99": 0.066,
+    "real_over_synthetic_extreme": 0.14,
+}
 
 #: How close a searched rolled control has to land to ``-roll * 11`` before it
 #: counts as having re-found the signal rather than found noise.  Two samples:
@@ -206,11 +229,12 @@ def threshold_from(nulls: list[float], *,
                    false_alarm_rate: float = DEFAULT_FALSE_ALARM_RATE) -> dict:
     """The value a null population exceeds at ``false_alarm_rate``, and whether it can.
 
-    Reports ``supported`` false when fewer than :data:`MINIMUM_EXCEEDANCES`
-    realisations would sit above the threshold, because at that point the
-    quantile is being set by two or three samples and moves by whole percent
-    when one more arrives.  The plan makes the same point from the other side:
-    1,456 clean realisations support ~0.2% and no further.
+    A finite null **bounds** a rate rather than pinning one, and the bound is
+    ``MINIMUM_EXCEEDANCES / samples``: 0.5% at 600 draws, 0.31% at 960.  Below
+    that the quantile is set by two or three draws and moves by whole percent
+    when one more arrives, so ``supported`` goes false and the caller is
+    expected to quote ``effective_rate`` — what the threshold achieves on the
+    population that produced it — rather than the rate that was asked for.
     """
     kept = sorted(value for value in nulls if value is not None)
     if not kept:
@@ -503,9 +527,13 @@ def rolled_control_trap(payloads: list[dict], *,
     shifts = [row.get("searched_control_epoch_shift_samples") for row in rows]
     period = (payloads[0].get("sample_rate_hz", 2_500_000.0)
               * STARLINK_FRAME_DURATION_S)
-    landed = sum(1 for shift in shifts
-                 if _wrapped_gap(shift, period - expected, period)
-                 <= ROLLED_SHIFT_TOLERANCE_SAMPLES)
+    # A sidecar that does not say how far the roll displaces the waveform cannot
+    # be asked whether the control landed there; counting zero would read as
+    # "it did not", which is a different and much more reassuring claim.
+    landed = (None if expected is None else
+              sum(1 for shift in shifts
+                  if _wrapped_gap(shift, period - expected, period)
+                  <= ROLLED_SHIFT_TOLERANCE_SAMPLES))
     return {"observations": len(rows), "method": "full-frame-300",
             "pinned_control": describe(pinned),
             "searched_control": describe(searched),
@@ -593,9 +621,8 @@ def review(corpus_root: Path, *, limit: int | None = None,
                             for payload in payloads),
         "false_alarm_rate": false_alarm_rate,
         "probe_lengths": _probe_lengths(payloads),
-        "deployed_threshold": sorted({payload.get("deployed_threshold")
-                                      for payload in payloads}
-                                     - {None}),
+        "deployed": _deployed_gate(payloads),
+        "null_provenance": REAL_VERSUS_SYNTHETIC_NULL,
         "rolled_control_trap": rolled_control_trap(
             payloads, false_alarm_rate=false_alarm_rate),
         "searched": searched,
@@ -608,6 +635,24 @@ def review(corpus_root: Path, *, limit: int | None = None,
         "cost_s_per_entry": describe([payload.get("elapsed_s")
                                       for payload in payloads]),
     }
+
+
+def _deployed_gate(payloads: list[dict]) -> dict:
+    """What the capture host would actually gate on, and with which bank.
+
+    Read out of the score files rather than assumed, because the deployed shape
+    moved from 3x8 to 13x8 while this comparison was being built: a review that
+    hard-coded either one would be describing a host that no longer exists.
+    """
+    shapes = {tuple(payload["deployed_shape"]) for payload in payloads
+              if payload.get("deployed_shape")}
+    thresholds: dict[str, set] = {}
+    for payload in payloads:
+        for name, value in (payload.get("deployed_threshold") or {}).items():
+            thresholds.setdefault(name, set()).add(value)
+    return {"shape": sorted(list(shape) for shape in shapes),
+            "threshold": {name: sorted(values)
+                          for name, values in sorted(thresholds.items())}}
 
 
 def _probe_lengths(payloads: list[dict]) -> dict:
@@ -646,11 +691,12 @@ def _abbreviate(method: str) -> str:
     """A column header that still names one method.
 
     ``differential-16`` and ``differential-32`` share their first eight
-    characters, so truncating the family alone would put two different methods
-    under one heading — the symbol count has to survive.
+    characters, and so do ``full-frame-verify`` and ``full-frame-acquire``, so
+    truncating the family alone would put two different methods under one
+    heading — the part that distinguishes them has to survive.
     """
-    family, _, count = method.rpartition("-")
-    return f"{family[:4]}-{count}" if family else method[:8]
+    family, _, tail = method.rpartition("-")
+    return f"{family[:4]}-{tail[:4]}" if family else method[:9]
 
 
 def _mark(threshold: dict) -> str:
@@ -725,18 +771,34 @@ def format_review(report: dict) -> str:
                  "have no wrong-code control at all —")
     lines.append("  the kernel bank has no rolled-template path. All three rest "
                  "on the cross-edge null alone.")
-    for value in report.get("deployed_threshold") or []:
-        coarse = (report["searched"].get("coarse-A") or {}).get(
+    deployed = report.get("deployed") or {}
+    for name, values in (deployed.get("threshold") or {}).items():
+        calibrated = (report["searched"].get(f"coarse-{name}") or {}).get(
             "cross_edge_null", {}).get("threshold")
         lines.append(
-            f"  deployed gate is {value:.3f} against a cross-edge "
-            f"{report['false_alarm_rate']:.0%} threshold of "
-            f"{_cell(coarse, '.3f', 'n/a')} for coarse-A: the deployed number "
-            "is the stricter of the two,")
-        lines.append("  which costs detections rather than manufacturing them. "
-                     "The plan's 8.11%/2.72%/2.11%")
-        lines.append("  false-alarm figures are wrong and self-contradictory; a "
-                     "clean 80 ms null puts 1.33 near 0.06%.")
+            f"  coarse-{name}: host gates at "
+            f"{'/'.join(f'{value:.3f}' for value in values)}, cross-edge "
+            f"{report['false_alarm_rate']:.0%} threshold here is "
+            f"{_cell(calibrated, '.3f', 'n/a')}"
+            f"   (deployed bank shape {deployed.get('shape')})")
+    lines.append("  Where the host gate is the higher number it is costing "
+                 "detections, not manufacturing them:")
+    lines.append("  the plan's 8.11%/2.72%/2.11% false-alarm figures are wrong "
+                 "and self-contradictory, and a")
+    lines.append("  clean 80 ms null puts 1.33 near 0.06% — about 17x stricter "
+                 "than 1%.")
+    provenance = report.get("null_provenance") or {}
+    if provenance:
+        lines.append(
+            "  Nulls are real sky, not synthetic: a cross-edge and a real-corpus "
+            "null agree to "
+            f"{provenance['cross_edge_vs_real_corpus_mean']:.1%} in the mean, "
+            "and both sit above a")
+        lines.append(
+            f"  synthetic Gaussian null by "
+            f"{provenance['real_over_synthetic_p99']:.1%} at p99 and "
+            f"{provenance['real_over_synthetic_extreme']:.0%} in the extreme, "
+            "in a statistic whose whole spread is 7%.")
     lines.append("")
 
     trap = report.get("rolled_control_trap") or {}
@@ -753,11 +815,12 @@ def format_review(report: dict) -> str:
             f" vs "
             f"{_cell(trap['searched_threshold'].get('threshold'), '.4f', 'n/a')}"
             f"   n={trap['observations']}")
+        landed = trap["landed_on_the_shifted_signal"]
         lines.append(
             f"  the searched control landed on the signal's own epoch minus "
             f"{trap.get('expected_shift_samples')} samples in "
-            f"{trap['landed_on_the_shifted_signal']}/{trap['observations']} "
-            "cases (median shift "
+            f"{'unrecorded' if landed is None else landed}/"
+            f"{trap['observations']} cases (median shift "
             f"{_cell(trap['epoch_shift_samples'].get('p50'), '.0f', 'n/a')}).")
         lines.append("  Rolling the codes rolls the waveform, so a control free "
                      "to choose its epoch is not a null.")
@@ -781,11 +844,19 @@ def format_review(report: dict) -> str:
             f" {_cell(wrong.get('threshold'), '9.4f', '        -')}"
             f" {_cell(wrong['confirms'].get('rate'), '9.1%', '        -')}"
             f" {_cell(summary['elapsed_ms'].get('p50'), '8.1f')}")
-    lines.append("  A conditioned test needs no extreme-value margin, so its "
-                 "threshold is far below the")
-    lines.append("  searched one for the same false-alarm rate. Never compare a "
-                 "conditioned score with a")
-    lines.append("  searched threshold, or with another method's searched score.")
+    lines.append("  A conditioned test pays no extreme-value penalty, so its "
+                 "threshold sits below the searched")
+    lines.append("  one at the same rate — by 2.2 dB measured, not the 5.2 dB "
+                 "an exponential tail implies, because")
+    lines.append("  a score averaged over ~59 frames has a nearly Gaussian "
+                 "null. Never compare a conditioned")
+    lines.append("  score with a searched threshold, or with another method's "
+                 "searched score.")
+    lines.append("  full-frame-verify scores symbols disjoint from "
+                 "full-frame-acquire. Today's proposers all")
+    lines.append("  read every symbol, so the split is recorded rather than "
+                 "protective; the adjudication's")
+    lines.append("  own withheld field says 'unknown' and means it.")
     lines.append("")
 
     confirmation = report.get("confirmation") or {}

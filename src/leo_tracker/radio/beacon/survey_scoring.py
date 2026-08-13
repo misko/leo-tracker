@@ -23,16 +23,40 @@ place, every other method can be asked about that place, and so can the second
 receiver, the other edge of the channel, the catalogue, and the next probe on
 the same tuning.  :mod:`survey_comparison` is what asks.
 
+Eight methods propose: the two coarse banks, the eight-anchor relative phase,
+adjacent differentials over 16 and 32 symbols, GLRTs over 32 and 64, and the
+300-symbol matched filter.  Six confirm from the shared correlation set, and
+:mod:`adjudicate` supplies the seventh, eighth and ninth — the full pilot set
+and its disjoint ACQUIRE and VERIFY halves — because it already holds the epoch,
+prices its own refinement and refuses to search.
+
 **Searching and confirming are different statistics with different nulls.**  A
 searcher maximises over its cells and pays the extreme-value penalty for it: the
 deployed 3x8 bank maximises over 3 offsets x 3,333 epochs, config E over 13 x
 3,333, the full-frame detector over ~197,000 lags.  A confirmer evaluates at one
-cell that somebody else proposed and pays nothing.  For an exponential-tailed
-power statistic at 1% false alarm the two thresholds are 15.28 and 4.61 times the
-mean — **5.2 dB apart** — so a signal too weak for any method to acquire can
-still be firmly confirmable once one method proposes where to look.  Every method
-therefore carries ``search_cells``, and every score is labelled ``searched`` or
-``conditioned``.  The two must never be pooled.
+cell that somebody else proposed and pays nothing.  So a signal too weak for any
+method to acquire can still be confirmable once one method proposes where to
+look — which is the whole reason the conditioned columns exist.
+
+**The size of that advantage is 2.2 dB, not the 5.2 dB the exponential model
+gives.**  Measured over a bounded 3,333 x 11 search: 0.02575 searched against
+0.02000 conditioned, a ratio of 1.288.  The exponential tail belongs to a
+*single-frame* power statistic; a score averaged over ~59 frames has a nearly
+Gaussian null (measured cv 0.070) and a Gaussian maximum grows with the root of
+the log of the cell count rather than with the log — 5.16 dB predicted by the
+exponential model, 1.91 dB by the Gaussian one, 2.20 dB measured.  The direction
+and the architecture survive; only the magnitude was wrong, and the flattering
+number is not quoted here.
+
+**Which is why frames are not averaged away before storage.**  A max-over-frames
+combiner keeps the exponential tail *and* is the better combiner under sparse
+occupancy, so it would legitimately earn something nearer the larger figure.
+Every conditioned score therefore carries ``frame_max`` beside its frame-summed
+value, and the adjudicated verdict carries the whole per-frame array, so that
+comparison stays open without re-running anything.
+
+Every method carries ``search_cells``, and every score is labelled ``searched``
+or ``conditioned``.  The two must never be pooled.
 
 Two nulls, and they are not interchangeable
 -------------------------------------------
@@ -85,14 +109,14 @@ import time
 
 import numpy as np
 
+from .adjudicate import adjudicate
 from .analysis import DUAL_EPOCH_DELTA_SAMPLES, LEARNED_MAXIMUM_CFO_DIFFERENCE_HZ
 from . import fast_scan
 from .pilots import (OFDM_SYMBOL_DURATION_S, edge_pilot_frame,
                      matched_pilot_control_scores)
 from .relative_phase import (CONTROL_SYMBOL_ROLL, DEFAULT_TRANSFORM_SIZE,
                              adjacent_differential, anchor_relative_phase,
-                             coherent_ceiling, contiguous_symbols,
-                             frame_spectrum, pilot_correlations,
+                             contiguous_symbols, pilot_correlations,
                              survey_anchor_symbols, symbol_glrt)
 from .structure import STARLINK_FRAME_DURATION_S
 
@@ -317,7 +341,8 @@ def _differential_at(correlations) -> dict:
     """
     values = correlations.values
     if values.size == 0 or values.shape[1] < 2:
-        return {"score": 0.0, "residual_frequency_offset_hz": 0.0, "pairs": 0}
+        return {"score": 0.0, "residual_frequency_offset_hz": 0.0, "pairs": 0,
+                "frame_max": 0.0, "frames": 0}
     leading, trailing = values[:, 1:], values[:, :-1]
     products = leading * np.conj(trailing)
     total = complex(np.sum(products))
@@ -326,7 +351,32 @@ def _differential_at(correlations) -> dict:
     return {"score": abs(total) / weight if weight > 0 else 0.0,
             "residual_frequency_offset_hz":
                 float(np.angle(total) / (2 * np.pi * step)) if total != 0 else 0.0,
-            "pairs": int(products.size)}
+            "pairs": int(products.size),
+            **_per_frame(np.abs(np.sum(products, axis=1)),
+                         np.sum(np.abs(leading) * np.abs(trailing), axis=1))}
+
+
+def _per_frame(numerators: np.ndarray, denominators: np.ndarray) -> dict:
+    """The best single frame, beside the frame count that produced it.
+
+    Kept because averaging over ~59 frames is not obviously the right combiner:
+    it dilutes a signal that lives in two of them, and Starlink occupancy runs
+    as low as 2%.  A max-over-frames statistic also keeps the exponential tail
+    the frame average loses, so it earns back more of the conditioned advantage
+    than the 2.2 dB the averaged score measures.  One extra float per score
+    keeps that comparison open; the full array is kept only where
+    :func:`adjudicated` already produces it, because carrying it everywhere
+    would be ~1.5 MB an entry for the review to parse.
+    """
+    usable = np.asarray(denominators, float) > 0
+    if not usable.any():
+        return {"frame_max": 0.0, "frames": int(np.size(denominators))}
+    per_frame = np.divide(np.asarray(numerators, float),
+                          np.asarray(denominators, float),
+                          out=np.zeros(np.shape(denominators), float),
+                          where=usable)
+    return {"frame_max": float(per_frame.max()),
+            "frames": int(per_frame.size)}
 
 
 def _spectrum_at(correlations, residual_hz: float = 0.0) -> dict:
@@ -336,12 +386,23 @@ def _spectrum_at(correlations, residual_hz: float = 0.0) -> dict:
     searched version reports ``max_f S(f)``; conditioned on a claim it reports
     ``S(f_claimed)``, which is a different statistic with a much lower threshold
     for the same false-alarm rate and must be kept in its own column.
+
+    Written out per frame rather than through :func:`frame_spectrum` and
+    :func:`coherent_ceiling`, which sum the two halves before returning them:
+    the ratio of the sums is exactly what those two produce — the gate test
+    pins that against :func:`symbol_glrt` — and the per-frame terms are the
+    thing a different combiner needs.
     """
-    ceiling = coherent_ceiling(correlations)
-    if ceiling <= 0:
-        return {"score": 0.0}
-    power = float(frame_spectrum(correlations, np.array([float(residual_hz)]))[0])
-    return {"score": power / ceiling}
+    values = correlations.values
+    if values.size == 0:
+        return {"score": 0.0, "frame_max": 0.0, "frames": 0}
+    rotated = values * np.exp(-2j * np.pi * float(residual_hz)
+                              * correlations.lags_s)
+    powers = np.abs(np.sum(rotated, axis=1)) ** 2
+    ceilings = np.sum(np.abs(values), axis=1) ** 2
+    total = float(ceilings.sum())
+    return {"score": float(powers.sum() / total) if total > 0 else 0.0,
+            **_per_frame(powers, ceilings)}
 
 
 def _first_symbols(correlations, count: int):
@@ -392,29 +453,83 @@ def conditioned_suite(samples: np.ndarray, sample_rate_hz: float,
             "frames": contiguous.frames}
 
 
-def conditioned_full_frame(
+def pinned_full_frame(
         samples: np.ndarray, sample_rate_hz: float, epoch_sample: int,
         frequency_offset_hz: float, *, edge: str,
         control_symbol_roll: int = CONTROL_SYMBOL_ROLL) -> dict | None:
-    """The 300-symbol matched filter at one lag, exact and wrong-code.
+    """The searched 300-symbol detector's own control, with its epoch held.
 
-    Built by handing :func:`pilots.matched_pilot_control_scores` a window
-    exactly one frame long, so its lag search has a single lag to choose from
-    and the maximum it reports is the value at the claimed epoch.  Composing the
-    reference rather than reimplementing it is what keeps the conditioned number
-    comparable with the searched one.
+    This exists *beside* :func:`adjudicated` rather than instead of it, and the
+    reason is that they are different statistics.  The searched certificate is
+    ``matched_pilot_score``: one frame's normalised correlation, maximised over
+    lags.  The adjudicator's blocks are a mean over ~59 frames of a per-frame
+    normalised correlation restricted to pilot samples.  Subtracting the second
+    from the first would not be a margin, it would be two different numbers with
+    a minus sign between them — so the control for the searched score is the
+    same detector handed a window exactly one frame long, which gives its lag
+    search a single lag and therefore the value at the claimed epoch.
+
+    The adjudicator remains the confirmer.  This is only the control that makes
+    the searched candidate's own margin a like-for-like difference.
     """
     frame = edge_pilot_frame(sample_rate_hz, edge)
     start = int(epoch_sample)
     if start < 0 or start + frame.size > samples.size:
         return None
-    window = samples[start:start + frame.size]
     exact, control = matched_pilot_control_scores(
-        window, sample_rate_hz, edge=edge,
+        samples[start:start + frame.size], sample_rate_hz, edge=edge,
         frequency_offsets_hz=(float(frequency_offset_hz),),
         control_symbol_roll=int(control_symbol_roll))
     return {"score": exact["score"], "control_score": control["score"],
             "margin": exact["score"] - control["score"]}
+
+
+def adjudicated(samples: np.ndarray, sample_rate_hz: float, epoch_sample: int,
+                frequency_offset_hz: float, *, edge: str,
+                method: str = "", utc: str = "") -> dict:
+    """Hand one claim to :mod:`adjudicate` and keep what a re-analysis needs.
+
+    Delegated rather than rebuilt.  That module already conditions the
+    300-symbol statistic at exactly the claimed point, splits the published
+    pilots into disjoint ACQUIRE and VERIFY halves so a verdict can be computed
+    on symbols the proposer did not use, evaluates the wrong-code control at the
+    same epoch — the only place that control is a null — and prices its own
+    narrow frequency refinement in decibels.  A second implementation of any of
+    that would be a second set of conventions.
+
+    **Every certificate here will come back** ``withheld: "unknown"``, and that
+    is correct rather than a defect: the deployed and candidate detectors all
+    score the full pilot set, so nothing was genuinely held back from them.  The
+    field is recorded so a later proposer that *does* declare its ACQUIRE set
+    can be told apart from these, not because these are protected.
+
+    Only the VERIFY block keeps its per-frame arrays.  Carrying all three blocks
+    whole would be 16 kB a claim and ~1.5 MB an entry, which the review would
+    then have to parse for every probe in the corpus; VERIFY is the block the
+    verdict is read from and the one a different frame combiner would want, so
+    it is the one that pays for the space.
+    """
+    verdict = adjudicate(samples, {"epoch_sample": int(epoch_sample),
+                                   "cfo_hz": float(frequency_offset_hz),
+                                   "edge": edge, "method": method, "utc": utc},
+                         sample_rate_hz=sample_rate_hz, edge=edge)
+    blocks = {}
+    for name, block in verdict["conditioned"].items():
+        kept = {key: block[key] for key in
+                ("score", "control_score", "margin", "maximum_frame_score",
+                 "control_maximum_frame_score", "symbols", "frames")}
+        if name == "verify":
+            kept["frame_scores"] = block["frame_scores"]
+            kept["control_frame_scores"] = block["control_frame_scores"]
+        blocks[name] = kept
+    refinement = {key: verdict["refinement"][key] for key in
+                  ("score", "control_score", "margin", "cells",
+                   "independent_cells", "search_penalty_db",
+                   "residual_frequency_offset_hz")}
+    return {"blocks": blocks, "refinement": refinement,
+            "withheld": verdict["withheld"], "caveats": verdict["caveats"],
+            "epoch_neighbourhood": verdict["epoch_neighbourhood"],
+            "cost_ms": verdict["cost_ms"]}
 
 
 def rolled_control_shift_samples(sample_rate_hz: float,
@@ -564,9 +679,9 @@ def search_observation(
     # what breaks the rolled control here and nowhere else in this family, so
     # the honest control is re-taken at the epoch the exact score chose, and the
     # searched one is kept beside it as the exhibit rather than discarded.
-    pinned = conditioned_full_frame(samples, sample_rate_hz,
-                                    exact["sample_index"], cfo, edge=edge,
-                                    control_symbol_roll=control_symbol_roll)
+    pinned = pinned_full_frame(samples, sample_rate_hz, exact["sample_index"],
+                               cfo, edge=edge,
+                               control_symbol_roll=control_symbol_roll)
     elapsed = 1000.0 * (time.perf_counter() - mark)
     period = _frame_period_samples(sample_rate_hz)
     shift = (int(control["sample_index"]) - int(exact["sample_index"])) % period
@@ -631,6 +746,13 @@ def confirm_points(samples: np.ndarray, sample_rate_hz: float, points: list[dict
                    control_symbol_roll: int = CONTROL_SYMBOL_ROLL) -> list[dict]:
     """Ask every confirmer about every claimed place, under every template.
 
+    Two families answer.  The relative-phase confirmers share one correlation
+    set per template.  The 300-symbol statistic is handed to
+    :func:`adjudicated`, which returns it three ways — the full pilot set and
+    the disjoint ACQUIRE and VERIFY halves — so ``full-frame-verify`` is a score
+    on symbols a differently-built proposer could have been kept away from, even
+    though today's proposers all see everything and the verdict says so.
+
     Three templates per point: the exact code, the same code rolled 17 symbols,
     and — when ``null_edge`` is given — the opposite edge's code.
 
@@ -641,8 +763,8 @@ def confirm_points(samples: np.ndarray, sample_rate_hz: float, points: list[dict
     the same gain — 0.585 exact against 0.019 control, measured.
 
     Together they give the conditioned statistic a threshold of its own instead
-    of borrowing the searched one, which would be 5.2 dB too strict and would
-    throw away the whole point of asking.
+    of borrowing the searched one, which is 2.2 dB too strict for it — smaller
+    than an exponential tail predicts, and still the whole point of asking.
     """
     kwargs = {"differential_counts": differential_counts,
               "glrt_counts": glrt_counts, "anchor_count": anchor_count}
@@ -668,22 +790,27 @@ def confirm_points(samples: np.ndarray, sample_rate_hz: float, points: list[dict
                 "cross_edge_score": (None if null is None
                                      else null["scores"][name]["score"]),
                 "residual_cfo_hz": value.get("residual_frequency_offset_hz"),
+                "frame_max": value.get("frame_max"),
                 # Nothing here searches an epoch, so every control is the kind
                 # of rolled control that stays a null.
                 "control_epoch": "pinned",
                 "elapsed_ms": value["elapsed_ms"]}
-        full = conditioned_full_frame(samples, sample_rate_hz, epoch, cfo,
-                                      edge=edge,
-                                      control_symbol_roll=control_symbol_roll)
-        if full is not None:
-            cross = (None if null_edge is None else conditioned_full_frame(
-                samples, sample_rate_hz, epoch, cfo, edge=null_edge,
-                control_symbol_roll=control_symbol_roll))
-            methods["full-frame-300"] = {
-                **full, "cross_edge_score": None if cross is None else cross["score"],
+        verdict = adjudicated(samples, sample_rate_hz, epoch, cfo, edge=edge,
+                              method="+".join(point["claimed_by"]))
+        null_verdict = (None if null_edge is None else
+                        adjudicated(samples, sample_rate_hz, epoch, cfo,
+                                    edge=null_edge))
+        for name, block in verdict["blocks"].items():
+            methods[f"full-frame-{name}"] = {
+                "score": block["score"], "control_score": block["control_score"],
+                "margin": block["margin"],
+                "frame_max": block["maximum_frame_score"],
+                "cross_edge_score": (None if null_verdict is None else
+                                     null_verdict["blocks"][name]["score"]),
                 "residual_cfo_hz": 0.0, "control_epoch": "pinned",
                 "elapsed_ms": None}
         confirmed.append({**point, "methods": methods,
+                          "adjudication": verdict,
                           "correlation_ms": exact["correlation_ms"]
                                             + control["correlation_ms"],
                           "frames": exact["frames"]})
@@ -975,11 +1102,14 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
         # codebase tracks that, so every entry carries the length it was scored
         # at and the review refuses to pool two of them.
         "probe_ms": 1000.0 * block.shape[1] / rate,
-        # What this host's fast_scan would gate on today, recorded rather than
-        # assumed: it is being edited in parallel, and the comparison's own
-        # cross-edge threshold is only interesting beside it.
-        "deployed_threshold": fast_scan.detection_threshold(
-            COARSE_CONFIGS["A"]["shape"]),
+        # What this host's fast_scan would gate on today, read rather than
+        # assumed: the deployed shape moved from A to E while this was being
+        # written, and a comparison's own cross-edge threshold is only
+        # interesting beside whatever is actually in force.
+        "deployed_threshold": {
+            name: fast_scan.detection_threshold(tuple(config["shape"]))
+            for name, config in COARSE_CONFIGS.items()},
+        "deployed_shape": list(fast_scan.SURVEY_BANK),
         "receiver_centers_hz": [float(value) for value in centers],
         "calibration_applied": bool(calibrated),
         "probe_time_basis": time_basis,

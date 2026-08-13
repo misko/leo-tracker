@@ -19,16 +19,16 @@ import numpy as np
 import pytest
 
 from leo_tracker.radio.beacon.pilots import (edge_pilot_frame,
-                                             matched_pilot_control_scores,
-                                             matched_pilot_score)
+                                             matched_pilot_control_scores)
 from leo_tracker.radio.beacon.relative_phase import (adjacent_differential,
                                                      anchor_relative_phase,
                                                      symbol_glrt)
 from leo_tracker.radio.beacon.structure import STARLINK_FRAME_DURATION_S
 from leo_tracker.radio.beacon.survey_scoring import (
-    ProbeUnusable, SCORES_SCHEMA, conditioned_full_frame, conditioned_suite,
-    cross_receiver_checks, distinct_points, rolled_control_shift_samples, run,
-    score_entry, scores_path, scoring_status, search_cells, tuning_plan)
+    ProbeUnusable, SCORES_SCHEMA, adjudicated, conditioned_suite,
+    cross_receiver_checks, distinct_points, pinned_full_frame,
+    rolled_control_shift_samples, run, score_entry, scores_path,
+    scoring_status, search_cells, tuning_plan)
 
 RATE = 2_500_000.0
 PERIOD = RATE * STARLINK_FRAME_DURATION_S
@@ -311,8 +311,8 @@ def test_every_claim_names_a_place_and_says_how_hard_it_searched(tmp_path):
     """A score cannot be checked by anything else; a certificate can.
 
     ``search_cells`` travels with it because a maximum over 43,329 cells and an
-    evaluation at one are different statistics with thresholds 5.2 dB apart, and
-    a reader who pools them will conclude the opposite of the truth.
+    evaluation at one are different statistics — 2.2 dB apart, measured — and a
+    reader who pools them will conclude the opposite of the truth.
     """
     entry = _entry(tmp_path, "ch1-certificates")
 
@@ -348,14 +348,17 @@ def test_a_rolled_control_given_a_free_epoch_re_finds_the_signal_it_should_not()
 
     _, control = matched_pilot_control_scores(samples, RATE, edge="lower",
                                               frequency_offsets_hz=(0.0,))
-    pinned = conditioned_full_frame(samples, RATE, 0, 0.0, edge="lower")
+    pinned = pinned_full_frame(samples, RATE, 0, 0.0, edge="lower")
 
     shift = rolled_control_shift_samples(RATE)
     assert shift == 187
     # Epoch zero minus 187 wraps to one frame period short of it.
     assert control["sample_index"] == pytest.approx(round(PERIOD) - shift, abs=2)
-    assert control["score"] > 0.85              # it found the signal
-    assert pinned["control_score"] < 0.15       # held still, it finds nothing
+    assert control["score"] > 0.85                   # it found the signal
+    assert pinned["control_score"] < 0.15            # held still, it finds none
+    # The same statistic on both sides, which is what makes it a margin: the
+    # searched score is one frame's normalised correlation and so is this.
+    assert pinned["score"] == pytest.approx(1.0, abs=1e-5)
 
 
 def test_the_searched_rolled_control_is_recorded_beside_the_pinned_one(tmp_path):
@@ -382,7 +385,10 @@ def test_the_searched_rolled_control_is_recorded_beside_the_pinned_one(tmp_path)
         full["score"] - full["control_score"])
     assert payload["rolled_control_shift_samples"] == 187
     assert payload["probe_ms"] == pytest.approx(1000.0 * SAMPLES / RATE)
-    assert payload["deployed_threshold"] > 1.0
+    # Both shapes, because the deployed one moved from 3x8 to 13x8 mid-flight
+    # and a comparison that assumed either would describe a host that is gone.
+    assert set(payload["deployed_threshold"]) == {"A", "E"}
+    assert payload["deployed_shape"]
 
 
 def test_the_wrong_code_control_travels_with_every_candidate_claim(tmp_path):
@@ -476,11 +482,17 @@ def test_every_method_is_asked_about_every_claimed_place(tmp_path):
     for point in observation["points"]:
         assert set(point["methods"]) == {
             "anchor-8", "differential-16", "differential-32", "glrt-32",
-            "glrt-64", "full-frame-300"}
+            "glrt-64", "full-frame-full", "full-frame-acquire",
+            "full-frame-verify"}
         for value in point["methods"].values():
             assert value["control_score"] is not None
             assert value["cross_edge_score"] is not None
+            # Frames are never averaged away before storage: a max-over-frames
+            # combiner keeps the exponential tail the average loses and is the
+            # better one under 2% occupancy.
+            assert value["frame_max"] is not None
         assert point["claimed_by"]
+        assert point["adjudication"]["withheld"] == "unknown"
 
 
 # --------------------------------------------------------------------------
@@ -530,32 +542,62 @@ def test_a_conditioned_glrt_is_the_searched_one_with_the_search_removed():
         searched["score"], rel=1e-12)
 
 
-def test_the_conditioned_full_frame_is_the_reference_pinned_to_one_lag():
-    """Built by handing the reference a window exactly one frame long.
+def test_the_searched_detectors_margin_subtracts_its_own_statistic():
+    """A margin is a difference of like for like, or it is not a margin.
 
-    Composing the published detector rather than reimplementing it is what keeps
-    its conditioned number comparable with its searched one; a second
-    implementation of the same normalisation would be a second convention.
+    The searched certificate is one frame's normalised correlation maximised
+    over lags; the adjudicator's blocks are a mean over ~59 frames of a
+    per-frame correlation over pilot samples only. Subtracting the second from
+    the first would be two different numbers with a minus sign between them, so
+    the searched candidate keeps its own control at a pinned epoch and the
+    adjudicator stays the confirmer.
     """
     samples = _replica()
-    frame = edge_pilot_frame(RATE, "lower")
 
-    conditioned = conditioned_full_frame(samples, RATE, 0, 0.0, edge="lower")
-    reference = matched_pilot_score(samples[:frame.size], RATE, edge="lower",
-                                    frequency_offsets_hz=(0.0,))
+    pinned = pinned_full_frame(samples, RATE, 0, 0.0, edge="lower")
+    blocks = adjudicated(samples, RATE, 0, 0.0, edge="lower")["blocks"]
 
-    # Both paths carry the correlation in complex64, so they agree to float32
-    # epsilon and no further; anything looser would stop being a gate.
-    assert conditioned["score"] == pytest.approx(reference["score"], rel=1e-5)
-    assert conditioned["score"] == pytest.approx(1.0, abs=1e-5)
+    assert pinned["score"] == pytest.approx(1.0, abs=1e-5)
+    assert blocks["full"]["score"] == pytest.approx(1.0, abs=1e-3)
+    # Same on a noiseless replica by construction; the point is that they are
+    # different statistics, which only shows on real data.
+    assert pinned["margin"] > 0.8
+    assert blocks["full"]["frames"] > 1
+
+
+def test_the_300_symbol_confirmer_is_the_adjudicator_rather_than_a_second_one():
+    """Delegated, not rebuilt, so there is one set of conventions rather than two.
+
+    :mod:`adjudicate` already conditions this statistic at the claimed point,
+    splits the pilots into disjoint ACQUIRE and VERIFY halves, and holds the
+    wrong-code control at the same epoch. A noiseless replica must read 1.0 on
+    every block, which is the repository's ``|r^H s| / sqrt(|r|^2 |s|^2)``
+    convention and the reason an ACQUIRE score and a VERIFY score compare.
+    """
+    samples = _replica()
+
+    verdict = adjudicated(samples, RATE, 0, 0.0, edge="lower")
+
+    assert set(verdict["blocks"]) == {"full", "acquire", "verify"}
+    for name, block in verdict["blocks"].items():
+        assert block["score"] == pytest.approx(1.0, abs=1e-3), name
+        assert block["control_score"] < 0.2, name
+    # Only the verdict block pays for its per-frame array; carrying all three
+    # would be ~1.5 MB an entry for the review to parse.
+    assert len(verdict["blocks"]["verify"]["frame_scores"]) > 1
+    assert "frame_scores" not in verdict["blocks"]["full"]
+    # Today's proposers read every symbol, so nothing was really withheld.
+    assert verdict["withheld"] == "unknown"
 
 
 def test_a_conditioned_score_needs_no_search_and_says_so():
     """One cell by definition, which is the whole reason it is worth recording.
 
-    An exponential-tailed statistic thresholded at 1% sits at 15.28 times the
-    mean after a 3,333-cell search and 4.61 times conditioned — 5.2 dB — so the
-    cell count is not bookkeeping, it is the size of the effect.
+    The advantage is 2.2 dB measured over a bounded 3,333 x 11 search, not the
+    5.2 dB an exponential tail gives: that tail belongs to a single-frame power
+    statistic, while a score averaged over ~59 frames has a nearly Gaussian
+    null. The cell count is not bookkeeping either way — it is which population
+    a score belongs to.
     """
     assert search_cells("coarse-A", RATE, 200_000) == 3 * round(PERIOD)
     assert search_cells("coarse-E", RATE, 200_000) == 13 * round(PERIOD)

@@ -36,12 +36,30 @@ CORPUS_SCHEMA = "leo-tracker.survey-corpus/v1"
 
 #: Above this peak-to-median, or this many agreeing anchors, a probe is kept as
 #: a `strong` positive. Deliberately loose: the cost of keeping a probe is
-#: 12.8 MB and the cost of discarding a real detection is that it never existed.
+#: 12.8 to 51.2 MB and the cost of discarding a real detection is that it never
+#: existed.
+#:
+#: **This bar is probe-length dependent and it is not corrected for.** The fold
+#: is incoherent across frames, so the same sky scores lower at 160 ms than at
+#: 80 ms — synthetic p99 runs 1.310 / 1.189 / 1.137 at 20 / 40 / 80 ms — and a
+#: fixed 1.6 therefore admits fewer long probes than short ones. That biases
+#: the ``strong`` stratum toward the short arms of the capture experiment.
+#: It is left uncorrected because correcting it would need the per-length
+#: distribution this corpus exists to measure, and it is harmless *provided*
+#: the ``random`` stratum is what the comparison rests on: that one is drawn
+#: before any score exists and is unbiased across all four configurations by
+#: construction. The reason list on every entry is what lets an analysis tell
+#: the two apart.
 STRONG_PEAK_TO_MEDIAN = 1.6
 STRONG_ANCHOR_AGREEMENT = 3
 
-#: Default ceiling on the whole corpus. At 12.8 MB a probe this is about 5,000
-#: probes, against roughly a terabyte free on a share that is already 85% full.
+#: Default ceiling on the whole corpus. One preserved probe is
+#: ``8 tunings x N samples x 2 receivers x 2 components x 2 bytes`` = 64N: so
+#: 12.8 MB at 80 ms / 2.5 MS/s, 25.6 MB at each of the two middle
+#: configurations and 51.2 MB at 160 ms / 5 MS/s, averaging **28.8 MB** over a
+#: uniform draw. This budget therefore holds about 2,400 probes rather than the
+#: 5,000 one fixed configuration gave — against roughly a terabyte free on a
+#: share that is already 85% full.
 DEFAULT_BUDGET_BYTES = 64 * 1024 ** 3
 
 

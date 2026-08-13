@@ -248,6 +248,33 @@ def tuning_plan(manifest: dict) -> list[dict]:
     return plan
 
 
+#: How far a declared sample count may sit from ``probe_s * sample_rate_hz``
+#: before the two are treated as describing different files. One sample of
+#: rounding is inherent; anything larger means the shape and the configuration
+#: disagree, and there is no way to tell which of them is right.
+SHAPE_CONSISTENCY_TOLERANCE_SAMPLES = 2
+
+
+def survey_sample_rate_hz(manifest: dict) -> float:
+    """The rate the *survey* ran at, which is not the rate the dwell ran at.
+
+    Read from the survey's own declarations in preference order and never from
+    ``manifest["sample_rate_hz"]``, which belongs to the recording the survey
+    merely preceded and is a different number by construction whenever the
+    survey draws 5 MS/s or the dwell is a wide or oversampled one.
+    """
+    record = _survey_record(manifest)
+    block = manifest.get("survey_iq") or {}
+    for value in ((record.get("capture_config") or {}).get("sample_rate_hz"),
+                  record.get("sample_rate_hz"),
+                  block.get("sample_rate_hz")):
+        if value:
+            return float(value)
+    # Every probe taken before the configuration was written down was taken at
+    # 2.5 MS/s, so this is the right answer for them and only for them.
+    return 2_500_000.0
+
+
 def read_probe(entry: Path, manifest: dict) -> np.ndarray:
     """The preserved IQ as ``(tuning, sample, receiver, component)`` int16.
 
@@ -255,6 +282,14 @@ def read_probe(entry: Path, manifest: dict) -> np.ndarray:
     constant here, because the capture path is what decided it; the file length
     is then checked against that shape, so a truncated copy is a refusal rather
     than a silently reshaped one.
+
+    Since the survey draws its configuration, the sample count is one of
+    200,000, 400,000 or 800,000 and there is no longer any value a reader could
+    default to. So the declared shape is also checked against the declared
+    probe length and rate: those three numbers describe the same file three
+    ways, and two of them agreeing while the third does not is the shape of a
+    silent mis-mapping. A wrong reshape either raises or misreads, and this
+    repository has already had one silent-mapping bug.
     """
     block = manifest.get("survey_iq") or {}
     tunings = int(block.get("tunings") or 0)
@@ -264,6 +299,18 @@ def read_probe(entry: Path, manifest: dict) -> np.ndarray:
     dtype = str(block.get("dtype") or "ci16_le")
     if dtype != "ci16_le":
         raise ProbeUnusable(f"unsupported survey IQ dtype {dtype!r}")
+    record = _survey_record(manifest)
+    config = record.get("capture_config") or {}
+    probe_s = config.get("probe_s") or block.get("probe_s")
+    rate = ((config.get("sample_rate_hz") or block.get("sample_rate_hz"))
+            if probe_s else None)
+    if probe_s and rate:
+        implied = round(float(probe_s) * float(rate))
+        if abs(implied - per_tuning) > SHAPE_CONSISTENCY_TOLERANCE_SAMPLES:
+            raise ProbeUnusable(
+                f"survey_iq declares {per_tuning} samples per tuning but the "
+                f"record's {float(probe_s) * 1000:.0f} ms at "
+                f"{float(rate) / 1e6:.1f} MS/s implies {implied}")
     raw = np.fromfile(Path(entry) / "survey.ci16", dtype="<i2")
     expected = tunings * per_tuning * 2 * 2
     if raw.size != expected:
@@ -978,7 +1025,14 @@ def _banks(edge: str, sample_rate_hz: float) -> dict:
             for name, config in COARSE_CONFIGS.items()}
 
 
-def warm(sample_rate_hz: float = 2_500_000.0) -> float:
+#: Rates the corpus can hold, because the survey draws between them.  Warming
+#: is keyed by rate all the way down — the pilot frame, the kernel bank and its
+#: tap count all change — so warming one rate leaves the other cold.
+CORPUS_SAMPLE_RATES_HZ = (2_500_000.0, 5_000_000.0)
+
+
+def warm(sample_rate_hz: float | tuple[float, ...] = CORPUS_SAMPLE_RATES_HZ
+         ) -> float:
     """Pay every one-off cost before anything is timed.
 
     The fused correlation kernel is compiled on first use — 833 ms measured,
@@ -986,17 +1040,25 @@ def warm(sample_rate_hz: float = 2_500_000.0) -> float:
     Charging any of that to the first candidate that happens to run would make
     the cost column, which is half of this comparison, a measurement of
     ordering.
+
+    Every rate the corpus can hold is warmed, not just one.  The bank cache is
+    keyed by rate, so warming 2.5 MS/s and then scoring a 5 MS/s probe charges
+    that probe for a bank build it did not cause — which is the same defect in
+    a different place.
     """
     started = time.perf_counter()
+    rates = ((sample_rate_hz,) if isinstance(sample_rate_hz, (int, float))
+             else tuple(sample_rate_hz))
     frames = max(fast_scan.MINIMUM_PROBE_FRAMES,
                  int(np.ceil(0.080 / STARLINK_FRAME_DURATION_S)))
-    quiet = np.zeros(int(frames * _frame_period_samples(sample_rate_hz)) + 64,
-                     np.complex64)
-    for edge in ("lower", "upper"):
-        for roll in (0, CONTROL_SYMBOL_ROLL):
-            edge_pilot_frame(sample_rate_hz, edge, symbol_roll=roll)
-        for bank in _banks(edge, sample_rate_hz).values():
-            fast_scan.probe(quiet, bank)
+    for rate in rates:
+        quiet = np.zeros(int(frames * _frame_period_samples(rate)) + 64,
+                         np.complex64)
+        for edge in ("lower", "upper"):
+            for roll in (0, CONTROL_SYMBOL_ROLL):
+                edge_pilot_frame(rate, edge, symbol_roll=roll)
+            for bank in _banks(edge, rate).values():
+                fast_scan.probe(quiet, bank)
     return time.perf_counter() - started
 
 
@@ -1022,7 +1084,10 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
         raise ProbeUnusable(
             f"sample_order names {len(plan)} tunings, IQ holds {block.shape[0]}")
     record = _survey_record(manifest)
-    rate = float(record.get("sample_rate_hz") or 2_500_000.0)
+    # The survey's own rate, never the dwell's. Everything downstream of this
+    # line is scaled by it: the kernel taps, the frame grid, the epoch count
+    # and every frequency reported.
+    rate = survey_sample_rate_hz(manifest)
     capture = entry.name
     identity = manifest.get("identity") or {}
     radio_id = identity.get("radio_id") or ""
@@ -1089,6 +1154,13 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
             "checked": len(deltas),
             "worst_delta": max(deltas) if deltas else None},
         "sample_rate_hz": rate, "samples_per_tuning": int(block.shape[1]),
+        # Which arm of the randomised capture experiment this probe belongs to,
+        # carried forward so the comparison can group by configuration rather
+        # than pooling four of them into one column. The draw travels with it
+        # so the split can be audited from the sidecars alone.
+        "capture_config": record.get("capture_config"),
+        "capture_experiment": record.get("experiment"),
+        "pilot_guard_hz": fast_scan.pilot_guard_hz(rate),
         "coarse_configs": {name: {"shape": list(config["shape"]),
                                   "offset_span_hz": config["offset_span_hz"]}
                            for name, config in COARSE_CONFIGS.items()},

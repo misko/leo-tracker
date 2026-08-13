@@ -39,8 +39,10 @@ duration_window="${LEO_ANALYSIS_DURATION_WINDOW:-200}"
 pipeline_id="${LEO_ANALYSIS_PIPELINE_ID:-kalman-full-v1}"
 full_coverage="${LEO_ANALYSIS_FULL_COVERAGE:-1}"
 archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
-# Survey probes are 12.8 MB each and live inside capture directories that
-# retention removes whole. On by default while detector work is under way.
+# Survey probes live inside capture directories that retention removes whole.
+# Their size follows the drawn capture configuration: 12.8 MB at 80 ms /
+# 2.5 MS/s, 51.2 MB at 160 ms / 5 MS/s, averaging 28.8 MB over a uniform draw.
+# On by default while detector work is under way.
 survey_corpus_mode="${LEO_ANALYSIS_SURVEY_CORPUS_MODE:-on}"
 survey_corpus_random_fraction="${LEO_ANALYSIS_SURVEY_CORPUS_FRACTION:-0.05}"
 # Shadow detector bake-off over the preserved probes. Scores every candidate on
@@ -49,6 +51,14 @@ survey_corpus_random_fraction="${LEO_ANALYSIS_SURVEY_CORPUS_FRACTION:-0.05}"
 # Measured at 55-62 s per entry on this host under normal contention, and the
 # corpus grows far slower than captures do, so one entry per job keeps the tail
 # bounded while still keeping up.
+#
+# The randomised capture configuration costs much less here than the four-fold
+# growth in samples suggests: measured relative cost across the four arms is
+# 1.00 / 1.17 / 1.19 / 1.44, because most of this stage is differential, GLRT
+# and conditioned statistics over a fixed symbol count, and only the coarse
+# bank and the full-frame search scale with probe length. So the dearest arm is
+# about 80-90 s rather than the 220 s a linear model would predict, and the
+# 240 s budget below still admits one entry per job in every configuration.
 survey_score_mode="${LEO_ANALYSIS_SURVEY_SCORE_MODE:-on}"
 survey_score_limit="${LEO_ANALYSIS_SURVEY_SCORE_LIMIT:-1}"
 survey_score_null_stride="${LEO_ANALYSIS_SURVEY_SCORE_NULL_STRIDE:-2}"

@@ -515,3 +515,82 @@ def test_the_survey_covers_the_eight_low_band_edge_tunings():
     assert len(LOW_BAND_TUNINGS) == 8
     assert {edge for _, edge in LOW_BAND_TUNINGS} == {"lower", "upper"}
     assert sorted({channel for channel, _ in LOW_BAND_TUNINGS}) == [1, 2, 3, 4]
+
+
+def test_the_survey_runs_at_its_drawn_rate_and_not_the_dwells(fake_iio,
+                                                              monkeypatch):
+    """These were the same number once and inheriting it is now wrong twice.
+
+    The survey draws 2.5 or 5 MS/s; the dwell records at whatever its own mode
+    wants, which for a wide capture is 10 MS/s and was never the survey's. The
+    radio is programmed from the drawn configuration, and the record has to
+    agree with the samples the radio then produced.
+    """
+    from leo_tracker.radio.beacon import presurvey
+
+    payloads, quiet = _tuning_payloads()
+    context = _context(payloads, quiet)
+    monkeypatch.setattr(presurvey, "_open_context", lambda uri, serial: context)
+    config = presurvey.config_by_name("80ms-5.0MSps")
+
+    record, samples = run_survey(uri="usb:1.2.3", tunings=[(4, "lower")],
+                                 config=config, keep_samples=True,
+                                 lnb_lo_hz=9_750_000_000.0)
+
+    assert record["state"] == "complete"
+    assert record["sample_rate_hz"] == 5_000_000.0
+    assert record["capture_config"]["name"] == "80ms-5.0MSps"
+    assert record["capture_config"]["pilot_guard_hz"] == 1_562_500.0
+    # The radio was told the drawn rate, not a default.
+    assert context._phy.channels[1].attrs["sampling_frequency"].value == "5000000"
+    assert samples.shape[1] == int(round(0.080 * 5_000_000.0))
+
+
+def test_deferring_the_score_keeps_the_probes_and_costs_no_arithmetic(
+        fake_iio, monkeypatch):
+    """The capture host owns the radio; it need not own the detection.
+
+    Deferring is only safe if the samples survive, because a deferred verdict
+    over discarded IQ is no verdict at all. So the two have to move together:
+    nothing scored here, everything kept for the host that will.
+    """
+    from leo_tracker.radio.beacon import presurvey
+
+    payloads, quiet = _tuning_payloads()
+    context = _context(payloads, quiet)
+    monkeypatch.setattr(presurvey, "_open_context", lambda uri, serial: context)
+
+    record, samples = run_survey(uri="usb:1.2.3", tunings=[(4, "lower")],
+                                 keep_samples=True, score_on_capture_host=False)
+
+    assert record["state"] == "complete"
+    assert record["compute_ms"] == 0.0
+    assert samples is not None and samples.shape[0] == 1
+    # The tuning is still named and located; only the scores are absent.
+    assert record["tunings"][0]["channel"] == 4
+    assert record["tunings"][0]["receivers"] == []
+    assert "analysis host" in record["capture_config"]["scored_on"]
+    # And no verdict of any kind: zero active would read as a finding.
+    assert record["scored_on_capture_host"] is False
+    assert record["active"] is None and record["active_count"] is None
+    assert record["threshold_calibrated"] is False
+
+
+def test_a_simulated_run_never_opens_a_radio(monkeypatch):
+    """A fake capture asking for a real survey would grab live hardware.
+
+    On this site the default URI answers, so the survey opened a context on a
+    Pluto a capture service owns and retuned it eight times. Nothing about
+    ``--fake`` said not to.
+    """
+    from leo_tracker.radio.beacon import presurvey
+
+    def explode(*args, **kwargs):
+        raise AssertionError("a simulated survey must not open a radio")
+
+    monkeypatch.setattr(presurvey, "_open_context", explode)
+
+    record, samples = run_survey(uri="pluto://ip:192.168.2.1", simulated=True)
+
+    assert record["state"] == "skipped" and samples is None
+    assert "simulated" in record["reason"]

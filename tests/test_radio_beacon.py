@@ -774,12 +774,27 @@ def test_a_capture_without_the_flag_carries_no_survey(tmp_path):
     assert "pre_dwell_survey" not in manifest["metadata"]
 
 
-def test_a_failed_survey_still_yields_a_capture(tmp_path, capsys):
-    """A delayed capture is gone for good; a missing survey is an annotation."""
+def test_a_failed_survey_still_yields_a_capture(tmp_path, capsys, monkeypatch):
+    """A delayed capture is gone for good; a missing survey is an annotation.
+
+    The failure is now injected rather than provoked. This test used to rely on
+    the comment "no radio is reachable under --fake", which was never a property
+    of the code and is false on the capture host itself: the survey opened a
+    context on the default URI and only failed later, when it tried to set a
+    sample rate the AD9361 cannot accept. It was passing for the wrong reason
+    while quietly retuning hardware a live capture service owns.
+    ``run_survey``'s own failure handling is covered without a radio in
+    ``test_a_survey_failure_never_costs_the_capture``; what is left for this
+    test is that the capture completes and the failure reaches the manifest.
+    """
+    from leo_tracker.radio.beacon import presurvey
+
+    monkeypatch.setattr(presurvey, "run_survey", lambda **kwargs: ({
+        "schema": presurvey.SURVEY_SCHEMA, "state": "failed",
+        "error": "OSError: no radio here", "active": None,
+        "tunings": None, "dwell": None}, None))
     capture = tmp_path / "survey-failed"
 
-    # No radio is reachable under --fake, so the survey fails for real here
-    # rather than being made to fail.
     assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
                  "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
                  "--block-size", "100", "--chunk-s", ".02", "--fake",
@@ -787,7 +802,32 @@ def test_a_failed_survey_still_yields_a_capture(tmp_path, capsys):
 
     manifest = json.loads((capture / "manifest.json").read_text())
     assert manifest["state"] == "complete"
-    assert manifest["metadata"]["pre_dwell_survey"]["state"] == "failed"
+    survey = manifest["metadata"]["pre_dwell_survey"]
+    assert survey["state"] == "failed" and "no radio here" in survey["error"]
+
+
+def test_a_simulated_capture_never_reaches_for_a_real_radio(tmp_path):
+    """--fake means no radio, and the survey is the one place that ignored it.
+
+    On a host with a Pluto on the default URI, a simulated capture asking for
+    a survey opened a context on it and retuned its local oscillator eight
+    times — hardware a live capture service owns. The watch script guards this;
+    the command it calls did not, so anyone invoking it directly got a real
+    survey out of a fake capture. Skipped is recorded rather than silently
+    omitted, so the manifest says why there is no survey.
+    """
+    capture = tmp_path / "simulated"
+
+    assert main(["starlink-beacon-capture", str(capture), "--duration-s", ".02",
+                 "--sample-rate-hz", "10000", "--bandwidth-hz", "9000",
+                 "--block-size", "100", "--chunk-s", ".02", "--fake",
+                 "--survey-before-dwell"]) == 0
+
+    survey = json.loads((capture / "manifest.json").read_text())[
+        "metadata"]["pre_dwell_survey"]
+    assert survey["state"] == "skipped"
+    assert survey["active"] is None and survey["tunings"] is None
+    assert "simulated" in survey["reason"]
 
 
 def test_beacon_capture_records_operator_radio_and_receiver_labels(tmp_path, capsys):

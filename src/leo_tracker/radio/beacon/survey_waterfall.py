@@ -60,30 +60,68 @@ def waterfall_paths(plots_root: Path, capture_name: str) -> tuple[Path, Path]:
             root / f"{capture_name}-survey.json")
 
 
+#: Fallback when a record predates the configuration being written down. Every
+#: probe taken before the survey was randomised was taken here, so it is the
+#: right guess — and it is only ever a guess, which is why
+#: :func:`record_sample_rate_hz` prefers what the record says.
+LEGACY_SAMPLE_RATE_HZ = 2_500_000.0
+
+
+def record_sample_rate_hz(record: dict,
+                          fallback: float = LEGACY_SAMPLE_RATE_HZ) -> float:
+    """The rate these samples were taken at, from the record that owns them.
+
+    The frequency axis of every panel is scaled by this, and the survey is now
+    drawn between 2.5 and 5 MS/s, so taking it from a constant would draw a
+    5 MS/s probe on a 2.5 MS/s axis and label the result in kilohertz. Nothing
+    in the picture would look wrong; every frequency in it would be half what
+    it should be.
+    """
+    for value in ((record.get("capture_config") or {}).get("sample_rate_hz"),
+                  record.get("sample_rate_hz")):
+        if value:
+            return float(value)
+    return float(fallback)
+
+
 def _panel_label(entry: dict, scored: dict, labels: list | None) -> str:
-    """Everything the panel is evidence for, in one line."""
+    """Everything the panel is evidence for, in one line.
+
+    ``active`` is a tri-state now: true, false, or absent because the
+    configuration this probe was taken in has no measured threshold. The label
+    distinguishes the third from the second, because "not marked active" and
+    "no bar exists to mark it against" are different pictures.
+    """
     name = (labels[scored["receiver"]] if labels
             and scored["receiver"] < len(labels) else f"rx{scored['receiver']}")
+    verdict = scored.get("active")
     return (f"ch{entry['channel']} {entry['region'].replace('-edge','')} · {name} · "
             f"p/med {scored['peak_to_median']:.2f} · "
             f"anch {scored.get('anchor_agreement', '-')}/"
             f"{scored.get('anchor_count', '-')} · "
             f"ctr {scored.get('offset_contrast', float('nan')):.2f}"
-            f"{'  ACTIVE' if scored.get('active') else ''}")
+            f"{'  ACTIVE' if verdict else ''}"
+            f"{'  (uncalibrated)' if verdict is None else ''}")
 
 
 def render(samples: np.ndarray, record: dict, output: Path, *,
-           sample_rate_hz: float = 2_500_000.0,
+           sample_rate_hz: float | None = None,
            span_hz: float = DEFAULT_SPAN_HZ,
            receiver_labels: list | None = None,
            capture_name: str = "") -> dict:
     """Draw one panel per tuning per receiver and write the image.
 
-    ``samples`` is the raw ci16 the survey scored, shaped
+    ``samples`` is the raw ci16 the survey collected, shaped
     ``(tuning, sample, receiver, component)`` and ordered as it was collected,
     which is why the tuning order is taken from ``sample_order`` rather than
     from the score-sorted results.
+
+    The sample count per tuning is read off the array and the rate off the
+    record; neither is assumed. Three of the four survey configurations hold a
+    sample count this function was originally written not to expect.
     """
+    if sample_rate_hz is None:
+        sample_rate_hz = record_sample_rate_hz(record)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -98,6 +136,12 @@ def render(samples: np.ndarray, record: dict, output: Path, *,
                  for entry in record["tunings"]}
 
     tunings, count = values.shape[0], values.shape[1]
+    # The axis cannot claim more band than was sampled. At 2.5 MS/s Nyquist is
+    # ±1.25 MHz and the default window fits inside it, so this changed nothing
+    # while the rate was fixed; a caller asking for a window wider than the
+    # drawn rate supports would otherwise get an extent that says 1 MHz over
+    # data that stops at half the rate.
+    span_hz = min(float(span_hz), float(sample_rate_hz) / 2.0)
     # Frequency resolution is what carries the Doppler, so the segment is
     # sized for it and time resolution is bought back with overlap instead.
     per_segment = max(64, 1 << int(np.log2(max(count // TIME_BINS, 64))))
@@ -169,11 +213,13 @@ def render(samples: np.ndarray, record: dict, output: Path, *,
     plt.close(figure)
     os.replace(partial, output)
     return {"path": output.name, "bytes": output.stat().st_size,
-            "span_hz": span_hz, "segment_samples": int(per_segment)}
+            "span_hz": span_hz, "segment_samples": int(per_segment),
+            "sample_rate_hz": float(sample_rate_hz),
+            "samples_per_tuning": int(count)}
 
 
 def write(samples, record: dict, plots_root: Path, capture_name: str, *,
-          sample_rate_hz: float = 2_500_000.0,
+          sample_rate_hz: float | None = None,
           receiver_labels: list | None = None) -> dict:
     """Write the picture and the full metric record beside it.
 

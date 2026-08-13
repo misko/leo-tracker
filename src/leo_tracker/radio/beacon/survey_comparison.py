@@ -656,17 +656,31 @@ def _deployed_gate(payloads: list[dict]) -> dict:
 
 
 def _probe_lengths(payloads: list[dict]) -> dict:
-    """Which probe lengths went into this aggregate, and whether that is one.
+    """Which capture configurations went into this aggregate, and whether one.
 
     A null threshold is not a property of a detector, it is a property of a
-    detector at a probe length: a clean null reaches p99 1.310 at 20 ms and
+    detector *in a configuration*: a clean null reaches p99 1.310 at 20 ms and
     1.137 at 80 ms.  Pooling two lengths produces a threshold that is right for
     neither, and nothing else in this codebase notices — so the review counts
-    the lengths it found and says so rather than averaging them.
+    what it found and says so rather than averaging them.
+
+    Sample rate is the second axis and it needs its own count, because the
+    survey draws two of them and two of its four arms share a probe length at
+    different rates.  Checking length alone would pass 80 ms at 2.5 MS/s pooled
+    with 80 ms at 5 MS/s, which is the identical defect with the identical
+    silence: rate sets the kernel taps, the epoch count the fold maximises
+    over, and how much of the sampled band is noise.
     """
     found = sorted({round(payload.get("probe_ms") or 0.0, 3)
                     for payload in payloads} - {0.0})
+    rates = sorted({round(float(payload.get("sample_rate_hz") or 0.0), 3)
+                    for payload in payloads} - {0.0})
+    arms = sorted({(payload.get("capture_config") or {}).get("name")
+                   for payload in payloads} - {None})
     return {"probe_ms": found, "single_length": len(found) <= 1,
+            "sample_rate_hz": rates, "single_rate": len(rates) <= 1,
+            "capture_configs": arms,
+            "single_configuration": len(found) <= 1 and len(rates) <= 1,
             "clean_null_p99_reference": CLEAN_NULL_P99_BY_PROBE_MS}
 
 
@@ -728,12 +742,24 @@ def format_review(report: dict) -> str:
             "wrong and nothing below is trustworthy")
     lengths = report.get("probe_lengths") or {}
     found = lengths.get("probe_ms") or []
+    rates = lengths.get("sample_rate_hz") or []
     length_line = ("probe length " + ", ".join(f"{value:g} ms" for value in found)
                    if found else "probe length unknown")
+    length_line += ("   rate " + ", ".join(f"{value / 1e6:g} MS/s"
+                                           for value in rates)
+                    if rates else "   rate unknown")
+    arms = lengths.get("capture_configs") or []
+    if arms:
+        length_line += "   arms " + ", ".join(arms)
     if not lengths.get("single_length", True):
-        length_line += ("  <-- MIXED: a null threshold belongs to one probe "
-                        "length (clean p99 1.310/1.189/1.137 at 20/40/80 ms); "
-                        "these must not be pooled")
+        length_line += ("  <-- MIXED LENGTH: a null threshold belongs to one "
+                        "probe length (clean p99 1.310/1.189/1.137 at "
+                        "20/40/80 ms); these must not be pooled")
+    if not lengths.get("single_rate", True):
+        length_line += ("  <-- MIXED RATE: rate sets the kernel taps (11 at "
+                        "2.5 MS/s, 22 at 5) and the epoch count (3,333 against "
+                        "6,667), so a threshold belongs to one rate as much as "
+                        "to one length; these must not be pooled either")
     lines = [PREAMBLE, "",
              f"entries {report['entries']}   observations {report['observations']}"
              f"   false-alarm rate {report['false_alarm_rate']:.3f}",

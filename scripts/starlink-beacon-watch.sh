@@ -93,6 +93,29 @@ gain_experiment_id="${LEO_BEACON_GAIN_EXPERIMENT_ID:-randomized-manual-vs-slow-a
 # having failed and the recording proceeds.
 survey_before_dwell="${LEO_BEACON_SURVEY_BEFORE_DWELL:-1}"
 keep_survey_iq="${LEO_BEACON_KEEP_SURVEY_IQ:-1}"
+# The survey's capture configuration is drawn uniformly from probe length in
+# {80, 160} ms crossed with sample rate in {2.5, 5} MS/s, rather than chosen.
+# Both axes have a real argument on each side -- a longer probe folds more
+# frames, a higher rate widens the guard the LNB offset eats into, and both
+# cost -- and neither argument is settled, so the corpus is asked instead of
+# us. This script draws the raw number and logs it; the assignment itself is
+# computed in Python, where it can be tested, and all three of experiment id,
+# draw and outcome are written into the manifest so the split can be audited
+# rather than trusted.
+#
+# Setting this to empty runs the survey at the one configuration whose
+# threshold has been measured -- 80 ms at 2.5 MS/s -- and records it as not
+# randomised.
+survey_experiment_id="${LEO_BEACON_SURVEY_EXPERIMENT_ID:-randomised-probe-length-and-rate-v1}"
+# Pin one arm by name (e.g. 160ms-5.0MSps) instead of drawing. For debugging a
+# single configuration; recorded as not randomised so it can be excluded.
+survey_config="${LEO_BEACON_SURVEY_CONFIG:-}"
+# Collect the probes and score none of them on the Pi. Off by default: the
+# capture-host score is bounded to the cheapest configuration's worth, about
+# 1.4 s of arithmetic, which is cheap enough to keep for the dashboard. Turn it
+# on if the Pi is short of headroom -- every verdict that matters is re-derived
+# on the analysis host from the preserved IQ anyway.
+survey_defer_scoring="${LEO_BEACON_SURVEY_DEFER_SCORING:-0}"
 # A waterfall per survey, plus every metric it computed, written outside the
 # capture so both outlive it. On while scanning reliability is being worked
 # out: a number cannot show a detection sitting on the edge of the search, a
@@ -304,14 +327,35 @@ capture_target() {
           "${fake_source}" != "1" ]]; then
       survey_args=(--survey-before-dwell)
       # The probes the scores came from, so a later analysis can re-decide
-      # rather than inherit this one's threshold. About 12.8 MB against the
-      # capture's 2.3 GB, and it shares the capture's lifecycle: retention
-      # removes the directory whole, so this is not a durable archive.
+      # rather than inherit this one's threshold. 12.8 MB at the cheapest drawn
+      # configuration and 51.2 MB at the dearest, against the capture's 2.3 GB,
+      # and it shares the capture's lifecycle: retention removes the directory
+      # whole, so this is not a durable archive.
       [[ "${keep_survey_iq}" == "1" ]] && survey_args+=(--keep-survey-iq)
       # Needs the samples, so the picture follows whether they were kept.
       if [[ "${keep_survey_iq}" == "1" && -n "${survey_waterfall_dir}" ]]; then
         survey_args+=(--survey-waterfall-dir "${survey_waterfall_dir}")
       fi
+      # A pinned arm and a drawn one are mutually exclusive: passing both would
+      # record a draw that decided nothing, which is worse than recording none.
+      if [[ -n "${survey_config}" ]]; then
+        survey_args+=(--survey-config "${survey_config}")
+        printf '{"survey_experiment":null,"survey_config":"%s","randomised":false}\n' \
+          "${survey_config}"
+      elif [[ -n "${survey_experiment_id}" ]]; then
+        # A fresh 32 bits per capture from the kernel pool, the same source the
+        # AGC assignment draws from. Independent per radio because the two
+        # radios run separate processes reading it separately.
+        survey_draw="$(od -An -N4 -tu4 /dev/urandom | tr -d '[:space:]')"
+        survey_args+=(--survey-experiment-id "${survey_experiment_id}"
+          --survey-random-draw-u32 "${survey_draw}")
+        # Logged raw. The arm it selects is computed in Python, so this script
+        # deliberately does not restate the mapping -- two copies of an
+        # assignment rule is how they drift apart.
+        printf '{"survey_experiment":"%s","survey_draw_u32":%s,"arms":4,"assignment_probability":0.25}\n' \
+          "${survey_experiment_id}" "${survey_draw}"
+      fi
+      [[ "${survey_defer_scoring}" == "1" ]] && survey_args+=(--survey-defer-scoring)
     fi
     env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync leo-radio \
       starlink-beacon-capture "${capture}" "${capture_args[@]}" \

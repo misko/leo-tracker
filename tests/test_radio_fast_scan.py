@@ -1,3 +1,6 @@
+import os
+import sys
+
 import numpy as np
 import pytest
 
@@ -563,3 +566,99 @@ def test_warming_the_kernel_moves_the_compile_out_of_the_survey():
     # A 20 ms probe of the 104-kernel bank measured 35 ms on a Pi 5; the
     # compile alone was 833 ms.
     assert _time.perf_counter() - started < 0.4
+
+
+# --------------------------------------------------------------------------
+# what the compiled kernel is cached under
+# --------------------------------------------------------------------------
+
+def _fake_compiler(path, identity):
+    """A stand-in ``cc`` that answers any interrogation with one identity.
+
+    Whatever is asked of it, it reports the same line, so the digest it
+    produces is a function of the build identity and of nothing else -- which
+    is exactly the property under test.
+    """
+    path.write_text(f'#!/bin/sh\necho "{identity}"\n')
+    path.chmod(0o755)
+    return path
+
+
+def test_the_kernel_cache_filename_separates_two_build_identities(tmp_path,
+                                                                  monkeypatch):
+    """``-march=native`` makes the .so a function of the host, not of the ISA.
+
+    Two hosts that are both linux/aarch64 can resolve ``-march=native`` to
+    different targets, and ``-ffast-math`` lets the compiler reassociate the
+    fold -- so the two builds sum the reduction in a different order. That is
+    the measured source of the ~1e-8 residual seen when a score is recomputed
+    on a different host: on one host the recomputation is bitwise exact, across
+    hosts it lands about 1e-8 away. Keyed on ``sys.platform`` and
+    ``os.uname().machine`` alone, both builds claim one cache filename, and now
+    that scoring runs on an analysis host separate from the capture host, the
+    loser loads a stale .so built for another CPU in silence.
+    """
+    from leo_tracker.radio.beacon import fast_scan
+
+    monkeypatch.setenv("LEO_SCAN_CACHE", str(tmp_path))
+    monkeypatch.setenv("CC", str(_fake_compiler(
+        tmp_path / "cc-a76", "gcc 14.2.0 -mcpu=cortex-a76+crc+crypto")))
+    a76 = fast_scan._library_path()
+    monkeypatch.setenv("CC", str(_fake_compiler(
+        tmp_path / "cc-a72", "gcc 14.2.0 -mcpu=cortex-a72")))
+    a72 = fast_scan._library_path()
+    monkeypatch.setenv("CC", str(_fake_compiler(
+        tmp_path / "cc-old", "gcc 12.2.0 -mcpu=cortex-a76+crc+crypto")))
+    older = fast_scan._library_path()
+
+    assert a76 != a72, "two -march=native targets, one cache filename"
+    assert a76 != older, "two compiler versions, one cache filename"
+    # Still recognisable to a human staring at the cache directory.
+    assert a76.name.startswith(f"libleoscan-{sys.platform}-{os.uname().machine}")
+    assert a76.suffix == ".so"
+
+
+def test_one_build_identity_keeps_one_cache_filename(tmp_path, monkeypatch):
+    """A key that moved between calls would recompile the kernel forever.
+
+    The whole point of the cache is that the second process does not pay the
+    compile, so the digest has to be a function of the build and not of the
+    clock, the pid or the iteration order of a set.
+    """
+    from leo_tracker.radio.beacon import fast_scan
+
+    monkeypatch.setenv("LEO_SCAN_CACHE", str(tmp_path))
+    monkeypatch.setenv("CC", str(_fake_compiler(
+        tmp_path / "cc-a76", "gcc 14.2.0 -mcpu=cortex-a76+crc+crypto")))
+
+    names = {fast_scan._library_path().name for _ in range(4)}
+
+    assert len(names) == 1
+    # And it is keyed on the build rather than merely on the machine: this host
+    # can be interrogated, so its name must carry more than platform+machine.
+    assert names != {f"libleoscan-{sys.platform}-{os.uname().machine}.so"}
+
+
+@pytest.mark.parametrize("script", ["#!/bin/sh\nexit 3\n", None])
+def test_a_compiler_that_cannot_be_interrogated_keeps_the_old_plain_name(
+        tmp_path, monkeypatch, script):
+    """Degrade to the old key rather than raise: this is the live capture path.
+
+    A compiler that will not answer -- absent, or answering with a failure --
+    leaves nothing to key on. The documented fallback is the name this cache
+    used before there was a digest, so a host that cannot be interrogated keeps
+    working exactly as it did.
+    """
+    from leo_tracker.radio.beacon import fast_scan
+
+    monkeypatch.setenv("LEO_SCAN_CACHE", str(tmp_path))
+    compiler = tmp_path / "cc-mute"
+    if script is not None:
+        compiler.write_text(script)
+        compiler.chmod(0o755)
+    monkeypatch.setenv("CC", str(compiler))
+
+    path = fast_scan._library_path()
+
+    assert path.name == (f"libleoscan-{sys.platform}-"
+                         f"{os.uname().machine}.so")

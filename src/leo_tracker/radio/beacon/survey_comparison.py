@@ -159,17 +159,29 @@ PREAMBLE = (
 # reading what the scorer wrote
 # --------------------------------------------------------------------------
 
-def load_scores(corpus_root: Path, *, limit: int | None = None) -> list[dict]:
-    """Every score sidecar of the current schema, oldest capture name first.
+def read_scores(corpus_root: Path, *,
+                limit: int | None = None) -> tuple[list[dict], dict[str, int]]:
+    """The sidecars of the current schema, and a census of the ones skipped.
 
     A sidecar that will not parse is skipped rather than fatal, for the same
     reason the scorer skips a damaged probe: an aggregate that refuses to
     produce anything because one file of two hundred is short is less useful
     than one that says so and carries on.
+
+    The census is the second return value because skipping cannot be silent.
+    A schema bump drops every existing sidecar from the aggregate — correctly,
+    since the two versions mean different things by the same key — but the drop
+    used to be a bare ``continue`` with no counter, so for the whole re-score
+    window the review reported "nothing scored yet" over a corpus that holds 84
+    scored entries and is still growing.  Re-scoring costs 74.6 s and 66.2 s
+    per entry under capture load, so about seven hours for the 378 entries that
+    need it, and for those seven hours the sentence would be false.  Counted and
+    named, it says instead which schema the corpus is at and how much of it is
+    waiting.
     """
-    root, loaded = Path(corpus_root), []
+    root, loaded, other = Path(corpus_root), [], {}
     if not root.is_dir():
-        return loaded
+        return loaded, other
     for entry in sorted(root.iterdir()):
         if limit is not None and len(loaded) >= limit:
             break
@@ -177,9 +189,18 @@ def load_scores(corpus_root: Path, *, limit: int | None = None) -> list[dict]:
             payload = json.loads((entry / SCORES_FILENAME).read_text())
         except (OSError, ValueError):
             continue
-        if payload.get("schema") == SCORES_SCHEMA:
+        schema = payload.get("schema")
+        if schema == SCORES_SCHEMA:
             loaded.append(payload)
-    return loaded
+        else:
+            name = str(schema) if schema else "no schema declared"
+            other[name] = other.get(name, 0) + 1
+    return loaded, other
+
+
+def load_scores(corpus_root: Path, *, limit: int | None = None) -> list[dict]:
+    """Every score sidecar of the current schema, oldest capture name first."""
+    return read_scores(corpus_root, limit=limit)[0]
 
 
 def certificate_rows(payloads: list[dict]):
@@ -635,7 +656,7 @@ def time_continuity(payloads: list[dict]) -> dict:
 def review(corpus_root: Path, *, limit: int | None = None,
            false_alarm_rate: float = DEFAULT_FALSE_ALARM_RATE) -> dict:
     """Everything the accumulated sidecars can say, in one document."""
-    payloads = load_scores(corpus_root, limit=limit)
+    payloads, other_schema = read_scores(corpus_root, limit=limit)
     searched = searched_comparison(payloads, false_alarm_rate=false_alarm_rate)
     conditioned = conditioned_comparison(payloads,
                                          false_alarm_rate=false_alarm_rate)
@@ -643,6 +664,11 @@ def review(corpus_root: Path, *, limit: int | None = None,
         "schema": REVIEW_SCHEMA,
         "caveat": PREAMBLE,
         "entries": len(payloads),
+        # Sidecars this aggregate did not read, by the schema they declare.
+        # An empty aggregate over a corpus full of last version's sidecars is
+        # a re-score in progress, not an unscored corpus, and the two must not
+        # print the same sentence.
+        "other_schema": dict(sorted(other_schema.items())),
         "captures": sorted({payload["capture"] for payload in payloads}),
         "observations": sum(len(payload.get("observations") or [])
                             for payload in payloads),
@@ -675,10 +701,35 @@ def _deployed_gate(payloads: list[dict]) -> dict:
     — 283 at (3, 8) over +/-300 kHz and 92 at (13, 8) over +/-700 kHz — report
     one shape between them.
 
+    ``regimes`` is the fact, and it is a *tuple* per entry with a count beside
+    it.  Shape, span and gate collected as three independent sorted sets lose
+    the pairing that is the whole content: over the 393 manifests on the share
+    283 records are (3, 8) over +/-300 kHz gating at 1.33 and 110 are (13, 8)
+    over +/-700 kHz gating at 1.252, and three sets printed in a row read
+    "shape [[3, 8], [13, 8]] over +/-300 kHz, +/-700 kHz, gating at
+    1.252/1.330" — which taken positionally says (3, 8) gated at 1.252, the
+    pairing exactly backwards.  That is the same flattening of a two-regime
+    corpus this whole change exists to undo, one level up, and the count is
+    what makes each regime checkable against the manifests.
+
     ``unknown`` is the count of entries whose record never said.  It is not
     folded into the shapes, because a bank nobody wrote down and a bank that
     happens to match today's are different facts and the first one is a hole.
+    An entry that recorded half its bank keeps its own regime with the missing
+    half spelled out, rather than being rounded into either.
     """
+    regimes: dict[tuple, int] = {}
+    for payload in payloads:
+        bank = payload.get("capture_bank") or {}
+        shape = payload.get("deployed_shape") or bank.get("shape")
+        if not shape:
+            continue
+        span = bank.get("offset_span_hz")
+        gate = payload.get("deployed_threshold")
+        key = (tuple(int(value) for value in shape),
+               None if span is None else float(span),
+               None if gate is None else float(gate))
+        regimes[key] = regimes.get(key, 0) + 1
     shapes = {tuple(payload["deployed_shape"]) for payload in payloads
               if payload.get("deployed_shape")}
     spans = {float(span) for payload in payloads
@@ -691,7 +742,17 @@ def _deployed_gate(payloads: list[dict]) -> dict:
         for name, value in (payload.get("scorer_coarse_threshold")
                             or {}).items():
             scorer.setdefault(name, set()).add(value)
-    return {"shape": sorted(list(shape) for shape in shapes),
+    return {"regimes": [{"shape": list(shape), "offset_span_hz": span,
+                         "threshold": gate, "entries": count}
+                        for (shape, span, gate), count in
+                        sorted(regimes.items(),
+                               key=lambda item: (-item[1], item[0][0],
+                                                 item[0][1] or -1.0,
+                                                 item[0][2] or -1.0))],
+            # Which values appear at all, which is a different question from
+            # which of them ever appeared together.  Only ``regimes`` is
+            # printed; these are here for a reader asking the first question.
+            "shape": sorted(list(shape) for shape in shapes),
             "offset_span_hz": sorted(spans),
             "unknown": sum(1 for payload in payloads
                            if not payload.get("deployed_shape")),
@@ -750,8 +811,19 @@ def _reproduction(payloads: list[dict]) -> dict:
     the interesting middle case — everything agrees to 1e-8, nothing agrees
     exactly — means a different build of the kernel wrote these sidecars, which
     is a fact about provenance and not a defect.
+
+    ``reproduced`` is the machine-readable form of the first of those three and
+    of nothing else, so it consults ``excluded`` as well as ``above``.  Without
+    that, one checked observation beside ninety-six unchecked ones sets the flag
+    True while the banner printed directly above it says PARTIAL — and of the
+    two, the flag is the one a later script reads with no human in between.
+
+    ``scored_samples`` is the window each delta was computed over, carried up
+    from the sidecars because the capture host scores a bounded prefix and this
+    host preserves the whole probe.  Two entries in that list means two windows
+    are pooled in one statistic.
     """
-    deltas, excluded, banks = [], {}, set()
+    deltas, excluded, banks, windows = [], {}, set(), set()
     for payload in payloads:
         for observation in payload.get("observations") or []:
             deltas.append(observation.get("deployed_reproduction_delta"))
@@ -761,6 +833,9 @@ def _reproduction(payloads: list[dict]) -> dict:
             bank = observation.get("deployed_reproduction_bank")
             if bank:
                 banks.add(str(bank))
+            window = observation.get("deployed_reproduction_samples")
+            if window:
+                windows.add(int(window))
     checked = [delta for delta in deltas if delta is not None]
     above = [delta for delta in checked if delta > REPRODUCTION_TOLERANCE]
     return {**describe(deltas),
@@ -771,7 +846,8 @@ def _reproduction(payloads: list[dict]) -> dict:
             "excluded": sum(excluded.values()),
             "excluded_reasons": dict(sorted(excluded.items())),
             "banks": sorted(banks),
-            "reproduced": bool(checked) and not above}
+            "scored_samples": sorted(windows),
+            "reproduced": bool(checked) and not above and not excluded}
 
 
 def _abbreviate(method: str) -> str:
@@ -792,6 +868,11 @@ def _mark(threshold: dict) -> str:
             else "*")
 
 
+def _entries(count: int) -> str:
+    """``1 entry`` or ``283 entries``, so a count reads as one."""
+    return f"{count} entr{'y' if count == 1 else 'ies'}"
+
+
 def _cell(value, spec: str = "8.3f", missing: str = "       -") -> str:
     if value is None or value != value:                # NaN is never equal to itself
         return missing
@@ -806,35 +887,55 @@ def format_review(report: dict) -> str:
     tolerance = reproduction.get("tolerance", REPRODUCTION_TOLERANCE)
     banks = ", ".join(reproduction.get("banks") or []) or "none"
     worst = _cell(reproduction.get("max"), ".3e", "n/a")
+    reasons = "; ".join(
+        f"{count} x {reason}"
+        for reason, count in (reproduction.get("excluded_reasons") or {}).items())
+    # Which window the check ran over, printed rather than implied: the capture
+    # host scores a bounded prefix and this host preserves the whole probe, and
+    # the two being different is what made the check fail for three of the four
+    # randomised arms while nothing said which one it used.
+    scored = reproduction.get("scored_samples") or []
+    window = ("" if not scored else
+              " over the capture's own "
+              + "/".join(f"{value:,}" for value in scored) + "-sample window")
+    other = report.get("other_schema") or {}
+    waiting = "; ".join(
+        f"{count} sidecar{'' if count == 1 else 's'} at {name} waiting to be "
+        "re-scored" for name, count in sorted(other.items()))
     # Three states, because a corpus that was verified, one that could only be
     # verified in part, and one that contradicts its own capture host are three
     # different reports and only the last of them means stop reading.
     if not checked and not skipped:
-        provenance = "deployed bank not re-run: nothing scored yet"
+        provenance = ("deployed bank not re-run: nothing scored yet"
+                      if not waiting else
+                      f"deployed bank not re-run at this schema: {waiting}")
     elif reproduction.get("above_tolerance"):
         provenance = (
             f"deployed bank ({banks}) reproduced with worst delta {worst} on "
-            f"{checked} observations, {reproduction['above_tolerance']} of "
-            f"them past {tolerance:.0e}  <-- NOT EXACT: the tuning mapping or "
-            "the reshape is wrong and nothing below is trustworthy")
+            f"{checked} observations{window}, "
+            f"{reproduction['above_tolerance']} of them past {tolerance:.0e}"
+            # A verdict on part of a corpus has to name the rest of it: sixteen
+            # of sixteen disagreeing reads very differently beside a hundred
+            # and sixty nobody could check, and that is the live shape of it.
+            + (f", and {skipped} more could not be checked at all ({reasons})"
+               if skipped else "")
+            + "  <-- NOT EXACT: the tuning mapping or the reshape is wrong and "
+            "nothing below is trustworthy")
     elif skipped:
-        reasons = "; ".join(
-            f"{count} x {reason}"
-            for reason, count in (reproduction.get("excluded_reasons")
-                                  or {}).items())
         provenance = (
             f"deployed bank not verified: none of {skipped} observations "
             f"could be checked ({reasons})  <-- PARTIAL: nothing below has "
             "been cross-checked against its capture host at all"
             if not checked else
             f"deployed bank ({banks}) reproduced within {tolerance:.0e} on "
-            f"{checked} observations, worst {worst}  <-- PARTIAL: {skipped} "
-            f"more could not be checked at all ({reasons}), so the corpus is "
-            "verified in part and the rest is unexamined rather than clean")
+            f"{checked} observations{window}, worst {worst}  <-- PARTIAL: "
+            f"{skipped} more could not be checked at all ({reasons}), so the "
+            "corpus is verified in part and the rest is unexamined rather than "
+            "clean")
     else:
         provenance = (
             f"deployed bank ({banks}) reproduced within {tolerance:.0e} on all "
-            f"{checked} observations, worst {worst}"
+            f"{checked} observations{window}, worst {worst}"
             + (f" ({reproduction.get('bitwise_exact', 0)} of them bitwise "
                "exact; a non-zero residual here is a different build of the "
                "kernel, not a different sky)"
@@ -860,10 +961,14 @@ def format_review(report: dict) -> str:
                         "2.5 MS/s, 22 at 5) and the epoch count (3,333 against "
                         "6,667), so a threshold belongs to one rate as much as "
                         "to one length; these must not be pooled either")
-    lines = [PREAMBLE, "",
-             f"entries {report['entries']}   observations {report['observations']}"
-             f"   false-alarm rate {report['false_alarm_rate']:.3f}",
-             length_line, provenance, ""]
+    entry_line = (
+        f"entries {report['entries']}   observations {report['observations']}"
+        f"   false-alarm rate {report['false_alarm_rate']:.3f}")
+    if other:
+        entry_line += ("   (" + ", ".join(f"{count} at {name}"
+                                          for name, count in sorted(other.items()))
+                       + ", another schema and not counted here)")
+    lines = [PREAMBLE, "", entry_line, length_line, provenance, ""]
 
     lines.append("SEARCHED  — each method maximising over its own cells")
     lines.append(f"{'method':>16} {'cells':>7} {'claims':>7} {'score p50':>10}"
@@ -906,24 +1011,31 @@ def format_review(report: dict) -> str:
             f"{'/'.join(f'{value:.3f}' for value in values)}, cross-edge "
             f"{report['false_alarm_rate']:.0%} threshold here is "
             f"{_cell(calibrated, '.3f', 'n/a')}")
-    # Separate line and separate wording: the gate above is this host's table
+    # Separate lines and separate wording: the gate above is this host's table
     # for the banks it re-runs, and (3, 8) is not in it, so coarse-A reads back
     # a 1.40 fallback no deployment has ever applied.  What the captures did is
-    # a different fact and comes from the captures.
-    gates = deployed.get("threshold") or []
+    # a different fact and comes from the captures — one line per regime, with
+    # shape, span and gate kept together, because read across a row three
+    # independently sorted sets assert a pairing no capture ever ran.
+    regimes = deployed.get("regimes") or []
     unknown = deployed.get("unknown") or 0
-    if deployed.get("shape") or gates or unknown:
-        lines.append(
-            "  captures themselves searched bank shape "
-            f"{deployed.get('shape') or 'unrecorded'} over "
-            + (", ".join(f"+/-{span / 1e3:g} kHz"
-                         for span in deployed.get("offset_span_hz") or [])
-               or "an unrecorded span")
-            + ", gating at "
-            + ("/".join(f"{value:.3f}" for value in gates)
-               if gates else "unrecorded")
-            + ("   (1 entry does not say)" if unknown == 1 else
-               f"   ({unknown} entries do not say)" if unknown else ""))
+    if regimes or unknown:
+        lines.append(f"  captures themselves searched {len(regimes)} bank "
+                     "configuration" + ("" if len(regimes) == 1 else "s")
+                     + (", one per line and never pooled:" if regimes else ":"))
+        for regime in regimes:
+            span, gate = regime["offset_span_hz"], regime["threshold"]
+            lines.append(
+                f"    {_entries(regime['entries'])}: shape {regime['shape']} "
+                + (f"over +/-{span / 1e3:g} kHz" if span else
+                   "over an unrecorded span")
+                + (f" gating at {gate:.3f}" if gate is not None
+                   else " gating at an unrecorded threshold"))
+        if unknown:
+            lines.append(f"    {_entries(unknown)} does not say which bank it "
+                         "searched" if unknown == 1 else
+                         f"    {_entries(unknown)} do not say which bank they "
+                         "searched")
     lines.append("  Where the host gate is the higher number it is costing "
                  "detections, not manufacturing them:")
     lines.append("  the plan's 8.11%/2.72%/2.11% false-alarm figures are wrong "

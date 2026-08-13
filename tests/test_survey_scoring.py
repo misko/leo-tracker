@@ -38,7 +38,7 @@ TUNINGS = ((1, "lower-edge"), (1, "upper-edge"))
 
 def _record(tunings, *, order=True, peak=1.2, shape=(3, 8),
             offset_span_hz=300_000.0, profile=True, profile_span=False,
-            threshold=1.33):
+            threshold=1.33, capture_config=None):
     """A pre-dwell survey record shaped the way the capture host writes one.
 
     The bank knobs default to the A-era configuration the corpus mostly holds:
@@ -46,6 +46,10 @@ def _record(tunings, *, order=True, peak=1.2, shape=(3, 8),
     all 283 of the narrow manifests are actually written. ``profile_span``
     additionally puts the span inside ``profile``, as the 75 widened ones do,
     and ``profile=False`` reproduces a record that never said at all.
+
+    ``capture_config`` is the randomised arm's block, absent on every entry
+    taken before the draw went live and carrying ``scored_samples`` on every
+    entry taken after it.
     """
     record = {
         "schema": "leo-tracker.pre-dwell-survey/v1", "state": "complete",
@@ -66,6 +70,8 @@ def _record(tunings, *, order=True, peak=1.2, shape=(3, 8),
                              "shape": list(shape)}
         if profile_span:
             record["profile"]["offset_span_hz"] = offset_span_hz
+    if capture_config:
+        record["capture_config"] = dict(capture_config)
     if order:
         record["sample_order"] = [list(pair) for pair in tunings]
     return record
@@ -448,6 +454,109 @@ def test_a_capture_on_the_widened_bank_is_reproduced_against_that_bank(
                - measured[0]["peak_to_median"]) > 1e-3
 
 
+def test_the_reproduction_scores_the_window_the_capture_host_scored(tmp_path):
+    """Two sides scoring different sample sets is not a reproduction check.
+
+    The capture host scores a bounded prefix — ``capture_config.scored_samples``
+    is 200,000 on every randomised arm, the cheapest arm's whole probe — so its
+    cost does not grow with the draw. The analysis host recomputes over the
+    whole preserved probe, which the draw makes 200,000, 400,000 or 800,000.
+    Three of the four live arms are longer than the cap, so the two sides score
+    different windows and disagree by construction, and the disagreement is not
+    a defect in the mapping the check exists to find.
+
+    Proven directly from the IQ on capture
+    ch1-lower-edge-narrow-pluto-5d4d-20260813T062858Z (arm 80ms-5.0MSps,
+    ``scored_samples`` 200,000, ``samples_per_tuning`` 400,000): the mean over
+    the first 200,000 samples is 87.4947, which is the manifest's deployed
+    ``mean_power`` exactly, and the mean over all 400,000 is 84.8204, which is
+    the recomputed one exactly. Over the sidecars that existed then, 16 of 16
+    target observations on the long arms failed, worst delta 0.1555, cheapest
+    6.945e-04 — a permanent false alarm that the corpus grows: 23 of the 40
+    randomised entries already preserve more than they scored, and each new
+    capture has a 3-in-4 chance of joining them.
+
+    Where the record carries no ``capture_config`` at all — 353 of the 393
+    manifests, every probe taken before the draw went live — the whole probe is
+    the window the capture scored, and that is what gets used.
+    """
+    from leo_tracker.radio.beacon.survey_scoring import receiver_samples
+    # A probe twice as long as the window the capture host scored, whose second
+    # half lands on a different epoch: the prefix and the whole are genuinely
+    # different measurements of different sky, not the same one rounded twice.
+    prefix = _replica()
+    whole = np.concatenate([prefix, _replica(epoch=int(PERIOD // 2))])
+    scored_entry = _entry(tmp_path, "ch1-prefix", tunings=((1, "lower-edge"),),
+                          samples=SAMPLES, block=_int16_block(prefix))
+    entry = _entry(tmp_path, "ch1-bounded-prefix", tunings=((1, "lower-edge"),),
+                   samples=whole.size, block=_int16_block(whole),
+                   capture_config={"name": "test-arm", "probe_s": whole.size / RATE,
+                                   "sample_rate_hz": RATE,
+                                   "samples_per_tuning": whole.size,
+                                   "scored_probe_s": SAMPLES / RATE,
+                                   "scored_samples": SAMPLES,
+                                   "scored_on": "capture host, bounded prefix"})
+    # What the capture host wrote down, computed over the prefix it scored.
+    bounded = {item["receiver"]: item["coarse"]["A"]["peak_to_median"]
+               for item in score_entry(scored_entry)["observations"]
+               if item["arm"] == "target"}
+    manifest = json.loads((entry / "manifest.json").read_text())
+    for tuning in manifest["metadata"]["pre_dwell_survey"]["tunings"]:
+        for scored in tuning["receivers"]:
+            scored["peak_to_median"] = bounded[scored["receiver"]]
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+
+    payload = score_entry(entry)
+
+    assert payload["samples_per_tuning"] == whole.size
+    assert payload["deployed_reproduction"]["checked"] == 2
+    assert payload["deployed_reproduction"]["excluded"] == 0
+    assert payload["deployed_reproduction"]["worst_delta"] == pytest.approx(
+        0.0, abs=1e-6)
+    # Which window, recorded rather than implied, at both levels.
+    assert payload["deployed_reproduction"]["scored_samples"] == SAMPLES
+    assert all(item["deployed_reproduction_samples"] == SAMPLES
+               for item in payload["observations"] if item["arm"] == "target")
+    # And the whole probe really is a different number, so a check that used it
+    # would be comparing two measurements rather than reproducing one.
+    full = next(item for item in payload["observations"]
+                if item["arm"] == "target" and item["receiver"] == 0)
+    assert abs(full["coarse"]["A"]["peak_to_median"] - bounded[0]) > 1e-3
+    # The whole probe is still what everything else is measured over: the probe
+    # is preserved so the analysis host can score all of it.
+    block = receiver_samples(
+        np.fromfile(entry / "survey.ci16", "<i2").reshape(1, whole.size, 2, 2),
+        0, 0)
+    assert block.size == whole.size
+
+
+def test_a_capture_that_scored_its_whole_probe_is_not_truncated(tmp_path):
+    """353 of the 393 manifests predate the draw and carry no window at all.
+
+    Absence of ``capture_config`` is not absence of a window: the capture host
+    scored everything it kept, so the whole preserved probe *is* the window and
+    truncating to some default would break the 353 entries that are currently
+    the only ones the check passes on.
+    """
+    entry = _entry(tmp_path, "ch1-pre-draw", tunings=((1, "lower-edge"),),
+                   block=_int16_block(_replica()))
+    first = score_entry(entry)
+    measured = {item["receiver"]: item["coarse"]["A"]["peak_to_median"]
+                for item in first["observations"] if item["arm"] == "target"}
+    manifest = json.loads((entry / "manifest.json").read_text())
+    for tuning in manifest["metadata"]["pre_dwell_survey"]["tunings"]:
+        for scored in tuning["receivers"]:
+            scored["peak_to_median"] = measured[scored["receiver"]]
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+
+    payload = score_entry(entry)
+
+    assert payload["deployed_reproduction"]["worst_delta"] == 0.0
+    assert payload["deployed_reproduction"]["scored_samples"] == SAMPLES
+    assert payload["deployed_reproduction"]["scored_samples_source"] == \
+        "whole preserved probe; the record declares no scored_samples"
+
+
 def test_a_capture_whose_bank_is_unknown_is_excluded_rather_than_failed(
         tmp_path):
     """An unanswerable check must not answer, and must not vanish either.
@@ -470,6 +579,82 @@ def test_a_capture_whose_bank_is_unknown_is_excluded_rather_than_failed(
     assert all(item["deployed_reproduction_delta"] is None
                and item["deployed_reproduction_excluded"]
                for item in payload["observations"] if item["arm"] == "target")
+
+
+def test_a_bank_is_a_shape_and_a_span_and_neither_names_it_alone():
+    """Half a bank identity matched against half a bank identity is a guess.
+
+    Thirteen hypotheses over +/-300 kHz is a 50 kHz grid and three over
+    +/-700 kHz is a 466 kHz one; no deployment has ever run either, and matching
+    on shape alone would happily reproduce a capture against a grid 2.33x the
+    spacing it actually searched — the same class of substitution the whole
+    check exists to catch, one level down. Both halves are pinned here because
+    a mutation dropping the span comparison from ``_reproduction_config``
+    otherwise passes the entire file.
+    """
+    from leo_tracker.radio.beacon.survey_scoring import _reproduction_config
+
+    assert _reproduction_config({"shape": [3, 8], "offset_span_hz": 300_000.0,
+                                 "known": True}) == "A"
+    assert _reproduction_config({"shape": [13, 8], "offset_span_hz": 700_000.0,
+                                 "known": True}) == "E"
+    # Right shapes, wrong spans: two grids nothing has ever searched.
+    assert _reproduction_config({"shape": [13, 8], "offset_span_hz": 300_000.0,
+                                 "known": True}) is None
+    assert _reproduction_config({"shape": [3, 8], "offset_span_hz": 700_000.0,
+                                 "known": True}) is None
+
+
+def test_a_record_that_names_a_shape_but_no_span_has_not_named_its_bank():
+    """A half-recorded bank is an unrecorded bank, and must read as one.
+
+    ``known`` is what decides whether the reproduction check runs at all, so a
+    record carrying a shape and no span has to fail it: the span is half the
+    configuration, and continuing with the half that is present would reproduce
+    against a grid nobody wrote down. A mutation dropping ``bool(span)`` from
+    the flag passes every other test in this file.
+    """
+    from leo_tracker.radio.beacon.survey_scoring import (_reproduction_config,
+                                                         capture_bank)
+
+    half = capture_bank({"profile": {"shape": [13, 8]}})
+
+    assert half["shape"] == [13, 8]
+    assert half["offset_span_hz"] is None
+    assert half["known"] is False
+    assert _reproduction_config(half) is None
+    # And the whole thing, for contrast, from a record that did say.
+    whole = capture_bank({"profile": {"shape": [13, 8],
+                                      "offset_span_hz": 700_000.0},
+                          "threshold": 1.252})
+    assert whole["known"] is True
+    assert _reproduction_config(whole) == "E"
+
+
+def test_an_observation_this_host_cannot_re_run_is_counted_not_dropped():
+    """The one hole in code whose whole principle is counted, never dropped.
+
+    When the selected config is missing from an observation's coarse dict the
+    delta guard returns None and the exclusion reason returns None too, so the
+    observation lands in neither count and the denominator shrinks in silence —
+    exactly the failure ``excluded`` was added to prevent, one branch further
+    in. Unreachable today because ``score_entry`` always computes every config;
+    it stops being unreachable the moment a config is added, dropped or fails,
+    and the check would then over-report its own coverage without a word. The
+    reason is the exact negative of the delta guard, so every in-scope
+    observation lands in exactly one of the two counts.
+    """
+    from leo_tracker.radio.beacon.survey_scoring import (_reproduction_delta,
+                                                         _reproduction_excluded)
+    scored = {"peak_to_median": 1.2}
+    bank = {"shape": [3, 8], "offset_span_hz": 300_000.0, "known": True}
+
+    delta = _reproduction_delta(scored, {}, "target", "A")
+    reason = _reproduction_excluded(scored, {}, "target", bank, "A")
+
+    assert delta is None
+    assert reason is not None
+    assert (delta is None) != (reason is None)
 
 
 def test_every_claim_names_a_place_and_says_how_hard_it_searched(tmp_path):
@@ -844,3 +1029,55 @@ def test_the_geometry_prior_carries_the_share_of_the_span_it_already_covers(
     assert report["by_method"]["glrt-32"]["best"]["norad_id"] == 1
     # 30 kHz to 80 kHz of a 200 kHz span, merged rather than double counted.
     assert report["prior_coverage_fraction"] == pytest.approx(0.25)
+
+
+def test_prior_coverage_is_priced_over_the_span_this_comparison_searches(
+        tmp_path):
+    """The denominator belongs to the search being priced, not to the capture.
+
+    ``prior_coverage_fraction`` prices *this* comparison's claims, and every
+    claim in the row comes from the candidate coarse config's +/-700 kHz search.
+    Swapping in the capture's own narrower span does not narrow what was
+    searched; it only narrows the denominator, while ``geometry_checks`` goes on
+    matching unclamped — 722 of 9,792 certificates on A-era captures carry
+    |cfo_hz| above 300,000, the largest 694,750 — so a claim outside the
+    capture's span can still match a satellite the same span excluded from the
+    denominator. The number does not even move the way swapping it was meant to
+    move it: ``_prior_coverage`` clamps its numerator too, so on a measured
+    [3, 8]/300 kHz capture the fraction is 0.3611 at 700 kHz and 0.1969 at
+    300 kHz — it *falls* 1.83x rather than the 2.33x rise the swap claimed.
+    Priced over the span the claims were drawn from, both halves clamp at the
+    same edge and the fraction means what it says.
+    """
+    entry = _entry(tmp_path, "ch1-geometry", tunings=((1, "lower-edge"),),
+                   shape=(3, 8), offset_span_hz=300_000.0, threshold=1.33)
+    # One satellite inside the capture's span and one entirely outside it, so
+    # the two denominators are different numbers and the test can tell which
+    # one was used: 100 kHz + 300 kHz over 1.4 MHz, against 100 kHz over 600 kHz.
+    satellites = [
+        {"norad_id": 1, "name": "STARLINK-1", "tolerance_hz": 50_000.0,
+         "receivers": [{"receiver": index, "predicted_offset_hz": 0.0}
+                       for index in (0, 1)]},
+        {"norad_id": 2, "name": "STARLINK-2", "tolerance_hz": 150_000.0,
+         "receivers": [{"receiver": index, "predicted_offset_hz": 550_000.0}
+                       for index in (0, 1)]}]
+    (entry / "truth.json").write_text(json.dumps(
+        {"tunings": [{"iq_index": 0, "satellites": satellites}]}))
+
+    payload = score_entry(entry)
+
+    geometry = next(item["geometry"] for item in payload["observations"]
+                    if item["arm"] == "target" and item["receiver"] == 0)
+    assert geometry["prior_coverage_fraction"] == pytest.approx(400_000.0
+                                                                / 1_400_000.0)
+    # The capture's own span would have said this instead, and it is the wrong
+    # denominator for a claim this comparison is free to make outside it.
+    assert geometry["prior_coverage_fraction"] != pytest.approx(100_000.0
+                                                                / 600_000.0)
+    # A claim 550 kHz out matches a satellite the 300 kHz denominator drops.
+    from leo_tracker.radio.beacon.survey_scoring import geometry_checks
+    narrow = geometry_checks([{"method": "coarse-E", "cfo_hz": 550_000.0}],
+                             satellites, 0, span_hz=300_000.0)
+    assert narrow["by_method"]["coarse-E"]["matches"] == 1
+    assert narrow["prior_coverage_fraction"] == pytest.approx(100_000.0
+                                                              / 600_000.0)

@@ -132,6 +132,15 @@ from .structure import STARLINK_FRAME_DURATION_S
 #: for: a mixed corpus would otherwise hold two definitions under one spelling
 #: and the comparison would average them without a word.  Re-scoring the corpus
 #: is the price, and it has to be paid anyway because the v1 numbers are wrong.
+#:
+#: v2 also states the *window* each reproduction delta was computed over, and
+#: computes it over the capture's window rather than the whole preserved probe.
+#: That is a third key keeping its name and changing its meaning
+#: (``deployed_reproduction_delta``) and would earn a bump of its own, except
+#: that v2 has never been written to the share — the census reads 84 sidecars
+#: at v1 and 0 at v2 — so there is no mixed corpus to protect and extending the
+#: unshipped version is free.  Two bumps for one re-score would cost seven more
+#: hours and buy nothing.
 SCORES_SCHEMA = "leo-tracker.survey-detector-comparison/v2"
 
 #: Name of the sidecar written beside the preserved IQ.
@@ -320,6 +329,43 @@ def capture_bank(record: dict) -> dict:
             "threshold": float(threshold) if threshold is not None else None,
             "threshold_calibrated": record.get("threshold_calibrated"),
             "known": shape is not None and bool(span)}
+
+
+def capture_scored_samples(record: dict, preserved: int) -> tuple[int, str]:
+    """How much of the probe the capture host scored, and how that is known.
+
+    The capture host scores a *bounded prefix* so its cost does not grow with
+    the randomised draw — ``capture_config.scored_samples`` is 200,000 on every
+    arm, the cheapest arm's whole probe — while the preserved probe is 200,000,
+    400,000 or 800,000 samples depending on which arm was drawn.  Three of the
+    four live arms preserve more than they scored, so an analysis host that
+    recomputes over the whole probe scores a different sample set from the one
+    it is checking against and disagrees by construction.
+
+    Proven from the IQ on ``ch1-lower-edge-narrow-pluto-5d4d-20260813T062858Z``
+    (arm 80ms-5.0MSps, 200,000 scored of 400,000 preserved): the mean over the
+    first 200,000 samples is 87.4947, which is the manifest's deployed
+    ``mean_power`` exactly, and the mean over all 400,000 is 84.8204, which is
+    the recomputed one exactly.  Sixteen of sixteen target observations on that
+    arm failed the reproduction check, worst delta 0.1555 and cheapest
+    6.945e-04, and the population grows with every capture: 23 of the 40
+    randomised entries on the share already preserve more than they scored, and
+    each new one has a three-in-four chance of joining them.
+
+    Where the record declares no window — 353 of the 393 manifests, every probe
+    taken before the draw went live — the capture scored everything it kept and
+    the whole preserved probe is the answer.  A declaration longer than the file
+    is also the whole file, because nothing can be scored past its end.
+    """
+    declared = (record.get("capture_config") or {}).get("scored_samples")
+    if not declared:
+        return preserved, ("whole preserved probe; the record declares no "
+                           "scored_samples")
+    if int(declared) >= preserved:
+        return preserved, (f"whole preserved probe; capture_config."
+                           f"scored_samples is {int(declared)}, which is the "
+                           "whole probe or more")
+    return int(declared), "capture_config.scored_samples"
 
 
 def read_probe(entry: Path, manifest: dict) -> np.ndarray:
@@ -1143,6 +1189,12 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
     # where nothing here does, which excludes the reproduction check rather
     # than answering it with a bank the capture never ran.
     reproduces = _reproduction_config(deployed_bank)
+    # And over how much of the probe it ran.  The capture host scores a bounded
+    # prefix and this host preserves the whole thing, so the same bank over the
+    # two windows is two different measurements; the check has to use the
+    # capture's window or it is measuring the draw rather than the mapping.
+    scored_samples, scored_samples_source = capture_scored_samples(
+        record, int(block.shape[1]))
     capture = entry.name
     identity = manifest.get("identity") or {}
     radio_id = identity.get("radio_id") or ""
@@ -1171,6 +1223,12 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
                     differential_counts=differential_counts,
                     glrt_counts=glrt_counts, anchor_count=anchor_count,
                     transform_size=transform_size)
+                # The one number in the sidecar that belongs to somebody else's
+                # window rather than to this host's whole-probe scoring.
+                reproduced = (_reproduction_coarse(samples, bank, reproduces,
+                                                   scored_samples,
+                                                   searched["coarse"])
+                              if arm == "target" else {})
                 points = distinct_points(searched["certificates"], rate)
                 confirmed = confirm_points(
                     samples, rate, points, edge=template_edge,
@@ -1193,22 +1251,26 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
                     "utc": stamps[item["iq_index"]],
                     "deployed": _deployed(deployed.get(receiver)),
                     "deployed_reproduction_delta":
-                        _reproduction_delta(deployed.get(receiver),
-                                            searched["coarse"], arm,
-                                            reproduces),
-                    # Which bank the delta above is against, and — when there
-                    # is no delta but there should have been — why not.
+                        _reproduction_delta(deployed.get(receiver), reproduced,
+                                            arm, reproduces),
+                    # Which bank the delta above is against, over how many
+                    # samples, and — when there is no delta but there should
+                    # have been — why not.  The window is recorded rather than
+                    # implied because the last time it was implied it was
+                    # wrong for three quarters of the arms.
                     "deployed_reproduction_bank": (
                         reproduces if arm == "target" else None),
+                    "deployed_reproduction_samples": (
+                        scored_samples if arm == "target" else None),
                     "deployed_reproduction_excluded":
-                        _reproduction_excluded(deployed.get(receiver), arm,
-                                               deployed_bank, reproduces),
+                        _reproduction_excluded(deployed.get(receiver),
+                                               reproduced, arm, deployed_bank,
+                                               reproduces),
                     "coarse": searched["coarse"],
                     "certificates": searched["certificates"],
                     "points": confirmed,
                     "geometry": _geometry_for(truth, item, receiver,
-                                              searched["certificates"],
-                                              deployed_bank)})
+                                              searched["certificates"])})
     elapsed = time.perf_counter() - started
     deltas = [item["deployed_reproduction_delta"] for item in observations
               if item["deployed_reproduction_delta"] is not None]
@@ -1224,6 +1286,13 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
             "excluded": len(excluded),
             "excluded_reason": excluded[0] if excluded else None,
             "bank": reproduces,
+            # Which window the deltas above were computed over, beside the one
+            # the rest of the sidecar was computed over.  A check whose window
+            # has to be inferred from the arm name cannot be audited, and this
+            # one was wrong for three of the four arms while it was implied.
+            "scored_samples": scored_samples,
+            "scored_samples_source": scored_samples_source,
+            "preserved_samples": int(block.shape[1]),
             "worst_delta": max(deltas) if deltas else None},
         "sample_rate_hz": rate, "samples_per_tuning": int(block.shape[1]),
         # Which arm of the randomised capture experiment this probe belongs to,
@@ -1321,6 +1390,42 @@ def _reproduction_config(bank: dict) -> str | None:
     return None
 
 
+def _reproduction_coarse(samples: np.ndarray, banks: dict, config: str | None,
+                         scored_samples: int, searched: dict) -> dict:
+    """The capture's own bank, re-run over the window the capture host scored.
+
+    Truncation happens here and nowhere else.  Everything else in the sidecar is
+    measured over the whole preserved probe, which is the entire reason the
+    probe is preserved; only the reproduction check has to match a window
+    somebody else chose, and it has to match it exactly.  Two sides scoring
+    different sample sets is not a check — it is a comparison of two different
+    measurements, disagreeing by construction and then blaming the sample
+    mapping for it, which is the permanent false alarm
+    :data:`survey_comparison.REPRODUCTION_TOLERANCE` was measured to prevent.
+    Measured on the 80ms-5.0MSps arm, 200,000 scored of 400,000 preserved: 16
+    of 16 target observations failed, worst delta 0.1555.
+
+    Where the capture scored the whole probe the full scan already *is* the
+    right answer and is reused rather than recomputed — every entry taken
+    before the randomised draw went live, 353 of 393, and the 80ms-2.5MSps arm
+    besides — so this costs nothing on the corpus as it stands and one extra
+    fold per target observation on the three arms that need it.
+    """
+    if config is None:
+        return {}
+    if scored_samples >= samples.size:
+        return searched
+    scored = fast_scan.probe(samples[:scored_samples], banks[config])
+    return {config: {
+        "epoch_sample": int(scored["epoch_sample"]),
+        "frequency_offset_hz": float(scored["frequency_offset_hz"]),
+        "peak_to_median": float(scored["peak_to_median"]),
+        "folded_score": float(scored["folded_score"]),
+        "folded_median": float(scored["folded_median"]),
+        "mean_power": float(scored["mean_power"]),
+        "samples": int(scored_samples)}}
+
+
 def _reproduction_delta(scored: dict | None, coarse: dict, arm: str,
                         config: str | None) -> float | None:
     """How far re-running the capture's own bank lands from its own number.
@@ -1344,18 +1449,31 @@ def _reproduction_delta(scored: dict | None, coarse: dict, arm: str,
     where three do not, which is why even a shared 0 Hz argmax disagrees.
 
     Only the target arm can be checked — the null arm deliberately scores the
-    opposite edge's bank, which is a different number by design.
+    opposite edge's bank, which is a different number by design.  ``coarse`` is
+    the capture's window, from :func:`_reproduction_coarse`, not this host's
+    whole-probe scan.
     """
-    if arm != "target" or not scored or config is None or config not in coarse:
+    if not _reproducible(scored, arm) or config is None or config not in coarse:
         return None
-    recorded = scored.get("peak_to_median")
-    if recorded is None:
-        return None
-    return abs(float(coarse[config]["peak_to_median"]) - float(recorded))
+    return abs(float(coarse[config]["peak_to_median"])
+               - float(scored["peak_to_median"]))
 
 
-def _reproduction_excluded(scored: dict | None, arm: str, bank: dict,
-                           config: str | None) -> str | None:
+def _reproducible(scored: dict | None, arm: str) -> bool:
+    """Whether this observation is one the reproduction check is about at all.
+
+    Shared by the delta and the exclusion so the two cannot drift apart: every
+    observation this returns True for lands in exactly one of the two counts,
+    and every observation it returns False for lands in neither because it was
+    never in scope.  A null arm deliberately scores the opposite edge's bank
+    and a row with no deployed number has nothing to be checked against.
+    """
+    return (arm == "target" and bool(scored)
+            and scored.get("peak_to_median") is not None)
+
+
+def _reproduction_excluded(scored: dict | None, coarse: dict, arm: str,
+                           bank: dict, config: str | None) -> str | None:
     """Why an observation that *should* be checkable was not checked.
 
     Excluded is not the same as failed and neither is the same as absent.  A
@@ -1363,8 +1481,17 @@ def _reproduction_excluded(scored: dict | None, arm: str, bank: dict,
     deployed number that cannot be reproduced is a hole in the corpus's
     verification, and the reader has to be told how big it is and why, or the
     reproduction statistic silently describes a subset it does not name.
+
+    The reasons below are the exact negative of :func:`_reproduction_delta`'s
+    guard, one branch for one branch.  The last of them was the hole: when the
+    selected config was missing from the coarse dict the delta returned None
+    and so did this, so the observation appeared in neither count and the
+    denominator shrank in silence — the very failure ``excluded`` was added to
+    prevent, one level further in.  It is unreachable while ``score_entry``
+    computes every config for every observation, and it stops being unreachable
+    the moment a config is added, removed or fails.
     """
-    if arm != "target" or not scored or scored.get("peak_to_median") is None:
+    if not _reproducible(scored, arm):
         return None
     if not bank.get("known"):
         return "capture record does not say which bank it searched"
@@ -1372,6 +1499,10 @@ def _reproduction_excluded(scored: dict | None, arm: str, bank: dict,
         return (f"capture searched shape {bank['shape']} over "
                 f"+/-{bank['offset_span_hz']:.0f} Hz, which this comparison "
                 "does not re-run")
+    if config not in coarse:
+        return (f"capture searched bank {config} and this host produced no "
+                f"coarse-{config} row for this observation, so there was "
+                "nothing to reproduce against")
     return None
 
 
@@ -1383,32 +1514,28 @@ def _load_truth(entry: Path) -> dict | None:
 
 
 def _geometry_for(truth: dict | None, item: dict, receiver: int,
-                  certificates: list[dict], bank: dict) -> dict | None:
-    """Prior coverage priced over the window the capture actually searched.
+                  certificates: list[dict]) -> dict | None:
+    """Prior coverage priced over the span this comparison's claims come from.
 
-    ``prior_coverage_fraction`` is covered width over ``2 * span``, so the span
-    is the denominator and using the wrong one moves the answer.  Held fixed at
-    the candidate's 700 kHz it understated coverage by 2.33x on every capture
-    that searched +/-300 kHz — which flatters a geometry match into looking
-    more like evidence than it is.  Where the capture did not record its span
-    there is no honest denominator, so the fallback is labelled in the output
-    rather than folded silently into the number.
+    The denominator belongs to the search being priced, and every certificate
+    in the row was drawn from the candidate coarse config's +/-700 kHz.  Taking
+    it from the capture's own narrower span instead does not narrow what was
+    searched, only what the fraction is divided by, while ``geometry_checks``
+    goes on matching unclamped: 722 of 9,792 certificates on A-era captures
+    carry ``|cfo_hz|`` above 300,000, the largest 694,750, so a claim outside
+    the capture's span can still match a satellite that same span excluded from
+    the denominator.  It does not even move the way swapping it was meant to —
+    :func:`_prior_coverage` clamps its numerator too, so on a measured
+    [3, 8]/300 kHz capture the fraction reads 0.3611 at 700 kHz and 0.1969 at
+    300 kHz, falling 1.83x rather than rising.
     """
     if truth is None:
         return None
-    span = bank["offset_span_hz"]
-    source = "capture record"
-    if not span:
-        span = COARSE_CONFIGS[CANDIDATE_COARSE]["offset_span_hz"]
-        source = (f"candidate coarse {CANDIDATE_COARSE}; the capture record "
-                  "does not say what it searched")
     for tuning in truth.get("tunings") or []:
         if tuning.get("iq_index") == item["iq_index"]:
-            return {**geometry_checks(
-                        certificates, tuning.get("satellites") or [], receiver,
-                        span_hz=span),
-                    "prior_coverage_span_hz": float(span),
-                    "prior_coverage_span_source": source}
+            return geometry_checks(
+                certificates, tuning.get("satellites") or [], receiver,
+                span_hz=COARSE_CONFIGS[CANDIDATE_COARSE]["offset_span_hz"])
     return None
 
 

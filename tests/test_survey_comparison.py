@@ -522,13 +522,88 @@ def test_the_deployed_gate_is_shown_beside_a_calibrated_one(tmp_path):
 
     assert report["deployed"]["shape"] == [[13, 8]]
     assert report["deployed"]["threshold"] == [1.252]
-    assert "captures themselves searched bank shape [[13, 8]] over +/-700 kHz" \
-        in printed
+    # Shape, span and gate travel together, so the line cannot assert a pairing
+    # by accident of three sets being sorted independently.
+    assert "1 entry: shape [13, 8] over +/-700 kHz gating at 1.252" in printed
     assert "coarse-A: this host would gate at 1.330" in printed
     assert "cross-edge 1% threshold here is 1.200" in printed
     assert "costing detections, not manufacturing them" in printed
     # Real backgrounds, not synthetic: the two agree, and both sit above noise.
     assert "agree to 0.1% in the mean" in printed
+
+
+def test_the_capture_gate_line_keeps_shape_span_and_gate_paired(tmp_path):
+    """Three sorted sets side by side assert a pairing nobody ever ran.
+
+    Ground truth over the 393 manifests on the share: 283 records are
+    (3, 8) over +/-300 kHz gating at 1.33 and 110 are (13, 8) over +/-700 kHz
+    gating at 1.252. Collected as three independent sets and printed in a row,
+    that reads "bank shape [[3, 8], [13, 8]] over +/-300 kHz, +/-700 kHz, gating
+    at 1.252/1.330" — which taken positionally says (3, 8) gated at 1.252 and
+    (13, 8) at 1.330, the pairing reversed. This is the same flattening of a
+    two-regime corpus that the sidecar fix exists to undo, moved up one level:
+    the fact is the tuple, and a count per regime is what makes it checkable.
+    """
+    narrow = _payload("narrow", [
+        _observation("target", certificates=[_certificate("coarse-A", 1.4)]),
+        _observation("cross-edge-null",
+                     certificates=[_certificate("coarse-A", 1.2)])])
+    narrow["deployed_shape"] = [3, 8]
+    narrow["deployed_threshold"] = 1.33
+    narrow["capture_bank"] = {"shape": [3, 8], "offset_span_hz": 300_000.0,
+                              "threshold": 1.33, "known": True}
+    wide = _payload("wide", [
+        _observation("target", bank="E",
+                     certificates=[_certificate("coarse-E", 1.4)])])
+    wide["deployed_shape"] = [13, 8]
+    wide["deployed_threshold"] = 1.252
+    wide["capture_bank"] = {"shape": [13, 8], "offset_span_hz": 700_000.0,
+                            "threshold": 1.252, "known": True}
+    silent = _payload("silent", [_observation("target", bank=None)])
+    for payload in (narrow, wide, silent):
+        _write(tmp_path, payload)
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["deployed"]["regimes"] == [
+        {"shape": [3, 8], "offset_span_hz": 300_000.0, "threshold": 1.33,
+         "entries": 1},
+        {"shape": [13, 8], "offset_span_hz": 700_000.0, "threshold": 1.252,
+         "entries": 1}]
+    assert report["deployed"]["unknown"] == 1
+    assert "1 entry: shape [3, 8] over +/-300 kHz gating at 1.330" in printed
+    assert "1 entry: shape [13, 8] over +/-700 kHz gating at 1.252" in printed
+    assert "1 entry does not say" in printed
+
+
+def test_sidecars_at_another_schema_are_counted_rather_than_vanishing(tmp_path):
+    """"Nothing scored yet" is false for a corpus holding 84 scored entries.
+
+    A schema bump drops every existing sidecar from the aggregate — correctly,
+    because the two versions mean different things by the same key — but
+    ``load_scores`` drops them with a bare ``continue`` and no counter, so for
+    the whole re-score window the review reports an empty corpus. Measured on
+    the share as this was written: 84 v1 sidecars and 0 v2, still climbing, and
+    re-scoring costs 74.6 s and 66.2 s per entry under capture load — about
+    seven hours for the 378 entries that need it. For seven hours the report
+    would tell a reader nothing has been scored while a third of a day's
+    scoring sits on disk.
+    """
+    stale = _write(tmp_path, _payload("stale", [_observation("target")]))
+    (stale / "scores.json").write_text(json.dumps(
+        {"schema": "leo-tracker.survey-detector-comparison/v1",
+         "capture": "stale", "observations": []}))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["entries"] == 0
+    assert report["other_schema"] == {
+        "leo-tracker.survey-detector-comparison/v1": 1}
+    assert "nothing scored yet" not in printed
+    assert ("1 sidecar at leo-tracker.survey-detector-comparison/v1 waiting to "
+            "be re-scored") in printed
 
 
 def test_an_unsupported_threshold_is_marked_in_the_table(tmp_path):
@@ -600,7 +675,35 @@ def test_observations_that_could_not_be_checked_read_as_partial_not_clean(
     assert "NOT EXACT" not in printed
     assert report["deployed_reproduction"]["count"] == 1
     assert report["deployed_reproduction"]["excluded"] == 1
-    assert report["deployed_reproduction"]["reproduced"] is True
+    # The banner says PARTIAL, so the flag beside it must not say verified.
+    assert report["deployed_reproduction"]["reproduced"] is False
+
+
+def test_reproduced_never_claims_coverage_the_check_did_not_have(tmp_path):
+    """A flag read by a machine has to mean what the banner beside it means.
+
+    ``bool(checked) and not above`` never consults ``excluded``, so one checked
+    observation beside ninety-six unchecked ones sets ``reproduced`` True while
+    the printed banner directly above it says PARTIAL. Whichever of the two a
+    reader trusts, one of them is lying, and the machine-readable one is the one
+    that gets carried into another script without a human in between.
+    """
+    _write(tmp_path, _payload("thin-coverage", [
+        _observation("target", delta=3.0e-08, bank="E",
+                     certificates=[_certificate("coarse-E", 1.4)]),
+        *[_observation("target", receiver=index % 2, delta=None, bank=None,
+                       excluded="capture record does not say which bank it "
+                                "searched")
+          for index in range(96)]]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["deployed_reproduction"]["count"] == 1
+    assert report["deployed_reproduction"]["excluded"] == 96
+    assert report["deployed_reproduction"]["above_tolerance"] == 0
+    assert report["deployed_reproduction"]["reproduced"] is False
+    assert "PARTIAL" in printed
 
 
 def test_a_failed_reproduction_stops_the_reader_before_the_tables(tmp_path):
@@ -624,6 +727,56 @@ def test_a_failed_reproduction_stops_the_reader_before_the_tables(tmp_path):
     assert report["deployed_reproduction"]["above_tolerance"] == 1
     assert report["deployed_reproduction"]["worst_above_tolerance"] == \
         pytest.approx(0.31)
+
+
+def test_the_cheapest_real_defect_ever_measured_is_still_a_failure(tmp_path):
+    """The tolerance has to sit below the defect it was measured against.
+
+    1.896e-04 is the *closest* any reproduction against a bank the capture never
+    searched ever came to agreeing, over 800 observations; the honest residuals
+    top out at 5.165e-08. Nothing else in this file lives in the 1e-6..1e-3 band,
+    so loosening ``REPRODUCTION_TOLERANCE`` to 1e-3 would swallow every real
+    defect the corpus has ever produced with only an echo assertion on the
+    constant objecting — and an echo assertion is not a check, it is the same
+    number written twice.
+    """
+    _write(tmp_path, _payload("cheapest-defect", [
+        _observation("target", delta=1.896e-04, bank="E",
+                     certificates=[_certificate("coarse-E", 1.4)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert "NOT EXACT" in printed
+    assert report["deployed_reproduction"]["reproduced"] is False
+    assert report["deployed_reproduction"]["above_tolerance"] == 1
+
+
+def test_the_not_exact_banner_still_says_how_much_was_checked(tmp_path):
+    """A verdict on a sixth of a corpus has to name the other five sixths.
+
+    The failure branch runs before the exclusion branch and never mentions
+    exclusions, so when both are non-zero — measured live at 160 exclusions
+    beside 16 failures — the reader is stopped by a NOT EXACT that says nothing
+    about how much of the corpus it looked at. "Sixteen of a thousand
+    disagree" and "sixteen of the sixteen we could check disagree, and there
+    were a hundred and sixty more we could not" are different findings.
+    """
+    _write(tmp_path, _payload("both", [
+        _observation("target", delta=0.31, bank="E",
+                     certificates=[_certificate("coarse-E", 1.4)]),
+        _observation("target", receiver=1, delta=None, bank=None,
+                     excluded="capture record does not say which bank it "
+                              "searched",
+                     certificates=[_certificate("coarse-E", 1.3)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert "NOT EXACT" in printed
+    assert report["deployed_reproduction"]["excluded"] == 1
+    assert "1 more could not be checked at all" in printed
+    assert "capture record does not say which bank it searched" in printed
 
 
 def test_an_empty_corpus_reviews_to_an_empty_report_rather_than_an_error(tmp_path):

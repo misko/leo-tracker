@@ -82,6 +82,33 @@ from .survey_scoring import (CLEAN_NULL_P99_BY_PROBE_MS,
 #: What the aggregate calls itself.
 REVIEW_SCHEMA = "leo-tracker.survey-detector-review/v1"
 
+#: How far a re-run may land from the capture host's own number and still be
+#: the same computation.
+#:
+#: The check this bounds used to demand ``delta == 0.0`` — exact bitwise
+#: equality from a threaded float reduction — which fired on 448 of 448
+#: observations and so condemned every report ever printed, unconditionally.
+#: The bar is now measured rather than assumed. Across the 800 target
+#: observations the corpus holds, re-run against the bank their capture
+#: actually searched, the median delta is 1.10e-08 and the worst 5.165e-08.
+#: Against a bank the capture never searched — the cheapest genuine defect
+#: there is, and the one that was live — the *closest* disagreement over the
+#: same 800 is 1.896e-04. The two populations are 3,670x apart with nothing
+#: between them, so anything in 1e-6..1e-5 separates the corpus perfectly;
+#: 1e-6 is the strict end, 19.4x above the worst honest residual and 190x
+#: below the cheapest real defect.
+#:
+#: The residual is not float inevitability either, which is why the tolerance
+#: is this tight: on one host the fold reproduces bitwise. ``fast_scan``
+#: compiles its kernel with ``-ffast-math -march=native`` and caches the object
+#: under a name keyed on platform and machine alone, so a sidecar written by a
+#: different build reduces in a different order and lands ~1e-8 away — 0 of
+#: the corpus's 800 reproduce bitwise, while all 800 reproduce to 5.2e-08. The
+#: review therefore reports how many observations were bitwise exact
+#: separately, because "a different build wrote these" and "this corpus is
+#: corrupt" must not arrive as the same sentence.
+REPRODUCTION_TOLERANCE = 1e-6
+
 #: False-alarm rate every threshold is calibrated at unless asked otherwise.
 #: 1% is the plan's own comparison rate; it is not a production threshold, which
 #: needs the whole-search harness of stage 0.4.
@@ -638,21 +665,39 @@ def review(corpus_root: Path, *, limit: int | None = None,
 
 
 def _deployed_gate(payloads: list[dict]) -> dict:
-    """What the capture host would actually gate on, and with which bank.
+    """What each capture host actually gated on, and with which bank.
 
     Read out of the score files rather than assumed, because the deployed shape
     moved from 3x8 to 13x8 while this comparison was being built: a review that
     hard-coded either one would be describing a host that no longer exists.
+    Collecting a *set* was always right; what was wrong was upstream, where the
+    sidecar wrote this host's constant and so made 375 captures in two regimes
+    — 283 at (3, 8) over +/-300 kHz and 92 at (13, 8) over +/-700 kHz — report
+    one shape between them.
+
+    ``unknown`` is the count of entries whose record never said.  It is not
+    folded into the shapes, because a bank nobody wrote down and a bank that
+    happens to match today's are different facts and the first one is a hole.
     """
     shapes = {tuple(payload["deployed_shape"]) for payload in payloads
               if payload.get("deployed_shape")}
-    thresholds: dict[str, set] = {}
+    spans = {float(span) for payload in payloads
+             if (span := (payload.get("capture_bank") or {}).get(
+                 "offset_span_hz"))}
+    gates = {float(payload["deployed_threshold"]) for payload in payloads
+             if payload.get("deployed_threshold") is not None}
+    scorer: dict[str, set] = {}
     for payload in payloads:
-        for name, value in (payload.get("deployed_threshold") or {}).items():
-            thresholds.setdefault(name, set()).add(value)
+        for name, value in (payload.get("scorer_coarse_threshold")
+                            or {}).items():
+            scorer.setdefault(name, set()).add(value)
     return {"shape": sorted(list(shape) for shape in shapes),
-            "threshold": {name: sorted(values)
-                          for name, values in sorted(thresholds.items())}}
+            "offset_span_hz": sorted(spans),
+            "unknown": sum(1 for payload in payloads
+                           if not payload.get("deployed_shape")),
+            "threshold": sorted(gates),
+            "scorer_threshold": {name: sorted(values)
+                                 for name, values in sorted(scorer.items())}}
 
 
 def _probe_lengths(payloads: list[dict]) -> dict:
@@ -685,20 +730,48 @@ def _probe_lengths(payloads: list[dict]) -> dict:
 
 
 def _reproduction(payloads: list[dict]) -> dict:
-    """Whether re-running config A here returns the capture host's own answer.
+    """Whether re-running each capture's own bank returns its own answer.
 
-    The one end-to-end check on everything in front of the comparison.  If this
-    is not zero the ``sample_order`` mapping, the reshape or the receiver index
-    is wrong, and every number in the report above is about the wrong sky — so
-    it is reported at the top rather than buried, and a non-zero value should
-    stop the reader before the tables rather than after them.
+    The one end-to-end check on everything in front of the comparison.  If it
+    fails, the ``sample_order`` mapping, the reshape or the receiver index is
+    wrong and every number in the report above is about the wrong sky — so it
+    is reported at the top rather than buried, and a failure should stop the
+    reader before the tables rather than after them.
+
+    Three outcomes, and they are not the same document.  Every checked
+    observation within :data:`REPRODUCTION_TOLERANCE` is a verified corpus.
+    The same, with observations that could not be checked at all, is a corpus
+    verified in part — honest only if the size of the unchecked part is printed
+    beside it, which is what ``excluded`` is for.  Anything beyond tolerance is
+    a corpus that contradicts its own capture host, and no amount of the rest
+    of the report is worth reading until it is explained.
+
+    ``bitwise_exact`` is carried separately from ``above_tolerance`` because
+    the interesting middle case — everything agrees to 1e-8, nothing agrees
+    exactly — means a different build of the kernel wrote these sidecars, which
+    is a fact about provenance and not a defect.
     """
-    deltas = [observation.get("deployed_reproduction_delta")
-              for payload in payloads
-              for observation in payload.get("observations") or []]
+    deltas, excluded, banks = [], {}, set()
+    for payload in payloads:
+        for observation in payload.get("observations") or []:
+            deltas.append(observation.get("deployed_reproduction_delta"))
+            reason = observation.get("deployed_reproduction_excluded")
+            if reason:
+                excluded[reason] = excluded.get(reason, 0) + 1
+            bank = observation.get("deployed_reproduction_bank")
+            if bank:
+                banks.add(str(bank))
     checked = [delta for delta in deltas if delta is not None]
+    above = [delta for delta in checked if delta > REPRODUCTION_TOLERANCE]
     return {**describe(deltas),
-            "exact": bool(checked) and all(delta == 0.0 for delta in checked)}
+            "tolerance": REPRODUCTION_TOLERANCE,
+            "above_tolerance": len(above),
+            "worst_above_tolerance": max(above) if above else None,
+            "bitwise_exact": sum(1 for delta in checked if delta == 0.0),
+            "excluded": sum(excluded.values()),
+            "excluded_reasons": dict(sorted(excluded.items())),
+            "banks": sorted(banks),
+            "reproduced": bool(checked) and not above}
 
 
 def _abbreviate(method: str) -> str:
@@ -729,17 +802,44 @@ def format_review(report: dict) -> str:
     """The comparison as a table, with the misreading spelled out above it."""
     reproduction = report.get("deployed_reproduction") or {}
     checked = reproduction.get("count", 0)
-    if not checked:
-        provenance = "deployed config A not re-run: nothing scored yet"
-    elif reproduction.get("exact"):
-        provenance = (f"deployed config A reproduced exactly on all {checked} "
-                      "observations")
+    skipped = reproduction.get("excluded", 0)
+    tolerance = reproduction.get("tolerance", REPRODUCTION_TOLERANCE)
+    banks = ", ".join(reproduction.get("banks") or []) or "none"
+    worst = _cell(reproduction.get("max"), ".3e", "n/a")
+    # Three states, because a corpus that was verified, one that could only be
+    # verified in part, and one that contradicts its own capture host are three
+    # different reports and only the last of them means stop reading.
+    if not checked and not skipped:
+        provenance = "deployed bank not re-run: nothing scored yet"
+    elif reproduction.get("above_tolerance"):
+        provenance = (
+            f"deployed bank ({banks}) reproduced with worst delta {worst} on "
+            f"{checked} observations, {reproduction['above_tolerance']} of "
+            f"them past {tolerance:.0e}  <-- NOT EXACT: the tuning mapping or "
+            "the reshape is wrong and nothing below is trustworthy")
+    elif skipped:
+        reasons = "; ".join(
+            f"{count} x {reason}"
+            for reason, count in (reproduction.get("excluded_reasons")
+                                  or {}).items())
+        provenance = (
+            f"deployed bank not verified: none of {skipped} observations "
+            f"could be checked ({reasons})  <-- PARTIAL: nothing below has "
+            "been cross-checked against its capture host at all"
+            if not checked else
+            f"deployed bank ({banks}) reproduced within {tolerance:.0e} on "
+            f"{checked} observations, worst {worst}  <-- PARTIAL: {skipped} "
+            f"more could not be checked at all ({reasons}), so the corpus is "
+            "verified in part and the rest is unexamined rather than clean")
     else:
         provenance = (
-            "deployed config A reproduced with worst delta "
-            f"{_cell(reproduction.get('max'), '.3e', 'n/a')} on {checked} "
-            "observations  <-- NOT EXACT: the tuning mapping or the reshape is "
-            "wrong and nothing below is trustworthy")
+            f"deployed bank ({banks}) reproduced within {tolerance:.0e} on all "
+            f"{checked} observations, worst {worst}"
+            + (f" ({reproduction.get('bitwise_exact', 0)} of them bitwise "
+               "exact; a non-zero residual here is a different build of the "
+               "kernel, not a different sky)"
+               if reproduction.get("bitwise_exact", 0) != checked else
+               " (all bitwise exact)"))
     lengths = report.get("probe_lengths") or {}
     found = lengths.get("probe_ms") or []
     rates = lengths.get("sample_rate_hz") or []
@@ -798,15 +898,32 @@ def format_review(report: dict) -> str:
     lines.append("  the kernel bank has no rolled-template path. All three rest "
                  "on the cross-edge null alone.")
     deployed = report.get("deployed") or {}
-    for name, values in (deployed.get("threshold") or {}).items():
+    for name, values in (deployed.get("scorer_threshold") or {}).items():
         calibrated = (report["searched"].get(f"coarse-{name}") or {}).get(
             "cross_edge_null", {}).get("threshold")
         lines.append(
-            f"  coarse-{name}: host gates at "
+            f"  coarse-{name}: this host would gate at "
             f"{'/'.join(f'{value:.3f}' for value in values)}, cross-edge "
             f"{report['false_alarm_rate']:.0%} threshold here is "
-            f"{_cell(calibrated, '.3f', 'n/a')}"
-            f"   (deployed bank shape {deployed.get('shape')})")
+            f"{_cell(calibrated, '.3f', 'n/a')}")
+    # Separate line and separate wording: the gate above is this host's table
+    # for the banks it re-runs, and (3, 8) is not in it, so coarse-A reads back
+    # a 1.40 fallback no deployment has ever applied.  What the captures did is
+    # a different fact and comes from the captures.
+    gates = deployed.get("threshold") or []
+    unknown = deployed.get("unknown") or 0
+    if deployed.get("shape") or gates or unknown:
+        lines.append(
+            "  captures themselves searched bank shape "
+            f"{deployed.get('shape') or 'unrecorded'} over "
+            + (", ".join(f"+/-{span / 1e3:g} kHz"
+                         for span in deployed.get("offset_span_hz") or [])
+               or "an unrecorded span")
+            + ", gating at "
+            + ("/".join(f"{value:.3f}" for value in gates)
+               if gates else "unrecorded")
+            + ("   (1 entry does not say)" if unknown == 1 else
+               f"   ({unknown} entries do not say)" if unknown else ""))
     lines.append("  Where the host gate is the higher number it is costing "
                  "detections, not manufacturing them:")
     lines.append("  the plan's 8.11%/2.72%/2.11% false-alarm figures are wrong "

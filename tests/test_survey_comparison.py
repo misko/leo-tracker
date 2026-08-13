@@ -37,7 +37,7 @@ def _certificate(method, score, *, control=None, epoch=1000, cfo=1000.0,
 
 def _observation(arm, *, receiver=0, channel=1, region="lower-edge",
                  certificates=(), utc="2026-08-12T20:00:00Z", points=(),
-                 geometry=None, delta=0.0):
+                 geometry=None, delta=0.0, bank="A", excluded=None):
     return {"arm": arm, "template_edge": "lower",
             "null_direction": None if arm == "target" else "upper-on-lower",
             "iq_index": 0, "channel": channel, "region": region,
@@ -46,6 +46,8 @@ def _observation(arm, *, receiver=0, channel=1, region="lower-edge",
             "rf_center_hz": 1.07e10, "utc": utc,
             "deployed": {"peak_to_median": 1.2, "anchor_agreement": 0},
             "deployed_reproduction_delta": delta,
+            "deployed_reproduction_bank": bank if arm == "target" else None,
+            "deployed_reproduction_excluded": excluded,
             "coarse": {}, "certificates": list(certificates),
             "points": list(points), "geometry": geometry}
 
@@ -506,15 +508,23 @@ def test_the_deployed_gate_is_shown_beside_a_calibrated_one(tmp_path):
         _observation("target", certificates=[_certificate("coarse-A", 1.4)]),
         _observation("cross-edge-null",
                      certificates=[_certificate("coarse-A", 1.2)])])
-    payload["deployed_threshold"] = {"A": 1.33, "E": 1.255}
+    # This host's table for the banks it re-runs, and — separately, because
+    # they are separate facts — what the capture itself searched and gated at.
+    payload["scorer_coarse_threshold"] = {"A": 1.33, "E": 1.255}
     payload["deployed_shape"] = [13, 8]
+    payload["deployed_threshold"] = 1.252
+    payload["capture_bank"] = {"shape": [13, 8], "offset_span_hz": 700_000.0,
+                               "threshold": 1.252, "known": True}
     _write(tmp_path, payload)
 
     report = review(tmp_path)
     printed = format_review(report)
 
     assert report["deployed"]["shape"] == [[13, 8]]
-    assert "coarse-A: host gates at 1.330" in printed
+    assert report["deployed"]["threshold"] == [1.252]
+    assert "captures themselves searched bank shape [[13, 8]] over +/-700 kHz" \
+        in printed
+    assert "coarse-A: this host would gate at 1.330" in printed
     assert "cross-edge 1% threshold here is 1.200" in printed
     assert "costing detections, not manufacturing them" in printed
     # Real backgrounds, not synthetic: the two agree, and both sit above noise.
@@ -535,16 +545,85 @@ def test_an_unsupported_threshold_is_marked_in_the_table(tmp_path):
     assert "not supported by the null population" in printed
 
 
+def test_a_float_residual_below_tolerance_is_not_a_broken_pipeline(tmp_path):
+    """Bitwise zero is not something a float recomputation can be held to.
+
+    ``all(delta == 0.0)`` fired on 448 of 448 observations — every report ever
+    printed — because it demanded exact equality from a threaded reduction.
+    Measured across the corpus's 800 correctly-banked target observations the
+    median delta is 1.10e-08 and the worst 5.165e-08; the cheapest *genuine*
+    defect, a reproduction run against a bank the capture never searched, lands
+    at 1.896e-04 at its very closest. The two populations are 3,670x apart with
+    nothing in between, so 1e-6 sits 19.4x above the worst honest residual and
+    190x below the cheapest real one. The residual itself is not noise: the
+    fold is bit-reproducible on one host, and 1e-8 is what ``-ffast-math`` and
+    ``-march=native`` cost when the sidecar was written by a different build.
+    """
+    _write(tmp_path, _payload("floaty", [
+        _observation("target", delta=1.35e-08, bank="E",
+                     certificates=[_certificate("coarse-E", 1.4)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert "NOT EXACT" not in printed
+    assert "reproduced within" in printed
+    assert report["deployed_reproduction"]["reproduced"] is True
+    assert report["deployed_reproduction"]["above_tolerance"] == 0
+    assert report["deployed_reproduction"]["tolerance"] == pytest.approx(1e-6)
+    # Not bitwise, and the report says which rather than rounding it away.
+    assert report["deployed_reproduction"]["bitwise_exact"] == 0
+
+
+def test_observations_that_could_not_be_checked_read_as_partial_not_clean(
+        tmp_path):
+    """Verified, unverifiable and contradicted are three different reports.
+
+    A corpus half of whose observations were never checked is not a clean
+    corpus, and it is not a broken one either. Reporting it as clean claims
+    coverage the check never had; reporting it as broken buries the rows that
+    genuinely did reproduce. The count of exclusions is the only thing that
+    tells the reader which of the three they are holding.
+    """
+    _write(tmp_path, _payload("partial", [
+        _observation("target", delta=2.0e-08, bank="E",
+                     certificates=[_certificate("coarse-E", 1.4)]),
+        _observation("target", receiver=1, delta=None, bank=None,
+                     excluded="capture record does not say which bank it "
+                              "searched",
+                     certificates=[_certificate("coarse-E", 1.3)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert "PARTIAL" in printed
+    assert "NOT EXACT" not in printed
+    assert report["deployed_reproduction"]["count"] == 1
+    assert report["deployed_reproduction"]["excluded"] == 1
+    assert report["deployed_reproduction"]["reproduced"] is True
+
+
 def test_a_failed_reproduction_stops_the_reader_before_the_tables(tmp_path):
-    """If config A does not reproduce, every row above is about the wrong sky."""
+    """If the capture's own bank does not reproduce, every row is wrong sky.
+
+    A tolerance is not a softening: 0.31 is seven orders above the 5.165e-08 a
+    matched bank produces, and the wording that stops the reader has to survive
+    the tolerance being introduced or the tolerance has swallowed the defect it
+    was measured against.
+    """
     payload = _payload("mismapped",
                        [_observation("target", delta=0.31,
                                      certificates=[_certificate("coarse-A", 1.4)])])
     _write(tmp_path, payload)
 
-    printed = format_review(review(tmp_path))
+    report = review(tmp_path)
+    printed = format_review(report)
 
     assert "NOT EXACT" in printed
+    assert report["deployed_reproduction"]["reproduced"] is False
+    assert report["deployed_reproduction"]["above_tolerance"] == 1
+    assert report["deployed_reproduction"]["worst_above_tolerance"] == \
+        pytest.approx(0.31)
 
 
 def test_an_empty_corpus_reviews_to_an_empty_report_rather_than_an_error(tmp_path):

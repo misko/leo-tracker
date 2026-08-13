@@ -36,11 +36,21 @@ SAMPLES = 15_000                       # 4.5 frames: the fold's own minimum is 4
 TUNINGS = ((1, "lower-edge"), (1, "upper-edge"))
 
 
-def _record(tunings, *, order=True, peak=1.2):
-    """A pre-dwell survey record shaped the way the capture host writes one."""
+def _record(tunings, *, order=True, peak=1.2, shape=(3, 8),
+            offset_span_hz=300_000.0, profile=True, profile_span=False,
+            threshold=1.33):
+    """A pre-dwell survey record shaped the way the capture host writes one.
+
+    The bank knobs default to the A-era configuration the corpus mostly holds:
+    ``profile.shape`` [3, 8] with the span at record level only, which is how
+    all 283 of the narrow manifests are actually written. ``profile_span``
+    additionally puts the span inside ``profile``, as the 75 widened ones do,
+    and ``profile=False`` reproduces a record that never said at all.
+    """
     record = {
         "schema": "leo-tracker.pre-dwell-survey/v1", "state": "complete",
-        "sample_rate_hz": RATE, "offset_span_hz": 300_000.0,
+        "sample_rate_hz": RATE, "offset_span_hz": offset_span_hz,
+        "threshold": threshold,
         "started_utc_ns": 1_760_000_000_000_000_000, "warm_ms": 800.0,
         "total_ms": 400.0, "per_tuning_ms": 50.0,
         "tunings": [{"channel": channel, "region": region,
@@ -50,17 +60,27 @@ def _record(tunings, *, order=True, peak=1.2):
                                     "anchor_agreement": 0, "anchor_count": 8}
                                    for index in (0, 1)]}
                     for channel, region in tunings]}
+    if profile:
+        record["profile"] = {"block_size": 200_000, "kernel_buffers": 1,
+                             "settle_buffers": 0, "probe_s": 0.08,
+                             "shape": list(shape)}
+        if profile_span:
+            record["profile"]["offset_span_hz"] = offset_span_hz
     if order:
         record["sample_order"] = [list(pair) for pair in tunings]
     return record
 
 
 def _entry(root, name, *, tunings=TUNINGS, order=True, samples=SAMPLES,
-           truncate=False, block=None, state="complete"):
-    """One preserved corpus entry, IQ and manifest, as the sampler writes it."""
+           truncate=False, block=None, state="complete", **bank):
+    """One preserved corpus entry, IQ and manifest, as the sampler writes it.
+
+    Keyword arguments not named here go to :func:`_record`, which is where the
+    capture's own bank is described.
+    """
     entry = root / name
     entry.mkdir(parents=True, exist_ok=True)
-    record = _record(tunings, order=order)
+    record = _record(tunings, order=order, **bank)
     record["state"] = state
     manifest = {
         "state": "complete", "created_utc_ns": 1_760_000_002_000_000_000,
@@ -92,6 +112,30 @@ def _replica(count=SAMPLES, *, epoch=0, edge="lower"):
         values[start:start + frame.size] += frame[:count - start]
         slot += 1
     return values.astype(np.complex64)
+
+
+#: The widened bank, and the hypothesis four steps above zero on its grid:
+#: 1.4 MHz over twelve intervals is 116,666.67 Hz apart, so this is exactly on
+#: E's grid and 166,666.67 Hz off the nearest point of A's {-300, 0, +300} kHz.
+#: Config A cannot represent a signal here at all, which is the whole point.
+WIDE_SHAPE = (13, 8)
+WIDE_SPAN_HZ = 700_000.0
+WIDE_OFFSET_HZ = 4 * 2 * WIDE_SPAN_HZ / 12
+
+
+def _shifted(values, offset_hz):
+    """The same waveform carried to a frequency offset, as the sky does."""
+    lag = np.arange(values.size) / RATE
+    return (values * np.exp(2j * np.pi * offset_hz * lag)).astype(np.complex64)
+
+
+def _int16_block(values, tunings=1):
+    """One waveform written into every tuning and receiver of a probe block."""
+    scaled = values / max(float(np.abs(values).max()), 1e-9) * 6000.0
+    block = np.zeros((tunings, values.size, 2, 2), np.int16)
+    block[..., 0] = np.rint(scaled.real).astype(np.int16)[None, :, None]
+    block[..., 1] = np.rint(scaled.imag).astype(np.int16)[None, :, None]
+    return block
 
 
 # --------------------------------------------------------------------------
@@ -274,6 +318,58 @@ def test_status_separates_scored_from_scorable(tmp_path):
 # what a scored entry has to contain
 # --------------------------------------------------------------------------
 
+def test_the_sidecar_records_the_bank_the_capture_ran_not_this_hosts(tmp_path):
+    """A capture's configuration is a fact about the capture, not about today.
+
+    Measured over all 375 corpus manifests: 283 record ``profile.shape``
+    [3, 8] over +/-300 kHz gating at 1.33 and 92 record [13, 8] over +/-700 kHz
+    gating at 1.252 — yet every sidecar written so far reports [13, 8], this
+    host's ``fast_scan.SURVEY_BANK`` at scoring time, consulted instead of the
+    capture. That is what made a two-regime corpus look homogeneous, and it hid
+    a reproduction check running against a bank 46 observations could not even
+    represent. The gate is the same defect and worse: ``detection_threshold``
+    has no entry for (3, 8) and emits the 1.40 fallback, a number no deployment
+    has ever used, under a key named for the deployment.
+    """
+    from leo_tracker.radio.beacon import fast_scan
+    entry = _entry(tmp_path, "ch1-narrow", tunings=((1, "lower-edge"),),
+                   shape=(3, 8), offset_span_hz=300_000.0, threshold=1.33)
+    # The trap: this host's constant is a different bank from the capture's.
+    assert tuple(fast_scan.SURVEY_BANK) != (3, 8)
+
+    payload = score_entry(entry)
+
+    assert payload["deployed_shape"] == [3, 8]
+    assert payload["deployed_threshold"] == 1.33
+    assert payload["capture_bank"]["shape"] == [3, 8]
+    assert payload["capture_bank"]["offset_span_hz"] == 300_000.0
+    assert payload["capture_bank"]["known"] is True
+
+
+def test_a_capture_that_never_said_which_bank_it_ran_is_unknown_not_todays(
+        tmp_path):
+    """A missing fact and a current-config guess must not share a spelling.
+
+    Every probe taken before the profile was written down carries no bank at
+    all. Filling that hole with whatever this host runs today produces a
+    sidecar that states, in the same words and with the same confidence as a
+    measured entry, something nobody measured — and the reader has no way to
+    tell the two apart. None is the honest answer and it is also the useful
+    one, because it is what makes the reproduction check exclude the row rather
+    than score it against a bank invented for the occasion.
+    """
+    entry = _entry(tmp_path, "ch1-silent", tunings=((1, "lower-edge"),),
+                   profile=False, offset_span_hz=None, threshold=None)
+
+    payload = score_entry(entry)
+
+    assert payload["deployed_shape"] is None
+    assert payload["deployed_threshold"] is None
+    assert payload["capture_bank"]["shape"] is None
+    assert payload["capture_bank"]["offset_span_hz"] is None
+    assert payload["capture_bank"]["known"] is False
+
+
 def test_rerunning_the_deployed_detector_reproduces_the_capture_hosts_number(tmp_path):
     """The only end-to-end check on everything in front of the comparison.
 
@@ -305,6 +401,75 @@ def test_rerunning_the_deployed_detector_reproduces_the_capture_hosts_number(tmp
     assert all(item["deployed"]["anchor_agreement"] is not None
                for item in payload["observations"]
                if item["arm"] == "target")
+
+
+def test_a_capture_on_the_widened_bank_is_reproduced_against_that_bank(
+        tmp_path):
+    """Re-running config A against a config E verdict is not a check.
+
+    The corpus spans the widening, and the check was hard-wired to A. Measured
+    over the 800 target observations the corpus's sidecars hold: against each
+    capture's own bank 0 of 800 disagree past 1e-6, worst 5.165e-08; against A
+    always, 160 of 800 do, worst 5.604e-01. Many sit off A's grid entirely —
+    A's hypotheses are 300 kHz apart and this signal is at 466,666.67 Hz, which
+    A cannot represent — and the rest land on the 0 Hz point both grids share,
+    where the offset and the epoch agree and only the fold's median, taken over
+    a curve already maximised across the offset axis, betrays the wrong bank.
+    """
+    entry = _entry(tmp_path, "ch1-widened", tunings=((1, "lower-edge"),),
+                   block=_int16_block(_shifted(_replica(), WIDE_OFFSET_HZ)),
+                   shape=WIDE_SHAPE, offset_span_hz=WIDE_SPAN_HZ,
+                   profile_span=True, threshold=1.252)
+    # What a capture host running the widened bank wrote down about this probe.
+    first = score_entry(entry)
+    measured = {item["receiver"]: item["coarse"]["E"]
+                for item in first["observations"] if item["arm"] == "target"}
+    assert measured[0]["frequency_offset_hz"] == pytest.approx(WIDE_OFFSET_HZ,
+                                                              abs=1.0)
+    manifest = json.loads((entry / "manifest.json").read_text())
+    for tuning in manifest["metadata"]["pre_dwell_survey"]["tunings"]:
+        for scored in tuning["receivers"]:
+            wide = measured[scored["receiver"]]
+            scored["peak_to_median"] = wide["peak_to_median"]
+            scored["frequency_offset_hz"] = wide["frequency_offset_hz"]
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+
+    payload = score_entry(entry)
+
+    assert payload["deployed_reproduction"]["worst_delta"] == 0.0
+    assert payload["deployed_reproduction"]["checked"] == 2
+    assert payload["deployed_reproduction"]["excluded"] == 0
+    assert payload["deployed_reproduction"]["bank"] == "E"
+    # And A really is a different measurement, not a rounding of the same one:
+    # its disagreement is orders above the 5.03e-08 a matched bank produces.
+    target = next(item for item in first["observations"]
+                  if item["arm"] == "target" and item["receiver"] == 0)
+    assert abs(target["coarse"]["A"]["peak_to_median"]
+               - measured[0]["peak_to_median"]) > 1e-3
+
+
+def test_a_capture_whose_bank_is_unknown_is_excluded_rather_than_failed(
+        tmp_path):
+    """An unanswerable check must not answer, and must not vanish either.
+
+    A probe whose record never said which bank it ran cannot be reproduced by
+    anything: there is nothing to re-run. Scoring it against whichever config
+    happens to be first manufactures a disagreement out of a missing fact, and
+    silently dropping it shrinks the denominator without telling the reader the
+    corpus is only partly verified. So it is excluded, and the exclusions are
+    counted where the count is read.
+    """
+    entry = _entry(tmp_path, "ch1-unbanked", tunings=((1, "lower-edge"),),
+                   profile=False, offset_span_hz=None, threshold=None)
+
+    payload = score_entry(entry)
+
+    assert payload["deployed_reproduction"]["checked"] == 0
+    assert payload["deployed_reproduction"]["excluded"] == 2
+    assert payload["deployed_reproduction"]["worst_delta"] is None
+    assert all(item["deployed_reproduction_delta"] is None
+               and item["deployed_reproduction_excluded"]
+               for item in payload["observations"] if item["arm"] == "target")
 
 
 def test_every_claim_names_a_place_and_says_how_hard_it_searched(tmp_path):
@@ -385,10 +550,12 @@ def test_the_searched_rolled_control_is_recorded_beside_the_pinned_one(tmp_path)
         full["score"] - full["control_score"])
     assert payload["rolled_control_shift_samples"] == 187
     assert payload["probe_ms"] == pytest.approx(1000.0 * SAMPLES / RATE)
-    # Both shapes, because the deployed one moved from 3x8 to 13x8 mid-flight
-    # and a comparison that assumed either would describe a host that is gone.
-    assert set(payload["deployed_threshold"]) == {"A", "E"}
-    assert payload["deployed_shape"]
+    # Both coarse gates, because this host re-runs both banks — and separately
+    # the capture's own, because the deployed shape moved from 3x8 to 13x8
+    # mid-flight and a sidecar that quoted either constant for every capture
+    # would be describing a host rather than a probe.
+    assert set(payload["scorer_coarse_threshold"]) == {"A", "E"}
+    assert payload["deployed_shape"] == [3, 8]
 
 
 def test_the_wrong_code_control_travels_with_every_candidate_claim(tmp_path):

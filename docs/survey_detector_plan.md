@@ -292,11 +292,31 @@ values — rather than *searched* over ~800 hypotheses in sample space. If that
 holds, the coherent detector's search cost stops being the architectural problem
 revision 4 called it.
 
-The ambiguity is the catch: adjacent-symbol phase is sampled every 4.4 µs, so the
-estimate is periodic at 227.3 kHz and unique only within **±113.6 kHz**. A coarse
-stage remains mandatory. Config E's 116.7 kHz spacing gives a worst nearest-bin
-residual of **58.3 kHz**, comfortably inside that window — so E is a good front end
-for relative phase, which is a second and independent reason to adopt it.
+The ambiguity is the catch, and it has **two distinct behaviours** — measured, now
+that the family is implemented:
+
+- **A residual inside one period wraps in silently.** A true +150 kHz reads as
+  −77 kHz, 227 kHz wrong, while the score falls only 1.00 → 0.79. Nothing in the
+  statistic flags it. This is the dangerous case.
+- **A residual a full period away is suppressed, not aliased.** The score collapses
+  to 0.07–0.17 and the estimate is nonsense, because the per-symbol matched filter
+  is 4.4 µs wide and its response at 227 kHz is already down to 0.29. So the
+  estimate is *not* "unique modulo 227.3 kHz" — outside the window you get garbage,
+  not a wrapped answer.
+
+A coarse stage is therefore mandatory. Config E's 116.7 kHz spacing gives a worst
+nearest-bin residual of **58.3 kHz**, inside the window; the deployed 3-hypothesis
+bank leaves worst residuals of 150 kHz, outside it. On real probes the recovered
+residuals spread across ±110 kHz including one pinned at exactly −113,636 Hz, the
+grid edge — so under the deployed bank some are certainly wrapped. **E is a hard
+prerequisite for anything relative-phase, not a preference.**
+
+One systematic error is now characterised: CFO estimates run **+0.5% high**, because
+each symbol's matched filter has its phase centre wherever its own 4QAM code puts
+it, drifting +0.055 samples per symbol across the block — indistinguishable from
+extra time between symbols. Predicted +0.497%, measured +0.543%. At E's worst
+58.3 kHz residual that is **+355 Hz against a ~±375 Hz confirmation tolerance**,
+which is uncomfortably close. Deterministic, so correctable.
 
 ### Claimed results, unverified
 
@@ -374,11 +394,24 @@ crosses a detection threshold; ask **whether the true epoch and CFO land in the 
 K candidates closely enough for the confirmation stage to recover them.** That is a
 much weaker and much cheaper requirement.
 
-Two candidates are worth naming as priors, on the external evidence above:
-`8-anchor relative phase` because it reuses anchors the survey already computes and
-its only structural change is *not* replacing each complex correlation with its
-magnitude; and `GLRT32 + wrong-code control` as the claimed performance/cost
-leader. Both remain hypotheses until the harness says otherwise.
+**The `8-anchor relative phase` candidate is no longer a cheap one, and the earlier
+description of it here was wrong.** Implementing it showed why: the survey's eight
+anchors are *spread* across the 300-symbol frame, so `S(f)` is a **comb** — teeth
+about 200 Hz wide repeating every 5,320 Hz, with the first alias at 0.998 of the
+true peak. Measured at residuals of 0 / 200 / 375 / 750 Hz the score runs
+1.00 / 0.74 / 0.31 / 0.016, then returns to 0.987 at 5,283 Hz. It therefore demands
+a coarse CFO as accurate as the 300-symbol detector does — precisely the search
+relative phase was supposed to remove. Preserving the complex correlations really is
+the only structural change *to the correlations*; it is not the only change to the
+CFO problem.
+
+The lesson generalises. Spread symbols buy frequency resolution and cost ambiguity;
+**adjacent** symbols buy an unambiguous ±113.6 kHz window and cost resolution. That
+is the classic baseline trade, and it is why the adjacent-differential and GLRT
+candidates are the affordable ones while the spread-anchor candidate is not.
+
+`GLRT32 + wrong-code control` remains the leading prior. It stays a hypothesis
+until the harness says otherwise.
 
 **4 — Build the winner**, gated on agreeing with a slow reference implementation of
 the same algorithm. The 300-symbol detector becomes the slow reference and optional

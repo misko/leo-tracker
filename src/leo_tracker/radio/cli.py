@@ -993,6 +993,36 @@ def command_starlink_survey_truth(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_survey_score(args: argparse.Namespace) -> int:
+    """Shadow-score preserved probes with every candidate, and compare them.
+
+    Nothing here gates a capture or moves a deployed threshold. It accumulates
+    statistics so the bake-off is decided on a day of real sky rather than on
+    one sweep, and the review says plainly that unlabelled sky yields no Pd.
+    """
+    from .beacon.lnb_calibration import load_calibration
+    from .beacon.survey_comparison import format_review, review
+    from .beacon.survey_scoring import run, scoring_status
+    corpus = args.corpus_root or (Path(args.root) / "surveys" / "corpus")
+    if args.action == "status":
+        print(json.dumps(scoring_status(corpus), indent=2, sort_keys=True))
+        return 0
+    if args.action == "review":
+        report = review(corpus, limit=args.limit,
+                        false_alarm_rate=args.false_alarm_rate)
+        print(json.dumps(report, indent=2, sort_keys=True) if args.json
+              else format_review(report))
+        return 0
+    print(json.dumps(run(corpus,
+                         calibration=load_calibration(
+                             args.calibration_root or args.root),
+                         limit=args.limit, rebuild=args.rebuild,
+                         null_stride=args.null_stride,
+                         maximum_seconds=args.maximum_seconds),
+                     indent=2, sort_keys=True))
+    return 0
+
+
 def command_starlink_probe_index(args: argparse.Namespace) -> int:
     """Build, inspect or query the per-probe projection."""
     from .beacon.probe_index import (ProbeIndexUnavailable, build,
@@ -2561,6 +2591,34 @@ def build_parser() -> argparse.ArgumentParser:
     survey_truth.add_argument("--rebuild", action="store_true")
     survey_truth.add_argument("--limit", type=int)
     survey_truth.set_defaults(handler=command_starlink_survey_truth)
+    survey_score = commands.add_parser("starlink-survey-score",
+        help="shadow-score every preserved probe with every candidate detector "
+             "and review the accumulated comparison; gates nothing")
+    survey_score.add_argument("action", choices=("run", "status", "review"))
+    survey_score.add_argument("root", type=Path,
+        help="shared root; also the default calibration root")
+    survey_score.add_argument("--corpus-root", type=Path,
+        help="where probes are preserved; defaults to ROOT/surveys/corpus")
+    survey_score.add_argument("--calibration-root", type=Path,
+        help="root holding reports/lnb-calibration.json; defaults to ROOT. "
+             "Without it the cross-receiver check cannot subtract the LNB "
+             "bias and will disagree on every real detection")
+    survey_score.add_argument("--limit", type=int,
+        help="entries to score, or to review; one keeps a single analysis job "
+             "bounded while the corpus grows slower than captures do")
+    survey_score.add_argument("--rebuild", action="store_true",
+        help="rescore entries that already carry a current-schema sidecar")
+    survey_score.add_argument("--null-stride", type=int, default=2,
+        help="one observation in this many also runs the cross-edge null; the "
+             "offset rotates with the capture name so coverage is even")
+    survey_score.add_argument("--maximum-seconds", type=float,
+        help="stop starting new entries after this much wall clock")
+    survey_score.add_argument("--false-alarm-rate", type=float, default=0.01,
+        help="rate every review threshold is calibrated at; a comparison rate, "
+             "not a production threshold")
+    survey_score.add_argument("--json", action="store_true",
+        help="print the review as JSON rather than as a table")
+    survey_score.set_defaults(handler=command_starlink_survey_score)
     probe_index = commands.add_parser("starlink-probe-index",
         help="project per-probe facts into day-partitioned parquet")
     probe_index.add_argument("action", choices=("build", "status", "query"))

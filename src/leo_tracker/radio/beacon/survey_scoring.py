@@ -180,8 +180,10 @@ CORPUS_CENSUS = {
 #: v2 states the bank the *capture* ran.  In v1 ``deployed_shape`` and
 #: ``deployed_threshold`` were this host's constants at scoring time, so every
 #: sidecar in a corpus spanning the bank widening claimed the same (13, 8) while
-#: the narrow half of the corpus says [3, 8], and the reproduction check below
-#: re-ran a bank those could not represent.  The two keys keep their names and
+#: every capture taken before that widening says [3, 8], and the reproduction
+#: check below re-ran a bank those could not represent.  Stated that way rather
+#: than as a share on purpose: every new capture lands on the widened bank, so
+#: any proportion written here is falling as it is read.  The two keys keep their names and
 #: change their meaning, which is exactly the case a version exists for: a mixed
 #: corpus would otherwise hold two definitions under one spelling and the
 #: comparison would average them without a word.  Re-scoring is the price, and

@@ -236,9 +236,25 @@ def read_scores(corpus_root: Path, *,
     files that sorted before the limit was reached: three current-schema
     sidecars beside five old ones census as five unlimited and as *nothing* at
     ``limit=2``, and ``cli.py`` passes ``--limit`` straight through.  A count
-    printed as a corpus fact has to be over the corpus.  Past the limit the
-    schema comes from the opening bytes rather than a full parse, so bounding
-    the job still bounds its cost.
+    printed as a corpus fact has to be over the corpus.
+
+    **Every sidecar is classified from its opening bytes and only the ones this
+    job will actually use are parsed**, so ``limit`` bounds full parses at
+    ``limit`` of them.  Classifying after the parse instead did not: the gate
+    was ``len(loaded) < limit`` and ``loaded`` grows only for current-schema
+    payloads, so a corpus sitting entirely at the previous schema never reached
+    the limit and every sidecar was read whole whatever was passed — ~350 kB
+    each off a network share, and that is the state of the corpus for the whole
+    re-score window the limit exists to make survivable.  The one file that
+    still costs a full read to classify is one that does not open with its
+    schema, which :func:`_declared_schema` falls back to parsing; that is a
+    property of how many such files a corpus holds and not of the limit, and
+    nothing this repository writes is one.
+
+    The order the directory is scanned in is the order the limit consumes, so
+    it is sorted: capture names carry their timestamp, and a bounded review has
+    to be reproducible from the corpus and its arguments rather than from
+    whatever order the filesystem happened to enumerate in.
 
     ``unreadable`` is counted for the same reason: this function's whole
     principle is that skipping is never silent, and it dropped every unparseable
@@ -256,26 +272,27 @@ def read_scores(corpus_root: Path, *,
         if not path.is_file():
             continue
         census["scanned"] += 1
-        payload = None
-        if limit is None or len(loaded) < limit:
-            try:
-                payload = json.loads(path.read_text())
-            except (OSError, ValueError):
-                payload = None
-            readable = payload is not None
-            schema = payload.get("schema") if readable else None
-        else:
-            schema, readable = _declared_schema(path)
+        schema, readable = _declared_schema(path)
         if not readable:
             census["unreadable"] += 1
-        elif schema != SCORES_SCHEMA:
+            continue
+        if schema != SCORES_SCHEMA:
             name = str(schema) if schema else "no schema declared"
             other = census["other_schema"]
             other[name] = other.get(name, 0) + 1
-        elif payload is None:
+            continue
+        if limit is not None and len(loaded) >= limit:
             census["beyond_limit"] += 1
-        else:
-            loaded.append(payload)
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, ValueError):
+            # It announced the current schema in its first bytes and then would
+            # not parse, so it is a half-written file rather than somebody
+            # else's format, and it is damage either way.
+            census["unreadable"] += 1
+            continue
+        loaded.append(payload)
     census["read"] = len(loaded)
     return loaded, census
 
@@ -789,12 +806,13 @@ def _deployed_gate(payloads: list[dict]) -> dict:
 
     ``regimes`` is the fact, and it is a *tuple* per entry with a count beside
     it.  Shape, span and gate collected as three independent sorted sets lose
-    the pairing that is the whole content: the share holds roughly three fifths
-    of its records at (3, 8) over +/-300 kHz gating at 1.33 and the rest at
-    (13, 8) over +/-700 kHz gating at 1.252 (:data:`survey_scoring.
-    CORPUS_CENSUS`), and three sets printed in a row read "shape [[3, 8],
-    [13, 8]] over +/-300 kHz, +/-700 kHz, gating at 1.252/1.330" — which taken
-    positionally says (3, 8) gated at 1.252, the pairing exactly backwards.
+    the pairing that is the whole content: the share holds both regimes in bulk,
+    a frozen population at (3, 8) over +/-300 kHz gating at 1.33 and a growing
+    one at (13, 8) over +/-700 kHz gating at 1.252 (:data:`survey_scoring.
+    CORPUS_CENSUS` counts each, on the date it was taken), and three sets
+    printed in a row read "shape [[3, 8], [13, 8]] over +/-300 kHz, +/-700 kHz,
+    gating at 1.252/1.330" — which taken positionally says (3, 8) gated at
+    1.252, the pairing exactly backwards.
     That is the same flattening of a two-regime corpus this whole change exists
     to undo, one level up, and the count is what makes each regime checkable
     against the manifest it came from.
@@ -923,16 +941,22 @@ def _reproduction(payloads: list[dict]) -> dict:
             reason = observation.get("deployed_reproduction_excluded")
             if reason:
                 excluded[reason] = excluded.get(reason, 0) + 1
+            # Both names below come only from observations that produced a
+            # delta.  An observation that produced none was never scored against
+            # anything, so neither the bank it would have been checked against
+            # nor the window that check would have covered is behind any number
+            # this banner reports — and those rows sit on the longest arms and
+            # on the banks this comparison does not re-run, so collecting either
+            # would name sky nothing was measured over.  The bank half is the
+            # worse of the two: an observation whose manifest carries no
+            # deployed number is in neither ``checked`` nor ``excluded``, so its
+            # bank used to reach the banner beside ``reproduced`` True with
+            # nothing anywhere saying it had not been.
+            if observation.get("deployed_reproduction_delta") is None:
+                continue
             bank = observation.get("deployed_reproduction_bank")
             if bank:
                 banks.add(str(bank))
-            # Only from observations that produced a delta. An excluded one was
-            # never scored against anything, so its window is behind none of the
-            # numbers this banner reports — and the excluded rows sit on the
-            # longest arms, so collecting theirs would name a window nothing was
-            # checked over.
-            if observation.get("deployed_reproduction_delta") is None:
-                continue
             window = observation.get("deployed_reproduction_samples")
             if window:
                 windows.add(int(window))

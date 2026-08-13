@@ -2082,6 +2082,28 @@ def command_validated_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _entries_to_read(value: str) -> int:
+    """A bound on how much of a corpus a job reads, and it has to be a job.
+
+    ``type=int`` accepts 0, and a survey review bounded to zero entries reads
+    nothing and then reports on the corpus anyway: every sidecar lands in
+    ``beyond_limit``, so the entry line says "N more at this schema the limit
+    did not read" and the provenance banner directly under it says "deployed
+    bank not re-run: nothing scored yet" — the exact sentence the sidecar census
+    exists to keep off a corpus that holds scored entries.  Nothing downstream
+    can fix that, because the aggregate genuinely read nothing and has nothing
+    to say about what it did not read.  A negative bound is the same request
+    spelled differently.
+    """
+    count = int(value)
+    if count < 1:
+        raise argparse.ArgumentTypeError(
+            f"{value}: a limit is how many entries to read, so it is at least "
+            "1; a bound of nothing produces a report about a corpus it never "
+            "opened. Omit --limit to read all of them")
+    return count
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="leo-radio", description="Independent LEO RF capture and analysis")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -2645,9 +2667,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="root holding reports/lnb-calibration.json; defaults to ROOT. "
              "Without it the cross-receiver check cannot subtract the LNB "
              "bias and will disagree on every real detection")
-    survey_score.add_argument("--limit", type=int,
+    survey_score.add_argument("--limit", type=_entries_to_read,
         help="entries to score, or to review; one keeps a single analysis job "
-             "bounded while the corpus grows slower than captures do")
+             "bounded while the corpus grows slower than captures do. At least "
+             "1 -- omit it to read every entry")
     survey_score.add_argument("--rebuild", action="store_true",
         help="rescore entries that already carry a current-schema sidecar")
     survey_score.add_argument("--null-stride", type=int, default=2,

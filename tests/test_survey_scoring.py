@@ -351,10 +351,11 @@ def test_status_separates_scored_from_scorable(tmp_path):
 def test_the_sidecar_records_the_bank_the_capture_ran_not_this_hosts(tmp_path):
     """A capture's configuration is a fact about the capture, not about today.
 
-    The corpus holds two regimes in bulk — roughly three fifths recording
-    ``profile.shape`` [3, 8] over +/-300 kHz gating at 1.33 and the rest [13, 8]
-    over +/-700 kHz gating at 1.252, counted in ``survey_scoring.CORPUS_CENSUS``
-    with the date it was counted — yet every sidecar written so far reports
+    The corpus holds two regimes in bulk — a frozen population recording
+    ``profile.shape`` [3, 8] over +/-300 kHz gating at 1.33 and a growing one at
+    [13, 8] over +/-700 kHz gating at 1.252, counted in
+    ``survey_scoring.CORPUS_CENSUS`` with the date it was counted — yet every
+    sidecar written so far reports
     [13, 8], this host's ``fast_scan.SURVEY_BANK`` at scoring time, consulted
     instead of the capture. That is what made a two-regime corpus look
     homogeneous, and it hid a reproduction check running against a bank a large
@@ -499,13 +500,14 @@ def test_the_reproduction_scores_the_window_the_capture_host_scored(tmp_path):
     the recomputed one exactly. Over the sidecars that existed then, 16 of 16
     target observations on the long arms failed, worst delta 0.1555, cheapest
     6.945e-04 — a permanent false alarm that the corpus grows into: three of
-    the four arms preserve more than they score, so about three quarters of
-    every new capture joins them, and every census so far has matched that
-    ratio (``survey_scoring.CORPUS_CENSUS``).
+    the four arms preserve more than they score, so about three in four new
+    draws join them. That is the draw's probability rather than a share of the
+    corpus, which is a different number that moves every hour
+    (``survey_scoring.CORPUS_CENSUS`` counts both, on the date it was taken).
 
     Where the record carries no ``capture_config`` at all — every probe taken
-    before the draw went live, still most of the corpus — the whole probe is
-    the window the capture scored, and that is what gets used.
+    before the draw went live, a population that stopped growing that day — the
+    whole probe is the window the capture scored, and that is what gets used.
     """
     from leo_tracker.radio.beacon.survey_scoring import receiver_samples
     # A probe twice as long as the window the capture host scored, whose second
@@ -658,6 +660,106 @@ def test_a_capture_that_scored_its_whole_probe_is_not_truncated(tmp_path):
     assert payload["deployed_reproduction"]["scored_samples"] == SAMPLES
     assert payload["deployed_reproduction"]["scored_samples_source"] == \
         "whole preserved probe; the record declares no scored_samples"
+
+
+def test_a_window_as_long_as_the_probe_is_the_whole_probe_and_says_so(tmp_path):
+    """The equal-length arm is the majority, and only its sentence distinguishes it.
+
+    ``capture_config.scored_samples`` is 200,000 on every arm and the
+    80ms-2.5MSps arm preserves exactly 200,000, so declared and preserved are
+    equal on the largest single arm the draw produces — 55 of the 164
+    window-declaring entries on the share today, more than either longer arm.
+    Relaxing the guard from ``>=`` to ``>`` leaves the window *value* untouched
+    at ``preserved`` on that arm and flips ``scored_samples_source`` from "whole
+    preserved probe" to "capture_config.scored_samples", and the whole suite
+    passes: the previous round pinned the value rather than the sentence, so the
+    converse case, where the sentence is the only thing that moves, was pinned
+    nowhere.
+
+    It is not cosmetic. That string is what a reader of the sidecar uses to tell
+    "this delta covers everything preserved" from "this delta covers a prefix
+    somebody else chose", which is exactly the distinction that made 16 of 16
+    observations on the long arms read as a broken tuning map. Both sides of the
+    boundary are asserted, so a sentence that is simply constant fails too.
+    """
+    from leo_tracker.radio.beacon.survey_scoring import capture_scored_samples
+    config = {"name": "80ms-2.5MSps", "scored_samples": SAMPLES}
+    record = _record(((1, "lower-edge"),), capture_config=config)
+
+    equal = capture_scored_samples(record, SAMPLES)
+    longer = capture_scored_samples({**record, "capture_config":
+                                     {**config, "scored_samples": SAMPLES + 1}},
+                                    SAMPLES)
+    shorter = capture_scored_samples({**record, "capture_config":
+                                      {**config, "scored_samples": SAMPLES - 1}},
+                                     SAMPLES)
+
+    whole = (f"whole preserved probe; capture_config.scored_samples is "
+             f"{SAMPLES}, which is the whole probe or more")
+    assert equal == (SAMPLES, whole)
+    # A declaration past the end of the file is the whole file for the same
+    # reason, and reads the same way.
+    assert longer[0] == SAMPLES
+    assert longer[1].startswith("whole preserved probe;")
+    # One sample short is a genuinely bounded prefix, and must not.
+    assert shorter == (SAMPLES - 1, "capture_config.scored_samples")
+
+    # And the sentence reaches the sidecar, which is where it is read.
+    entry = _entry(tmp_path, "ch1-equal-window", tunings=((1, "lower-edge"),),
+                   block=_int16_block(_replica()), capture_config=config)
+    payload = score_entry(entry)
+
+    assert payload["deployed_reproduction"]["scored_samples"] == SAMPLES
+    assert payload["deployed_reproduction"]["preserved_samples"] == SAMPLES
+    assert payload["deployed_reproduction"]["scored_samples_source"] == whole
+
+
+def test_a_declared_window_of_zero_is_an_absent_window_not_an_empty_one(
+        tmp_path):
+    """Zero samples is not a window a capture host could have scored.
+
+    The guard reads ``if not declared``, which folds ``0`` in with ``None`` and
+    a missing key: a record whose ``capture_config.scored_samples`` is 0 has not
+    declared a bounded prefix, it has failed to declare one, and the capture
+    scored everything it kept. Narrowing that to ``if declared is None`` passes
+    all 81 tests and turns such a record into a genuinely empty window — the
+    reproduction check then hands ``samples[:0]`` to ``fast_scan.probe``, which
+    refuses it with ``ValueError: at least four frames are required``, so
+    ``score_entry`` raises and the sweep books the entry under ``failed``
+    instead of scoring it.
+
+    A record that scored nothing cannot also have written the
+    ``peak_to_median`` this check reproduces, so the only reading of a 0 that
+    is consistent with the rest of the manifest is "not stated".
+    """
+    from leo_tracker.radio.beacon import fast_scan
+    from leo_tracker.radio.beacon.survey_scoring import (_banks,
+                                                         capture_scored_samples,
+                                                         receiver_samples)
+    record = _record(((1, "lower-edge"),),
+                     capture_config={"name": "80ms-2.5MSps",
+                                     "scored_samples": 0})
+
+    window, source = capture_scored_samples(record, SAMPLES)
+
+    assert (window, source) == (SAMPLES, "whole preserved probe; the record "
+                                         "declares no scored_samples")
+    # Why the other answer is not merely a different window: an empty slice is
+    # not a probe, and the fold says so rather than returning a statistic.
+    samples = receiver_samples(_int16_block(_replica()), 0, 0)
+    with pytest.raises(ValueError):
+        fast_scan.probe(samples[:0], _banks("lower", RATE)["A"])
+
+    # So the entry scores, over everything it preserved.
+    entry = _entry(tmp_path, "ch1-zero-window", tunings=((1, "lower-edge"),),
+                   block=_int16_block(_replica()),
+                   capture_config={"name": "80ms-2.5MSps", "scored_samples": 0})
+    payload = score_entry(entry)
+
+    assert payload["deployed_reproduction"]["scored_samples"] == SAMPLES
+    assert payload["deployed_reproduction"]["scored_samples_source"] == source
+    assert all(item["deployed_reproduction_coarse"]["A"]["samples"] == SAMPLES
+               for item in payload["observations"] if item["arm"] == "target")
 
 
 def test_the_row_the_delta_came_from_is_kept_beside_the_whole_probe_one(
@@ -861,6 +963,78 @@ def test_an_observation_this_host_cannot_re_run_is_counted_not_dropped():
     assert (delta is None) != (reason is None)
 
 
+def test_no_census_share_is_written_down_as_a_fact_that_holds():
+    """Ratios go stale the same way counts do; only mechanisms do not.
+
+    The counts moved into :data:`CORPUS_CENSUS` and the prose kept quoting the
+    *proportions*, which decay for the same reason: every numerator here is
+    frozen while ``entries`` grows. Nothing narrow has been captured since the
+    bank widened, so "roughly three fifths of the corpus on the narrow bank" was
+    283 of 459 when it was written and is 283 of 519 now, 61.7% to 54.5% in a
+    day; nothing pre-draw has been captured either, so "roughly three quarters
+    taken before the randomised draw" was 355 of 459 and is 355 of 519, 77.3% to
+    68.4%. Both only fall, and neither sentence says so.
+
+    The header went further and asserted the decay away — "the proportions have
+    been steady across every census taken so far" — which is false and shaped so
+    that a reader cannot check it: 109 of the 164 window-declaring entries
+    preserve more than they scored, 66.5%, against the 75% the same paragraph
+    predicts from the four arms. The draw is uniform; a realised share of a few
+    dozen draws is not the probability, and quoting one as if it were confirmed
+    the mechanism is how a measurement turns into a slogan.
+
+    So: mechanism and direction of travel in the prose, counts and a date in the
+    census, and no claim anywhere that a share has held or will.
+    """
+    import re
+
+    from leo_tracker.radio.beacon import survey_comparison, survey_scoring
+
+    holds = re.compile(r"every census|steady", re.I)
+    for module in (survey_scoring, survey_comparison):
+        found = holds.findall(Path(module.__file__).read_text())
+        assert not found, f"{Path(module.__file__).name} claims {found}"
+
+
+def test_the_census_names_the_population_it_actually_counted():
+    """"Randomised" was the name; a declared window was the measurement.
+
+    ``CORPUS_CENSUS["randomised"]`` counts entries whose record declares a
+    ``capture_config.scored_samples`` window. That is not the population the
+    draw marked, and the capture path is explicit about the difference:
+    ``presurvey.draw_configuration`` writes ``randomised: False`` for an arm
+    pinned by name and for the default calibrated arm, and says in the record
+    that such a row must be "excluded from any comparison that assumes random
+    assignment" — while still writing the ``capture_config`` that carries the
+    window. Measured on the share today: 164 entries declare a window, 156 are
+    marked randomised, and the 8 in between were attributed to a draw that never
+    happened.
+
+    Eight is small and the name is not: a census field is read as a fact about
+    the corpus, and a count of one population under the name of another is
+    exactly the conflation the rest of this module refuses everywhere else.
+    """
+    from leo_tracker.radio.beacon.presurvey import SURVEY_CONFIGS, draw_configuration
+    from leo_tracker.radio.beacon.survey_scoring import CORPUS_CENSUS
+
+    assert "randomised" not in CORPUS_CENSUS
+    assert (CORPUS_CENSUS["declaring_no_scored_window"]
+            + CORPUS_CENSUS["declaring_a_scored_window"]
+            == CORPUS_CENSUS["entries"])
+    # The two populations are counted separately because they are different,
+    # and the smaller one is the one the draw actually marked.
+    assert (CORPUS_CENSUS["marked_randomised"]
+            <= CORPUS_CENSUS["declaring_a_scored_window"])
+    assert (CORPUS_CENSUS["declaring_a_window_shorter_than_the_probe"]
+            <= CORPUS_CENSUS["declaring_a_scored_window"])
+    # And why they can differ at all, from the capture path rather than from the
+    # count: an arm pinned by name still declares its window and is recorded as
+    # not drawn.
+    _, experiment = draw_configuration(config_name=SURVEY_CONFIGS[0]["name"])
+    assert experiment["randomised"] is False
+    assert experiment["assigned_config"] == SURVEY_CONFIGS[0]["name"]
+
+
 def test_the_corpus_figures_are_census_data_rather_than_prose():
     """A total written into prose is wrong by the next capture.
 
@@ -872,9 +1046,11 @@ def test_the_corpus_figures_are_census_data_rather_than_prose():
     was written.
 
     So the census is data, taken once with the moment it was taken, and the
-    prose quotes ratios and mechanisms instead: "three of the four arms the draw
-    picks between preserve more than they scored" stays true as the corpus
-    grows, and "23 of the 40 randomised entries" was false within a day.
+    prose quotes mechanisms instead: "three of the four arms the draw picks
+    between preserve more than they scored" stays true as the corpus grows, and
+    "23 of the 40 randomised entries" was false within a day. Ratios are not a
+    third option — every numerator here is frozen, so a share decays exactly the
+    way a count does, only more quietly.
     """
     import re
 
@@ -885,15 +1061,16 @@ def test_the_corpus_figures_are_census_data_rather_than_prose():
 
     assert CORPUS_CENSUS["taken_utc"].endswith("Z")
     assert sum(CORPUS_CENSUS["regimes"].values()) == CORPUS_CENSUS["entries"]
-    assert (CORPUS_CENSUS["pre_draw"] + CORPUS_CENSUS["randomised"]
+    assert (CORPUS_CENSUS["declaring_no_scored_window"]
+            + CORPUS_CENSUS["declaring_a_scored_window"]
             == CORPUS_CENSUS["entries"])
-    assert (CORPUS_CENSUS["randomised_preserving_more_than_they_scored"]
-            <= CORPUS_CENSUS["randomised"])
+    assert (CORPUS_CENSUS["declaring_a_window_shorter_than_the_probe"]
+            <= CORPUS_CENSUS["declaring_a_scored_window"])
     # The mechanism the prose leans on instead of a count, pinned against the
     # arm table it comes from: three of the four arms the draw picks between
-    # preserve more than they score, so about three quarters of every new
-    # capture joins the population the truncation exists for. Add a fifth arm
-    # and this is what says the sentence needs rewriting.
+    # preserve more than they score, so about three in four new draws join the
+    # population the truncation exists for. Add a fifth arm and this is what
+    # says the sentence needs rewriting.
     longer = [config for config in SURVEY_CONFIGS
               if config["samples_per_tuning"] > PI_SCORE_SAMPLE_LIMIT]
     assert (len(longer), len(SURVEY_CONFIGS)) == (3, 4)

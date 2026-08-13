@@ -539,8 +539,8 @@ def test_the_capture_gate_line_keeps_shape_span_and_gate_paired(tmp_path):
     """Three sorted sets side by side assert a pairing nobody ever ran.
 
     Ground truth on the share, counted with its date in
-    ``survey_scoring.CORPUS_CENSUS``: roughly three fifths of the records are
-    (3, 8) over +/-300 kHz gating at 1.33 and the rest are (13, 8) over
+    ``survey_scoring.CORPUS_CENSUS``: a frozen population of records at (3, 8)
+    over +/-300 kHz gating at 1.33 and a growing one at (13, 8) over
     +/-700 kHz gating at 1.252, both in bulk. Collected as three independent
     sets and printed in a row,
     that reads "bank shape [[3, 8], [13, 8]] over +/-300 kHz, +/-700 kHz, gating
@@ -734,6 +734,98 @@ def test_the_limit_bounds_what_is_read_and_never_the_census(tmp_path):
     assert "1 more at this schema the limit did not read" in printed
 
 
+def test_bounding_the_job_bounds_what_it_parses(tmp_path, monkeypatch):
+    """The cost sentence, checked against the reads it promises rather than read.
+
+    ``read_scores`` tells the reader that past the limit a sidecar's schema
+    comes from its opening bytes "so bounding the job still bounds its cost".
+    The gate was ``len(loaded) < limit`` and ``loaded`` grows only for
+    current-schema payloads, so while the corpus sits entirely at the previous
+    schema — which is exactly where it sits today, every sidecar on the share at
+    v1 and none at v2 — the limit was never reached and every sidecar was parsed
+    in full whatever was passed. At ~350 kB each off a network share that is the
+    whole cost the limit exists to avoid, and it is worst precisely during the
+    re-score window the limit is for.
+
+    Counted here in reads rather than asserted in prose, because the sentence is
+    about cost and a docstring cannot be wrong about a number nobody measured.
+    """
+    from pathlib import Path
+
+    from leo_tracker.radio.beacon.survey_comparison import read_scores
+    for index in range(6):
+        stale = _write(tmp_path, _payload(f"z-stale-{index}",
+                                          [_observation("target")]))
+        (stale / "scores.json").write_text(json.dumps(
+            {"schema": "leo-tracker.survey-detector-comparison/v1",
+             "capture": f"z-stale-{index}", "observations": []}))
+    reads = []
+    whole_file = Path.read_text
+    monkeypatch.setattr(Path, "read_text", lambda self, *args, **kwargs: (
+        reads.append(str(self)) or whole_file(self, *args, **kwargs)))
+
+    loaded, census = read_scores(tmp_path, limit=1)
+
+    assert loaded == []
+    assert census["other_schema"] == {
+        "leo-tracker.survey-detector-comparison/v1": 6}
+    # Nothing at the current schema, so nothing had to be parsed to find out.
+    assert reads == []
+
+    # And the bound is a bound rather than a refusal: the sidecars the job is
+    # actually for are still read, up to the limit and no further.
+    for index in range(3):
+        _write(tmp_path, _payload(f"a-current-{index}",
+                                  [_observation("target")]))
+    reads.clear()
+
+    loaded, census = read_scores(tmp_path, limit=1)
+
+    assert [payload["capture"] for payload in loaded] == ["a-current-0"]
+    assert census["beyond_limit"] == 2
+    assert census["scanned"] == 9
+    assert len(reads) == 1
+
+
+def test_the_scan_order_is_the_capture_order_and_the_limit_rides_on_it(
+        tmp_path, monkeypatch):
+    """``iterdir`` promises no order, and with a limit the order picks the corpus.
+
+    ``load_scores`` documents "oldest capture name first", and capture names are
+    timestamped, so sorting the directory is what makes that sentence true.
+    Dropping the ``sorted`` passes all 81 tests because every other test either
+    reads a whole corpus or asserts a count, and a set does not notice a
+    permutation. It is still load-bearing twice over: the aggregate would report
+    on a different subset of the corpus from one run to the next at the same
+    ``--limit``, and a review is supposed to be reproducible from the corpus and
+    the arguments alone; and the entries a bounded job reads would be whichever
+    the filesystem happened to hand back rather than the oldest, which is the
+    only choice that makes two successive bounded runs comparable.
+
+    Pinned against a directory that enumerates in the opposite order, because a
+    real one is entitled to enumerate in any order at all — ext4 with
+    ``dir_index`` returns hash order, not creation order — and a test that
+    relied on the filesystem being tidy would pass here and fail on the share.
+    """
+    from pathlib import Path
+    names = ["ch1-lower-edge-narrow-pluto-19f2-20260812T194645Z",
+             "ch1-lower-edge-narrow-pluto-19f2-20260813T055745Z",
+             "ch1-lower-edge-narrow-pluto-19f2-20260813T062858Z"]
+    for name in names:
+        _write(tmp_path, _payload(name, [_observation("target")]))
+    listing = Path.iterdir
+    monkeypatch.setattr(Path, "iterdir",
+                        lambda self: iter(sorted(listing(self), reverse=True)))
+
+    whole = [payload["capture"] for payload in load_scores(tmp_path)]
+    bounded = [payload["capture"] for payload in load_scores(tmp_path, limit=2)]
+
+    assert whole == names
+    # And the limit takes the oldest two rather than whichever two the
+    # directory offered first.
+    assert bounded == names[:2]
+
+
 def test_a_sidecar_that_will_not_parse_is_counted_rather_than_dropped(tmp_path):
     """The bare ``continue`` this function's own docstring rules out.
 
@@ -760,6 +852,65 @@ def test_a_sidecar_that_will_not_parse_is_counted_rather_than_dropped(tmp_path):
     assert report["sidecars"]["scanned"] == 2
     assert report["sidecars"]["unreadable"] == 1
     assert "1 that would not parse" in printed
+
+
+def test_a_sidecar_that_will_not_parse_is_damage_past_the_limit_too(
+        tmp_path, monkeypatch):
+    """The conflation ``_declared_schema``'s own docstring exists to forbid.
+
+    The opening-bytes reader returns two things: the schema, and whether the
+    file could be read at all, and it says ``unreadable`` in two places — one
+    for a file that will not open and one for a file that will not parse.
+    Flipping *either* to ``(None, True)`` passes all 81 tests, and the file is
+    then censused as ``other_schema["no schema declared"]`` — a sidecar some
+    other producer wrote — rather than as ``unreadable``. "A corpus holding a
+    half-written file and a corpus holding a sidecar from some other producer
+    are different problems", says that docstring, and nothing asserted it.
+
+    Only the full-parse path was ever pinned, by
+    ``test_a_sidecar_that_will_not_parse_is_counted_rather_than_dropped``, and
+    that path was the one a *bounded* review never took: past the limit the
+    census came from opening bytes alone, so on the corpus this stage actually
+    runs against — hundreds of entries, read with ``--limit`` — the assertion
+    covered nothing. A limit is set here for that reason and not for the
+    arithmetic.
+
+    The unopenable half is refused through the filesystem rather than by
+    ``chmod``, which is advisory for the root the CI container runs as and would
+    make this test pass by not testing anything there.
+    """
+    from pathlib import Path
+    for index in range(2):
+        _write(tmp_path, _payload(f"a-current-{index}",
+                                  [_observation("target")]))
+    broken = tmp_path / "z-broken"
+    broken.mkdir()
+    (broken / "scores.json").write_text("{ truncated")
+    denied = tmp_path / "z-denied"
+    denied.mkdir()
+    (denied / "scores.json").write_text(json.dumps(
+        _payload("z-denied", [_observation("target")])))
+    opener = Path.open
+    monkeypatch.setattr(Path, "open", lambda self, *args, **kwargs: (
+        _refuse(self) if self.parent.name == "z-denied"
+        else opener(self, *args, **kwargs)))
+
+    report = review(tmp_path, limit=1)
+    printed = format_review(report)
+
+    assert report["entries"] == 1
+    assert report["sidecars"]["scanned"] == 4
+    # Three the limit did not read, and they are three different facts: a
+    # current-schema sidecar this job skipped, a half-written one, and one that
+    # would not open at all. Only the first is not damage.
+    assert report["sidecars"]["beyond_limit"] == 1
+    assert report["sidecars"]["unreadable"] == 2
+    assert report["other_schema"] == {}
+    assert "2 that would not parse" in printed
+
+
+def _refuse(path):
+    raise PermissionError(13, "Permission denied", str(path))
 
 
 def test_an_unsupported_threshold_is_marked_in_the_table(tmp_path):
@@ -995,6 +1146,49 @@ def test_the_window_named_in_the_banner_is_one_something_was_checked_over(
     assert "800,000" not in printed
 
 
+def test_the_bank_named_in_the_banner_is_one_something_was_checked_against(
+        tmp_path):
+    """The other half of the same collector, and it was left above the guard.
+
+    The window set learned to skip observations that produced no delta; the bank
+    set sits two lines higher and still collects from every observation that
+    names one. So a bank nothing was ever checked against is printed as a bank
+    that reproduced, and unlike the window case the banner can say so with
+    ``reproduced`` True and no warning anywhere — because the observation that
+    contributed the name contributed no exclusion either.
+
+    That combination is reachable rather than theoretical: a target observation
+    whose manifest carries no deployed ``peak_to_median`` for that receiver is
+    not reproducible, so ``_reproduction_delta`` returns None *and*
+    ``_reproduction_excluded`` returns None — both by the same
+    ``_reproducible`` guard, which is what keeps them consistent — while
+    ``deployed_reproduction_bank`` is still the config the capture ran. The
+    banner then reads "deployed bank (A, E) reproduced within 1e-06 on all 1
+    observations", and every delta behind it came from A.
+    """
+    _write(tmp_path, _payload("banks", [
+        _observation("target", delta=2.0e-08, bank="A", samples=200_000,
+                     certificates=[_certificate("coarse-A", 1.4)]),
+        # Same capture, other receiver: nothing to reproduce against, so it is
+        # in neither count — and its bank must be in neither list.
+        _observation("target", receiver=1, delta=None, bank="E",
+                     samples=800_000, excluded=None,
+                     certificates=[_certificate("coarse-E", 1.3)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["deployed_reproduction"]["count"] == 1
+    assert report["deployed_reproduction"]["excluded"] == 0
+    assert report["deployed_reproduction"]["reproduced"] is True
+    assert report["deployed_reproduction"]["banks"] == ["A"]
+    # The window collector already refuses this row; the bank collector has to
+    # refuse the same row or the two halves of one banner disagree.
+    assert report["deployed_reproduction"]["scored_samples"] == [200_000]
+    assert "deployed bank (A) reproduced within" in printed
+    assert "(A, E)" not in printed
+
+
 def test_two_pooled_windows_are_named_as_two(tmp_path):
     """A singular noun over two windows is the pooling this file exists to stop.
 
@@ -1019,6 +1213,45 @@ def test_two_pooled_windows_are_named_as_two(tmp_path):
                                                                  400_000]
     assert ("over the 2 different windows the captures scored "
             "(200,000/400,000 samples, pooled)") in printed
+
+
+def test_a_limit_of_zero_is_refused_before_it_can_print_a_false_banner(tmp_path):
+    """A job that reads nothing is not a job, and it reports a corpus it did not read.
+
+    ``--limit`` is ``type=int`` and unbounded, so 0 parses. Over a corpus
+    entirely at the current schema — which is what the share becomes the moment
+    the re-score finishes — every sidecar then lands in ``beyond_limit`` and the
+    report prints, verbatim:
+
+        entries 0   observations 0   false-alarm rate 0.010   (3 more at this
+        schema the limit did not read)
+        probe length unknown   rate unknown
+        deployed bank not re-run: nothing scored yet
+
+    The banner contradicts the line directly above it. "Nothing scored yet" is
+    the sentence the census was built to stop being printed over a corpus that
+    holds scored entries, and at ``--limit 0`` it comes back — not because the
+    census is wrong this time, but because a bound of zero asks for a review of
+    nothing and then describes the corpus as if that were the answer. Nothing
+    downstream can repair it: the aggregate read no entries, so it has nothing
+    to say. The place to refuse is where the number is accepted.
+
+    A negative limit is the same request written differently, and both are
+    refused where a positive one is not.
+    """
+    from leo_tracker.radio.cli import build_parser
+    parser = build_parser()
+
+    for value in ("0", "-1"):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["starlink-survey-score", "review", str(tmp_path),
+                               "--limit", value])
+    # One entry is a bounded job; none is not.
+    assert parser.parse_args(["starlink-survey-score", "review", str(tmp_path),
+                              "--limit", "1"]).limit == 1
+    # And no limit at all still means the whole corpus.
+    assert parser.parse_args(["starlink-survey-score", "review",
+                              str(tmp_path)]).limit is None
 
 
 def test_an_empty_corpus_reviews_to_an_empty_report_rather_than_an_error(tmp_path):

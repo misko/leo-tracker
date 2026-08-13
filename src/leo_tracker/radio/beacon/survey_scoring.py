@@ -131,27 +131,44 @@ from .structure import STARLINK_FRAME_DURATION_S
 #: figure that has to be re-derived from prose in three places will be wrong in
 #: at least one of them.
 #:
-#: So the prose quotes ratios and mechanisms, which stay true as the corpus
-#: grows, and the counts live here with their date.  The proportions have been
-#: steady across every census taken so far — roughly three fifths of the corpus
-#: on the narrow bank, roughly three quarters of it taken before the randomised
-#: draw went live, and roughly three quarters of the randomised part preserving
-#: more than it scored, which is what a uniform draw over four arms of which
-#: three preserve more than they score predicts.
+#: **This is one snapshot, not a trend, and its shares only move one way.**
+#: Quoting ratios instead of counts did not fix the decay, it slowed it: every
+#: numerator below is frozen while ``entries`` grows.  Nothing narrow has been
+#: captured since the bank widened and nothing pre-draw since the draw went
+#: live, so those two counts are the same today as at the previous census two
+#: hours earlier — 283 and 355 both — while ``entries`` moved 459 to 524.  The
+#: narrow share therefore fell 61.7% to 54.0% and the pre-draw share 77.3% to
+#: 67.7% in one afternoon, and both will keep falling for as long as the
+#: experiment runs.  So the prose downstream states the *mechanism* and the
+#: direction it drives, never the share it has reached.
+#:
+#: A share is not the probability that produced it either: the draw is uniform
+#: over four arms of which three preserve more than they score, and the realised
+#: figure below is 114 of 169, 67.5%, not the 75% that mechanism predicts.  A
+#: few hundred draws is a small sample and saying "about three in four new
+#: draws" is a statement about the draw; saying "three quarters of the corpus"
+#: is a statement about this afternoon.
 CORPUS_CENSUS = {
-    "taken_utc": "2026-08-13T09:25:54Z",
-    "entries": 459,
+    "taken_utc": "2026-08-13T11:24:02Z",
+    "entries": 524,
     # Shape, span and gate, kept together: read as three sets they assert a
     # pairing no capture ever ran.
     "regimes": {"(3, 8) over +/-300 kHz gating at 1.33": 283,
-                "(13, 8) over +/-700 kHz gating at 1.252": 176},
-    # Taken before the randomised draw went live, so they carry no
-    # capture_config and scored everything they preserved.
-    "pre_draw": 355,
-    "randomised": 104,
-    "randomised_preserving_more_than_they_scored": 71,
-    "preserved_samples_per_tuning": {200_000: 388, 400_000: 51, 800_000: 20},
-    "sidecars": {"leo-tracker.survey-detector-comparison/v1": 136,
+                "(13, 8) over +/-700 kHz gating at 1.252": 241},
+    # Named for what was counted.  These two are a declaration in the record --
+    # a capture_config carrying scored_samples, or none -- and not a statement
+    # about the draw: `presurvey.draw_configuration` writes `randomised: False`
+    # for an arm pinned by name and for the default calibrated arm, and both
+    # still declare their window.  Counting the declarations under the name of
+    # the draw put 8 entries the capture path records as *not* randomised, and
+    # says to exclude from any comparison assuming random assignment, into the
+    # randomised column.
+    "declaring_no_scored_window": 355,
+    "declaring_a_scored_window": 169,
+    "declaring_a_window_shorter_than_the_probe": 114,
+    "marked_randomised": 161,
+    "preserved_samples_per_tuning": {200_000: 410, 400_000: 79, 800_000: 35},
+    "sidecars": {"leo-tracker.survey-detector-comparison/v1": 197,
                  "leo-tracker.survey-detector-comparison/v2": 0},
     # What a re-score costs per entry, measured on this host under capture load.
     "seconds_per_entry": (74.6, 66.2),
@@ -163,7 +180,7 @@ CORPUS_CENSUS = {
 #: v2 states the bank the *capture* ran.  In v1 ``deployed_shape`` and
 #: ``deployed_threshold`` were this host's constants at scoring time, so every
 #: sidecar in a corpus spanning the bank widening claimed the same (13, 8) while
-#: three fifths of the corpus says [3, 8], and the reproduction check below
+#: the narrow half of the corpus says [3, 8], and the reproduction check below
 #: re-ran a bank those could not represent.  The two keys keep their names and
 #: change their meaning, which is exactly the case a version exists for: a mixed
 #: corpus would otherwise hold two definitions under one spelling and the
@@ -336,11 +353,13 @@ def capture_bank(record: dict) -> dict:
 
     Read the way :func:`survey_sample_rate_hz` reads the rate — out of the
     capture's declarations, never out of this module's constants — and for the
-    same reason.  The corpus spans a widening and holds both regimes in bulk,
-    around three fifths of it on (3, 8) over +/-300 kHz gating at 1.33 and the
-    rest on (13, 8) over +/-700 kHz gating at 1.252 (:data:`CORPUS_CENSUS`), so
-    a sidecar that reported this host's current pairing for both described
-    neither.
+    same reason.  The corpus spans a widening and holds both regimes in bulk:
+    (3, 8) over +/-300 kHz gating at 1.33, a population that stopped growing the
+    day the bank widened and now only shrinks as a share, and (13, 8) over
+    +/-700 kHz gating at 1.252, which every new capture joins
+    (:data:`CORPUS_CENSUS` counts both, on the date it was taken).  A sidecar
+    that reported this host's current pairing for both described neither, and
+    will go on describing neither for as long as the narrow half is preserved.
 
     The span cannot come from ``profile`` alone; only the widened records carry
     it there and every narrow one carries it at record level, so both are
@@ -387,16 +406,20 @@ def capture_scored_samples(record: dict, preserved: int) -> tuple[int, str]:
     ``mean_power`` exactly, and the mean over all 400,000 is 84.8204, which is
     the recomputed one exactly.  Sixteen of sixteen target observations on that
     arm failed the reproduction check, worst delta 0.1555 and cheapest
-    6.945e-04.  That population only grows, and it grows at a rate the draw
-    fixes rather than one that has to be re-counted: three of the four arms
-    preserve more than they score, so about three quarters of everything drawn
-    since joins it, and the share has matched that ratio at every census
-    (:data:`CORPUS_CENSUS`).
+    6.945e-04.  That population only grows: three of the four arms preserve more
+    than they score, so about three in four new draws join it.  Three in four is
+    the draw's own probability and not a count of the corpus — the realised
+    share in :data:`CORPUS_CENSUS` is 114 of 169 — and the direction is what
+    matters here, because it means an analysis host that gets this wrong gets it
+    wrong about a growing majority of everything captured from now on.
 
-    Where the record declares no window — every probe taken before the draw went
-    live, which is still most of the corpus — the capture scored everything it
-    kept and the whole preserved probe is the answer.  A declaration longer than
-    the file is also the whole file, because nothing can be scored past its end.
+    Where the record declares no window the capture scored everything it kept
+    and the whole preserved probe is the answer.  That population stopped
+    growing when the draw went live, so it shrinks as a share of the corpus and
+    never as a count: every probe taken before the draw is still in it, and
+    still has to reproduce.  A declaration longer than the file is also the
+    whole file, because nothing can be scored past its end, and a declaration of
+    nothing at all is no declaration rather than an empty window.
     """
     declared = (record.get("capture_config") or {}).get("scored_samples")
     if not declared:

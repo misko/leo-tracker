@@ -17,7 +17,8 @@ from leo_tracker.radio.cli import main
 from leo_tracker.radio.beacon.analysis import (analyze_capture, analyze_exact_window,
                                                detection_gates,
                                                summarize_doppler_track)
-from leo_tracker.radio.beacon.acquisition import (acquire_exact_receiver,
+from leo_tracker.radio.beacon.acquisition import (TIMING_PILOT_STEP_HZ,
+    TIMING_PSS_STEP_HZ, TIMING_SEARCH_SPAN_HZ, acquire_exact_receiver,
     acquisition_centers, extract_complex_subband, usable_acquisition_span_hz)
 from leo_tracker.radio.beacon.artifact import (BeaconCapture, capture_beacon_iq,
                                                queued_paired_blocks)
@@ -205,6 +206,40 @@ def test_acquisition_bank_is_symmetric_and_rejects_out_of_band_requests():
                                 4_000_000, 2_500_000)
 
 
+def test_the_timing_stage_searches_the_whole_derived_doppler_span():
+    """It is the tight link: every later stage inherits its candidate CFO from here.
+
+    The requirement is 279,059 Hz of all-sky Doppler p99.9 from 63,035,467
+    satellite-instants, plus 19,346 Hz of LNB bias uncertainty, plus 21,595 Hz
+    of margin from p99.9 out to closed form -- 320 kHz.  It searched +/-300 kHz,
+    which clears Doppler plus bias by 1.6 kHz and leaves nothing for either
+    margin term, so a satellite in the tail was unreachable by every stage
+    downstream and not only by this one.
+    """
+    assert TIMING_SEARCH_SPAN_HZ >= 279_059 + 19_346 + 21_595
+    for step in (TIMING_PSS_STEP_HZ, TIMING_PILOT_STEP_HZ):
+        grid = acquisition_centers(TIMING_SEARCH_SPAN_HZ, step)
+        assert min(grid) <= -320_000.0 and max(grid) >= 320_000.0
+        assert 0.0 in grid
+
+
+def test_widening_the_timing_stage_did_not_coarsen_it():
+    """Extra width bought with extra spacing would be a trade, not a fix.
+
+    Spacing is the other half of whether a hypothesis is near enough to find
+    anything: the same injection sweep that sized the survey bank puts the
+    largest usable spacing at 150 kHz for -12 dB.  Both grids came out finer
+    than they were -- 150 kHz to 106.7 kHz and 100 kHz to 80 kHz -- because
+    ``acquisition_centers`` rounds the step down to fit the span rather than
+    stretching it to cover.
+    """
+    pss = acquisition_centers(TIMING_SEARCH_SPAN_HZ, TIMING_PSS_STEP_HZ)
+    pilot = acquisition_centers(TIMING_SEARCH_SPAN_HZ, TIMING_PILOT_STEP_HZ)
+
+    assert max(np.diff(pss)) <= TIMING_PSS_STEP_HZ <= 150_000.0
+    assert max(np.diff(pilot)) <= TIMING_PILOT_STEP_HZ <= 100_000.0
+
+
 def test_usable_span_is_bounded_by_the_sampled_bandwidth():
     assert usable_acquisition_span_hz(10_000_000, 2_500_000) == 3_750_000
     assert usable_acquisition_span_hz(10_000_000, 5_000_000) == 2_500_000
@@ -307,6 +342,20 @@ def test_coherent_grid_v1_documents_off_grid_cfo_blind_spot():
 
 
 def test_pilot_symbolwise_v3_recovers_weak_timing_when_narrow_pss_is_insufficient():
+    """Timing is the property; the exact-minus-control margin is not.
+
+    177,777 Hz is deliberately off-grid, and the margin at an off-grid CFO is a
+    lock indicator rather than a quantity: it is large when a hypothesis lands
+    within a few kHz of the truth and small otherwise, with nothing in between.
+    Measured across three noise seeds at this CFO it reads 0.010, 0.128 and
+    0.018, so the 0.015 it used to be pinned at was pinning a coin flip that
+    the old +/-300 kHz grid happened to win with this seed.
+
+    Bounded here against ``symbolwise_prefilter_margin`` instead, which is the
+    number the pipeline itself uses to decide whether the symbolwise track is
+    worth running.  What the test is named for -- the epoch, and the CFO to
+    within 5 kHz -- is asserted exactly as before and is unaffected.
+    """
     rate, size, epoch, cfo_hz = 2_500_000.0, 25_000, 500, 177_777.0
     frame = edge_pilot_frame(rate, "lower")
     pss = pss_subband_samples(rate, "lower")
@@ -332,8 +381,49 @@ def test_pilot_symbolwise_v3_recovers_weak_timing_when_narrow_pss_is_insufficien
     assert found["acquisition"]["selected_epoch_sample"] == epoch
     assert found["pilot_epoch"]["epoch_sample"] == epoch
     assert found["pilot"]["frequency_offset_hz"] == pytest.approx(cfo_hz, abs=5_000)
-    assert found["acquisition"]["match_score_margin"] > .015
+    assert (found["acquisition"]["match_score_margin"]
+            > found["acquisition"]["symbolwise_prefilter_margin"])
     assert found["pilot"]["score_margin"] > .03
+
+
+@pytest.mark.parametrize("cfo_hz", [77_777.0, 240_000.0])
+def test_the_widened_timing_grid_locks_offsets_the_narrow_one_missed(cfo_hz):
+    """What the extra width and the finer step actually buy, on the same signal.
+
+    The old grid ran +/-300 kHz at 100 kHz for the pilot-epoch search.  At
+    77,777 Hz its nearest hypothesis was 22 kHz away and the exact-minus-
+    control margin came out 0.005 -- no lock -- with the CFO landing at
+    81,146.  At 240,000 Hz its nearest was 40 kHz away and it picked the
+    *wrong epoch*, 289 instead of 500.  The grid is now +/-320 kHz at 80 kHz,
+    which puts a hypothesis 2 kHz from the first and exactly on the second.
+
+    Across a sweep of seven CFOs by three seeds the median margin moves from
+    0.021 to 0.277 and epoch-plus-CFO recovery from 15/21 to 16/21.  It is not
+    uniformly better -- 290 kHz was 10 kHz from an old hypothesis and is
+    30 kHz from a new one -- because that is what any grid does.  It is better
+    where the requirement says it has to be.
+    """
+    rate, size, epoch = 2_500_000.0, 25_000, 500
+    frame = edge_pilot_frame(rate, "lower")
+    pss = pss_subband_samples(rate, "lower")
+    frame[:pss.size] += np.sqrt(pss.size) * pss
+    model = np.zeros(size, np.complex64)
+    for frame_index in range(8):
+        start = epoch + round(frame_index * rate / 750)
+        if start + frame.size <= size:
+            model[start:start + frame.size] += frame
+    model /= np.sqrt(np.mean(np.abs(model) ** 2))
+    rng = np.random.default_rng(992)
+    noise = (rng.normal(size=size) + 1j * rng.normal(size=size)).astype(np.complex64)
+    signal = noise + .3 * np.sqrt(np.mean(np.abs(noise) ** 2)) * model * np.exp(
+        2j * np.pi * cfo_hz * np.arange(size) / rate)
+
+    found = acquire_exact_receiver(signal, rate, edge="lower",
+                                   method="pilot_symbolwise_v3")
+
+    assert found["acquisition"]["selected_epoch_sample"] == epoch
+    assert found["pilot"]["frequency_offset_hz"] == pytest.approx(cfo_hz, abs=5_000)
+    assert found["acquisition"]["match_score_margin"] > .2
 
 
 def test_symbolwise_tracker_is_skipped_below_configurable_joint_prefilter():

@@ -27,6 +27,31 @@ def _conditioned_cfo_refinement(samples: np.ndarray, sample_rate_hz: float,
     return exact, control
 
 
+#: How far the timing stage must search before anything downstream can find a
+#: signal.  Every later stage inherits its candidate CFO from that search, so
+#: this is the tight link in the chain rather than the +/-350 kHz grid below.
+#:
+#: From a 3-day, 2-second sweep of the whole catalogue against this site,
+#: 63,035,467 satellite-instants, propagated vectorised and agreeing with the
+#: repository's scalar path to 0.057 Hz::
+#:
+#:     Doppler p99.9, all-sky, top tuning (11.690 GHz)   279,059 Hz
+#:     LNB bias uncertainty (p99.9 of 2,865 pairs)        19,346
+#:     margin: p99.9 -> population max -> closed form     21,595
+#:                                                      =========
+#:                                                       320,000
+#:
+#: It searched +/-300 kHz until this was measured, which clears Doppler-p99.9
+#: plus bias by 1.6 kHz and leaves nothing for either margin term.
+TIMING_SEARCH_SPAN_HZ = 320_000.0
+#: Coarsest hypothesis spacing the two timing grids may use.  Both are widened
+#: to :data:`TIMING_SEARCH_SPAN_HZ` at *no more* than the spacing they already
+#: had, so neither can trade sensitivity for the extra width; the symmetric
+#: grid below rounds outward, so both come out finer than these bounds.
+TIMING_PSS_STEP_HZ = 150_000.0
+TIMING_PILOT_STEP_HZ = 100_000.0
+
+
 def acquisition_centers(span_hz: float, step_hz: float) -> tuple[float, ...]:
     """Return a symmetric digital-tuning bank including zero and both limits."""
     if span_hz < 0 or step_hz <= 0:
@@ -105,18 +130,24 @@ def acquire_exact_receiver(samples: np.ndarray, source_rate_hz: float, *, edge: 
             pss_search = acquire_pss_epoch(subband, output_rate, edge=edge,
                 maximum_candidates=4,
                 frequency_offsets_hz=tuple(
-                    value + centre for value in
-                    (-300_000.0, -150_000.0, 0.0, 150_000.0, 300_000.0)))
+                    value + centre for value in acquisition_centers(
+                        TIMING_SEARCH_SPAN_HZ, TIMING_PSS_STEP_HZ)))
             timing_search = (pss_search if method == "pss_symbolwise_v2" else
                              acquire_pilot_epoch(
                                  subband, output_rate, edge=edge,
                                  maximum_candidates=4,
                                  frequency_offsets_hz=tuple(
-                                     np.arange(-300_000, 300_001, 100_000,
-                                               dtype=float) + centre)))
+                                     value + centre for value in
+                                     acquisition_centers(
+                                         TIMING_SEARCH_SPAN_HZ,
+                                         TIMING_PILOT_STEP_HZ))))
             hypotheses = []
             for rank, candidate in enumerate(timing_search["candidate_epochs"]):
                 initial_cfo = candidate["frequency_offset_hz"]
+                # Clipped to the +/-350 kHz grid above, which is wider than the
+                # +/-320 kHz the timing stage now searches, so every candidate
+                # it can produce survives the clip and only the +/-100 kHz
+                # exploration either side of one is trimmed.
                 coarse_offsets = tuple(sorted({
                     float(np.clip(initial_cfo + delta,
                                   centre - 350_000.0, centre + 350_000.0))

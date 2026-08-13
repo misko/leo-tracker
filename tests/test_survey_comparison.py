@@ -457,13 +457,19 @@ def test_the_deployed_gate_is_shown_beside_a_calibrated_one(tmp_path):
         _observation("target", certificates=[_certificate("coarse-A", 1.4)]),
         _observation("cross-edge-null",
                      certificates=[_certificate("coarse-A", 1.2)])])
-    payload["deployed_threshold"] = 1.33
+    payload["deployed_threshold"] = {"A": 1.33, "E": 1.255}
+    payload["deployed_shape"] = [13, 8]
     _write(tmp_path, payload)
 
-    printed = format_review(review(tmp_path))
+    report = review(tmp_path)
+    printed = format_review(report)
 
-    assert "deployed gate is 1.330" in printed
-    assert "costs detections rather than manufacturing them" in printed
+    assert report["deployed"]["shape"] == [[13, 8]]
+    assert "coarse-A: host gates at 1.330" in printed
+    assert "cross-edge 1% threshold here is 1.200" in printed
+    assert "costing detections, not manufacturing them" in printed
+    # Real backgrounds, not synthetic: the two agree, and both sit above noise.
+    assert "agree to 0.1% in the mean" in printed
 
 
 def test_an_unsupported_threshold_is_marked_in_the_table(tmp_path):

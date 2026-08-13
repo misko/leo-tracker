@@ -363,6 +363,39 @@ that boundary is in the right place is a live question — the alternative is
 recording per-column null counts in `partition.json` so the drift is visible in
 the manifest rather than discovered in a query months later.
 
+## Who reads it
+
+The dashboard, through `analysis_store/reader.py`. It answers the three
+questions the listing needs — recent recordings, one recording's detail, and the
+corpus summary — with one query each:
+
+```
+listing (12,000 rows)   1.4 s cold, 0.18 s warm
+detail (one recording)  0.55 s
+summary (16,115)        0.01 s
+```
+
+It needs no configuration. The projection lives under the beacon root the
+dashboard already knows, so the repository is constructed only when a projection
+is actually present and is otherwise `None`. A capture-only host, a host without
+the `analysis` extra, or any host before the first build takes the JSON path
+exactly as it did before, and a projection that fails mid-request falls back the
+same way rather than taking the dashboard down with it.
+
+One connection is held rather than one per request, and its views resolve their
+glob when a query runs rather than when the view is created — so a partition the
+timer builds after the dashboard started is picked up without reconnecting.
+That property has a test.
+
+A reader never sees a half-written table: the builder stages under a name a
+`*.parquet` glob cannot match and renames atomically, so a query returns the
+previous partition or the next one.
+
+To get the benefit on SATPI01 the `analysis` extra must be installed there. It
+degrades rather than fails without it, which means a missing dependency shows up
+as an unchanged dashboard rather than a broken one — worth checking deliberately
+rather than assuming.
+
 ## What this removes
 
 The whole publication subsystem becomes unnecessary, and with it the blocker

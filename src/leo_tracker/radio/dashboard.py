@@ -88,6 +88,15 @@ class DashboardModel:
         self.root = Path(observation_dir).resolve()
         self.passes_path = (Path(passes_path).resolve() if passes_path else self.root / "passes.json")
         self.beacon_root = None if beacon_root is None else Path(beacon_root).resolve()
+        # The analysis index lives under the beacon root, so it needs no
+        # configuration of its own: if a projection is there it is used, and if
+        # it is not — a capture-only host, or before the first build — the JSON
+        # path below answers exactly as it did before.
+        self._analysis = None
+        if self.beacon_root is not None:
+            from .analysis_store.reader import ParquetAnalysisRepository
+            candidate = ParquetAnalysisRepository(self.beacon_root)
+            self._analysis = candidate if candidate.available() else None
         # Surveys are written by the capture host into its own storage root's
         # plots/, which is the beacon root only when capture and dashboard read
         # the same tree; where captures stage locally and the dashboard reads an
@@ -179,6 +188,16 @@ class DashboardModel:
     def _beacon_recording_index(self) -> dict:
         if self.beacon_root is None:
             return {}
+        if self._analysis is not None:
+            try:
+                return {"schema": "leo-tracker.beacon-dashboard-index/v3",
+                        "recordings": self._analysis.recent_recordings(
+                            limit=LISTING_READ_LIMIT),
+                        "summary": self._analysis.summary()}
+            except Exception:
+                # A projection that cannot answer must not take the dashboard
+                # with it: DuckDB may be absent, or QNAP briefly unreachable.
+                pass
         reports = self.beacon_root / "reports"
         shards = sorted((reports / "dashboard-index").glob("2*.json"))
         path = reports / "dashboard-index.json"
@@ -1206,6 +1225,17 @@ class DashboardModel:
             # record cannot carry a link to a directory it never saw.
             survey_plots = ([url] if (url := self._survey_plot_url(recording_id))
                             else [])
+            if self._analysis is not None:
+                try:
+                    complete = self._analysis.recording_detail(recording_id)
+                except Exception:
+                    complete = None
+                if complete is not None:
+                    return {"kind": kind, "recording_id": recording_id,
+                            "active": False,
+                            "statistics": complete.get("_statistics", {}),
+                            "plots": [*complete.get("_plots", []), *survey_plots],
+                            "artifacts": complete.get("_artifacts", [])}
             persisted = self._beacon_recording_index()
             if persisted.get("schema") in {
                     "leo-tracker.beacon-dashboard-index/v2",

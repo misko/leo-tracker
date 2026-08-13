@@ -412,6 +412,12 @@ def read_connection(root: Path, *, memory_limit: str = QUERY_MEMORY_LIMIT,
             PARTITION BY recording_id
             ORDER BY completed_utc DESC, commit_sequence DESC, run_id DESC) AS _rank
           FROM analysis_runs) WHERE _rank = 1""")
+    # One row per recording, from whichever run analysed it last. Two pipelines
+    # commonly hold receipts for the same recording, and a listing wants one row.
+    connection.execute("""
+        CREATE VIEW current_dashboard_records AS
+        SELECT dashboard_records.* FROM dashboard_records
+        JOIN current_runs USING (run_id)""")
     return connection
 
 

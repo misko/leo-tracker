@@ -198,6 +198,68 @@ implementation*, not a property of the signal — see the relative-phase section
 
 ---
 
+## Learning each LNB's offset, rather than being told it
+
+The receivers are free-running and independent — the shared 10 MHz reference in
+`hardware/koolerton.md` is not in use. The method therefore has to work with an
+arbitrary LNB whose absolute local-oscillator error is unknown at the outset, and
+learn it from the sky.
+
+**The existing calibration structurally cannot do this.** `receiver_centers`
+differences two ports on the same capture, so anything common to both cancels
+exactly. It learns how far apart they are and never where either one sits. With
+one LNB it learns nothing at all.
+
+**Doppler symmetry gives the bootstrap.** The geometry sweep measured 49.998% of
+satellite-instants approaching, so `E[Doppler] = 0` to five digits. Over many
+detections the mean measured offset therefore converges on the LNB's own error,
+with no satellite identification, no culmination hunting and no TLE matching:
+
+| target | detections needed (sigma ≈ 150 kHz) |
+|---|---:|
+| ±50 kHz | 9 |
+| ±20 kHz | 56 |
+| ±10 kHz | 225 |
+| ±5 kHz | 900 |
+
+A newly attached LNB is roughly located within about ten detections and well
+pinned after a few hundred. Free-running oscillators drift with temperature, so
+this wants to be a running estimate with a time constant, not a one-off
+calibration.
+
+**The estimate must come from a continuous CFO, not from which bank hypothesis
+won.** A coarse bank quantises detections onto its own grid, and averaging those
+pulls the estimate toward hypothesis centres. The relative-phase stage produces a
+continuous estimate independent of the grid, which is a second and independent
+reason to build it.
+
+**What 2.5 MS/s can accept.** Search cost is linear in hypotheses, so a wide
+search is affordable; capture bandwidth is the hard limit, and no search recovers
+a pilot band that has slid out of the sampled spectrum. The eight pilot
+subcarriers occupy 1.875 MHz, leaving 312 kHz of guard each side at 2.5 MS/s:
+
+| LNB offset | cost |
+|---|---|
+| ≤ ±312 kHz | none |
+| ±312–547 kHz | 0.58 dB (one subcarrier of eight) |
+| ±547–781 kHz | 1.25 dB |
+| ±781–1016 kHz | 2.04 dB |
+
+Degradation is graceful rather than a cliff, and aliasing itself costs 0.02 dB
+because rotating an already-sampled replica aliases exactly as the signal does.
+
+**5 MS/s is parked, deliberately.** It would move the no-loss tolerance from
+±312 kHz to ±1562 kHz and is the change that would make "any LNB someone bolts on"
+literally true. It is not being done now: changing the capture format ripples
+through storage, the existing corpus and every comparison made so far, and none of
+that is worth spending before the detector work has demonstrably improved tracking
+on the LNBs already attached. **Revisit once that is shown.** Until then the
+supported envelope is the table above, and it should be stated rather than
+implied.
+
+
+---
+
 ## Relative phase — external, unverified, and the reason Stage 3 is now a bake-off
 
 **Provenance: this work was not done in this repository and none of it has been
@@ -381,8 +443,9 @@ carrier phase is unmodelled, so raw frame amplitudes must not be summed.
 Phase-invariant statistics are explicitly permitted: normalised coherent energy,
 differential products and other relative-phase quantities cancel the unknown frame
 phase and may be accumulated across frame opportunities. No PSS/SSS acquisition — at 2.5 MHz we capture ~1% of its energy. No
-T-codes — they need all 1024 subcarriers. No 5 MS/s — aliasing costs 0.02 dB, the
-door stays open only if the fractional-epoch loss survives. No per-subcarrier
+T-codes — they need all 1024 subcarriers. 5 MS/s is parked rather than
+rejected — see the LNB section; it is the change that would make arbitrary-LNB
+support real, and it waits on the detector work proving itself first. No per-subcarrier
 equalisation — 0.0–0.4 dB measured ceiling. No 40° elevation gate on the corpus —
 it would bake a "typically" statement into the evidence, and the measurements
 above show the gated and ungated populations differ by 35%.

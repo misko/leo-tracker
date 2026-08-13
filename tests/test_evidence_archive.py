@@ -485,11 +485,17 @@ def test_archive_shell_pipeline_is_end_to_end_and_source_preserving(tmp_path):
     result = subprocess.run([
         "bash", str(repo / "scripts/starlink-evidence-archive.sh"),
         "--recording", capture.name, str(source), str(qnap)],
+        # Floor of zero, so the free-space guard cannot fire. This test's subject
+        # is the pipeline, not the guard, and tmp_path lives on a 2 GiB tmpfs
+        # here — a 1 GiB floor is half the filesystem, and the suite's own
+        # retained roots breach it. The guard then backs off correctly, prints
+        # evidence_complete processed=0, exits 0, and the failure lands on the
+        # assertion below with nothing to explain it.
         env=os.environ | {"LEO_TRACKER_REPO": str(repo),
-                          "LEO_EVIDENCE_MINIMUM_QNAP_FREE_GB": "1"},
+                          "LEO_EVIDENCE_MINIMUM_QNAP_FREE_GB": "0"},
         text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stderr
-    assert "evidence_done" in result.stdout
+    assert "evidence_done" in result.stdout, result.stderr
     assert _tree_hashes(source) == before
     assert json.loads((qnap / "catalog" / "v2" / "receipts" /
                        f"{capture.name}.json").read_text())["status"] == "verified"

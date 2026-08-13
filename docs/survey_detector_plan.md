@@ -1,13 +1,19 @@
 # Survey detector: a staged plan
 
-Revision 6. Revision 5 rewrote the architecture section as a bake-off. This
-revision changes nothing about the plan's direction; it records that **step 1 is
-built**, and corrects two claims that the work of building it measured and found
-wrong. See "What building step 1 changed in this document" below.
+Revision 7. Revision 6 recorded that step 1 was built. This revision **retracts
+two of the four proposals revision 6 declared dead** — 5 MS/s and probe
+lengthening — on the grounds that both died on arguments about cost rather than
+on measurements of benefit, and replaces both arguments with a randomised
+experiment. It also splits the survey's collection from its scoring, which is
+"the capture host records, the analysis host decides" applied to the one place
+it was not yet true. See "Randomising the survey's capture configuration".
 
 Status: step 1 is **in the repository, not on the capture host**. No service has
-been restarted, so the running survey is still the 3×8 bank at 1.33. Steps 2–6
-are unstarted.
+been restarted, so the running survey is still the 3×8 bank at 1.33 and is still
+fixed at 80 ms / 2.5 MS/s. **The randomisation is also in the repository and not
+running**: it needs a `systemctl restart` of both
+`leo-tracker-beacon-watch@` instances before a single capture is drawn. Steps
+2–6 are unstarted.
 
 ---
 
@@ -317,14 +323,20 @@ subcarriers occupy 1.875 MHz, leaving 312 kHz of guard each side at 2.5 MS/s:
 Degradation is graceful rather than a cliff, and aliasing itself costs 0.02 dB
 because rotating an already-sampled replica aliases exactly as the signal does.
 
-**5 MS/s is parked, deliberately.** It would move the no-loss tolerance from
-±312 kHz to ±1562 kHz and is the change that would make "any LNB someone bolts on"
-literally true. It is not being done now: changing the capture format ripples
-through storage, the existing corpus and every comparison made so far, and none of
-that is worth spending before the detector work has demonstrably improved tracking
-on the LNBs already attached. **Revisit once that is shown.** Until then the
-supported envelope is the table above, and it should be stated rather than
-implied.
+**~~5 MS/s is parked, deliberately.~~ Unparked — it is now one arm of a
+randomised survey experiment.** It moves the no-loss tolerance from ±312 kHz to
+±1562 kHz and is the change that would make "any LNB someone bolts on" literally
+true. The reason for parking it was that changing the capture format ripples
+through storage, the existing corpus and every comparison made so far. That is
+still true of the *dwell* format and the dwell format has not moved. It is much
+weaker for the survey probe, which is 12.8 MB rather than 2.3 GB, is already
+carried as a shape declared in the manifest, and is scored by a path that
+derives every rate-dependent quantity from the rate.
+
+So the survey now **draws** its capture configuration rather than being given
+one: probe length in {80, 160} ms crossed with sample rate in {2.5, 5} MS/s,
+uniformly, four arms at exactly 2^30 draws each. See "Randomising the survey's
+capture configuration" below.
 
 
 ---
@@ -541,13 +553,101 @@ and cannot tell the difference. Recorded in the code, not fixed.
 
 ---
 
+## Randomising the survey's capture configuration
+
+Two of the four proposals this document retired — 5 MS/s and probe lengthening —
+were retired on **arguments about cost**, not on measurements of benefit. Reread
+them: 5 MS/s "ripples through storage", probe length is "a third-order fix" that
+"wins only by amortising fixed per-probe overhead". Both are statements about
+price. Neither is a measurement of what the extra bandwidth or the extra frames
+would buy on this sky, because no probe was ever taken at either setting to
+measure it with.
+
+So both are now arms of one randomised experiment rather than decisions:
+
+```
+probe length in {80 ms, 160 ms}  x  sample rate in {2.5 MS/s, 5 MS/s}
+```
+
+drawn uniformly per capture, `randomised-probe-length-and-rate-v1`. 2^32 is
+divisible by four, so `draw % 4` is *exactly* uniform — no modulo bias to
+correct for, unlike the AGC experiment's `% 10000`. The experiment id, the raw
+32-bit draw and the resulting assignment are all written into the manifest, so
+the fairness of the split is checkable from the corpus rather than trusted.
+
+**This is what makes the honest order possible: randomise, accumulate, then
+calibrate.** `SURVEY_NOISE_CEILING` = 1.252 was measured over 1,696 clean
+cross-edge windows at 80 ms and 2.5 MS/s **only**. The statistic moves with
+probe length (p99 1.310 / 1.189 / 1.137 at 20 / 40 / 80 ms) and must move with
+rate too, because rate sets the kernel taps (11 against 22), the epoch count the
+fold maximises over (3,333 against 6,667) and how much of the sampled band is
+noise. Characterising the other three thresholds needs null populations taken
+*in* those configurations, and producing them is exactly what this experiment
+does. Until then, **three of the four arms emit no `active` boolean at all** —
+`None`, not `false`, because an empty active list is the same shape as "looked
+and found nothing". The score is kept beside it, so every row becomes usable the
+moment its bar exists.
+
+### The capture host records; the analysis host decides — applied here
+
+Scoring used to run in the same loop as the reading, so the survey's wall clock
+scaled with the bank *and* with the configuration. Measured on the capture Pi 5
+under its own live load, scoring one sweep in full costs **2.0 / 5.6 / 4.7 /
+11.6 s** across the four arms — 23.9 s if all four ran, up to 9.7% of a 120 s
+dwell for the dearest arm alone.
+
+`scan_radio` is therefore split. `collect_radio` tunes, reads and returns IQ;
+`score_collection` takes samples and produces the verdict, and touches no
+device. Radio time follows probe *duration* and not rate, because the block is
+sized to the probe: **0.79 s at 80 ms and 1.43 s at 160 ms**, identical at both
+rates. The Pi keeps a verdict, bounded to a 200,000-sample prefix — the cheapest
+arm's worth, 1.9–2.9 s in every configuration — and the full-length comparison
+runs on the analysis host over the preserved probe, where `starlink-survey-score`
+already runs with sixteen workers.
+
+### What it costs
+
+| arm | samples/tuning | taps | epochs | guard | IQ/capture | radio | Pi score | full score |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 80 ms 2.5 MS/s | 200,000 | 11 | 3,333 | ±312.5 kHz | 12.8 MB | 0.79 s | 2.07 s | 1.99 s |
+| 80 ms 5 MS/s | 400,000 | 22 | 6,667 | ±1562.5 kHz | 25.6 MB | 0.79 s | 2.85 s | 5.60 s |
+| 160 ms 2.5 MS/s | 400,000 | 11 | 3,333 | ±312.5 kHz | 25.6 MB | 1.43 s | 1.94 s | 4.72 s |
+| 160 ms 5 MS/s | 800,000 | 22 | 6,667 | ±1562.5 kHz | 51.2 MB | 1.43 s | 2.71 s | 11.60 s |
+
+Scoring measured on the capture Pi 5 itself, three threads, minimum of twelve
+round-robin rounds so the two live capture services' load fell on every arm
+alike; radio time from the profile's field-anchored cost model. IQ is
+`8 tunings x N x 2 receivers x 2 components x 2 bytes`, i.e. 64N exactly.
+
+**The analysis host barely notices.** `starlink-survey-score` costs
+**1.00 / 1.17 / 1.19 / 1.44** relative across the four arms — measured, same
+host, one tuning by two receivers scaled to eight. Quadrupling the samples costs
+44%, not 300%, because most of that stage is differential, GLRT and conditioned
+statistics over a *fixed symbol count*; only the coarse bank and the full-frame
+epoch search scale with probe length. So the 240 s per-job budget still admits
+one entry per job in every configuration, and the deferral is affordable on the
+side it was moved to as well as on the side it was moved from.
+
+**The 48 MB/capture estimate this work was commissioned with is wrong.** The
+mean over a uniform draw is **28.8 MB**, not 48 — the arithmetic mean of 12.8,
+25.6, 25.6 and 51.2. At 30 captures/hour fleet-wide that is **20.7 GB/day**, not
+35, against 879 GB measured free on the share (87% used), so about 42 days of
+headroom rather than 28.
+
+---
+
 ## Principles, unchanged
 
 **The capture host records; the analysis host decides.**
 
 **Nothing is included without measured evidence.** Four proposals died this
 revision — 5 MS/s, per-subcarrier equalisation, recentring as a fleet default, and
-probe lengthening — each on a measurement rather than an argument.
+probe lengthening — each on a measurement rather than an argument. **Two of those
+four are now retracted**: 5 MS/s and probe lengthening died on arguments about
+*cost*, and this revision replaces both arguments with a randomised corpus. See
+"Randomising the survey's capture configuration". Per-subcarrier equalisation
+(0.0–0.4 dB measured ceiling) and fleet-wide recentring (a per-port
+configuration, measured) did die on measurements and stay dead.
 
 **Truth comes from outside the detector.** Injection gives Pd under the injection
 model; TLE proximity gives enrichment, whose slices cover 74% of the search space
@@ -581,9 +681,15 @@ carrier phase is unmodelled, so raw frame amplitudes must not be summed.
 Phase-invariant statistics are explicitly permitted: normalised coherent energy,
 differential products and other relative-phase quantities cancel the unknown frame
 phase and may be accumulated across frame opportunities. No PSS/SSS acquisition — at 2.5 MHz we capture ~1% of its energy. No
-T-codes — they need all 1024 subcarriers. 5 MS/s is parked rather than
-rejected — see the LNB section; it is the change that would make arbitrary-LNB
-support real, and it waits on the detector work proving itself first. No per-subcarrier
+T-codes — they need all 1024 subcarriers. **~~5 MS/s is parked rather than
+rejected.~~ Now a randomised arm of the survey's capture configuration**, at the
+survey probe only; the 120 s dwell format is untouched. No per-subcarrier
 equalisation — 0.0–0.4 dB measured ceiling. No 40° elevation gate on the corpus —
 it would bake a "typically" statement into the evidence, and the measurements
 above show the gated and ungated populations differ by 35%.
+
+**No verdict in a configuration whose threshold has not been measured.** Three of
+the four survey arms carry a score and no boolean. A stored boolean that means
+"1% false alarms" in one row and "below a bar borrowed from a different
+experiment" in the next is worse than no boolean, and the corpus already holds
+rows written under two different thresholds that only a basis string separates.

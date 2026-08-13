@@ -441,7 +441,56 @@ def test_two_probe_lengths_are_never_pooled_into_one_threshold(tmp_path):
 
     assert report["probe_lengths"]["probe_ms"] == [20.0, 80.0]
     assert report["probe_lengths"]["single_length"] is False
-    assert "MIXED" in format_review(report)
+    assert "MIXED LENGTH" in format_review(report)
+
+
+def test_two_sample_rates_are_never_pooled_either(tmp_path):
+    """The same defect on the axis the length check cannot see.
+
+    The survey draws four configurations and two of them are 80 ms probes at
+    different rates, so a guard on probe length alone passes them as one
+    population. Rate sets the kernel taps — 11 at 2.5 MS/s, 22 at 5 — the epoch
+    count the fold maximises over, and how much of the sampled band is noise.
+    A threshold belongs to one rate exactly as much as to one length.
+    """
+    slow = _payload("slow", [_observation("target")])
+    slow["probe_ms"], slow["sample_rate_hz"] = 80.0, 2.5e6
+    slow["capture_config"] = {"name": "80ms-2.5MSps"}
+    fast = _payload("fast", [_observation("target")])
+    fast["probe_ms"], fast["sample_rate_hz"] = 80.0, 5.0e6
+    fast["capture_config"] = {"name": "80ms-5.0MSps"}
+    _write(tmp_path, slow)
+    _write(tmp_path, fast)
+
+    report = review(tmp_path)
+    rendered = format_review(report)
+
+    # The length guard is satisfied and would have passed this silently.
+    assert report["probe_lengths"]["single_length"] is True
+    assert report["probe_lengths"]["single_rate"] is False
+    assert report["probe_lengths"]["single_configuration"] is False
+    assert report["probe_lengths"]["capture_configs"] == ["80ms-2.5MSps",
+                                                          "80ms-5.0MSps"]
+    assert "MIXED RATE" in rendered and "MIXED LENGTH" not in rendered
+
+
+def test_one_configuration_is_named_rather_than_merely_not_complained_about(
+        tmp_path):
+    """A reader must see which arm a clean report came from, not just that it is clean.
+
+    "no warning" and "80 ms at 2.5 MS/s" are different amounts of information,
+    and only the second lets a later reader pool this report with another one.
+    """
+    single = _payload("single", [_observation("target")])
+    single["probe_ms"], single["sample_rate_hz"] = 160.0, 5.0e6
+    single["capture_config"] = {"name": "160ms-5.0MSps"}
+    _write(tmp_path, single)
+
+    rendered = format_review(review(tmp_path))
+
+    assert "160 ms" in rendered and "5 MS/s" in rendered
+    assert "160ms-5.0MSps" in rendered
+    assert "MIXED" not in rendered
 
 
 def test_the_deployed_gate_is_shown_beside_a_calibrated_one(tmp_path):

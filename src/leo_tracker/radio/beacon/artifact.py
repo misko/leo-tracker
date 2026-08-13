@@ -122,8 +122,11 @@ def _block_to_ci16(block: PairedSampleBlock | PairedCI16Block, count: int) -> np
 SURVEY_IQ_FILENAME = "survey.ci16"
 
 
-def _write_survey_iq(destination: Path, samples: np.ndarray) -> dict:
-    """Commit the probes the survey scored, with a digest, before the dwell.
+def _write_survey_iq(destination: Path, samples: np.ndarray, *,
+                     sample_rate_hz: float | None = None,
+                     probe_s: float | None = None,
+                     config_name: str | None = None) -> dict:
+    """Commit the probes the survey collected, with a digest, before the dwell.
 
     Written here rather than after the capture because this is the moment the
     directory exists and nothing else is competing for the disk; a capture
@@ -131,6 +134,13 @@ def _write_survey_iq(destination: Path, samples: np.ndarray) -> dict:
 
     Same ci16 layout as a chunk with a tuning axis in front, so existing
     tooling reads it with a reshape rather than a new decoder.
+
+    **The rate and probe length are declared here, not inferred.**  The survey
+    is drawn from four configurations and three of them hold a different sample
+    count from the fourth, so nothing about this file's shape is a constant any
+    more.  A reader that took ``sample_rate_hz`` from the enclosing manifest
+    would take the *dwell's* rate, which is a different number by construction
+    and would silently mis-scale every frequency it derived.
     """
     values = np.ascontiguousarray(samples, dtype="<i2")
     if values.ndim != 4 or values.shape[2:] != (2, 2):
@@ -148,6 +158,15 @@ def _write_survey_iq(destination: Path, samples: np.ndarray) -> dict:
             "layout": "tuning,sample,receiver,component; " + LAYOUT,
             "tunings": int(values.shape[0]),
             "samples_per_tuning": int(values.shape[1]),
+            "sample_rate_hz": (None if sample_rate_hz is None
+                               else float(sample_rate_hz)),
+            "probe_s": None if probe_s is None else float(probe_s),
+            "capture_config": config_name,
+            "shape_note": ("shape and rate are declared, never assumed: the "
+                           "pre-dwell survey draws its configuration, so this "
+                           "file holds 200,000, 400,000 or 800,000 samples per "
+                           "tuning and its rate is the survey's, not the "
+                           "dwell's"),
             "sha256": digest.hexdigest(),
             "bytes": final.stat().st_size}
 
@@ -160,7 +179,10 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock | PairedCI16Block],
                       identity: dict | None = None, gain_mode: str = "manual",
                       configured_gain_db: float | None = None,
                       metadata: dict | None = None,
-                      survey_samples: np.ndarray | None = None) -> dict:
+                      survey_samples: np.ndarray | None = None,
+                      survey_sample_rate_hz: float | None = None,
+                      survey_probe_s: float | None = None,
+                      survey_config_name: str | None = None) -> dict:
     """Write raw ci16 chunks, committing each chunk atomically with a checksum."""
     if min(sample_rate_hz, center_frequency_hz, bandwidth_hz, duration_s, chunk_s) <= 0:
         raise ValueError("capture frequencies, rates, duration, and chunk length must be positive")
@@ -185,7 +207,9 @@ def capture_beacon_iq(blocks: Iterable[PairedSampleBlock | PairedCI16Block],
         "metadata": metadata or {},
         "created_utc_ns": started_ns, "chunks": []}
     if survey_samples is not None:
-        manifest["survey_iq"] = _write_survey_iq(destination, survey_samples)
+        manifest["survey_iq"] = _write_survey_iq(
+            destination, survey_samples, sample_rate_hz=survey_sample_rate_hz,
+            probe_s=survey_probe_s, config_name=survey_config_name)
     _atomic_json(manifest_path, manifest)
     pending: list[np.ndarray] = []
     pending_count = total = 0

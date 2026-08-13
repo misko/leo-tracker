@@ -122,6 +122,35 @@ SURVEY_NULL_CAPTURES = 106
 #: to whatever chunk it is handed and has no way to know the difference; that
 #: is a real gap and it is recorded here rather than papered over.
 SURVEY_CEILING_PROBE_S = 0.080
+#: The sample rate the ceiling was measured at, and the second axis the same
+#: argument runs along.  Rate changes the taps in every kernel (11 at 2.5 MS/s,
+#: 22 at 5 MS/s), the number of epochs the fold maximises over (3,333 against
+#: 6,667) and how much of the spectrum is noise rather than signal, so a bar
+#: measured at one rate is no more transferable across rates than across
+#: lengths.  The 1,696 clean windows behind :data:`SURVEY_NOISE_CEILING` were
+#: all taken here.
+SURVEY_CEILING_SAMPLE_RATE_HZ = 2_500_000.0
+
+#: The eight published edge-pilot subcarriers, 234.375 kHz apart, span this
+#: much.  It is a property of the signal, not of the receiver, which is why the
+#: guard either side of it is a function of the sample rate alone.
+PILOT_BANDWIDTH_HZ = 1_875_000.0
+
+
+def pilot_guard_hz(sample_rate_hz: float) -> float:
+    """Frequency room either side of the pilot band before subcarriers are lost.
+
+    312.5 kHz at 2.5 MS/s and 1,562.5 kHz at 5 MS/s.  This is the whole reason
+    5 MS/s is worth measuring: an LNB whose absolute error exceeds the guard
+    slides pilot subcarriers past Nyquist and loses them, 0.58 dB for the first
+    of eight and gracefully worse after that, and no amount of searching
+    recovers a band that was never sampled.  Every port on this site sits
+    inside 312.5 kHz *except* lnb-c at +434 kHz, which is exactly the port the
+    span argument has always been about.
+    """
+    if sample_rate_hz <= 0:
+        raise ValueError("sample rate must be positive")
+    return (float(sample_rate_hz) - PILOT_BANDWIDTH_HZ) / 2.0
 
 #: Peak-to-median a probe must beat, per bank shape, for a 1% false alarm rate.
 #:
@@ -159,8 +188,68 @@ def detection_threshold(shape: tuple[int, int]) -> float:
     Keyed by shape alone, so it is only the right answer for a bank searching
     the span its ceiling was measured at; :data:`SURVEY_PROFILE` is what pairs
     :data:`SURVEY_BANK` with :data:`SURVEY_OFFSET_SPAN_HZ`.
+
+    Shape is not the whole configuration either: see :func:`survey_threshold`,
+    which is what a *survey* should call, because the same shape scored over a
+    different probe length or at a different sample rate does not share this
+    bar.
     """
     return NOISE_CEILING.get(tuple(shape), FALLBACK_NOISE_CEILING)
+
+
+def survey_threshold(shape: tuple[int, int], *, probe_s: float,
+                     sample_rate_hz: float) -> dict:
+    """The bar, plus whether it describes the configuration it is applied to.
+
+    Returns the number **and** a ``calibrated`` flag, because those are two
+    different facts and only one of them can be inferred from the other.  A
+    threshold always exists; whether it means 1% false alarms in *this*
+    configuration is a claim that rests on where the null population was drawn,
+    and that population was drawn at exactly one probe length and one rate.
+
+    The reason this is a function rather than a table is that the table cannot
+    be written yet.  Characterising the other three configurations needs a null
+    population taken in them, and producing that population is what the
+    randomised survey exists to do.  So the honest order is randomise,
+    accumulate, then calibrate -- and until the third step, a caller that would
+    have stored ``active: false`` must store nothing instead.  A boolean that
+    means "below a bar calibrated somewhere else" is not the same fact as
+    ``active: false`` and must not share a column with it.
+    """
+    value = detection_threshold(shape)
+    matches = (abs(float(probe_s) - SURVEY_CEILING_PROBE_S) < 1e-9
+               and abs(float(sample_rate_hz) - SURVEY_CEILING_SAMPLE_RATE_HZ) < 1e-6)
+    if matches:
+        basis = (
+            f"{value:.3f}: the 1% false-alarm point of the peak-to-median "
+            f"statistic for a {shape[0]}x{shape[1]} bank, measured on real sky "
+            f"over {SURVEY_NULL_REALISATIONS} target-pilot-free windows drawn "
+            f"from {SURVEY_NULL_CAPTURES} captures -- a lower-edge bank scored "
+            "on an upper-edge tuning, whose pilot codes sit 230.6 MHz away. No "
+            "window was screened on the statistic being calibrated. Measured "
+            f"at {SURVEY_CEILING_PROBE_S * 1000:.0f} ms and "
+            f"{SURVEY_CEILING_SAMPLE_RATE_HZ / 1e6:.1f} MS/s, which is the "
+            "configuration this probe was scored in")
+    else:
+        basis = (
+            f"UNCALIBRATED at this configuration. The score was taken over "
+            f"{float(probe_s) * 1000:.0f} ms at "
+            f"{float(sample_rate_hz) / 1e6:.1f} MS/s; the only measured 1% "
+            f"point for this bank, {value:.3f}, was taken over "
+            f"{SURVEY_CEILING_PROBE_S * 1000:.0f} ms at "
+            f"{SURVEY_CEILING_SAMPLE_RATE_HZ / 1e6:.1f} MS/s over "
+            f"{SURVEY_NULL_REALISATIONS} clean windows. The statistic is known "
+            "to move with probe length -- p99 1.310 / 1.189 / 1.137 at 20 / 40 "
+            "/ 80 ms on synthetic noise -- and moves with rate too, because "
+            "rate sets the kernel taps and the epoch count. No verdict is "
+            "emitted here: the score is kept and the bar is left to a null "
+            "population taken in this configuration, which is what randomising "
+            "the configuration is accumulating")
+    return {"threshold": value, "calibrated": matches, "basis": basis,
+            "probe_s": float(probe_s), "sample_rate_hz": float(sample_rate_hz),
+            "calibrated_probe_s": SURVEY_CEILING_PROBE_S,
+            "calibrated_sample_rate_hz": SURVEY_CEILING_SAMPLE_RATE_HZ,
+            "null_realisations": SURVEY_NULL_REALISATIONS}
 
 
 #: Median peak-to-median of the **retired** three-hypothesis survey bank
@@ -371,6 +460,30 @@ DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=3,
 SURVEY_PROFILE = ScanProfile(probe_s=0.080, block_size=200_000,
                              shape=SURVEY_BANK,
                              offset_span_hz=SURVEY_OFFSET_SPAN_HZ)
+
+
+def survey_profile(probe_s: float = SURVEY_CEILING_PROBE_S,
+                   sample_rate_hz: float = SURVEY_CEILING_SAMPLE_RATE_HZ
+                   ) -> ScanProfile:
+    """The survey profile for one probe length and one sample rate.
+
+    ``block_size`` is the whole reason this is a function.  The survey reads
+    exactly one block per tuning and sizes it to the probe, so a block left at
+    another configuration's sample count either reads short -- a second refill,
+    another 12.8 ms of radio time and a probe stitched from two -- or reads long
+    and throws the surplus away.  :data:`SURVEY_PROFILE` is 200,000 because
+    that is 80 ms at 2.5 MS/s, and it stops being right the moment either
+    number moves.
+
+    Everything else in the profile is a property of how the radio is driven
+    rather than of the configuration, so it is inherited unchanged.
+    """
+    if probe_s <= 0 or sample_rate_hz <= 0:
+        raise ValueError("probe length and sample rate must be positive")
+    return ScanProfile(probe_s=float(probe_s),
+                       block_size=int(round(probe_s * sample_rate_hz)),
+                       shape=SURVEY_BANK,
+                       offset_span_hz=SURVEY_OFFSET_SPAN_HZ)
 #: The profile the model was validated against on hardware, kept because the
 #: measurement belongs to a specific configuration rather than to whichever
 #: one is currently deployed: 43.5 ms per tuning across eight tunings, on
@@ -662,42 +775,34 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
     return results
 
 
-def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
-               sample_rate_hz: float = 2_500_000.0,
-               lnb_lo_hz: float = 9_750_000_000.0,
-               threads: int = DEFAULT_THREADS,
-               keep_samples: bool = False) -> dict:
-    """Survey several tunings on one radio, reporting where the time went.
+def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
+                  sample_rate_hz: float = 2_500_000.0,
+                  lnb_lo_hz: float = 9_750_000_000.0) -> dict:
+    """Tune, listen, and hand the IQ back.  Nothing here scores anything.
 
-    With ``keep_samples`` the raw ci16 is returned under ``samples``, shaped
-    ``(tuning, sample, receiver, component)`` — the capture path's own layout
-    with a tuning axis in front. Kept as the driver delivered it rather than
-    as the complex64 the detector works in, so a later analysis is re-deciding
-    from the signal rather than from this one's conversion of it.
+    This is everything that needs the radio and nothing else.  The split is the
+    point: the capture host is a four-core Pi already running two live capture
+    services, and radio time is the part no amount of arithmetic elsewhere can
+    recover, while scoring is host time that any machine can spend.  Keeping
+    them in one loop charged the Pi for both and made the survey's cost scale
+    with the bank; separated, the Pi pays only for the seconds the antenna is
+    pointed somewhere.
+
+    **Radio time depends on probe duration, not on sample rate.**  A block is
+    sized to the probe by :func:`survey_profile`, so 80 ms costs one 80 ms read
+    whether that is 200,000 samples or 400,000 of them.  What the rate changes
+    is bytes -- 8 tunings x samples x 2 receivers x 2 components x 2 bytes --
+    and arithmetic downstream.
+
+    The raw ci16 comes back shaped ``(tuning, sample, receiver, component)``:
+    the capture path's own layout with a tuning axis in front, kept as the
+    driver delivered it rather than as the complex64 a detector works in, so a
+    later analysis re-decides from the signal rather than from this one's
+    conversion of it.
 
     The radio is configured from the profile rather than from whatever the
     capture path left behind: a survey wants a shallow queue and a block the
     size of its probe, which is the opposite of what a long dwell wants.
-
-    Both receivers are scored from the same capture.  They arrive interleaved
-    whether or not anyone looks at the second one, so the only extra cost is
-    the arithmetic, and the capture this survey precedes keeps both — a survey
-    of one port cannot be set beside what that capture found.
-
-    Both are scored against the *same* bank, centred on zero.  Re-centring a
-    port's search on its own local oscillator is what the analysis path had to
-    do, and it does not transfer here: a bank spread thinly over its span
-    raises its median as much as its peak when it is moved onto the signal, and
-    the statistic is a ratio, so the score falls.  Measured on a 436 kHz offset
-    at -3 dB against the retired three-hypothesis bank, 1.41 centred against
-    1.61 as it stood.  The answer is a finer bank rather than a moved one, and
-    :data:`SURVEY_BANK` is now that; recentring stays wrong for the same reason
-    it was wrong before.
-
-    Timing is returned split by what the radio charges for, because the parts
-    are not comparable to each other: retuning and draining are radio time that
-    no amount of arithmetic can recover, while scoring is host time that can be
-    overlapped with the next tuning.
     """
     import iio                                    # kept local: host-only import
 
@@ -716,14 +821,12 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
         channel.enabled = True
     stream.set_kernel_buffers_count(profile.kernel_buffers)
     buffer = iio.Buffer(stream, profile.block_size, False)
-    wanted = int(profile.probe_s * sample_rate_hz)
-    results, retained = [], []
-    timing = {"tune": 0.0, "settle": 0.0, "listen": 0.0, "compute": 0.0}
+    wanted = int(round(profile.probe_s * sample_rate_hz))
+    plan, retained = [], []
+    timing = {"tune": 0.0, "settle": 0.0, "listen": 0.0}
     try:
         for channel_number, edge in tunings:
             centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
-            bank = build_bank(edge, sample_rate_hz, profile.shape,
-                              profile.offset_span_hz)
 
             mark = time.perf_counter()
             lo.attrs["frequency"].value = str(int(centre))
@@ -741,56 +844,193 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
                 raw = np.frombuffer(buffer.read(), dtype=np.int16)
                 pieces.append(raw)
                 remaining -= raw.size // 4
-            # i0 q0 i1 q1 per sample: one read carries both receivers.
+            # i0 q0 i1 q1 per sample: one read carries both receivers.  They
+            # arrive interleaved whether or not anyone looks at the second one,
+            # so keeping both costs no radio time at all -- and the capture this
+            # precedes keeps both, so a survey of one port could not be set
+            # beside what that capture found.
             raw = np.concatenate(pieces).reshape(-1, 2, 2)[:wanted]
-            samples = np.stack([raw[:, 0, 0] + 1j * raw[:, 0, 1],
-                                raw[:, 1, 0] + 1j * raw[:, 1, 1]]).astype(np.complex64)
-            if keep_samples:
-                retained.append(raw.copy())
+            # Copied rather than kept as a view, so a read that overshot the
+            # probe releases the surplus instead of pinning it for the whole
+            # survey.
+            retained.append(raw.copy())
             timing["listen"] += time.perf_counter() - mark
 
-            mark = time.perf_counter()
-            scored = [{"receiver": index,
-                       **probe(np.ascontiguousarray(samples[index]), bank,
-                               threads=threads)}
-                      for index in range(samples.shape[0])]
-            timing["compute"] += time.perf_counter() - mark
-
-            results.append({"channel": channel_number,
-                            "region": f"{edge}-edge", "if_center_hz": centre,
-                            "rf_center_hz": centre + lnb_lo_hz,
-                            "edge": edge, "receivers": scored,
-                            # Either port seeing a pilot makes the channel
-                            # worth dwelling on, so a tuning ranks by its best.
-                            "peak_to_median": max(item["peak_to_median"]
-                                                  for item in scored)})
+            plan.append({"channel": channel_number, "region": f"{edge}-edge",
+                         "edge": edge, "if_center_hz": centre,
+                         "rf_center_hz": centre + lnb_lo_hz})
     finally:
         # The binding has no explicit close: the buffer is freed when its last
         # reference goes, and a leaked one holds the context so that whatever
         # opens the radio next fails with EBUSY.
         del buffer
-    # Sorted for reading; the retained IQ stays in the order it was collected
-    # and is indexed by ``sample_order``, so the two cannot be mismatched.
-    order = [(item["channel"], item["region"]) for item in results]
+    samples = np.stack(retained) if retained else None
+    radio_s = sum(timing.values())
+    return {
+        "samples": samples, "plan": plan,
+        # The retained IQ stays in the order it was collected.  Every consumer
+        # indexes it by this, never by the score-sorted result list, so the two
+        # cannot be mismatched.
+        "sample_order": [(item["channel"], item["region"]) for item in plan],
+        "tunings": len(plan),
+        "timing_ms": {key: value * 1000 for key, value in timing.items()},
+        "radio_ms": radio_s * 1000,
+        "radio_ms_per_tuning": radio_s * 1000 / max(len(plan), 1),
+        "sample_rate_hz": float(sample_rate_hz),
+        "probe_s": float(profile.probe_s),
+        "samples_per_tuning": int(samples.shape[1]) if samples is not None else 0,
+        "iq_bytes": int(samples.nbytes) if samples is not None else 0,
+        "pilot_guard_hz": pilot_guard_hz(sample_rate_hz),
+        "profile": {"block_size": profile.block_size,
+                    "kernel_buffers": profile.kernel_buffers,
+                    "settle_buffers": profile.settle_buffers,
+                    "probe_s": profile.probe_s,
+                    "shape": list(profile.shape),
+                    "offset_span_hz": float(profile.offset_span_hz)}}
+
+
+def score_collection(collected: dict, *,
+                     shape: tuple[int, int] = SURVEY_BANK,
+                     offset_span_hz: float = SURVEY_OFFSET_SPAN_HZ,
+                     threads: int = DEFAULT_THREADS,
+                     sample_limit: int | None = None) -> dict:
+    """Score collected IQ.  Callable anywhere, because it never touches a radio.
+
+    Takes what :func:`collect_radio` returned and produces the verdict material
+    the survey record has always carried.  Nothing here reads a device, so the
+    analysis host runs it over the preserved corpus with sixteen workers and
+    the capture host need not run it at all.
+
+    ``sample_limit`` caps the window scored.  It is how a Pi-side score stays
+    affordable while the *collected* configuration varies: correlation cost is
+    linear in samples, so scoring a fixed prefix costs the same in all four
+    configurations.  The record must then say which window was scored, because
+    a score over 200,000 samples at 5 MS/s is a 40 ms probe and shares neither
+    its threshold nor its sensitivity with an 80 ms one.
+
+    Both receivers are scored against the *same* bank, centred on zero.
+    Re-centring a port's search on its own local oscillator is what the
+    analysis path had to do, and it does not transfer here: a bank spread
+    thinly over its span raises its median as much as its peak when it is moved
+    onto the signal, and the statistic is a ratio, so the score falls.
+    Measured on a 436 kHz offset at -3 dB against the retired three-hypothesis
+    bank, 1.41 centred against 1.61 as it stood.  The answer is a finer bank
+    rather than a moved one, and :data:`SURVEY_BANK` is now that.
+    """
+    samples = collected.get("samples")
+    plan = collected.get("plan") or []
+    rate = float(collected["sample_rate_hz"])
+    if samples is None:
+        raise ValueError("nothing was collected to score")
+    if samples.shape[0] != len(plan):
+        raise ValueError(
+            f"collected {samples.shape[0]} tunings against {len(plan)} planned")
+    count = int(samples.shape[1])
+    scored_count = count if sample_limit is None else min(count, int(sample_limit))
+    if scored_count < 1:
+        raise ValueError("sample limit leaves nothing to score")
+    results = []
+    mark = time.perf_counter()
+    for index, item in enumerate(plan):
+        bank = build_bank(item["edge"], rate, shape, offset_span_hz)
+        block = samples[index, :scored_count]
+        per_receiver = []
+        for receiver in range(block.shape[1]):
+            piece = block[:, receiver, :]
+            values = np.empty(piece.shape[0], np.complex64)
+            values.real, values.imag = piece[:, 0], piece[:, 1]
+            per_receiver.append({"receiver": receiver,
+                                 **probe(values, bank, threads=threads)})
+        results.append({"channel": item["channel"], "region": item["region"],
+                        "if_center_hz": item["if_center_hz"],
+                        "rf_center_hz": item["rf_center_hz"],
+                        "edge": item["edge"], "receivers": per_receiver,
+                        # Either port seeing a pilot makes the channel worth
+                        # dwelling on, so a tuning ranks by its best.
+                        "peak_to_median": max(entry["peak_to_median"]
+                                              for entry in per_receiver)})
+    compute_s = time.perf_counter() - mark
     results.sort(key=lambda item: item["peak_to_median"], reverse=True)
-    total = sum(timing.values())
-    return {"results": results, "tunings": len(tunings),
-            "samples": np.stack(retained) if retained else None,
-            "sample_order": order,
-            "timing_ms": {k: v * 1000 for k, v in timing.items()},
-            "total_ms": total * 1000,
-            "per_tuning_ms": total * 1000 / max(len(tunings), 1),
+    return {"results": results,
+            "compute_ms": compute_s * 1000,
+            "compute_ms_per_tuning": compute_s * 1000 / max(len(plan), 1),
+            "scored_samples": scored_count,
+            "scored_probe_s": scored_count / rate,
+            "scored_fraction": scored_count / max(count, 1),
+            "sample_rate_hz": rate,
+            "shape": list(shape),
+            "offset_span_hz": float(offset_span_hz)}
+
+
+def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
+               sample_rate_hz: float = 2_500_000.0,
+               lnb_lo_hz: float = 9_750_000_000.0,
+               threads: int = DEFAULT_THREADS,
+               keep_samples: bool = False,
+               score: bool = True,
+               score_sample_limit: int | None = None) -> dict:
+    """Collect and score in one call, reporting where the time went.
+
+    The composition of :func:`collect_radio` and :func:`score_collection`, kept
+    because a caller that wants both in one place should not have to assemble
+    them, and because every existing reader of this return shape still works.
+
+    ``score=False`` collects and returns no verdict at all, which is what
+    "the capture host records, the analysis host decides" looks like when it is
+    taken literally.  ``score_sample_limit`` bounds what a Pi-side verdict
+    costs when the configuration it was collected in is larger than the one the
+    threshold was measured in.
+
+    Timing is returned split by what the radio charges for, because the parts
+    are not comparable to each other: retuning and draining are radio time that
+    no amount of arithmetic can recover, while scoring is host time that can be
+    moved to another machine entirely.
+    """
+    collected = collect_radio(context, tunings, profile=profile,
+                              sample_rate_hz=sample_rate_hz, lnb_lo_hz=lnb_lo_hz)
+    timing = dict(collected["timing_ms"])
+    if score:
+        scored = score_collection(collected, shape=profile.shape,
+                                  offset_span_hz=profile.offset_span_hz,
+                                  threads=threads,
+                                  sample_limit=score_sample_limit)
+    else:
+        # Still one entry per tuning, carrying where the radio was pointed and
+        # no scores at all.  Dropping the entries would lose the centres, and
+        # every downstream reader pairs ``sample_order`` against this list to
+        # learn which sky each block of IQ is of.
+        scored = {"results": [{**item, "receivers": []}
+                              for item in collected["plan"]],
+                  "compute_ms": 0.0, "scored_samples": 0,
+                  "scored_probe_s": 0.0, "scored_fraction": 0.0,
+                  "sample_rate_hz": float(sample_rate_hz),
+                  "shape": list(profile.shape),
+                  "offset_span_hz": float(profile.offset_span_hz)}
+    # Milliseconds throughout: ``collect_radio`` already converted, so anything
+    # added here has to arrive in the same unit.
+    timing["compute"] = scored["compute_ms"]
+    total_ms = sum(timing.values())
+    return {"results": scored["results"], "tunings": collected["tunings"],
+            "samples": collected["samples"] if keep_samples else None,
+            "sample_order": collected["sample_order"],
+            "timing_ms": timing,
+            "total_ms": total_ms,
+            "per_tuning_ms": total_ms / max(collected["tunings"], 1),
+            "radio_ms": collected["radio_ms"],
+            "compute_ms": scored["compute_ms"],
+            "scored_samples": scored["scored_samples"],
+            "scored_probe_s": scored["scored_probe_s"],
+            "scored": bool(score),
             "sample_rate_hz": float(sample_rate_hz),
+            "probe_s": collected["probe_s"],
+            "samples_per_tuning": collected["samples_per_tuning"],
+            "iq_bytes": collected["iq_bytes"],
+            "pilot_guard_hz": collected["pilot_guard_hz"],
             # The profile's span, not the module default: those two are
             # deliberately different numbers and a record that reported the
             # wrong one would put the wrong spacing in the corpus.
             "offset_span_hz": float(profile.offset_span_hz),
-            "profile": {"block_size": profile.block_size,
-                        "kernel_buffers": profile.kernel_buffers,
-                        "settle_buffers": profile.settle_buffers,
-                        "probe_s": profile.probe_s,
-                        "shape": list(profile.shape),
-                        "offset_span_hz": float(profile.offset_span_hz)}}
+            "profile": collected["profile"]}
 
 
 def verify_presence(samples: np.ndarray, bank: KernelBank, *,

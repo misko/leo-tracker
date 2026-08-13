@@ -287,16 +287,31 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
     config = RadioConfig(center_hz, args.sample_rate_hz, args.bandwidth_hz,
                          configured_gain_db, gain_mode=args.gain_mode)
     # Before the capture claims the radio, not while it holds it: a USB context
-    # is an exclusive claim, and the two want opposite configurations. Roughly
-    # half a second against a dwell of two minutes.
+    # is an exclusive claim, and the two want opposite configurations. The
+    # radio half is 0.79 s at an 80 ms probe and 1.43 s at 160 ms, both rates
+    # alike, against a dwell of two minutes; the scoring half is bounded
+    # separately and is the part that can be moved off this host entirely.
     survey = survey_samples = None
+    survey_capture_config = None
     if getattr(args, "survey_before_dwell", False):
-        from .beacon.presurvey import run_survey
+        from .beacon.presurvey import draw_configuration, run_survey
+        # The survey's configuration is drawn, and it is deliberately *not*
+        # the dwell's. The survey inherited args.sample_rate_hz for as long as
+        # the two were always the same number; they are not any more, and an
+        # oversampled or wide dwell never shared it in the first place.
+        survey_capture_config, survey_experiment = draw_configuration(
+            experiment_id=getattr(args, "survey_experiment_id", None),
+            random_draw_u32=getattr(args, "survey_random_draw_u32", None),
+            config_name=getattr(args, "survey_config", None))
         survey, survey_samples = run_survey(
             uri=args.uri, serial=args.serial,
-            sample_rate_hz=args.sample_rate_hz, lnb_lo_hz=args.lnb_lo_hz,
+            lnb_lo_hz=args.lnb_lo_hz,
             dwell_channel=args.channel_number, dwell_region=args.region,
-            keep_samples=args.keep_survey_iq)
+            keep_samples=args.keep_survey_iq,
+            config=survey_capture_config, experiment=survey_experiment,
+            score_on_capture_host=not getattr(args, "survey_defer_scoring",
+                                              False),
+            simulated=bool(args.fake))
     if args.fake:
         count = round(args.duration_s * args.sample_rate_hz)
         period = max(1, round(args.sample_rate_hz / 750))
@@ -340,7 +355,10 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
                       "tuning_basis": "published Starlink channel and edge-pilot geometry",
                       **({"pre_dwell_survey": survey} if survey else {}),
                       **experiment_metadata},
-            survey_samples=survey_samples)
+            survey_samples=survey_samples,
+            survey_sample_rate_hz=(survey_capture_config or {}).get("sample_rate_hz"),
+            survey_probe_s=(survey_capture_config or {}).get("probe_s"),
+            survey_config_name=(survey_capture_config or {}).get("name"))
     finally:
         if "queued" in locals():
             queued.close()
@@ -355,13 +373,21 @@ def command_starlink_beacon_capture(args: argparse.Namespace) -> int:
         from .beacon.survey_waterfall import write as write_waterfall
         waterfall = write_waterfall(
             survey_samples, survey, Path(args.survey_waterfall_dir),
-            Path(args.output).name, sample_rate_hz=args.sample_rate_hz,
+            Path(args.output).name,
+            # The survey's rate, not the dwell's: the frequency axis of every
+            # panel is scaled by it, and passing the capture's would have put
+            # a 5 MS/s probe on a 2.5 MS/s axis without anything complaining.
+            sample_rate_hz=(survey_capture_config or {}).get("sample_rate_hz"),
             receiver_labels=identity.get("receiver_labels"))
     print(json.dumps({"capture": str(args.output), "state": manifest["state"],
         "samples_per_receiver": manifest["captured_samples_per_receiver"],
         "stored_bytes": manifest["stored_bytes"], "rf_center_hz": manifest["rf_center_hz"],
         **({"survey_state": survey["state"],
             "survey_active": survey.get("active_count"),
+            "survey_config": (survey.get("capture_config") or {}).get("name"),
+            "survey_calibrated": survey.get("threshold_calibrated"),
+            "survey_radio_ms": survey.get("radio_ms"),
+            "survey_compute_ms": survey.get("compute_ms"),
             "survey_ms": survey.get("total_ms")} if survey else {}),
         **({"survey_waterfall": waterfall.get("state"),
             "survey_waterfall_bytes": waterfall.get("bytes")}
@@ -2131,7 +2157,21 @@ def build_parser() -> argparse.ArgumentParser:
     beacon_capture.add_argument("--keep-survey-iq", action="store_true",
         help="also store the survey's raw ci16 beside the capture, so a later "
              "analysis can re-decide from the signal rather than the verdict; "
-             "about 12.8 MB per capture at an 80 ms probe")
+             "12.8 to 51.2 MB per capture depending on the drawn configuration")
+    beacon_capture.add_argument("--survey-experiment-id",
+        help="name the randomised probe-length/sample-rate experiment this "
+             "survey belongs to; requires --survey-random-draw-u32")
+    beacon_capture.add_argument("--survey-random-draw-u32", type=int,
+        help="raw uniform 32-bit draw that selects the survey configuration. "
+             "Stored alongside the assignment so the split can be audited "
+             "from the corpus rather than trusted")
+    beacon_capture.add_argument("--survey-config",
+        help="pin one survey configuration by name instead of drawing it "
+             "(e.g. 160ms-5.0MSps); recorded as not randomised")
+    beacon_capture.add_argument("--survey-defer-scoring", action="store_true",
+        help="collect the survey IQ and score none of it on the capture host, "
+             "leaving every verdict to the analysis host. The Pi owns the "
+             "radio; it need not own the detection")
     beacon_capture.add_argument("--survey-waterfall-dir", type=Path,
         default=os.environ.get("LEO_BEACON_SURVEY_WATERFALL_DIR") or None,
         help="write the survey waterfall and its full metrics here, outside "
@@ -2563,7 +2603,9 @@ def build_parser() -> argparse.ArgumentParser:
              "the only stratum unbiased by construction")
     survey_corpus.add_argument("--budget-bytes", type=int,
         default=64 * 1024 ** 3,
-        help="ceiling on the whole corpus; about 5000 probes at 12.8 MB each")
+        help="ceiling on the whole corpus; a probe is 12.8 MB at the cheapest "
+             "drawn configuration and 51.2 MB at the dearest, averaging "
+             "28.8 MB, so about 2400 probes")
     survey_corpus.add_argument("--seed", type=int,
         help="fix the random draw, for a reproducible sample")
     survey_corpus.set_defaults(handler=command_starlink_survey_corpus)

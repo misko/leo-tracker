@@ -305,6 +305,39 @@ remains the more complete answer for that window.
 The one gap on 2026-08-10 is different in kind and fully accounted for: a single
 recording, and `partition.json` names it in `excluded` with its reason.
 
+### What the exclusions actually are
+
+The completed backfill excluded 360 runs of 25,111 (1.4%), and 344 of those fall
+on a single date, 2026-08-07, across both pipelines. That concentration is the
+whole story, and it is worth stating plainly because the raw count reads far
+worse than the loss is.
+
+359 of the 360 fail identically — `completion output changed before store
+ingest: analysis` — and one on an unreadable receipt. A report lives at one
+mutable path per recording, so re-analysing a recording rewrites the file and
+leaves any earlier receipt attesting to bytes that no longer exist.
+
+Sampling shows what normally happens instead: on 2026-08-08, 08-09 and 08-10,
+every sampled pair of `legacy-v1` and `kalman-full-v1` receipts claims the
+**same** digest. The two pipelines are two receipts for one analysis, not two
+analyses, which is why those partitions exclude nothing at all. On 2026-08-07,
+27% of sampled pairs claim **different** digests: those recordings were genuinely
+re-analysed, and the earlier receipt went stale.
+
+The loss is therefore much smaller than 360:
+
+| | |
+|---|---|
+| distinct recordings with an excluded run | 307 |
+| still projected via the other pipeline's receipt | **248 (81%)** |
+| absent from the projection entirely | **59** |
+
+So 248 lost only a redundant attestation — `current_runs` would have preferred
+the surviving one regardless. The real gap is **59 recordings of 15,974
+(0.37%)**, where the report was rewritten after *both* receipts were issued and
+neither can authenticate it. Those are recoverable only by re-analysing the
+capture, which is exactly what the receipts exist to make detectable.
+
 ### The corpus changed shape mid-flight
 
 That build returned `receiver_label` as NULL for every row, which looked like a

@@ -1,3 +1,10 @@
+> **Superseded.** The single-file DuckDB store this plan describes was
+> replaced by a partitioned Parquet projection; see
+> [`analysis_parquet_projection.md`](analysis_parquet_projection.md) for what
+> was built and why. This document is kept because the relational schema it
+> designed is still the one the projection builds through, and because the
+> reasoning about identity, authentication and NFS remains the basis of it.
+
 # DuckDB analysis store
 
 Plan of record for consolidating structured Kalman analysis results into a
@@ -555,10 +562,10 @@ src/leo_tracker/radio/analysis_store/
   snapshot.py          verified immutable publication
   repository.py        query and dashboard boundary
 
-deploy/leo-tracker-analysis-store.service
-docs/analysis_store_operations.md
+deploy/leo-tracker-analysis-index.service
+docs/analysis_parquet_projection.md
 
-tests/test_analysis_store.py
+tests/test_analysis_partition.py
 ```
 
 The initial test implementation is kept in one cohesive module while the store

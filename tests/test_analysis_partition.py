@@ -26,9 +26,9 @@ from leo_tracker.radio.analysis_store.partition import (BUILD_MEMORY_LIMIT,
                                                         temporary_path)
 from leo_tracker.radio.cli import main as radio_main
 
-# The receipt fixture is shared with the store tests it will outlive; it writes
-# a complete run through the same contract paths production uses.
-from test_analysis_store import _completed_run
+# Writes a complete run through the same contract paths production uses, so the
+# tests exercise real authentication rather than a stub.
+from analysis_fixtures import _completed_run
 
 KALMAN = "kalman-full-v1"
 LEGACY = "legacy-v1"

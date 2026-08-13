@@ -1014,73 +1014,6 @@ def command_starlink_analysis_index(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_starlink_analysis_store(args: argparse.Namespace) -> int:
-    """Operate the Kalman-owned transactional analysis store."""
-    from .analysis_store.queue import StoreQueue, enqueue_backfill, owner_lock
-    from .analysis_store.service import run_service, service_status
-    from .analysis_store.snapshot import publish_snapshot
-
-    database = (args.database if args.database is not None else
-                args.store_root / "live" / "analysis.duckdb")
-    create_queue = args.action not in {"status", "query"} and not (
-        args.action == "backfill" and args.dry_run)
-    queue = StoreQueue(args.store_root, args.shared_root, database,
-                       create=create_queue)
-    if args.action == "init":
-        with owner_lock(args.store_root):
-            result = queue.store.initialize()
-    elif args.action == "enqueue":
-        if not args.recording_id or not args.pipeline_id:
-            raise ValueError("enqueue requires --recording-id and --pipeline-id")
-        result = queue.enqueue(args.recording_id, args.pipeline_id)
-    elif args.action == "drain":
-        with owner_lock(args.store_root):
-            queue.store.initialize(); queue.recover()
-            result = queue.drain(limit=args.limit,
-                                 continue_on_error=args.continue_on_error)
-    elif args.action == "backfill":
-        if args.dry_run and not database.is_file():
-            result = enqueue_backfill(queue, limit=args.limit, dry_run=True)
-        else:
-            # Backfill reads the live run-ID set. It may enqueue concurrently
-            # with workers, but it must never open the live database alongside
-            # the daemon owner.
-            with owner_lock(args.store_root):
-                result = enqueue_backfill(queue, limit=args.limit,
-                                          dry_run=args.dry_run)
-    elif args.action == "status":
-        if args.runtime_output is not None and args.runtime_output.is_file():
-            result = json.loads(args.runtime_output.read_text())
-        else:
-            # Offline inspection only. A running daemon publishes its cheap
-            # status document via --runtime-output.
-            with owner_lock(args.store_root):
-                result = service_status(queue)
-    elif args.action == "query":
-        if not args.sql:
-            raise ValueError("query requires --sql")
-        if args.database is None:
-            raise ValueError("query requires --database pointing to a published snapshot")
-        columns, rows = queue.store.query(args.sql)
-        result = {"columns": columns, "rows": rows}
-    elif args.action == "publish":
-        if args.publication_root is None:
-            raise ValueError("publish requires --publication-root")
-        with owner_lock(args.store_root):
-            result = publish_snapshot(queue.store, args.store_root,
-                                      args.publication_root)
-    else:
-        result = run_service(
-            args.store_root, args.shared_root, database=database,
-            publication_root=args.publication_root,
-            runtime_output=args.runtime_output, poll_s=args.poll_s,
-            snapshot_interval_s=args.snapshot_interval_s,
-            reconciliation_interval_s=args.reconciliation_interval_s,
-            reconciliation_limit=args.reconciliation_limit, once=args.once)
-    print(json.dumps(result, indent=2, sort_keys=True, default=str))
-    return 1 if result.get("errors") or result.get("failures") else 0
-
-
 def command_starlink_lnb_calibration(args: argparse.Namespace) -> int:
     """Measure LNB mismatch, and report anything that moved since last time."""
     from .beacon.lnb_calibration import (compare_calibration, load_calibration,
@@ -1558,8 +1491,6 @@ def command_starlink_dashboard(args: argparse.Namespace) -> int:
     serve_dashboard(args.observation_dir, host=args.host, port=args.port,
                     passes_path=args.passes,
                     beacon_root=args.beacon_root,
-                    analysis_store_pointer=args.analysis_store_pointer,
-                    analysis_store_cache=args.analysis_store_cache,
                     samples_per_snapshot=args.samples_per_snapshot,
                     sample_rate_hz=args.sample_rate_hz,
                     snapshots_per_chunk=args.snapshots_per_chunk)
@@ -2602,31 +2533,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="DuckDB memory limit for a partition build; the export peaks, "
              "not the ingest (default 16GB)")
     analysis_index.set_defaults(handler=command_starlink_analysis_index)
-    analysis_store = commands.add_parser("starlink-analysis-store",
-        help="ingest authenticated Kalman outputs into a single-owner DuckDB store")
-    analysis_store.add_argument("action", choices=(
-        "init", "enqueue", "drain", "backfill", "status", "query", "publish", "service"))
-    analysis_store.add_argument("store_root", type=Path,
-        help="Kalman-local store root containing live, inbox and snapshot state")
-    analysis_store.add_argument("--shared-root", type=Path, required=True,
-        help="shared analysis root containing reports and completion receipts")
-    analysis_store.add_argument("--database", type=Path,
-        help="live or read-only DuckDB path; defaults below STORE_ROOT/live")
-    analysis_store.add_argument("--recording-id")
-    analysis_store.add_argument("--pipeline-id")
-    analysis_store.add_argument("--limit", type=int)
-    analysis_store.add_argument("--dry-run", action="store_true")
-    analysis_store.add_argument("--continue-on-error", action="store_true")
-    analysis_store.add_argument("--sql")
-    analysis_store.add_argument("--publication-root", type=Path,
-        help="shared directory for immutable snapshots and current.json")
-    analysis_store.add_argument("--runtime-output", type=Path)
-    analysis_store.add_argument("--poll-s", type=float, default=2.0)
-    analysis_store.add_argument("--snapshot-interval-s", type=float, default=300.0)
-    analysis_store.add_argument("--reconciliation-interval-s", type=float, default=600.0)
-    analysis_store.add_argument("--reconciliation-limit", type=int, default=100)
-    analysis_store.add_argument("--once", action="store_true")
-    analysis_store.set_defaults(handler=command_starlink_analysis_store)
     lnb_calibration = commands.add_parser("starlink-lnb-calibration",
         help="measure the LNB local-oscillator mismatch on each radio")
     lnb_calibration.add_argument("root", type=Path)
@@ -2896,10 +2802,6 @@ def build_parser() -> argparse.ArgumentParser:
                            help="expected-pass catalog; defaults to OBSERVATION_DIR/passes.json")
     dashboard.add_argument("--beacon-root", type=Path,
                            help="continuous exact-beacon storage root")
-    dashboard.add_argument("--analysis-store-pointer", type=Path,
-        help="verified shared analysis-store current.json pointer")
-    dashboard.add_argument("--analysis-store-cache", type=Path,
-        help="dashboard-local directory for verified read-only snapshots")
     dashboard.add_argument("--host", default="127.0.0.1")
     dashboard.add_argument("--port", type=int, default=8765)
     dashboard.add_argument("--samples-per-snapshot", type=int, default=262_144)

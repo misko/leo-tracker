@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 import pytest
@@ -555,5 +556,91 @@ def test_dashboard_publishes_and_serves_beacon_decode_artifacts(tmp_path):
         assert fingerprint_svg.startswith(b'<svg xmlns="http://www.w3.org/2000/svg"')
         assert b"Nearest-neighbor fingerprint evidence map" in fingerprint_svg
         assert b"No linked family yet" in fingerprint_svg
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+
+def _write_beacon_capture(beacon_root: Path, name: str):
+    """One analyzed beacon capture: the manifest it ran with, and its report."""
+    capture = beacon_root / "captures" / name
+    capture.mkdir(parents=True)
+    manifest = {"state": "complete", "created_utc_ns": 1_700_000_000_000_000_000,
+        "sample_rate_hz": 2_500_000, "bandwidth_hz": 2_300_000,
+        "center_frequency_hz": 959_687_500, "rf_center_hz": 10_709_687_500,
+        "gain_mode": "manual", "configured_gain_db": 50,
+        "metadata": {"channel_number": 1, "region": "lower-edge"}}
+    (capture / "manifest.json").write_text(json.dumps(manifest))
+    reports = beacon_root / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    (reports / f"{name}.json").write_text(json.dumps({
+        "schema": "leo-tracker.starlink-beacon-analysis/v1",
+        "capture_manifest": manifest, "summary": {}, "analysis": {},
+        "exact_checks": []}))
+
+
+def test_dashboard_links_survey_waterfalls_by_capture_name(tmp_path):
+    observation_root = tmp_path / "watch"; observation_root.mkdir()
+    beacon_root = tmp_path / "beacons"
+    # The capture host writes surveys under its own storage root, which is not
+    # the archive this dashboard reads; both arrangements have to work.
+    surveys = tmp_path / "capture-host" / "plots"; surveys.mkdir(parents=True)
+    surveyed = "ch1-lower-edge-narrow-pluto-19f2-20260812T194645Z"
+    unsurveyed = "ch1-lower-edge-narrow-pluto-19f2-20260812T200612Z"
+    _write_beacon_capture(beacon_root, surveyed)
+    _write_beacon_capture(beacon_root, unsurveyed)
+    (surveys / f"{surveyed}-survey.png").write_bytes(b"survey-png")
+
+    model = DashboardModel(observation_root, beacon_root=beacon_root,
+                           survey_plot_dir=surveys)
+    rows = {row["name"]: row for row in model.beacon()["captures"]}
+    survey_url = f"/beacon-survey-plots/{surveyed}-survey.png"
+    assert rows[surveyed]["survey_plot_url"] == survey_url
+    assert rows[unsurveyed]["survey_plot_url"] is None
+    assert survey_url in model.recording_detail("beacon", surveyed)["plots"]
+    assert model.recording_detail("beacon", unsurveyed)["plots"] == []
+
+    # A capture whose analysis has not landed yet has no other plot at all,
+    # which is the case the survey exists to cover.
+    analyzing = "ch1-lower-edge-narrow-pluto-19f2-20260812T203158Z"
+    (beacon_root / "captures" / analyzing).mkdir(parents=True)
+    (beacon_root / "captures" / analyzing / "manifest.json").write_text(
+        json.dumps({"state": "complete", "created_utc_ns": 1_700_000_000_000_000_000}))
+    (surveys / f"{analyzing}-survey.png").write_bytes(b"survey-png")
+    detail = model.recording_detail("beacon", analyzing)
+    assert detail["active"]
+    assert detail["plots"] == [f"/beacon-survey-plots/{analyzing}-survey.png"]
+
+    default = DashboardModel(observation_root, beacon_root=beacon_root)
+    assert default.survey_plot_dir == beacon_root / "plots"
+    assert default.beacon()["captures"][0]["survey_plot_url"] is None
+    assert DashboardModel(observation_root).survey_plot_dir is None
+
+
+def test_dashboard_serves_survey_waterfalls_without_leaving_their_directory(tmp_path):
+    observation_root = tmp_path / "watch"; observation_root.mkdir()
+    beacon_root = tmp_path / "beacons"
+    surveys = tmp_path / "capture-host" / "plots"; surveys.mkdir(parents=True)
+    name = "ch1-lower-edge-narrow-pluto-19f2-20260812T194645Z"
+    _write_beacon_capture(beacon_root, name)
+    (surveys / f"{name}-survey.png").write_bytes(b"survey-png")
+    (surveys.parent / "private.png").write_bytes(b"outside-the-survey-directory")
+
+    model = DashboardModel(observation_root, beacon_root=beacon_root,
+                           survey_plot_dir=surveys)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(model))
+    thread = Thread(target=server.serve_forever, daemon=True); thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        served = urlopen(base + f"/beacon-survey-plots/{name}-survey.png", timeout=2)
+        assert served.read() == b"survey-png"
+        assert served.headers["Cache-Control"] == "public, max-age=300"
+        with pytest.raises(HTTPError) as absent:
+            urlopen(base + "/beacon-survey-plots/never-recorded-survey.png", timeout=2)
+        assert absent.value.code == 404
+        # urlopen forwards the dot segment rather than resolving it first, so
+        # the refusal being tested here is the server's.
+        with pytest.raises(HTTPError) as escape:
+            urlopen(base + "/beacon-survey-plots/../private.png", timeout=2)
+        assert escape.value.code == 404
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=2)

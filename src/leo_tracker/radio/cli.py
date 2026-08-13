@@ -964,6 +964,35 @@ def command_starlink_survey_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_survey_truth(args: argparse.Namespace) -> int:
+    """Annotate preserved probes with the TLE geometry that was overhead.
+
+    A prior, never a label: a catalogued satellite can be in view and silent.
+    """
+    from .beacon.lnb_calibration import load_calibration
+    from .beacon.survey_truth import (annotate, annotation_status, load_catalog,
+                                      resolve_observer)
+    corpus = args.corpus_root or (Path(args.root) / "surveys" / "corpus")
+    if args.action == "status":
+        print(json.dumps(annotation_status(corpus), indent=2, sort_keys=True))
+        return 0
+    if args.catalog is None:
+        raise ValueError("annotating needs --catalog: a prior is only as good "
+                         "as the elements it was propagated from")
+    observer, provenance = resolve_observer(
+        latitude_deg=args.lat, longitude_deg=args.lon, altitude_m=args.alt_m,
+        context_root=args.context_root)
+    outcome = annotate(corpus, observer=observer,
+                       catalog=load_catalog(args.catalog),
+                       calibration=load_calibration(
+                           args.calibration_root or args.root),
+                       horizon_deg=args.horizon_deg, rebuild=args.rebuild,
+                       limit=args.limit)
+    print(json.dumps({**outcome, "observer_source": provenance["source"]},
+                     indent=2, sort_keys=True))
+    return 0
+
+
 def command_starlink_probe_index(args: argparse.Namespace) -> int:
     """Build, inspect or query the per-probe projection."""
     from .beacon.probe_index import (ProbeIndexUnavailable, build,
@@ -1491,6 +1520,7 @@ def command_starlink_dashboard(args: argparse.Namespace) -> int:
     serve_dashboard(args.observation_dir, host=args.host, port=args.port,
                     passes_path=args.passes,
                     beacon_root=args.beacon_root,
+                    survey_plot_dir=args.survey_plot_dir,
                     samples_per_snapshot=args.samples_per_snapshot,
                     sample_rate_hz=args.sample_rate_hz,
                     snapshots_per_chunk=args.snapshots_per_chunk)
@@ -2507,6 +2537,30 @@ def build_parser() -> argparse.ArgumentParser:
     survey_corpus.add_argument("--seed", type=int,
         help="fix the random draw, for a reproducible sample")
     survey_corpus.set_defaults(handler=command_starlink_survey_corpus)
+    survey_truth = commands.add_parser("starlink-survey-truth",
+        help="annotate preserved probes with the TLE geometry prior; a prior, "
+             "not a label, because a catalogued satellite can be in view and "
+             "not transmitting")
+    survey_truth.add_argument("action", choices=("annotate", "status"))
+    survey_truth.add_argument("root", type=Path,
+        help="shared root; also the default calibration root")
+    survey_truth.add_argument("--corpus-root", type=Path,
+        help="where probes are preserved; defaults to ROOT/surveys/corpus")
+    survey_truth.add_argument("--catalog", type=Path,
+        help="frozen TLE catalog, as leo-orbit associate takes one")
+    survey_truth.add_argument("--context-root", type=Path,
+        help="context bundle whose passes.json stamps the observer")
+    survey_truth.add_argument("--calibration-root", type=Path,
+        help="root holding reports/lnb-calibration.json; defaults to ROOT")
+    survey_truth.add_argument("--lat", type=float)
+    survey_truth.add_argument("--lon", type=float)
+    survey_truth.add_argument("--alt-m", type=float)
+    survey_truth.add_argument("--horizon-deg", type=float, default=0.0,
+        help="the geometric horizon, not a transmit cutoff; Qin's ~40 deg is "
+             "recorded per satellite so it can be measured, never applied")
+    survey_truth.add_argument("--rebuild", action="store_true")
+    survey_truth.add_argument("--limit", type=int)
+    survey_truth.set_defaults(handler=command_starlink_survey_truth)
     probe_index = commands.add_parser("starlink-probe-index",
         help="project per-probe facts into day-partitioned parquet")
     probe_index.add_argument("action", choices=("build", "status", "query"))
@@ -2802,6 +2856,10 @@ def build_parser() -> argparse.ArgumentParser:
                            help="expected-pass catalog; defaults to OBSERVATION_DIR/passes.json")
     dashboard.add_argument("--beacon-root", type=Path,
                            help="continuous exact-beacon storage root")
+    dashboard.add_argument("--survey-plot-dir", type=Path,
+        help="pre-dwell survey waterfalls written by starlink-beacon-capture; "
+             "defaults to BEACON_ROOT/plots, which is right only when the "
+             "capture host and the dashboard read the same storage root")
     dashboard.add_argument("--host", default="127.0.0.1")
     dashboard.add_argument("--port", type=int, default=8765)
     dashboard.add_argument("--samples-per-snapshot", type=int, default=262_144)

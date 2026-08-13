@@ -21,6 +21,7 @@ from .beacon.fingerprint import render_fingerprint_svg
 from .beacon.dashboard_index import (capture_dashboard_record,
                                      capture_radio_parameters,
                                      confirmed_beacon_events)
+from .beacon.survey_waterfall import waterfall_paths
 
 
 def _utc(value: str) -> datetime:
@@ -80,12 +81,20 @@ class DashboardModel:
 
     def __init__(self, observation_dir: Path, passes_path: Path | None = None, *,
                  beacon_root: Path | None = None,
+                 survey_plot_dir: Path | None = None,
                  samples_per_snapshot: int = 262_144,
                  sample_rate_hz: float = 30_720_000,
                  snapshots_per_chunk: int = 4096):
         self.root = Path(observation_dir).resolve()
         self.passes_path = (Path(passes_path).resolve() if passes_path else self.root / "passes.json")
         self.beacon_root = None if beacon_root is None else Path(beacon_root).resolve()
+        # Surveys are written by the capture host into its own storage root's
+        # plots/, which is the beacon root only when capture and dashboard read
+        # the same tree; where captures stage locally and the dashboard reads an
+        # archive, the operator has to name the capture host's directory.
+        self.survey_plot_dir = (
+            Path(survey_plot_dir).resolve() if survey_plot_dir is not None else
+            None if self.beacon_root is None else self.beacon_root / "plots")
         self.samples_per_snapshot = int(samples_per_snapshot)
         self.sample_rate_hz = float(sample_rate_hz)
         self.snapshots_per_chunk = int(snapshots_per_chunk)
@@ -153,6 +162,19 @@ class DashboardModel:
         except OSError:
             version = 0
         return f"/plots/{plot_name}?v={version}"
+
+    def _survey_plot_url(self, capture_name: str) -> str | None:
+        """Link a capture's pre-dwell survey waterfall, if one was drawn.
+
+        Keyed by capture name rather than by analysis, because the survey is
+        written outside the capture directory and outlives both it and the
+        analysis: for an old recording this can be the only plot left.
+        """
+        if self.survey_plot_dir is None:
+            return None
+        image_path = waterfall_paths(self.survey_plot_dir, capture_name)[0]
+        return (f"/beacon-survey-plots/{image_path.name}"
+                if image_path.is_file() else None)
 
     def _beacon_recording_index(self) -> dict:
         if self.beacon_root is None:
@@ -468,12 +490,6 @@ class DashboardModel:
                 "tracker_plot_name": (f"{analysis_path.stem}-trackers.png"
                     if (self.root / "plots" / f"{analysis_path.stem}-trackers.png").is_file()
                     else None),
-                # Named for the capture rather than the analysis, because it
-                # is written before the analysis exists and outlives the
-                # recording it describes.
-                "survey_plot_name": (f"{analysis_path.stem}-survey.png"
-                    if (self.root / "plots" / f"{analysis_path.stem}-survey.png").is_file()
-                    else None),
             })
         return records
 
@@ -680,8 +696,6 @@ class DashboardModel:
                                   self._plot_url(record["wide_plot_name"])),
                 "tracker_plot_url": (None if not record.get("tracker_plot_name") else
                                      self._plot_url(record["tracker_plot_name"])),
-                "survey_plot_url": (None if not record.get("survey_plot_name") else
-                                    self._plot_url(record["survey_plot_name"])),
             })
         return {"carrier_hz": carrier_hz,
                 "speed_note": ("Doppler slope measures radial acceleration. Absolute measured speed "
@@ -776,8 +790,6 @@ class DashboardModel:
                                   self._plot_url(record["wide_plot_name"])),
                 "tracker_plot_url": (None if not record.get("tracker_plot_name") else
                                      self._plot_url(record["tracker_plot_name"])),
-                "survey_plot_url": (None if not record.get("survey_plot_name") else
-                                    self._plot_url(record["survey_plot_name"])),
             })
         return {"waterfalls": rows}
 
@@ -897,6 +909,7 @@ class DashboardModel:
                 "plot_url": (f"/beacon-plots/{report_path.stem}.png"
                              if (reports_root / "plots" / f"{report_path.stem}.png").is_file()
                              else None),
+                "survey_plot_url": self._survey_plot_url(report_path.stem),
                 "created_utc": _iso_from_ns(manifest.get("created_utc_ns", 0)),
                 "channel_number": manifest.get("metadata", {}).get("channel_number"),
                 "region": manifest.get("metadata", {}).get("region"),
@@ -1188,6 +1201,11 @@ class DashboardModel:
     def recording_detail(self, kind: str, recording_id: str) -> dict | None:
         """Return one recording's statistics and plot links on demand."""
         if kind == "beacon":
+            # Surveys live beside the capture host rather than in the analysis
+            # artifacts, so every branch below has to add them itself; a stored
+            # record cannot carry a link to a directory it never saw.
+            survey_plots = ([url] if (url := self._survey_plot_url(recording_id))
+                            else [])
             persisted = self._beacon_recording_index()
             if persisted.get("schema") in {
                     "leo-tracker.beacon-dashboard-index/v2",
@@ -1202,7 +1220,7 @@ class DashboardModel:
                         return None
                     return {"kind": kind, "recording_id": recording_id, "active": False,
                             "statistics": complete.get("_statistics", {}),
-                            "plots": complete.get("_plots", []),
+                            "plots": [*complete.get("_plots", []), *survey_plots],
                             "artifacts": complete.get("_artifacts", [])}
             manifest_path = (self.beacon_root / "captures" / recording_id /
                              "manifest.json")
@@ -1234,7 +1252,7 @@ class DashboardModel:
                             "configured_gain_db": manifest.get("configured_gain_db"),
                             "capture_manifest": manifest,
                             "radio_parameters": capture_radio_parameters(manifest)},
-                        "plots": [], "artifacts": []}
+                        "plots": survey_plots, "artifacts": []}
             report = self.beacon(limit=100)
             if (report.get("active") or {}).get("name") == recording_id:
                 manifest = self._json(self.beacon_root / "captures" / recording_id /
@@ -1242,14 +1260,14 @@ class DashboardModel:
                 return {"kind": kind, "recording_id": recording_id,
                         "active": True, "statistics": {**report["active"],
                             "capture_manifest": manifest,
-                            "radio_parameters": capture_radio_parameters(manifest)}, "plots": [],
-                        "artifacts": []}
+                            "radio_parameters": capture_radio_parameters(manifest)},
+                        "plots": survey_plots, "artifacts": []}
             item = next((row for row in report.get("captures", [])
                          if row.get("name") == recording_id), None)
             if item is None:
                 return None
-            plots = [value for value in (item.get("plot_url"), item.get("decode_plot_url"))
-                     if value]
+            plots = [value for value in (item.get("plot_url"), item.get("decode_plot_url"),
+                                         item.get("survey_plot_url")) if value]
             artifacts = [{"label": label, "url": item.get(key)} for label, key in (
                 ("Follow-up JSON", "followup_url"), ("Decode JSON", "decode_url"),
                 ("Fingerprint JSON", "fingerprint_url")) if item.get(key)]
@@ -1270,8 +1288,7 @@ class DashboardModel:
             if item is None:
                 return None
             plots = [value for value in (item.get("plot_url"), item.get("tracker_plot_url"),
-                item.get("wide_plot_url"), item.get("carrier_zoom_url"),
-                item.get("survey_plot_url")) if value]
+                item.get("wide_plot_url"), item.get("carrier_zoom_url")) if value]
             artifacts = ([{"label": "Structured observation JSON",
                            "url": item["structured_observation_url"]}]
                          if item.get("structured_observation_url") else [])
@@ -1343,7 +1360,7 @@ let waterfallSignature='',refreshing=false;
 async function refresh(){if(refreshing)return;refreshing=true;try{const d=await fetch('/api/snapshot',{cache:'no-store'}).then(r=>r.json()),s=d.status;
 document.querySelector('#stamp').textContent='updated '+new Date().toLocaleTimeString();document.querySelector('#state').innerHTML='<span class="live">'+s.state.toUpperCase()+'</span>';document.querySelector('#age').textContent=f(s.update_age_s,0)+' s since completed chunk';
 document.querySelector('#progress').textContent=f(100*s.progress_fraction,1)+'%';document.querySelector('#progressbar').style.width=(100*s.progress_fraction)+'%';document.querySelector('#coverage').textContent=f(s.retained_sample_hours*60,1)+' min';document.querySelector('#coveragebar').style.width=(100*s.retained_sample_fraction)+'%';document.querySelector('#count').textContent=s.detection_count;document.querySelector('#chunks').textContent=s.completed_chunks+' chunks · '+f(s.analyzed_span_hours,2)+' h wall span · '+f(s.frequency_bin_width_hz/1000,2)+' kHz/bin · baseline '+(s.resolution_baseline_ready?'ready':'warming')+(s.pending_wide_analysis_chunks?' · '+s.pending_wide_analysis_chunks+' pending wide':'');
-const bcn=d.beacon||{},cal=bcn.calibration||{},cm=bcn.active_acquisition_method||'coherent_grid_v1',cms=(cal.acquisition_methods||{})[cm]||cal.modes||{},cn=cms.narrow||{},cw=cms.wide||{},fps=bcn.fingerprints||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Detector ${cm} · recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · method-specific null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''} · waveform fingerprints ${fps.count||0} · linked ${fps.linked_count||0} · largest family ${fps.largest_cluster_size||0} · unresolved low-confidence ${fps.unresolved_count||0}${fps.index_url?' · <a href="'+fps.index_url+'" target="_blank">index JSON</a>':''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[],dec=x.decode||{},soft=((dec.soft_dual_rx||{}).pilot||{}),mode=x.observation_mode||'narrow',match=(x.fingerprint_nearest_matches||[])[0]||{};return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${mode==='oversample'?'5 MS/s oversample':wide?'wide acquisition':'narrow lock'} · detector ${x.exact_acquisition_method||'coherent_grid_v1'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${Number.isFinite(x.exact_temporal_coverage_fraction)?' · exact replay '+f(100*x.exact_temporal_coverage_fraction,2)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.dual_receiver_confirmed?'dual-RX Doppler':x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${x.decode_url?`<br><span class="yes">DECODED</span> · held-out pilots ${f(100*dec.minimum_pilot_accuracy,1)}%${Number.isFinite(soft.hard_symbol_accuracy)?' · soft dual-RX '+f(100*soft.hard_symbol_accuracy,1)+'% / confidence '+f(100*soft.soft_mean_confidence,1)+'%':''} · narrow SSS ${f(100*dec.minimum_sss_accuracy,1)}% · ${dec.minimum_frame_count} frames · <a href="${x.decode_url}" target="_blank">decode JSON</a>`:''}${x.fingerprint_url?`<br><span class="live">FINGERPRINT</span> · family ${x.fingerprint_cluster_id} (${x.fingerprint_cluster_size})${match.capture_name?' · nearest '+match.capture_name+' · waveform '+f(100*match.waveform_family_similarity,1)+'% · conditional channel '+f(100*match.conditional_channel_similarity,1)+'%':''} · <a href="${x.fingerprint_url}" target="_blank">signature JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}${x.decode_plot_url?`<a href="${x.decode_plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.decode_plot_url}"></a>`:''}</div>`}).join('');
+const bcn=d.beacon||{},cal=bcn.calibration||{},cm=bcn.active_acquisition_method||'coherent_grid_v1',cms=(cal.acquisition_methods||{})[cm]||cal.modes||{},cn=cms.narrow||{},cw=cms.wide||{},fps=bcn.fingerprints||{};document.querySelector('#beacon').innerHTML=!bcn.enabled?'<span class="muted">Beacon storage is not configured.</span>':`${bcn.active?`<div class="log"><span class="live">${(bcn.active.stage||'active').toUpperCase()}</span> ${bcn.active.name} · IF ${f(bcn.active.if_center_hz/1e6,3)} MHz · Ku ${f(bcn.active.rf_center_hz/1e9,6)} GHz</div>`:''}<div class="log">Detector ${cm} · recent exact candidates ${bcn.candidate_count} · qualified ${bcn.qualified_count}${Number.isFinite(cn.check_count)?' · method-specific null narrow/wide '+cn.check_count+'/'+cw.check_count+' checks · p99 '+f(cn.match_margin_quantiles.p99,4)+'/'+f(cw.match_margin_quantiles.p99,4):''} · waveform fingerprints ${fps.count||0} · linked ${fps.linked_count||0} · largest family ${fps.largest_cluster_size||0} · unresolved low-confidence ${fps.unresolved_count||0}${fps.index_url?' · <a href="'+fps.index_url+'" target="_blank">index JSON</a>':''}</div>`+bcn.captures.slice(0,8).map(x=>{const e=(x.exact_checks||[])[0]||{},t=x.stream_timing||{},single=x.single_receiver_candidate_count||0,label=x.followup_confirmed?'TEMPORALLY CONFIRMED':x.qualified_count?'QUALIFIED':x.candidate_count?'DUAL CANDIDATE':single?'single-RX follow-up':'control rejected',obs=Number.isFinite(t.sample_time_s)&&Number.isFinite(t.wall_span_s)?100*t.sample_time_s/t.wall_span_s:null,wide=(x.acquisition_span_hz||0)>0,link=x.strongest_confirmed_link||{},passes=x.overlapping_passes||[],dec=x.decode||{},soft=((dec.soft_dual_rx||{}).pilot||{}),mode=x.observation_mode||'narrow',match=(x.fingerprint_nearest_matches||[])[0]||{};return `<div class="log"><strong>${x.name}</strong> · <span class="${x.candidate_count||single||x.followup_confirmed?'yes':'muted'}">${label}</span><br>ch ${x.channel_number} ${x.region} · ${mode==='oversample'?'5 MS/s oversample':wide?'wide acquisition':'narrow lock'} · detector ${x.exact_acquisition_method||'coherent_grid_v1'} · IF ${f(x.if_center_hz/1e6,3)} MHz · ${f(x.sample_rate_hz/1e6,2)} MS/s · RF BW ${f(x.bandwidth_hz/1e6,2)} MHz · ${x.gain_mode}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''}${Number.isFinite(obs)?' · observed/wall '+f(obs,1)+'%':''}${Number.isFinite(x.exact_temporal_coverage_fraction)?' · exact replay '+f(100*x.exact_temporal_coverage_fraction,2)+'%':''}${wide?' · search ±'+f(x.acquisition_span_hz/1e6,2)+' MHz':''}${x.followup_trigger_count?' · dense replay '+x.followup_check_count+' checks':''}${x.followup_confirmed?' · '+(x.dual_receiver_confirmed?'dual-RX Doppler':x.cross_receiver_confirmed?'cross-RX':'same-RX')+' confirmation · '+x.confirmed_link_count+' link(s) · strongest drift '+f(link.drift_hz_s/1000,2)+' kHz/s · '+x.overlapping_pass_count+' overlapping Starlink passes':''}${x.followup_url?` · <a href="${x.followup_url}" target="_blank">follow-up JSON</a>`:''}${x.decode_url?`<br><span class="yes">DECODED</span> · held-out pilots ${f(100*dec.minimum_pilot_accuracy,1)}%${Number.isFinite(soft.hard_symbol_accuracy)?' · soft dual-RX '+f(100*soft.hard_symbol_accuracy,1)+'% / confidence '+f(100*soft.soft_mean_confidence,1)+'%':''} · narrow SSS ${f(100*dec.minimum_sss_accuracy,1)}% · ${dec.minimum_frame_count} frames · <a href="${x.decode_url}" target="_blank">decode JSON</a>`:''}${x.fingerprint_url?`<br><span class="live">FINGERPRINT</span> · family ${x.fingerprint_cluster_id} (${x.fingerprint_cluster_size})${match.capture_name?' · nearest '+match.capture_name+' · waveform '+f(100*match.waveform_family_similarity,1)+'% · conditional channel '+f(100*match.conditional_channel_similarity,1)+'%':''} · <a href="${x.fingerprint_url}" target="_blank">signature JSON</a>`:''}${passes.length?'<br><span class="muted">top pass compatibility:</span> '+passes.map(p=>p.name+' ('+f(p.culmination_elevation_deg,1)+'°)').join(', '):''}<br>joint match margin ${(e.matched_margins||[]).map(v=>f(v,4)).join(' / ')} · symbolwise margin ${(e.pilot_margins||[]).map(v=>f(v,4)).join(' / ')} · PSS ${(e.pss_ratios||[]).map(v=>f(v,2)).join(' / ')} · epoch Δ ${f(e.epoch_difference_samples,1)} samples · CFO Δ ${f(e.cfo_difference_hz/1000,1)} kHz${(e.selected_subband_offsets_hz||[]).some(Number.isFinite)?' · selected bank '+e.selected_subband_offsets_hz.map(v=>f(v/1e6,2)).join(' / ')+' MHz':''}${x.plot_url?`<a href="${x.plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.plot_url}"></a>`:''}${x.decode_plot_url?`<a href="${x.decode_plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.decode_plot_url}"></a>`:''}${x.survey_plot_url?`<br><span class="muted">pre-dwell survey · all eight low-band edge tunings, both receivers · ±600 kHz around each</span><a href="${x.survey_plot_url}" target="_blank"><img loading="lazy" style="max-width:100%;margin-top:8px" src="${x.survey_plot_url}"></a>`:''}</div>`}).join('');
 const ge=bcn.gain_experiment||{},groups=ge.groups||{},gainRow=(label,g)=>{g=g||{};const hg=g.median_hardware_gain_db||[],rms=g.median_rms_magnitude||[],clip=g.maximum_near_full_scale_fraction||[];return `<tr><td>${label}</td><td>${g.capture_count||0} / ${g.analyzed_count||0}</td><td>${g.confirmed_count||0} (${Number.isFinite(g.confirmation_rate)?f(100*g.confirmation_rate,1)+'%':'—'})</td><td>${Number.isFinite(g.median_pilot_accuracy)?f(100*g.median_pilot_accuracy,1)+'%':'—'}</td><td>${Number.isFinite(g.median_pilot_confidence)?f(100*g.median_pilot_confidence,1)+'%':'—'}</td><td>${f(g.median_pilot_evm,3)}</td><td>${f(hg[0],1)} / ${f(hg[1],1)} dB</td><td>${f(rms[0],1)} / ${f(rms[1],1)}</td><td>${f(100*Math.max(clip[0]||0,clip[1]||0),4)}%</td></tr>`};document.querySelector('#gainexperiment').innerHTML=!ge.schema?'<p class="muted">Waiting for the first randomized capture.</p>':`<div class="log">Experiment ${ge.experiment_ids.join(', ')} · ${ge.randomized_capture_count} randomized captures · decision ${ge.decision_guidance.ready?'<span class="yes">sample-size ready</span>':'waiting for ≥30 analyzed captures per group'}</div><table><thead><tr><th>Mode</th><th>captures / analyzed</th><th>confirmed</th><th>pilot accuracy</th><th>confidence</th><th>EVM ↓</th><th>gain RX0/RX1</th><th>RMS RX0/RX1</th><th>max near-FS</th></tr></thead><tbody>${gainRow('manual 50 dB',groups.manual)}${gainRow('slow-attack AGC',groups.slow_attack)}</tbody></table>`;
 const fpSignature=[fps.count,fps.linked_count,fps.largest_cluster_size,fps.unresolved_count].join('-'),fpPlot=document.querySelector('#fingerprintplot');document.querySelector('#fingerprintsummary').innerHTML=`Nearest-neighbor evidence: ${fps.count||0} fingerprints · ${fps.linked_count||0} linked · largest repeated family ${fps.largest_cluster_size||0} · ${fps.unresolved_count||0} unresolved. X measures pilot/SSS repetition; Y includes the fixed LNB/RX path. This is not satellite identity.${fps.index_url?' <a href="'+fps.index_url+'" target="_blank">Open comparison index</a>':''}`;if(fpPlot.dataset.signature!==fpSignature){fpPlot.dataset.signature=fpSignature;fpPlot.data='/beacon-fingerprint-map.svg?v='+encodeURIComponent(fpSignature)}
 document.querySelector('#dither').innerHTML=(d.dither.comparisons||[]).slice(0,6).map(x=>`<div class="log"><strong>Chunk ${x.chunk}</strong> · ${x.classification} · ${f(x.tuning_dither_hz/1e6,3)} MHz dither · receivers ${x.receivers_agree?'agree':'disagree'}<br>${x.receivers.map(r=>'RX'+r.receiver+' sky/baseband '+f(r.sky_fixed_correlation,3)+' / '+f(r.baseband_fixed_correlation,3)).join(' · ')}</div>`).join('')||'<span class="muted">Waiting for the first nominal/dither pair.</span>';
@@ -1356,11 +1373,10 @@ const carrier=c?`<br><span class="muted">RF-blind carrier</span> ${c.qualified?'
 const wide=w?(()=>{const t=(w.tle_comparisons||[])[0],label=w.orbital_shape_qualified?'orbital shape qualified':w.leo_like_qualified?'moving RF · LEO-rate compatible · curvature unproven':w.doppler_candidate_qualified?'dual-RX Doppler candidate · orbital interpretation unproven':(w.moving_rf_qualified??w.leo_like_qualified)?'centroid motion only · internal translation unconfirmed':'rejected',tr=w.receivers.map(x=>x.internal_translation_drift_hz_s/1000);return `<br><span class="muted">wide feature</span> ${label} · ${w.polarity} · ${f(w.duration_s,1)} s × ${f(w.bounding_width_hz/1000,0)} kHz · <span class="muted">RX path corr</span> ${f(w.receiver_path_correlation,2)} · <span class="muted">centroid drift</span> ${f(w.receivers[0].linear_drift_hz_s/1000,2)} / ${f(w.receivers[1].linear_drift_hz_s/1000,2)} kHz/s${tr.every(Number.isFinite)?` · <span class="muted">internal-pattern drift</span> ${f(tr[0],2)} / ${f(tr[1],2)} kHz/s · corr ${f(w.internal_translation_path_correlation,2)} · ${w.internal_translation_consistent?'consistent':'not consistent'}`:''} · <span class="muted">TLEs within 1 bin</span> ${w.tles_within_one_bin_of_best||0}${w.specific_tle_identifiable?' · specific TLE':' · no unique TLE'}${t?` · <span class="muted">best TLE / affine RMS</span> ${f(t.rms_error_hz/1000,2)} / ${f(t.affine_drift_rms_error_hz/1000,2)} kHz · <span class="muted">predicted curvature</span> ${f(w.best_tle_curvature_resolution_bins,2)} bins`:''}${(w.measurement_warnings||[]).length?`<br><span class="muted">measurement warnings:</span> ${w.measurement_warnings.join('; ')}`:''}<br><span class="muted">orbital-shape rejected:</span> ${(w.orbital_shape_rejection_reasons||w.rejection_reasons||[]).join('; ')||'none'}`})():'';
 const wideImage=x.wide_plot_url?`<a href="${x.wide_plot_url}" target="_blank"><img loading="lazy" src="${x.wide_plot_url}"></a>`:'';
 const trackerImage=x.tracker_plot_url?`<a href="${x.tracker_plot_url}" target="_blank"><img loading="lazy" src="${x.tracker_plot_url}"></a>`:'';
-const surveyImage=x.survey_plot_url?`<figure class="survey"><figcaption class="muted">pre-dwell survey \u00b7 all eight low-band edge tunings, both receivers</figcaption><a href="${x.survey_plot_url}" target="_blank"><img loading="lazy" src="${x.survey_plot_url}"></a></figure>`:'';
 const dither=x.interleaved_dither?` · <span class="muted">rapid dither</span> ${x.interleaved_dither.classification||'active'}`:'';
 const so=x.structured_observation_summary||{},structured=x.structured_observation_url?`<br><a href="${x.structured_observation_url}" target="_blank">structured observation JSON</a> · validated ${so.accepted_track_count||0}/${so.track_count||0} · processed as Doppler ${so.processed_as_doppler_count||0} · boundary sky/baseband/ambiguous ${so.sky_fixed_count||0}/${so.baseband_fixed_count||0}/${so.ambiguous_boundary_count||0}`:'';
 const tq=x.tracker_qualified_count_by_tracker||{},tracker=x.tracker_ensemble_available?`<br><span class="muted">tracker ensemble</span> ${Object.entries(tq).map(([k,v])=>k.replace('/v1','')+': '+v).join(' · ')} · paired ${x.tracker_qualified_joint_count}/${x.tracker_joint_count} · TLE compatible ${x.tracker_tle_compatible_count} · specific IDs ${x.tracker_qualified_tle_identification_count}${x.coherent_analysis_available?' · coherent IQ '+x.coherent_block_count+' blocks'+(x.coherent_joint_track?.qualified?' · paired '+f(x.coherent_joint_track.mean_drift_hz_s/1000,2)+' kHz/s':''):''}`:'';
-return `<article class="card waterfall"><strong>${x.capture_id||('Chunk '+x.chunk)}</strong> · ${when(x.start_utc)} · <span class="muted">mode</span> ${x.observation_mode||'fixed'}<br><span class="muted">IF</span> ${x.channel?f(x.channel.if_center_hz/1e6,3)+' MHz':'—'} · <span class="muted">gain control</span> ${x.gain_mode||'—'}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''} · <span class="muted">sample rate</span> ${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'} · <span class="muted">RF bandwidth</span> ${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'} · <span class="muted">events RX0/RX1</span> ${x.event_counts?x.event_counts.join(' / '):'—'} · <span class="muted">raw joint</span> ${x.joint_event_count} · <span class="muted">Doppler observations</span> ${x.doppler_observation_count} · <span class="muted">sky-fixed by dither</span> ${x.sky_fixed_doppler_count||0} · <span class="muted">identified</span> ${x.qualified_event_count} · <span class="muted">TLE-integrated</span> ${x.tle_guided_candidate_count}${dither} · <span class="muted">comb/carrier/wide</span> ${x.blind_comb_candidate_count}/${x.blind_carrier_candidate_count}/${x.wide_feature_candidate_count}${carrier}${blind}${best}${wide}${structured}${tracker}<a href="${x.plot_url}" target="_blank"><img loading="lazy" src="${x.plot_url}"></a>${trackerImage}${wideImage}${surveyImage}</article>`}).join('')||'<p class="muted">No completed waterfalls yet.</p>'}
+return `<article class="card waterfall"><strong>${x.capture_id||('Chunk '+x.chunk)}</strong> · ${when(x.start_utc)} · <span class="muted">mode</span> ${x.observation_mode||'fixed'}<br><span class="muted">IF</span> ${x.channel?f(x.channel.if_center_hz/1e6,3)+' MHz':'—'} · <span class="muted">gain control</span> ${x.gain_mode||'—'}${Number.isFinite(x.configured_gain_db)?' '+f(x.configured_gain_db,1)+' dB':''} · <span class="muted">sample rate</span> ${Number.isFinite(x.sample_rate_hz)?f(x.sample_rate_hz/1e6,2)+' MS/s':'—'} · <span class="muted">RF bandwidth</span> ${Number.isFinite(x.bandwidth_hz)?f(x.bandwidth_hz/1e6,2)+' MHz':'—'} · <span class="muted">events RX0/RX1</span> ${x.event_counts?x.event_counts.join(' / '):'—'} · <span class="muted">raw joint</span> ${x.joint_event_count} · <span class="muted">Doppler observations</span> ${x.doppler_observation_count} · <span class="muted">sky-fixed by dither</span> ${x.sky_fixed_doppler_count||0} · <span class="muted">identified</span> ${x.qualified_event_count} · <span class="muted">TLE-integrated</span> ${x.tle_guided_candidate_count}${dither} · <span class="muted">comb/carrier/wide</span> ${x.blind_comb_candidate_count}/${x.blind_carrier_candidate_count}/${x.wide_feature_candidate_count}${carrier}${blind}${best}${wide}${structured}${tracker}<a href="${x.plot_url}" target="_blank"><img loading="lazy" src="${x.plot_url}"></a>${trackerImage}${wideImage}</article>`}).join('')||'<p class="muted">No completed waterfalls yet.</p>'}
 document.querySelector('#speednote').textContent=d.detected.speed_note;document.querySelector('#detections').innerHTML=d.detected.detections.slice(0,12).map(x=>{const p=x.tle_guided_candidate;const measurement=x.mean_drift_hz_s===null?(p?`<span class="muted">TLE path</span> ${p.name} · ${p.signal_model||'single-tone'} · <span class="muted">predicted span</span> ${f(p.predicted_doppler_span_hz/1000,1)} kHz<br><span class="muted">score / stationary gain</span> ${f(p.joint_score_db,3)} / ${f(p.stationary_improvement_db,3)} dB`:'measured drift unavailable'):`<span class="muted">drift</span> ${f(x.mean_drift_hz_s/1000,2)} kHz/s · <span class="muted">radial a</span> ${f(x.radial_acceleration_m_s2,1)} m/s²<br><span class="muted">Δ radial v</span> ${f(x.equivalent_radial_velocity_change_m_s/1000,2)} km/s`;return `<article class="card candidate"><strong>Chunk ${x.chunk}</strong> · ${when(x.start_utc)}<br>${measurement} · ${x.overlapping_expected_passes} TLE overlaps<br>${x.best_tle_match?'<span class="muted">matched pass</span> '+x.best_tle_match.name+' ('+f(x.best_tle_match.max_elevation_deg,1)+'°)':''}<a href="${x.plot_url}" target="_blank"><img loading="lazy" src="${x.plot_url}"></a></article>`}).join('')||'<p class="muted">No promoted candidates yet.</p>';
 document.querySelector('#passes').innerHTML='<table><tr><th>Satellite</th><th>Rise</th><th>El.</th><th>LOS speed</th></tr>'+d.expected.passes.slice(0,12).map(p=>`<tr><td>${p.name}</td><td>${when(p.rise_utc)}</td><td>${f(p.max_elevation_deg,0)}°</td><td>${f(Math.max(Math.abs(p.rise_range_rate_km_s),Math.abs(p.set_range_rate_km_s)),2)} km/s</td></tr>`).join('')+'</table>';
 document.querySelector('#logs').innerHTML=d.logs.events.slice(0,18).map(e=>`<div class="log"><span class="muted">${when(e.time_utc)}</span> chunk ${e.chunk} <span class="${e.detected?'yes':''}">${e.detected?'candidate':'rejected'}</span><br>${e.drift_hz_s.map(x=>f(x/1000,2)).join(' / ')} kHz/s</div>`).join('');
@@ -1492,6 +1508,13 @@ def make_handler(model: DashboardModel):
                 if name.endswith(".png") and target.is_file():
                     return self._send(target.read_bytes(), "image/png",
                                       cache_control="public, max-age=300")
+            if (path.startswith("/beacon-survey-plots/") and
+                    model.survey_plot_dir is not None):
+                name = Path(path).name
+                target = model.survey_plot_dir / name
+                if name.endswith(".png") and target.is_file():
+                    return self._send(target.read_bytes(), "image/png",
+                                      cache_control="public, max-age=300")
             if path.startswith("/beacon-analyses/") and model.beacon_root is not None:
                 name = Path(path).name
                 target = model.beacon_root / "reports" / name
@@ -1563,10 +1586,12 @@ def make_handler(model: DashboardModel):
 def serve_dashboard(observation_dir: Path, *, host: str = "127.0.0.1", port: int = 8765,
                     passes_path: Path | None = None,
                     beacon_root: Path | None = None,
+                    survey_plot_dir: Path | None = None,
                     samples_per_snapshot: int = 262_144,
                     sample_rate_hz: float = 30_720_000,
                     snapshots_per_chunk: int = 4096):
     model = DashboardModel(observation_dir, passes_path, beacon_root=beacon_root,
+        survey_plot_dir=survey_plot_dir,
         samples_per_snapshot=samples_per_snapshot, sample_rate_hz=sample_rate_hz,
         snapshots_per_chunk=snapshots_per_chunk)
     server = ThreadingHTTPServer((host, port), make_handler(model))

@@ -80,7 +80,48 @@ from .survey_scoring import (CLEAN_NULL_P99_BY_PROBE_MS,
                              SCORES_SCHEMA, TYPICAL_DOPPLER_RATE_HZ_S)
 
 #: What the aggregate calls itself.
-REVIEW_SCHEMA = "leo-tracker.survey-detector-review/v1"
+#:
+#: v2 because four keys changed meaning under the v1 name, which is the same
+#: argument that earned :data:`survey_scoring.SCORES_SCHEMA` its own bump one
+#: layer down.  ``deployed.threshold`` was a dict of this host's per-config
+#: gates, became a list of the gates the *captures* applied, and is now gone
+#: entirely — every value it held is in ``deployed.regimes``, paired with the
+#: shape and span it actually ran with, because read across, three independently
+#: sorted sets assert a pairing no capture ever searched.
+#: ``deployed_reproduction.exact`` became ``reproduced`` and now consults
+#: ``excluded`` as well as the tolerance.  ``deployed_reproduction.
+#: scored_samples`` and ``sidecars`` are new.  A consumer holding one of these
+#: documents and a consumer holding the other disagree about what those keys
+#: mean while both read "v1", and nothing but the version can tell them apart.
+REVIEW_SCHEMA = "leo-tracker.survey-detector-review/v2"
+
+#: How far a re-run may land from the capture host's own number and still be
+#: the same computation.
+#:
+#: The check this bounds used to demand ``delta == 0.0`` — exact bitwise
+#: equality from a threaded float reduction — which fired on 448 of 448
+#: observations and so condemned every report ever printed, unconditionally.
+#: The bar is now measured rather than assumed. Across the 800 target
+#: observations the corpus held when the tolerance was set, re-run against the
+#: bank their capture actually searched, the median delta is 1.10e-08 and the
+#: worst 5.165e-08.
+#: Against a bank the capture never searched — the cheapest genuine defect
+#: there is, and the one that was live — the *closest* disagreement over the
+#: same 800 is 1.896e-04. The two populations are 3,670x apart with nothing
+#: between them, so anything in 1e-6..1e-5 separates the corpus perfectly;
+#: 1e-6 is the strict end, 19.4x above the worst honest residual and 190x
+#: below the cheapest real defect.
+#:
+#: The residual is not float inevitability either, which is why the tolerance
+#: is this tight: on one host the fold reproduces bitwise. ``fast_scan``
+#: compiles its kernel with ``-ffast-math -march=native`` and caches the object
+#: under a name keyed on platform and machine alone, so a sidecar written by a
+#: different build reduces in a different order and lands ~1e-8 away — 0 of
+#: the corpus's 800 reproduce bitwise, while all 800 reproduce to 5.2e-08. The
+#: review therefore reports how many observations were bitwise exact
+#: separately, because "a different build wrote these" and "this corpus is
+#: corrupt" must not arrive as the same sentence.
+REPRODUCTION_TOLERANCE = 1e-6
 
 #: False-alarm rate every threshold is calibrated at unless asked otherwise.
 #: 1% is the plan's own comparison rate; it is not a production threshold, which
@@ -132,27 +173,133 @@ PREAMBLE = (
 # reading what the scorer wrote
 # --------------------------------------------------------------------------
 
-def load_scores(corpus_root: Path, *, limit: int | None = None) -> list[dict]:
-    """Every score sidecar of the current schema, oldest capture name first.
+#: How a sidecar opens when :func:`survey_scoring._write` wrote it, which puts
+#: ``schema`` first for exactly this reason.
+_SCHEMA_HEAD = '{"schema": "'
+
+#: Enough opening bytes to carry a schema name.  A census over a corpus of
+#: hundreds costs one short read per entry this way; parsing them would cost
+#: ~350 kB each off a network share, which is more than the aggregate the census
+#: is a footnote to.
+_SCHEMA_HEAD_BYTES = 256
+
+
+def _declared_schema(path: Path) -> tuple[str | None, bool]:
+    """The schema a sidecar declares, and whether it could be read at all.
+
+    The same trick :func:`survey_scoring._scored` uses, for the same reason and
+    with the same fallback: a file that does not open with its schema is parsed
+    in full rather than guessed at, so a sidecar written by anything else is
+    still counted under the schema it really declares.
+
+    The second element separates "declares no schema" from "would not open or
+    would not parse".  A corpus holding a half-written file and a corpus holding
+    a sidecar from some other producer are different problems, and a census that
+    reported them as one number could not tell a reader which they had.
+    """
+    try:
+        with path.open("rb") as stream:
+            head = stream.read(_SCHEMA_HEAD_BYTES).decode("utf-8", "replace")
+    except OSError:
+        return None, False
+    if head.startswith(_SCHEMA_HEAD):
+        end = head.find('"', len(_SCHEMA_HEAD))
+        if end > 0:
+            return head[len(_SCHEMA_HEAD):end], True
+    try:
+        return json.loads(path.read_text()).get("schema"), True
+    except (OSError, ValueError):
+        return None, False
+
+
+def read_scores(corpus_root: Path, *,
+                limit: int | None = None) -> tuple[list[dict], dict]:
+    """The sidecars of the current schema, and a census of every one skipped.
 
     A sidecar that will not parse is skipped rather than fatal, for the same
     reason the scorer skips a damaged probe: an aggregate that refuses to
     produce anything because one file of two hundred is short is less useful
     than one that says so and carries on.
+
+    The census is the second return value because skipping cannot be silent.
+    A schema bump drops every existing sidecar from the aggregate — correctly,
+    since the two versions mean different things by the same key — but the drop
+    used to be a bare ``continue`` with no counter, so for the whole re-score
+    window the review reported "nothing scored yet" over a corpus that holds
+    scored entries and is still growing.  Re-scoring costs 74.6 s and 66.2 s
+    per entry under capture load, so a corpus of a few hundred is most of a day,
+    and for that whole day the sentence would be false.  Counted and named, it
+    says instead which schema the corpus is at and how much of it is waiting.
+
+    **The census covers the whole directory and the limit does not touch it.**
+    It used to stop at the same ``break``, so it counted only the off-schema
+    files that sorted before the limit was reached: three current-schema
+    sidecars beside five old ones census as five unlimited and as *nothing* at
+    ``limit=2``, and ``cli.py`` passes ``--limit`` straight through.  A count
+    printed as a corpus fact has to be over the corpus.
+
+    **Every sidecar is classified from its opening bytes and only the ones this
+    job will actually use are parsed**, so ``limit`` bounds full parses at
+    ``limit`` of them.  Classifying after the parse instead did not: the gate
+    was ``len(loaded) < limit`` and ``loaded`` grows only for current-schema
+    payloads, so a corpus sitting entirely at the previous schema never reached
+    the limit and every sidecar was read whole whatever was passed — ~350 kB
+    each off a network share, and that is the state of the corpus for the whole
+    re-score window the limit exists to make survivable.  The one file that
+    still costs a full read to classify is one that does not open with its
+    schema, which :func:`_declared_schema` falls back to parsing; that is a
+    property of how many such files a corpus holds and not of the limit, and
+    nothing this repository writes is one.
+
+    The order the directory is scanned in is the order the limit consumes, so
+    it is sorted: capture names carry their timestamp, and a bounded review has
+    to be reproducible from the corpus and its arguments rather than from
+    whatever order the filesystem happened to enumerate in.
+
+    ``unreadable`` is counted for the same reason: this function's whole
+    principle is that skipping is never silent, and it dropped every unparseable
+    sidecar with a bare ``continue`` of its own.  Files that are simply absent
+    are not counted — most of a corpus is unscored, and calling that damage
+    would bury the real thing.
     """
     root, loaded = Path(corpus_root), []
+    census = {"scanned": 0, "read": 0, "beyond_limit": 0, "unreadable": 0,
+              "other_schema": {}}
     if not root.is_dir():
-        return loaded
+        return loaded, census
     for entry in sorted(root.iterdir()):
-        if limit is not None and len(loaded) >= limit:
-            break
-        try:
-            payload = json.loads((entry / SCORES_FILENAME).read_text())
-        except (OSError, ValueError):
+        path = entry / SCORES_FILENAME
+        if not path.is_file():
             continue
-        if payload.get("schema") == SCORES_SCHEMA:
-            loaded.append(payload)
-    return loaded
+        census["scanned"] += 1
+        schema, readable = _declared_schema(path)
+        if not readable:
+            census["unreadable"] += 1
+            continue
+        if schema != SCORES_SCHEMA:
+            name = str(schema) if schema else "no schema declared"
+            other = census["other_schema"]
+            other[name] = other.get(name, 0) + 1
+            continue
+        if limit is not None and len(loaded) >= limit:
+            census["beyond_limit"] += 1
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, ValueError):
+            # It announced the current schema in its first bytes and then would
+            # not parse, so it is a half-written file rather than somebody
+            # else's format, and it is damage either way.
+            census["unreadable"] += 1
+            continue
+        loaded.append(payload)
+    census["read"] = len(loaded)
+    return loaded, census
+
+
+def load_scores(corpus_root: Path, *, limit: int | None = None) -> list[dict]:
+    """Every score sidecar of the current schema, oldest capture name first."""
+    return read_scores(corpus_root, limit=limit)[0]
 
 
 def certificate_rows(payloads: list[dict]):
@@ -608,7 +755,7 @@ def time_continuity(payloads: list[dict]) -> dict:
 def review(corpus_root: Path, *, limit: int | None = None,
            false_alarm_rate: float = DEFAULT_FALSE_ALARM_RATE) -> dict:
     """Everything the accumulated sidecars can say, in one document."""
-    payloads = load_scores(corpus_root, limit=limit)
+    payloads, census = read_scores(corpus_root, limit=limit)
     searched = searched_comparison(payloads, false_alarm_rate=false_alarm_rate)
     conditioned = conditioned_comparison(payloads,
                                          false_alarm_rate=false_alarm_rate)
@@ -616,6 +763,16 @@ def review(corpus_root: Path, *, limit: int | None = None,
         "schema": REVIEW_SCHEMA,
         "caveat": PREAMBLE,
         "entries": len(payloads),
+        # Sidecars this aggregate did not read, by the schema they declare.
+        # An empty aggregate over a corpus full of last version's sidecars is
+        # a re-score in progress, not an unscored corpus, and the two must not
+        # print the same sentence.
+        "other_schema": dict(sorted(census["other_schema"].items())),
+        # What the whole directory holds, beside what this aggregate read of
+        # it. ``entries`` is bounded by ``limit`` and these are not, so the
+        # reader can tell a small corpus from a bounded read of a large one.
+        "sidecars": {key: census[key] for key in
+                     ("scanned", "read", "beyond_limit", "unreadable")},
         "captures": sorted({payload["capture"] for payload in payloads}),
         "observations": sum(len(payload.get("observations") or [])
                             for payload in payloads),
@@ -638,21 +795,81 @@ def review(corpus_root: Path, *, limit: int | None = None,
 
 
 def _deployed_gate(payloads: list[dict]) -> dict:
-    """What the capture host would actually gate on, and with which bank.
+    """What each capture host actually gated on, and with which bank.
 
     Read out of the score files rather than assumed, because the deployed shape
     moved from 3x8 to 13x8 while this comparison was being built: a review that
     hard-coded either one would be describing a host that no longer exists.
+    Collecting a *set* was always right; what was wrong was upstream, where the
+    sidecar wrote this host's constant and so made a corpus holding both regimes
+    in bulk report one shape between them.
+
+    ``regimes`` is the fact, and it is a *tuple* per entry with a count beside
+    it.  Shape, span and gate collected as three independent sorted sets lose
+    the pairing that is the whole content: the share holds both regimes in bulk,
+    a frozen population at (3, 8) over +/-300 kHz gating at 1.33 and a growing
+    one at (13, 8) over +/-700 kHz gating at 1.252 (:data:`survey_scoring.
+    CORPUS_CENSUS` counts each, on the date it was taken), and three sets
+    printed in a row read "shape [[3, 8], [13, 8]] over +/-300 kHz, +/-700 kHz,
+    gating at 1.252/1.330" — which taken positionally says (3, 8) gated at
+    1.252, the pairing exactly backwards.
+    That is the same flattening of a two-regime corpus this whole change exists
+    to undo, one level up, and the count is what makes each regime checkable
+    against the manifest it came from.
+
+    ``unknown`` is the count of entries whose record never said, and it is the
+    exact negative of the regime test rather than a second one: derived from
+    ``deployed_shape`` alone while the regime read ``deployed_shape or
+    capture_bank.shape``, it counted an entry that recorded its bank only in
+    ``capture_bank`` twice, and the printed lines then added up to more entries
+    than the review said it read.  It is not folded into the shapes either,
+    because a bank nobody wrote down and a bank that happens to match today's
+    are different facts and the first one is a hole.  An entry that recorded
+    half its bank keeps its own regime with the missing half spelled out,
+    rather than being rounded into either.
+
+    Nothing else comes back.  Flat ``shape``, ``offset_span_hz`` and
+    ``threshold`` sets travelled here for a reader asking which values appear at
+    all, and they carry the same trap the printed line was rewritten to remove:
+    read across, ``[[3, 8], [13, 8]]`` beside ``[1.252, 1.33]`` says (3, 8)
+    gated at 1.252, which is the pairing backwards.  The text is the half of
+    this that got fixed; the JSON is the half a later script reads with no human
+    in between.  ``regimes`` holds every value they held, paired.
     """
-    shapes = {tuple(payload["deployed_shape"]) for payload in payloads
-              if payload.get("deployed_shape")}
-    thresholds: dict[str, set] = {}
+    regimes: dict[tuple, int] = {}
+    unknown = 0
     for payload in payloads:
-        for name, value in (payload.get("deployed_threshold") or {}).items():
-            thresholds.setdefault(name, set()).add(value)
-    return {"shape": sorted(list(shape) for shape in shapes),
-            "threshold": {name: sorted(values)
-                          for name, values in sorted(thresholds.items())}}
+        bank = payload.get("capture_bank") or {}
+        shape = payload.get("deployed_shape") or bank.get("shape")
+        if not shape:
+            # The exact negative of the line above, in the same pass. Derived
+            # separately from ``deployed_shape`` alone, it counted an entry
+            # that recorded its bank only under ``capture_bank`` twice — once
+            # in its regime and once as unknown — so the printed lines added up
+            # to more entries than the review read.
+            unknown += 1
+            continue
+        span = bank.get("offset_span_hz")
+        gate = payload.get("deployed_threshold")
+        key = (tuple(int(value) for value in shape),
+               None if span is None else float(span),
+               None if gate is None else float(gate))
+        regimes[key] = regimes.get(key, 0) + 1
+    scorer: dict[str, set] = {}
+    for payload in payloads:
+        for name, value in (payload.get("scorer_coarse_threshold")
+                            or {}).items():
+            scorer.setdefault(name, set()).add(value)
+    return {"regimes": [{"shape": list(shape), "offset_span_hz": span,
+                         "threshold": gate, "entries": count}
+                        for (shape, span, gate), count in
+                        sorted(regimes.items(),
+                               key=lambda item: (-item[1], item[0][0],
+                                                 item[0][1] or -1.0,
+                                                 item[0][2] or -1.0))],
+            "unknown": unknown,
+            "scorer_threshold": {name: sorted(values)
+                                 for name, values in sorted(scorer.items())}}
 
 
 def _probe_lengths(payloads: list[dict]) -> dict:
@@ -685,20 +902,76 @@ def _probe_lengths(payloads: list[dict]) -> dict:
 
 
 def _reproduction(payloads: list[dict]) -> dict:
-    """Whether re-running config A here returns the capture host's own answer.
+    """Whether re-running each capture's own bank returns its own answer.
 
-    The one end-to-end check on everything in front of the comparison.  If this
-    is not zero the ``sample_order`` mapping, the reshape or the receiver index
-    is wrong, and every number in the report above is about the wrong sky — so
-    it is reported at the top rather than buried, and a non-zero value should
-    stop the reader before the tables rather than after them.
+    The one end-to-end check on everything in front of the comparison.  If it
+    fails, the ``sample_order`` mapping, the reshape or the receiver index is
+    wrong and every number in the report above is about the wrong sky — so it
+    is reported at the top rather than buried, and a failure should stop the
+    reader before the tables rather than after them.
+
+    Three outcomes, and they are not the same document.  Every checked
+    observation within :data:`REPRODUCTION_TOLERANCE` is a verified corpus.
+    The same, with observations that could not be checked at all, is a corpus
+    verified in part — honest only if the size of the unchecked part is printed
+    beside it, which is what ``excluded`` is for.  Anything beyond tolerance is
+    a corpus that contradicts its own capture host, and no amount of the rest
+    of the report is worth reading until it is explained.
+
+    ``bitwise_exact`` is carried separately from ``above_tolerance`` because
+    the interesting middle case — everything agrees to 1e-8, nothing agrees
+    exactly — means a different build of the kernel wrote these sidecars, which
+    is a fact about provenance and not a defect.
+
+    ``reproduced`` is the machine-readable form of the first of those three and
+    of nothing else, so it consults ``excluded`` as well as ``above``.  Without
+    that, one checked observation beside ninety-six unchecked ones sets the flag
+    True while the banner printed directly above it says PARTIAL — and of the
+    two, the flag is the one a later script reads with no human in between.
+
+    ``scored_samples`` is the window each delta was computed over, carried up
+    from the sidecars because the capture host scores a bounded prefix and this
+    host preserves the whole probe.  Two entries in that list means two windows
+    are pooled in one statistic.
     """
-    deltas = [observation.get("deployed_reproduction_delta")
-              for payload in payloads
-              for observation in payload.get("observations") or []]
+    deltas, excluded, banks, windows = [], {}, set(), set()
+    for payload in payloads:
+        for observation in payload.get("observations") or []:
+            deltas.append(observation.get("deployed_reproduction_delta"))
+            reason = observation.get("deployed_reproduction_excluded")
+            if reason:
+                excluded[reason] = excluded.get(reason, 0) + 1
+            # Both names below come only from observations that produced a
+            # delta.  An observation that produced none was never scored against
+            # anything, so neither the bank it would have been checked against
+            # nor the window that check would have covered is behind any number
+            # this banner reports — and those rows sit on the longest arms and
+            # on the banks this comparison does not re-run, so collecting either
+            # would name sky nothing was measured over.  The bank half is the
+            # worse of the two: an observation whose manifest carries no
+            # deployed number is in neither ``checked`` nor ``excluded``, so its
+            # bank used to reach the banner beside ``reproduced`` True with
+            # nothing anywhere saying it had not been.
+            if observation.get("deployed_reproduction_delta") is None:
+                continue
+            bank = observation.get("deployed_reproduction_bank")
+            if bank:
+                banks.add(str(bank))
+            window = observation.get("deployed_reproduction_samples")
+            if window:
+                windows.add(int(window))
     checked = [delta for delta in deltas if delta is not None]
+    above = [delta for delta in checked if delta > REPRODUCTION_TOLERANCE]
     return {**describe(deltas),
-            "exact": bool(checked) and all(delta == 0.0 for delta in checked)}
+            "tolerance": REPRODUCTION_TOLERANCE,
+            "above_tolerance": len(above),
+            "worst_above_tolerance": max(above) if above else None,
+            "bitwise_exact": sum(1 for delta in checked if delta == 0.0),
+            "excluded": sum(excluded.values()),
+            "excluded_reasons": dict(sorted(excluded.items())),
+            "banks": sorted(banks),
+            "scored_samples": sorted(windows),
+            "reproduced": bool(checked) and not above and not excluded}
 
 
 def _abbreviate(method: str) -> str:
@@ -719,6 +992,11 @@ def _mark(threshold: dict) -> str:
             else "*")
 
 
+def _entries(count: int) -> str:
+    """``1 entry`` or ``283 entries``, so a count reads as one."""
+    return f"{count} entr{'y' if count == 1 else 'ies'}"
+
+
 def _cell(value, spec: str = "8.3f", missing: str = "       -") -> str:
     if value is None or value != value:                # NaN is never equal to itself
         return missing
@@ -729,17 +1007,71 @@ def format_review(report: dict) -> str:
     """The comparison as a table, with the misreading spelled out above it."""
     reproduction = report.get("deployed_reproduction") or {}
     checked = reproduction.get("count", 0)
-    if not checked:
-        provenance = "deployed config A not re-run: nothing scored yet"
-    elif reproduction.get("exact"):
-        provenance = (f"deployed config A reproduced exactly on all {checked} "
-                      "observations")
+    skipped = reproduction.get("excluded", 0)
+    tolerance = reproduction.get("tolerance", REPRODUCTION_TOLERANCE)
+    banks = ", ".join(reproduction.get("banks") or []) or "none"
+    worst = _cell(reproduction.get("max"), ".3e", "n/a")
+    reasons = "; ".join(
+        f"{count} x {reason}"
+        for reason, count in (reproduction.get("excluded_reasons") or {}).items())
+    # Which window the check ran over, printed rather than implied: the capture
+    # host scores a bounded prefix and this host preserves the whole probe, and
+    # the two being different is what made the check fail for three of the four
+    # randomised arms while nothing said which one it used.
+    #
+    # Two entries in that list means two windows were pooled into one statistic,
+    # which ``_reproduction``'s docstring calls out as the thing to notice — so
+    # it is said in words rather than left as a slash inside a singular noun.
+    scored = reproduction.get("scored_samples") or []
+    counted = "/".join(f"{value:,}" for value in scored)
+    window = ("" if not scored else
+              f" over the capture's own {counted}-sample window"
+              if len(scored) == 1 else
+              f" over the {len(scored)} different windows the captures scored "
+              f"({counted} samples, pooled)")
+    other = report.get("other_schema") or {}
+    waiting = "; ".join(
+        f"{count} sidecar{'' if count == 1 else 's'} at {name} waiting to be "
+        "re-scored" for name, count in sorted(other.items()))
+    # Three states, because a corpus that was verified, one that could only be
+    # verified in part, and one that contradicts its own capture host are three
+    # different reports and only the last of them means stop reading.
+    if not checked and not skipped:
+        provenance = ("deployed bank not re-run: nothing scored yet"
+                      if not waiting else
+                      f"deployed bank not re-run at this schema: {waiting}")
+    elif reproduction.get("above_tolerance"):
+        provenance = (
+            f"deployed bank ({banks}) reproduced with worst delta {worst} on "
+            f"{checked} observations{window}, "
+            f"{reproduction['above_tolerance']} of them past {tolerance:.0e}"
+            # A verdict on part of a corpus has to name the rest of it: sixteen
+            # of sixteen disagreeing reads very differently beside a hundred
+            # and sixty nobody could check, and that is the live shape of it.
+            + (f", and {skipped} more could not be checked at all ({reasons})"
+               if skipped else "")
+            + "  <-- NOT EXACT: the tuning mapping or the reshape is wrong and "
+            "nothing below is trustworthy")
+    elif skipped:
+        provenance = (
+            f"deployed bank not verified: none of {skipped} observations "
+            f"could be checked ({reasons})  <-- PARTIAL: nothing below has "
+            "been cross-checked against its capture host at all"
+            if not checked else
+            f"deployed bank ({banks}) reproduced within {tolerance:.0e} on "
+            f"{checked} observations{window}, worst {worst}  <-- PARTIAL: "
+            f"{skipped} more could not be checked at all ({reasons}), so the "
+            "corpus is verified in part and the rest is unexamined rather than "
+            "clean")
     else:
         provenance = (
-            "deployed config A reproduced with worst delta "
-            f"{_cell(reproduction.get('max'), '.3e', 'n/a')} on {checked} "
-            "observations  <-- NOT EXACT: the tuning mapping or the reshape is "
-            "wrong and nothing below is trustworthy")
+            f"deployed bank ({banks}) reproduced within {tolerance:.0e} on all "
+            f"{checked} observations{window}, worst {worst}"
+            + (f" ({reproduction.get('bitwise_exact', 0)} of them bitwise "
+               "exact; a non-zero residual here is a different build of the "
+               "kernel, not a different sky)"
+               if reproduction.get("bitwise_exact", 0) != checked else
+               " (all bitwise exact)"))
     lengths = report.get("probe_lengths") or {}
     found = lengths.get("probe_ms") or []
     rates = lengths.get("sample_rate_hz") or []
@@ -760,10 +1092,23 @@ def format_review(report: dict) -> str:
                         "2.5 MS/s, 22 at 5) and the epoch count (3,333 against "
                         "6,667), so a threshold belongs to one rate as much as "
                         "to one length; these must not be pooled either")
-    lines = [PREAMBLE, "",
-             f"entries {report['entries']}   observations {report['observations']}"
-             f"   false-alarm rate {report['false_alarm_rate']:.3f}",
-             length_line, provenance, ""]
+    entry_line = (
+        f"entries {report['entries']}   observations {report['observations']}"
+        f"   false-alarm rate {report['false_alarm_rate']:.3f}")
+    # Everything the scan saw and this aggregate did not read. ``entries`` is
+    # bounded by the limit while these are counts over the whole directory, so
+    # a bounded read of a large corpus cannot be mistaken for a small one.
+    census = report.get("sidecars") or {}
+    notes = [f"{count} at {name}, another schema and not counted here"
+             for name, count in sorted(other.items())]
+    if census.get("beyond_limit"):
+        notes.append(f"{census['beyond_limit']} more at this schema the limit "
+                     "did not read")
+    if census.get("unreadable"):
+        notes.append(f"{census['unreadable']} that would not parse")
+    if notes:
+        entry_line += "   (" + "; ".join(notes) + ")"
+    lines = [PREAMBLE, "", entry_line, length_line, provenance, ""]
 
     lines.append("SEARCHED  — each method maximising over its own cells")
     lines.append(f"{'method':>16} {'cells':>7} {'claims':>7} {'score p50':>10}"
@@ -798,15 +1143,39 @@ def format_review(report: dict) -> str:
     lines.append("  the kernel bank has no rolled-template path. All three rest "
                  "on the cross-edge null alone.")
     deployed = report.get("deployed") or {}
-    for name, values in (deployed.get("threshold") or {}).items():
+    for name, values in (deployed.get("scorer_threshold") or {}).items():
         calibrated = (report["searched"].get(f"coarse-{name}") or {}).get(
             "cross_edge_null", {}).get("threshold")
         lines.append(
-            f"  coarse-{name}: host gates at "
+            f"  coarse-{name}: this host would gate at "
             f"{'/'.join(f'{value:.3f}' for value in values)}, cross-edge "
             f"{report['false_alarm_rate']:.0%} threshold here is "
-            f"{_cell(calibrated, '.3f', 'n/a')}"
-            f"   (deployed bank shape {deployed.get('shape')})")
+            f"{_cell(calibrated, '.3f', 'n/a')}")
+    # Separate lines and separate wording: the gate above is this host's table
+    # for the banks it re-runs, and (3, 8) is not in it, so coarse-A reads back
+    # a 1.40 fallback no deployment has ever applied.  What the captures did is
+    # a different fact and comes from the captures — one line per regime, with
+    # shape, span and gate kept together, because read across a row three
+    # independently sorted sets assert a pairing no capture ever ran.
+    regimes = deployed.get("regimes") or []
+    unknown = deployed.get("unknown") or 0
+    if regimes or unknown:
+        lines.append(f"  captures themselves searched {len(regimes)} bank "
+                     "configuration" + ("" if len(regimes) == 1 else "s")
+                     + (", one per line and never pooled:" if regimes else ":"))
+        for regime in regimes:
+            span, gate = regime["offset_span_hz"], regime["threshold"]
+            lines.append(
+                f"    {_entries(regime['entries'])}: shape {regime['shape']} "
+                + (f"over +/-{span / 1e3:g} kHz" if span else
+                   "over an unrecorded span")
+                + (f" gating at {gate:.3f}" if gate is not None
+                   else " gating at an unrecorded threshold"))
+        if unknown:
+            lines.append(f"    {_entries(unknown)} does not say which bank it "
+                         "searched" if unknown == 1 else
+                         f"    {_entries(unknown)} do not say which bank they "
+                         "searched")
     lines.append("  Where the host gate is the higher number it is costing "
                  "detections, not manufacturing them:")
     lines.append("  the plan's 8.11%/2.72%/2.11% false-alarm figures are wrong "

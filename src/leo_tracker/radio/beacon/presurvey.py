@@ -19,23 +19,36 @@ from __future__ import annotations
 
 import time
 
-from .fast_scan import (SURVEY_PROFILE, ScanProfile, detection_threshold,
-                        scan_radio, warm_kernel)
+from .fast_scan import (SURVEY_NULL_REALISATIONS, SURVEY_PROFILE, ScanProfile,
+                        detection_threshold, scan_radio, warm_kernel)
 
 #: What the record calls itself, so a reader can tell a v1 verdict from a later
 #: one without inferring it from which keys happen to be present.
 SURVEY_SCHEMA = "leo-tracker.pre-dwell-survey/v1"
+
+#: Written into every record so a stored verdict says what its bar meant.
+#: Records written before this read "the 99th percentile of noise for this bank
+#: shape, measured over 60 realisations" -- synthetic Gaussian noise, which the
+#: field distribution does not match, and 60 realisations, which cannot resolve
+#: a 1% tail at all.
+THRESHOLD_BASIS = (
+    "1% false-alarm point of the peak-to-median statistic, measured on real "
+    f"sky over {SURVEY_NULL_REALISATIONS} target-pilot-free windows: a "
+    "lower-edge bank scored on an upper-edge tuning, whose pilot codes sit "
+    "230.6 MHz away. No window was screened on the statistic being calibrated")
 
 #: The eight edge-pilot tunings of the LNB low band, in channel order.
 LOW_BAND_TUNINGS: tuple[tuple[int, str], ...] = tuple(
     (channel, edge) for channel in (1, 2, 3, 4) for edge in ("lower", "upper"))
 
 #: Evidence carried alongside the verdict without being used to reach it.
-#: The threshold currently rests on peak-to-median alone, characterised
-#: against synthetic Gaussian noise; the field distribution sits close enough
-#: to it that the intended false-alarm rate is doubtful. These are what a
-#: later answer would be built from, and they can only be recovered from
-#: probes that stored them, so they are stored from the start.
+#: The verdict still rests on peak-to-median alone. Its threshold is now
+#: measured on the sky against windows that hold no target pilot by
+#: construction, so the 1% it claims is a number and not a hope, but it is
+#: still one statistic. Which of these separates a pilot from field
+#: interference *better* than peak-to-median is a different question, it is a
+#: question for the corpus, and it can only be asked of probes that stored
+#: them, so they are stored from the start.
 CORROBORATION_FIELDS = ("peak_to_p99", "peak_to_second", "offset_contrast",
                         "offset_profile", "anchor_agreement", "anchor_count",
                         "folded_p99", "second_score", "mean_power",
@@ -83,8 +96,7 @@ def summarise(outcome: dict, *, dwell_channel: int | None = None,
     return {"schema": SURVEY_SCHEMA, "state": "complete",
             "started_utc_ns": started_utc_ns,
             "threshold": threshold,
-            "threshold_basis": ("peak-to-median at the 99th percentile of noise "
-                                "for this bank shape, measured over 60 realisations"),
+            "threshold_basis": THRESHOLD_BASIS,
             "dwell": ({"channel": dwell_channel, "region": dwell_region}
                       if dwell_channel is not None else None),
             "active": active,
@@ -99,10 +111,16 @@ def summarise(outcome: dict, *, dwell_channel: int | None = None,
             # inferred. Without it a later analysis silently scores one tuning's
             # samples against another tuning's label.
             "sample_order": outcome.get("sample_order"),
+            # Kept as a key, and softened rather than dropped, because probes
+            # written before the bank widened carry the stronger wording and a
+            # reader comparing two records has to be able to see which regime
+            # each was taken in.
             "quiet_verdict_caveat": (
-                "a port whose LNB sits near the edge of the search scores close "
-                "to threshold on a beacon that is plainly there; quiet on such a "
-                "port is not evidence of a quiet sky"),
+                "the bank now spreads 13 hypotheses over +/-700 kHz, so a "
+                "biased port sits within 58 kHz of a hypothesis and scores "
+                "within about 10% of a centred one on the same beacon; earlier "
+                "records, written against 3 hypotheses, mean something weaker "
+                "by quiet than this one does"),
             "warm_ms": warm_s * 1000.0,
             "timing_ms": outcome["timing_ms"],
             "total_ms": outcome["total_ms"],

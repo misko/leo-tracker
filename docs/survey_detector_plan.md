@@ -1,12 +1,13 @@
 # Survey detector: a staged plan
 
-Revision 5. Revision 4 replaced the design arguments with measurements and kept
-one assumption: that the 300-symbol coherent detector was the destination and its
-search cost was the remaining problem. External work has since challenged that,
-and the architecture section is rewritten as a bake-off rather than a decision.
-The measured sections are unchanged.
+Revision 6. Revision 5 rewrote the architecture section as a bake-off. This
+revision changes nothing about the plan's direction; it records that **step 1 is
+built**, and corrects two claims that the work of building it measured and found
+wrong. See "What building step 1 changed in this document" below.
 
-Status: proposed. Nothing here has changed the capture host.
+Status: step 1 is **in the repository, not on the capture host**. No service has
+been restarted, so the running survey is still the 3×8 bank at 1.33. Steps 2–6
+are unstarted.
 
 ---
 
@@ -120,11 +121,26 @@ environment is not matched — hence the second null below.
 
 Earlier work in this repository — including revision 3's own experiments —
 calibrated on lower-edge windows, of which 8–26% hold real pilots. That charges
-real detections to the false-alarm budget and inflates every threshold. The
-deployed 1.33 realises **8.11% / 2.72% / 2.11%** false alarms at 20 / 40 / 80 ms,
-not 1%.
+real detections to the false-alarm budget and inflates every threshold.
 
 1,456 clean realisations support false-alarm rates down to ≈0.2% and no further.
+
+**Reproduced independently** while building step 1, on 106 corpus captures whose
+manifests record `sample_order`, 1,696 realisations, 80 ms windows: config E
+**1.2524** both directions and **1.2547** in exactly the direction stated above,
+against 1.255; config A 1.2785 against 1.289. Bootstrap 90% interval on E's 99th
+percentile [1.2444, 1.2570].
+
+**Corrected.** This section previously read "the deployed 1.33 realises
+8.11% / 2.72% / 2.11% false alarms at 20 / 40 / 80 ms, not 1%". On the clean
+cross-edge null at 80 ms, 1.33 realises **0.06%**. The sentence also contradicted
+the paragraph above it: contamination *inflates* a threshold, and an inflated
+threshold gives fewer false alarms, not more. What 8.11% appears to be is the
+*fire rate on same-edge windows* — detections and false alarms together, which is
+the very conflation the clean null exists to undo. Config A at 1.33 fires on 7.8%
+of same-edge windows in this reproduction. So the deployed threshold was about
+**seventeen times too strict**, not too lax, and adopting the measured 1% point is
+a sensitivity gain in its own right, separate from the bank.
 
 ### Real sky, no injection
 
@@ -136,6 +152,17 @@ A fires on  9.0% / 7.0%          E fires on  30.6% / 29.2%
 ```
 
 A 3–4× detection gain from spacing alone, on the sky.
+
+**Reproduced**, same 106 captures, each bank at its own reproduced 1% point:
+
+```
+A fires on  9.7% / 7.6%          E fires on  24.3% / 20.4%      gain 2.5× / 2.7×
+```
+
+The A figures land on top of the originals; the E figures are lower and the gain
+is 2.5–2.7× rather than 3–4×. Different corpus, different sky, same direction and
+same order. The biased port is where it is largest: lnb-c goes 3.1% → 11.8%, a
+3.8× gain, which is what a span argument predicts and a spacing argument does not.
 
 ---
 
@@ -163,18 +190,50 @@ detector, false for the deployed one, where both terms fail at once.
 ## Decided
 
 **Adopt config E** — 13×8 over ±700 kHz, 104 kernels, threshold 1.255. Span and
-spacing come from independent measurements and both point here. Roughly 2× the
-scoring compute, ~50 ms per 80 ms probe. Deploy in shadow: the survey never gates
-a capture.
+spacing come from independent measurements and both point here. Deploy in shadow:
+the survey never gates a capture.
 
-**Adopt two nulls, not one.** The cross-edge null is target-pilot-free by
-construction, which is what exposed the contaminated thresholds — but it sits
-230 MHz away, so its interference environment is not ours. Pair it with a
-**same-tuning wrong-code null**: score the *rolled* pilot sequence on the *same*
-raw IQ, same tuning, same gain, same CFO search, same interference. The repository
-already computes exactly this (`control_symbol_roll=17`). One null is independent,
-the other is distribution-matched; agreement between them is a far stronger
-false-alarm argument than either alone.
+*Cost, measured on building it:* **3.76×** the scoring compute and **121 ms** per
+80 ms probe, against the ~2× and ~50 ms estimated here. The estimate was low
+because it counted kernels against the wrong baseline; the ratio is below the
+4.33× the kernel count alone gives, because a quarter of a 24-kernel probe is
+fixed cost. Still host time only, and still preamble to a 120 s dwell.
+
+**~~Adopt two nulls, not one.~~ Retracted — the second null does not exist.**
+The reasoning was right and the construction was wrong. A same-tuning
+wrong-code null *would* be worth having: the cross-edge null is target-pilot-free
+by construction, which is what exposed the contaminated thresholds, but it sits
+230 MHz away, so its interference environment is not ours.
+
+The proposed construction — score the 17-symbol-rolled pilot sequence on the same
+raw IQ — **is not a wrong code.** Every symbol occupies exactly one symbol period,
+so rolling the code sequence by *r* symbols produces the same waveform shifted by
+*r* symbol periods: measured coherence **0.909** between the 17-roll and the plain
+frame circularly shifted 187 samples, which is exactly 17 × 11. A statistic that
+*searches* the epoch simply re-finds the true pilot at the shifted epoch. Measured:
+
+```
+rolled-bank winning epoch = true epoch − r × 11 samples, exactly, for r = 1,5,17,29
+on the corpus:  rolled p99 1.851   cross-edge p99 1.252   matched p99 1.943
+                correlation with the matched score: rolled 0.967, cross-edge 0.825
+```
+
+A threshold calibrated on the rolled population would be 1.851, at which the
+survey would fire on 1.8% of the sky instead of 21%. It would have looked like a
+sober, conservative, distribution-matched null and it would have made the detector
+nearly blind.
+
+`control_symbol_roll=17` remains correct where the repository actually uses it —
+`conditioned_pilot_score`, which **holds the epoch fixed** and separates the same
+signal 0.585 to 0.019. The rule is that a symbol roll is a control for a
+conditioned statistic and never for a searching one. Note that
+`matched_pilot_control_scores`, which searches `sample_index`, has the same defect
+and was not part of this work.
+
+A genuine same-tuning null still wants building. It needs a code that is not a
+time shift of the target — the other edge's code evaluated on this tuning is the
+obvious candidate and is *not* the same thing as the cross-edge null, because the
+window is the operational one.
 
 ---
 
@@ -186,10 +245,20 @@ was never determined. `measured_centers_hz` is absent from the calibration
 artifact. Every span above is centred on an imperfectly located origin. Only a
 direct absolute sweep closes this, and it needs radio time.
 
-**The timing stage searches ±300 kHz** (`acquisition.py:105-116`). That clears
-Doppler-p99.9 + bias (298.4 kHz) by 1.6 kHz but falls **below the ±320 kHz the
-margin terms require** — and every later stage inherits its candidate CFO from
-there. It is the tight link in the chain, not the ±350 kHz grid.
+**~~The timing stage searches ±300 kHz~~ — closed.** It now searches
+±320 kHz, at 106.7 kHz for PSS and 80 kHz for pilot-epoch, both *finer* than the
+150 kHz and 100 kHz they replaced because `acquisition_centers` rounds the step
+down to fit the span. Measured over seven CFOs by three seeds, the median
+exact-minus-control margin moves from 0.021 to 0.277 and epoch-plus-CFO recovery
+from 15/21 to 16/21; 240 kHz went from picking the *wrong epoch* to exact.
+
+It is not uniformly better, and that is worth recording: 290 kHz sat 10 kHz from
+an old hypothesis and sits 30 kHz from a new one, and loses lock. Which exposes
+something the spacing analysis above does not cover — this stage's full-frame
+templates have an effective capture range of roughly ±10–20 kHz around a
+hypothesis, not the ±40 kHz half-spacing an 80 kHz grid implies. The ±320 kHz
+requirement is met; the grid is still coarse relative to what this stage can pull
+in, and closing that is a separate measurement.
 
 **Whether the expensive coherent detector is needed at all.** Its full-frame
 template tolerates ~±375 Hz residual CFO, so a brute-force search over the span
@@ -268,11 +337,13 @@ differential processing, and phase-only weighting.
 
 ## Next steps
 
-**1 — Repair what is deployed.** Config E with a cross-edge-calibrated
-`NOISE_CEILING`; widen the timing stage past ±320 kHz. Small, backed by a measured
-3–4× on real sky, waits on nothing. E is now doubly justified: it is also the right
-coarse front end for anything relative-phase, since its worst residual sits inside
-the ±113.6 kHz ambiguity window.
+**1 — ~~Repair what is deployed.~~ Built, not deployed.** Config E with a
+cross-edge-calibrated `NOISE_CEILING` (1.252 over 1,696 clean realisations); the
+timing stage widened to ±320 kHz at 106.7 kHz for PSS and 80 kHz for pilot-epoch,
+both finer than they were. E is doubly justified: it is also the right coarse
+front end for anything relative-phase, since its worst residual sits inside the
+±113.6 kHz ambiguity window. Reaching the capture host is a deployment, and
+nothing here has restarted a service.
 
 **2 — Measure the absolute LO error.** The one gap no stored data can close. Until
 it exists, every span is a width about an unknown centre.
@@ -338,6 +409,40 @@ injection ground truth both exist, and every measurement above came from them.
 Stage 0.4 — a whole-search false-alarm harness over a null population large enough
 to pin 1% — remains the prerequisite for any *production* threshold, as opposed to
 the comparison thresholds used here.
+
+---
+
+## What building step 1 changed in this document
+
+Four things, all of them measurements the build had to make and none of them
+changing where the plan is going.
+
+**The threshold reproduced.** Config E's 1% point came out at 1.2547 in exactly
+the construction this document specifies and 1.2524 over both cross-edge
+directions, against 1.255. Config A came out 1.2785 against 1.289. The real-sky
+fire rates for A on lnb-a and lnb-b came out 9.7% and 7.6% against 9.0% and 7.0%.
+E came out lower than claimed, 24.3% and 20.4% against 30.6% and 29.2%.
+
+**The 8.11% / 2.72% / 2.11% sentence was wrong** and is corrected above. The
+deployed 1.33 realises 0.06% on a clean null, not 2.11%.
+
+**The second null does not exist** as specified, and the retraction above says why.
+This is the one place where the plan would have made things worse if followed.
+
+**The cost model is affine, not proportional.** 104 kernels against 24 costs
+**3.76×**, not 4.33×, because about a quarter of a 24-kernel probe is fixed cost —
+the energy normaliser and the running-power cumsum run over the whole window
+before a single kernel is touched. Measured on a Pi 5, 80 ms probes, three threads,
+best of nine: 14.7 ms at 8 kernels, 28.2 at 24, 60.2 at 56, 106.2 at 104. The
+field anchors the level: 234 deployed surveys report 400.4 ms per probe-second at
+24 kernels. The survey sweep goes from a field-measured 1.70 s to a projected
+3.1 s.
+
+**One gap the build exposed and did not close.** The statistic depends on how many
+frames it folds, so a threshold belongs to a probe length: on synthetic noise this
+bank's 99th percentile runs 1.310 at 20 ms, 1.189 at 40 ms and 1.137 at 80 ms.
+`verify_presence` applies the 80 ms ceiling to whatever dwell chunk it is handed
+and cannot tell the difference. Recorded in the code, not fixed.
 
 ---
 

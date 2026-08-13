@@ -647,6 +647,43 @@ def _empty_corroboration() -> dict:
             "prior_coverage": []}
 
 
+def _landed(row: dict, sample_rate_hz: float | None) -> bool | None:
+    """Did this one control re-find the signal at *its own* capture rate?
+
+    ``None`` where the question cannot be put: a sidecar that does not say how
+    far the roll displaces the waveform, or a payload that does not say what
+    rate it was captured at, cannot be asked whether the control landed there.
+    Counting either as zero would read as "it did not", which is a different
+    and much more reassuring claim.  Guessing a rate would be worse still,
+    since the displacement is a number of *samples* and a guess that is wrong
+    by a factor of two moves the target by a factor of two.
+    """
+    expected = row.get("rolled_shift_samples")
+    if expected is None or not sample_rate_hz:
+        return None
+    period = float(sample_rate_hz) * STARLINK_FRAME_DURATION_S
+    return bool(_wrapped_gap(row.get("searched_control_epoch_shift_samples"),
+                             period - expected, period)
+                <= ROLLED_SHIFT_TOLERANCE_SAMPLES)
+
+
+def _trap_at_rate(sample_rate_hz: float | None, rows: list[dict]) -> dict:
+    """One rate's half of the trap, in the units that rate measures in."""
+    verdicts = [_landed(row, sample_rate_hz) for row in rows]
+    checked = [verdict for verdict in verdicts if verdict is not None]
+    displacements = sorted({row.get("rolled_shift_samples") for row in rows}
+                           - {None})
+    return {"sample_rate_hz": sample_rate_hz,
+            "observations": len(rows),
+            "expected_shift_samples": (displacements[0]
+                                       if len(displacements) == 1 else None),
+            "epoch_shift_samples": describe(
+                [row.get("searched_control_epoch_shift_samples")
+                 for row in rows]),
+            "landed_on_the_shifted_signal": sum(checked) if checked else None,
+            "unchecked": len(verdicts) - len(checked)}
+
+
 def rolled_control_trap(payloads: list[dict], *,
                         false_alarm_rate: float = DEFAULT_FALSE_ALARM_RATE) -> dict:
     """The same wrong-code control scored two ways, so the trap is on the record.
@@ -655,32 +692,53 @@ def rolled_control_trap(payloads: list[dict], *,
     which makes it the only one that can demonstrate the failure directly: the
     identical rolled template is scored once at the epoch the exact detector
     chose and once free to choose its own.  Free, it should land
-    ``roll * 11`` samples away — 187 at 2.5 MS/s, which wraps to 3,146 modulo
-    the frame period — carrying the real signal with it, and the threshold it
-    implies should be far above the pinned one.
+    ``roll * samples_per_symbol`` away — carrying the real signal with it — and
+    the threshold it implies should be far above the pinned one.
+
+    That displacement is a number of **samples**, so it belongs to one capture
+    rate and not to the corpus: 17 symbols is 187 samples at 2.5 MS/s and 374
+    at 5 MS/s, wrapping to 3,146 of 3,333 and 6,293 of 6,667.  The survey
+    randomises its capture configuration and the corpus genuinely holds both,
+    so every payload is scaled by its own ``sample_rate_hz`` here.  Taking one
+    payload's rate for the aggregate — any one, first or last — mis-placed the
+    trap by a factor of two on every payload that did not share it, and left
+    which half was mis-placed to directory scan order.
+
+    Reported per rate rather than pooled, for the same reason
+    :func:`_probe_lengths` counts configurations rather than averaging them: a
+    single "expected 187 samples" over a two-rate corpus is a sentence that is
+    false for half of it, and the median of the two shift populations is a
+    number neither of them produced.  ``expected_shift_samples`` and the
+    pooled ``epoch_shift_samples`` quantiles are therefore withheld unless the
+    aggregate holds exactly one rate; ``by_sample_rate_hz`` always carries
+    both.  ``landed_on_the_shifted_signal`` is a count of observations and
+    stays whole, because each was judged at its own rate.
 
     Recorded rather than merely avoided.  A future reader who finds
     ``matched_pilot_control_scores`` and reaches for its control column needs
     the number in front of them, not a comment in a module they will not open.
     """
-    rows = [row for row in certificate_rows(payloads)
-            if row["arm"] == "target"
-            and row.get("searched_control_score") is not None]
+    rows: list[dict] = []
+    grouped: dict[float | None, list[dict]] = {}
+    for payload in payloads:
+        rate = float(payload.get("sample_rate_hz") or 0.0) or None
+        for row in certificate_rows([payload]):
+            if (row["arm"] != "target"
+                    or row.get("searched_control_score") is None):
+                continue
+            rows.append(row)
+            grouped.setdefault(rate, []).append(row)
     if not rows:
         return {"observations": 0}
+    by_rate = [_trap_at_rate(rate, group) for rate, group in
+               sorted(grouped.items(),
+                      key=lambda item: (item[0] is None, item[0] or 0.0))]
+    single_rate = len(grouped) <= 1
     pinned = [row["control_score"] for row in rows]
     searched = [row["searched_control_score"] for row in rows]
-    expected = rows[0].get("rolled_shift_samples")
     shifts = [row.get("searched_control_epoch_shift_samples") for row in rows]
-    period = (payloads[0].get("sample_rate_hz", 2_500_000.0)
-              * STARLINK_FRAME_DURATION_S)
-    # A sidecar that does not say how far the roll displaces the waveform cannot
-    # be asked whether the control landed there; counting zero would read as
-    # "it did not", which is a different and much more reassuring claim.
-    landed = (None if expected is None else
-              sum(1 for shift in shifts
-                  if _wrapped_gap(shift, period - expected, period)
-                  <= ROLLED_SHIFT_TOLERANCE_SAMPLES))
+    landed = [slot["landed_on_the_shifted_signal"] for slot in by_rate
+              if slot["landed_on_the_shifted_signal"] is not None]
     return {"observations": len(rows), "method": "full-frame-300",
             "pinned_control": describe(pinned),
             "searched_control": describe(searched),
@@ -688,9 +746,15 @@ def rolled_control_trap(payloads: list[dict], *,
                 pinned, false_alarm_rate=false_alarm_rate),
             "searched_threshold": threshold_from(
                 searched, false_alarm_rate=false_alarm_rate),
-            "expected_shift_samples": expected,
-            "epoch_shift_samples": describe(shifts),
-            "landed_on_the_shifted_signal": landed}
+            "sample_rate_hz": sorted(rate for rate in grouped if rate),
+            "single_rate": single_rate,
+            "expected_shift_samples": (by_rate[0]["expected_shift_samples"]
+                                       if single_rate else None),
+            "epoch_shift_samples": (describe(shifts) if single_rate
+                                    else {"count": len(rows)}),
+            "landed_on_the_shifted_signal": sum(landed) if landed else None,
+            "unchecked": sum(slot["unchecked"] for slot in by_rate),
+            "by_sample_rate_hz": by_rate}
 
 
 def _parse_utc(stamp: str | None) -> float | None:
@@ -1211,12 +1275,31 @@ def format_review(report: dict) -> str:
             f"{_cell(trap['searched_threshold'].get('threshold'), '.4f', 'n/a')}"
             f"   n={trap['observations']}")
         landed = trap["landed_on_the_shifted_signal"]
-        lines.append(
-            f"  the searched control landed on the signal's own epoch minus "
-            f"{trap.get('expected_shift_samples')} samples in "
-            f"{'unrecorded' if landed is None else landed}/"
-            f"{trap['observations']} cases (median shift "
-            f"{_cell(trap['epoch_shift_samples'].get('p50'), '.0f', 'n/a')}).")
+        if trap.get("single_rate", True):
+            lines.append(
+                f"  the searched control landed on the signal's own epoch minus "
+                f"{trap.get('expected_shift_samples')} samples in "
+                f"{'unrecorded' if landed is None else landed}/"
+                f"{trap['observations']} cases (median shift "
+                f"{_cell(trap['epoch_shift_samples'].get('p50'), '.0f', 'n/a')}).")
+        else:
+            lines.append(
+                f"  the searched control landed on the signal's own epoch, "
+                f"each payload judged at its own rate, in "
+                f"{'unrecorded' if landed is None else landed}/"
+                f"{trap['observations']} cases. The displacement is a number of "
+                f"samples, so it is reported per rate and never pooled:")
+            for slot in trap["by_sample_rate_hz"]:
+                rate = slot["sample_rate_hz"]
+                slot_landed = slot["landed_on_the_shifted_signal"]
+                named = ("rate unrecorded" if rate is None
+                         else f"{rate / 1e6:.1f} MS/s")
+                lines.append(
+                    f"    {named}"
+                    f"   epoch minus {slot['expected_shift_samples']} samples in "
+                    f"{'unrecorded' if slot_landed is None else slot_landed}/"
+                    f"{slot['observations']} cases (median shift "
+                    f"{_cell(slot['epoch_shift_samples'].get('p50'), '.0f', 'n/a')})")
         lines.append("  Rolling the codes rolls the waveform, so a control free "
                      "to choose its epoch is not a null.")
         lines.append("  It is kept here as the exhibit; nothing above is "

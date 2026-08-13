@@ -55,9 +55,9 @@ def _observation(arm, *, receiver=0, channel=1, region="lower-edge",
 
 
 def _payload(capture, observations, *, elapsed=50.0, cross_receiver=(),
-             cross_edge=()):
+             cross_edge=(), rate=2.5e6):
     return {"schema": SCORES_SCHEMA, "capture": capture,
-            "radio_id": "pluto-test", "sample_rate_hz": 2.5e6,
+            "radio_id": "pluto-test", "sample_rate_hz": rate,
             "deployed_reproduction": {"checked": len(observations),
                                       "worst_delta": 0.0},
             "observations": list(observations),
@@ -426,6 +426,94 @@ def test_the_rolled_control_trap_is_written_down_rather_than_stepped_around(
     assert trap["searched_control"]["p50"] == pytest.approx(0.58)
     assert trap["landed_on_the_shifted_signal"] == 6
     assert "ROLLED-CONTROL TRAP" in format_review(review(tmp_path))
+
+
+def _trap_payload(capture, *, rate, shift, expected, count=3):
+    """A capture whose ``full-frame-300`` controls all re-found the signal."""
+    return _payload(capture, [
+        _observation("target", channel=index, certificates=[
+            _certificate("full-frame-300", 0.6, control=0.02,
+                         searched_control_score=0.58,
+                         searched_control_epoch_shift_samples=shift,
+                         rolled_shift_samples=expected)])
+        for index in range(count)], rate=rate)
+
+
+@pytest.mark.parametrize("reversed_order", [False, True])
+def test_the_rolled_control_trap_scales_each_payload_by_its_own_rate(
+        reversed_order):
+    """A corpus holding two rates traps at both of them or at neither.
+
+    Rolling the pilot codes by 17 symbols displaces the waveform by 17 symbol
+    periods, and a symbol is 11 samples at 2.5 MS/s and 22 at 5 MS/s: the same
+    roll is **187** samples on one arm of this corpus and **374** on the other,
+    and the frame it wraps in is 3,333 samples on one and 6,667 on the other.
+    Taking one payload's rate for the whole aggregate mis-places the trap by a
+    factor of two on every payload that does not share it — and which half is
+    mis-placed is decided by directory scan order, so the test asserts both
+    orderings give the same answer as well as the right one.
+    """
+    slow = _trap_payload("slow", rate=2.5e6, shift=3146.333, expected=187)
+    fast = _trap_payload("fast", rate=5.0e6, shift=6292.667, expected=374)
+    payloads = [fast, slow] if reversed_order else [slow, fast]
+
+    trap = rolled_control_trap(payloads)
+
+    assert trap["observations"] == 6
+    # Every control re-found the signal; none of them is evidence of a null.
+    assert trap["landed_on_the_shifted_signal"] == 6
+    by_rate = {entry["sample_rate_hz"]: entry
+               for entry in trap["by_sample_rate_hz"]}
+    assert by_rate[2.5e6]["expected_shift_samples"] == 187
+    assert by_rate[5.0e6]["expected_shift_samples"] == 374
+    assert by_rate[2.5e6]["landed_on_the_shifted_signal"] == 3
+    assert by_rate[5.0e6]["landed_on_the_shifted_signal"] == 3
+    assert by_rate[2.5e6]["epoch_shift_samples"]["p50"] == pytest.approx(3146.3,
+                                                                        abs=0.1)
+    assert by_rate[5.0e6]["epoch_shift_samples"]["p50"] == pytest.approx(6292.7,
+                                                                        abs=0.1)
+    # Order-independent: the same corpus read in the other direction is the
+    # same corpus.
+    assert trap["by_sample_rate_hz"] == rolled_control_trap(
+        list(reversed(payloads)))["by_sample_rate_hz"]
+
+
+def test_a_two_rate_trap_refuses_to_name_one_shift_or_one_median():
+    """Reported per rate or refused, never pooled — the probe-length precedent.
+
+    ``187`` and ``374`` are both true and neither is true of the aggregate, so
+    the summary that has to be one number carries none: a reader who sees a
+    single "expected 187 samples" beside a median of the two populations cannot
+    tell that half the corpus was measured against the wrong displacement.
+    """
+    mixed = [_trap_payload("slow", rate=2.5e6, shift=3146.333, expected=187),
+             _trap_payload("fast", rate=5.0e6, shift=6292.667, expected=374)]
+    single = [_trap_payload("slow", rate=2.5e6, shift=3146.333, expected=187)]
+
+    trap, alone = rolled_control_trap(mixed), rolled_control_trap(single)
+
+    assert trap["sample_rate_hz"] == [2.5e6, 5.0e6]
+    assert trap["single_rate"] is False
+    assert trap["expected_shift_samples"] is None
+    assert trap["epoch_shift_samples"].get("p50") is None
+    # One rate still names its own numbers, exactly as it did before.
+    assert alone["single_rate"] is True
+    assert alone["expected_shift_samples"] == 187
+    assert alone["epoch_shift_samples"]["p50"] == pytest.approx(3146.3, abs=0.1)
+
+
+def test_the_printed_trap_names_both_rates_when_the_corpus_holds_both(tmp_path):
+    """The number in the report is what a reader quotes, so it carries its rate."""
+    _write(tmp_path, _trap_payload("slow", rate=2.5e6, shift=3146.333,
+                                   expected=187))
+    _write(tmp_path, _trap_payload("fast", rate=5.0e6, shift=6292.667,
+                                   expected=374))
+
+    rendered = format_review(review(tmp_path))
+
+    assert "2.5 MS/s" in rendered and "5.0 MS/s" in rendered
+    assert "187 samples" in rendered and "374 samples" in rendered
+    assert "6/6" in rendered
 
 
 def test_two_probe_lengths_are_never_pooled_into_one_threshold(tmp_path):

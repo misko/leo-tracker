@@ -34,6 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import ctypes
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -274,16 +275,87 @@ _SOURCE = Path(__file__).with_name("_scan_kernel.c")
 _CFLAGS = ["-O3", "-march=native", "-ffast-math", "-funroll-loops",
            "-fopenmp", "-fPIC", "-shared"]
 
+#: How the compiler is asked what it will actually produce here.  Every probe
+#: is cheap -- 43 ms for all four on a cold Pi 5, and they run once per process
+#: -- and every one of them answers a question the cache filename used to
+#: guess at.  ``--version`` is which compiler and which build of it;
+#: ``-dumpmachine`` is the triple it emits for; ``-Q --help=target`` is what
+#: ``-march=native`` *resolved* to, which on this host prints
+#: ``-mcpu= cortex-a76+crc+crypto`` and is the whole point; the macro dump is
+#: the same question asked in a way a compiler without ``--help=target`` will
+#: still answer.  The flags go in beside the answers because a flag change that
+#: no probe reflects -- ``-funroll-loops``, say -- still changes the object.
+_IDENTITY_PROBES = (
+    ("--version",),
+    ("-dumpmachine",),
+    (*_CFLAGS, "-Q", "--help=target"),
+    (*_CFLAGS, "-dM", "-E", "-"),
+)
+
+#: Long enough for a compiler that is merely slow -- the slowest of these
+#: measures 20 ms here and the build itself 323 ms -- and short enough that a
+#: compiler that will never answer cannot wedge a capture.
+_IDENTITY_TIMEOUT_S = 10.0
+
 
 class ScanKernelUnavailable(RuntimeError):
     """Raised when the fused kernel cannot be built for this machine."""
 
 
+def _compiler() -> str:
+    """The compiler the kernel is built with, so the key names the same one."""
+    return os.environ.get("CC", "cc")
+
+
+def _build_identity(compiler: str) -> str | None:
+    """A short digest of what this host will compile the kernel *into*.
+
+    ``sys.platform`` and ``os.uname().machine`` name an ISA, not a build.  Two
+    hosts that are both linux/aarch64 resolve ``-march=native`` to different
+    targets -- cortex-a76 here, something else there -- and ``-ffast-math``
+    lets the compiler reassociate the fold, so the two objects sum the
+    reduction in a different order.  That is the measured source of the ~1e-8
+    residual a score picks up when it is recomputed on another host: on one
+    host the recomputation is bitwise exact, across hosts it lands about 1e-8
+    away.  Scoring now runs on an analysis host separate from the capture host
+    and both write into a cache keyed by name, so under the old key one of them
+    silently loads a shared object built for the other's CPU.
+
+    ``None`` when the compiler answers nothing at all -- absent, unexecutable,
+    or failing every probe.  This is on the live capture path, so an
+    uninterrogable compiler degrades to the key this cache used before the
+    digest existed rather than raising: the worst case is the collision that
+    was there all along, and no capture stops.
+    """
+    answers = []
+    for probe in _IDENTITY_PROBES:
+        try:
+            done = subprocess.run([compiler, *probe], capture_output=True,
+                                  input=b"", timeout=_IDENTITY_TIMEOUT_S)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if done.returncode == 0 and done.stdout:
+            answers.append(done.stdout)
+    if not answers:
+        return None
+    answers.append("\0".join(_CFLAGS).encode())
+    return hashlib.sha256(b"\0".join(answers)).hexdigest()[:12]
+
+
 def _library_path() -> Path:
+    """Where this build's kernel is cached, keyed so another build cannot claim it.
+
+    The digest is appended rather than substituted: the name still says which
+    platform and machine it belongs to, so the cache directory stays readable
+    to a person, and a build that cannot be identified keeps exactly the name
+    it had before.
+    """
     cache = Path(os.environ.get("LEO_SCAN_CACHE",
                                 Path(tempfile.gettempdir()) / "leo-scan-kernel"))
     cache.mkdir(parents=True, exist_ok=True)
-    return cache / f"libleoscan-{sys.platform}-{os.uname().machine}.so"
+    stem = f"libleoscan-{sys.platform}-{os.uname().machine}"
+    digest = _build_identity(_compiler())
+    return cache / (f"{stem}.so" if digest is None else f"{stem}-{digest}.so")
 
 
 @lru_cache(maxsize=1)
@@ -295,7 +367,7 @@ def _load_kernel():
     """
     target = _library_path()
     if not target.is_file() or target.stat().st_mtime < _SOURCE.stat().st_mtime:
-        compiler = os.environ.get("CC", "cc")
+        compiler = _compiler()
         try:
             subprocess.run([compiler, *_CFLAGS, str(_SOURCE), "-o", str(target)],
                            check=True, capture_output=True)

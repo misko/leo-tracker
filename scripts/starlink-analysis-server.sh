@@ -43,6 +43,16 @@ archive_mode="${LEO_ANALYSIS_ARCHIVE_MODE:-shadow}"
 # retention removes whole. On by default while detector work is under way.
 survey_corpus_mode="${LEO_ANALYSIS_SURVEY_CORPUS_MODE:-on}"
 survey_corpus_random_fraction="${LEO_ANALYSIS_SURVEY_CORPUS_FRACTION:-0.05}"
+# Shadow detector bake-off over the preserved probes. Scores every candidate on
+# every probe and accumulates, so methods are compared on a day of real sky
+# rather than one sweep. Gates nothing and moves no deployed threshold.
+# Measured at 55-62 s per entry on this host under normal contention, and the
+# corpus grows far slower than captures do, so one entry per job keeps the tail
+# bounded while still keeping up.
+survey_score_mode="${LEO_ANALYSIS_SURVEY_SCORE_MODE:-on}"
+survey_score_limit="${LEO_ANALYSIS_SURVEY_SCORE_LIMIT:-1}"
+survey_score_null_stride="${LEO_ANALYSIS_SURVEY_SCORE_NULL_STRIDE:-2}"
+survey_score_maximum_s="${LEO_ANALYSIS_SURVEY_SCORE_MAXIMUM_S:-240}"
 archive_root="${LEO_ANALYSIS_ARCHIVE_ROOT:-/mnt/qnap01/mouse9911/leo-cropped}"
 retention_mode="${LEO_ANALYSIS_RETENTION_MODE:-disabled}"
 # Optional shadow projection. Workers publish only immutable input manifests;
@@ -528,6 +538,22 @@ process_job() {
       emit "shadow_stage_failed worker=${worker_id} job=${name} stage=survey_corpus production_affected=false"
     fi
   fi
+  # Score whatever the corpus stage just preserved with every candidate
+  # detector. This is the accumulating half of the bake-off: one sweep of real
+  # sky is one draw from an uncharacterised distribution, and with no injection
+  # there is no ground truth, so the comparison has to be built out of many
+  # probes rather than one. Shadow for the same reason as the corpus above: a
+  # comparison that stopped growing is a slower experiment, while a job that
+  # failed because of one is a capture nobody analysed.
+  if [[ "${survey_score_mode:-on}" != off ]]; then
+    if ! run_stage "${worker_id}" "${name}" survey_score radio \
+        starlink-survey-score run "${root}" \
+        --limit "${survey_score_limit:-1}" \
+        --null-stride "${survey_score_null_stride:-2}" \
+        --maximum-seconds "${survey_score_maximum_s:-240}"; then
+      emit "shadow_stage_failed worker=${worker_id} job=${name} stage=survey_score production_affected=false"
+    fi
+  fi
   emit "coverage_result worker=${worker_id} job=${name} full_coverage=${full_coverage} has_checks=${has_checks} archived=${archived}"
 }
 
@@ -651,7 +677,7 @@ for interrupted in "${queue}"/*.running.*; do
 done
 shopt -u nullglob
 publish_runtime_state running
-emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_policy=tiered-v2 retention_mode=${retention_mode} python=$(${venv}/bin/python --version 2>&1)"
+emit "server_start repo=${repo_dir} shared_root=${root} queue=${queue} reports=${reports} workers=${workers} once=${once} heartbeat_s=${heartbeat_s} pipeline=${pipeline_id} full_coverage=${full_coverage} archive_mode=${archive_mode} archive_root=${archive_root} evidence_policy=tiered-v2 retention_mode=${retention_mode} survey_corpus_mode=${survey_corpus_mode} survey_score_mode=${survey_score_mode} python=$(${venv}/bin/python --version 2>&1)"
 startup_reconciliation() {
   local audit_result
   audit_result="$(protocol audit "${root}" --context "${default_context}" --pipeline-id "${pipeline_id}")"

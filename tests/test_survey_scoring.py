@@ -1,0 +1,637 @@
+"""Shadow-scoring every preserved probe with every candidate detector.
+
+The comparison this feeds is only as good as the bookkeeping underneath it, and
+the bookkeeping fails silently: a probe mapped to the wrong tuning still scores,
+a half-written sidecar still parses, and a corpus that quietly skips the entries
+it cannot map produces a comparison over a biased subset without ever saying so.
+So the properties pinned here are mostly about refusing rather than computing —
+what must be skipped, what must be counted, and what must never be guessed.
+
+The exception is the shared conditioned path, which exists because conditioning
+six statistics on one correlation set is five times cheaper than recomputing it
+six times. That is an optimisation, and this repository's rule is that an
+optimisation agrees with the obvious implementation or it is a redesign, so it
+is gated against :mod:`relative_phase`'s public functions on the same input.
+"""
+import json
+
+import numpy as np
+import pytest
+
+from leo_tracker.radio.beacon.pilots import (edge_pilot_frame,
+                                             matched_pilot_control_scores,
+                                             matched_pilot_score)
+from leo_tracker.radio.beacon.relative_phase import (adjacent_differential,
+                                                     anchor_relative_phase,
+                                                     symbol_glrt)
+from leo_tracker.radio.beacon.structure import STARLINK_FRAME_DURATION_S
+from leo_tracker.radio.beacon.survey_scoring import (
+    ProbeUnusable, SCORES_SCHEMA, conditioned_full_frame, conditioned_suite,
+    cross_receiver_checks, distinct_points, rolled_control_shift_samples, run,
+    score_entry, scores_path, scoring_status, search_cells, tuning_plan)
+
+RATE = 2_500_000.0
+PERIOD = RATE * STARLINK_FRAME_DURATION_S
+SAMPLES = 15_000                       # 4.5 frames: the fold's own minimum is 4
+TUNINGS = ((1, "lower-edge"), (1, "upper-edge"))
+
+
+def _record(tunings, *, order=True, peak=1.2):
+    """A pre-dwell survey record shaped the way the capture host writes one."""
+    record = {
+        "schema": "leo-tracker.pre-dwell-survey/v1", "state": "complete",
+        "sample_rate_hz": RATE, "offset_span_hz": 300_000.0,
+        "started_utc_ns": 1_760_000_000_000_000_000, "warm_ms": 800.0,
+        "total_ms": 400.0, "per_tuning_ms": 50.0,
+        "tunings": [{"channel": channel, "region": region,
+                     "if_center_hz": 9.6e8, "rf_center_hz": 1.07e10,
+                     "receivers": [{"receiver": index, "active": False,
+                                    "peak_to_median": peak,
+                                    "anchor_agreement": 0, "anchor_count": 8}
+                                   for index in (0, 1)]}
+                    for channel, region in tunings]}
+    if order:
+        record["sample_order"] = [list(pair) for pair in tunings]
+    return record
+
+
+def _entry(root, name, *, tunings=TUNINGS, order=True, samples=SAMPLES,
+           truncate=False, block=None, state="complete"):
+    """One preserved corpus entry, IQ and manifest, as the sampler writes it."""
+    entry = root / name
+    entry.mkdir(parents=True, exist_ok=True)
+    record = _record(tunings, order=order)
+    record["state"] = state
+    manifest = {
+        "state": "complete", "created_utc_ns": 1_760_000_002_000_000_000,
+        "identity": {"radio_id": "pluto-test",
+                     "receiver_labels": ["lnb-a", "lnb-b"]},
+        "metadata": {"pre_dwell_survey": record},
+        "survey_iq": {"path": "survey.ci16", "dtype": "ci16_le",
+                      "tunings": len(tunings), "samples_per_tuning": samples,
+                      "layout": "tuning,sample,receiver,component"}}
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+    if block is None:
+        block = np.zeros((len(tunings), samples, 2, 2), np.int16)
+        block[..., 0] = 40                      # a flat, finite, boring probe
+    raw = np.asarray(block, np.int16).ravel()
+    (entry / "survey.ci16").write_bytes(
+        raw[:-4].tobytes() if truncate else raw.tobytes())
+    return entry
+
+
+def _replica(count=SAMPLES, *, epoch=0, edge="lower"):
+    """A noiseless pilot in every frame slot, on the fractional frame grid."""
+    frame = edge_pilot_frame(RATE, edge)
+    values = np.zeros(count, np.complex128)
+    slot = 0
+    while True:
+        start = epoch + int(round(slot * PERIOD))
+        if start >= count:
+            break
+        values[start:start + frame.size] += frame[:count - start]
+        slot += 1
+    return values.astype(np.complex64)
+
+
+# --------------------------------------------------------------------------
+# what must be refused
+# --------------------------------------------------------------------------
+
+def test_an_entry_without_sample_order_is_skipped_rather_than_guessed(tmp_path):
+    """Position agrees with the record list only by luck, and luck is not a map.
+
+    ``summarise`` sorts the tuning records by score while the IQ stays in
+    collection order. Roughly half the live corpus predates ``sample_order``,
+    and inferring it would attribute a detection to a channel and edge the radio
+    was not pointed at — a wrong answer that looks exactly like a right one.
+    """
+    _entry(tmp_path, "ch1-no-order", order=False)
+
+    outcome = run(tmp_path)
+
+    assert outcome["scored"] == 0
+    assert outcome["no_sample_order"] == 1
+    assert not scores_path(tmp_path / "ch1-no-order").exists()
+
+
+def test_the_tuning_map_comes_only_from_the_manifests_own_order(tmp_path):
+    """Read directly, so the refusal cannot be softened by a later caller."""
+    entry = _entry(tmp_path, "ch1-mapped")
+    manifest = json.loads((entry / "manifest.json").read_text())
+
+    plan = tuning_plan(manifest)
+
+    assert [(item["channel"], item["region"]) for item in plan] == list(TUNINGS)
+    assert [item["iq_index"] for item in plan] == [0, 1]
+    del manifest["metadata"]["pre_dwell_survey"]["sample_order"]
+    with pytest.raises(ProbeUnusable, match="sample_order"):
+        tuning_plan(manifest)
+
+
+def test_a_truncated_probe_is_counted_and_the_sweep_carries_on(tmp_path):
+    """One short copy must not stop a sweep that runs beside every analysis job.
+
+    The length is checked against the shape the manifest declares rather than
+    trusted, because ``reshape`` on a truncated file either raises somewhere far
+    away or, worse, succeeds against a different shape.
+    """
+    _entry(tmp_path, "ch1-damaged", truncate=True)
+    _entry(tmp_path, "ch2-intact")
+
+    outcome = run(tmp_path)
+
+    assert outcome["unusable"] == 1
+    assert outcome["scored"] == 1
+    assert outcome["errors"][0]["entry"] == "ch1-damaged"
+    assert not scores_path(tmp_path / "ch1-damaged").exists()
+
+
+def test_a_survey_that_never_completed_is_not_scored(tmp_path):
+    """A failed survey holds no probes; its IQ would be an empty exhibit."""
+    _entry(tmp_path, "ch1-failed", state="failed")
+
+    outcome = run(tmp_path)
+
+    assert outcome["scored"] == 0 and outcome["unusable"] == 1
+
+
+# --------------------------------------------------------------------------
+# how it must behave when it runs again
+# --------------------------------------------------------------------------
+
+def test_scoring_twice_rescores_nothing(tmp_path):
+    """It runs beside every analysis job; repeating it has to be nearly free."""
+    _entry(tmp_path, "ch1-idempotent")
+
+    first = run(tmp_path)
+    second = run(tmp_path)
+
+    assert first["scored"] == 1
+    assert second["scored"] == 0 and second["already_scored"] == 1
+
+
+def test_a_sidecar_from_an_older_schema_is_replaced_rather_than_trusted(tmp_path):
+    """Two definitions of one column silently averaged is the worst outcome."""
+    entry = _entry(tmp_path, "ch1-stale")
+    scores_path(entry).write_text(json.dumps({"schema": "something-older"}))
+
+    outcome = run(tmp_path)
+
+    assert outcome["scored"] == 1
+    assert json.loads(scores_path(entry).read_text())["schema"] == SCORES_SCHEMA
+
+
+def test_the_sidecar_is_published_in_one_step(tmp_path):
+    """A reader must never see half a file, and a crash must leave none.
+
+    The staging name is written, flushed and renamed, so an interrupted run
+    leaves the entry unscored — which the next sweep fixes — rather than a file
+    that parses far enough to poison an aggregate.
+    """
+    entry = _entry(tmp_path, "ch1-atomic")
+    stale = scores_path(entry).with_suffix(".json.partial")
+    stale.write_text("{ truncated")
+
+    run(tmp_path)
+
+    assert json.loads(scores_path(entry).read_text())["schema"] == SCORES_SCHEMA
+    assert not list(entry.glob("*.partial"))
+
+
+def test_a_finished_sidecar_announces_itself_in_its_first_bytes(tmp_path):
+    """The sweep runs on every analysis job over hundreds of files on a share.
+
+    Each sidecar is ~350 kB, so parsing every one of them to learn it is already
+    done would cost more than scoring the single entry that is not. ``schema``
+    is written first for exactly that reason, and sorting the keys would bury it
+    behind the observation list where the shortcut cannot see it.
+    """
+    entry = _entry(tmp_path, "ch1-prefix")
+
+    run(tmp_path)
+
+    head = scores_path(entry).read_bytes()[:80].decode()
+    assert head.startswith(f'{{"schema": "{SCORES_SCHEMA}"')
+
+
+def test_the_limit_bounds_one_analysis_job(tmp_path):
+    """Scoring costs ~57 s an entry; a job must not inherit the whole backlog."""
+    for index in range(3):
+        _entry(tmp_path, f"ch{index}-limited")
+
+    outcome = run(tmp_path, limit=1)
+
+    assert outcome["scored"] == 1 and outcome["budget_reached"] is True
+
+
+def test_rebuild_rescores_what_is_already_done(tmp_path):
+    """The statistic changes more often than the corpus does.
+
+    Every constant here — the coarse shapes, the symbol counts, the transform
+    size — is under active comparison, so re-deriving the whole corpus has to be
+    one flag rather than a manual sweep of two hundred directories.
+    """
+    _entry(tmp_path, "ch1-rebuild")
+    run(tmp_path)
+
+    outcome = run(tmp_path, rebuild=True)
+
+    assert outcome["scored"] == 1 and outcome["already_scored"] == 0
+
+
+def test_a_wall_clock_budget_stops_before_starting_another_entry(tmp_path):
+    """Bounded between entries, never inside one.
+
+    A half-scored probe would enter the comparison as a hole that is missing
+    for a reason correlated with what it contains, which is worse than one that
+    is simply absent — so the budget is checked before an entry begins and
+    never abandons one partway.
+    """
+    _entry(tmp_path, "ch1-budget")
+
+    outcome = run(tmp_path, maximum_seconds=0.0)
+
+    assert outcome["scored"] == 0 and outcome["budget_reached"] is True
+    assert not scores_path(tmp_path / "ch1-budget").exists()
+
+
+def test_status_separates_scored_from_scorable(tmp_path):
+    """An entry nobody can map is not a backlog item; it will never be scored."""
+    _entry(tmp_path, "ch1-status-done")
+    _entry(tmp_path, "ch2-status-todo")
+    _entry(tmp_path, "ch3-status-unmappable", order=False)
+    run(tmp_path, limit=1)
+
+    status = scoring_status(tmp_path)
+
+    assert status["held"] == 3
+    assert status["scored"] == 1
+    assert status["eligible_unscored"] == 1
+
+
+# --------------------------------------------------------------------------
+# what a scored entry has to contain
+# --------------------------------------------------------------------------
+
+def test_rerunning_the_deployed_detector_reproduces_the_capture_hosts_number(tmp_path):
+    """The only end-to-end check on everything in front of the comparison.
+
+    Config A ran on these exact samples at capture time and the answer is in the
+    manifest. The mapping, the reshape, the receiver index and the bank build
+    must all be right for re-running it here to land on the same value, and every
+    one of them fails silently otherwise. Measured at exactly 0.0 across sixteen
+    observations of a real entry, so approximate agreement is not the bar.
+    """
+    entry = _entry(tmp_path, "ch1-reproduce")
+    # The synthetic manifest quotes a made-up 1.2 where a real one quotes what
+    # the capture host measured, so what the capture host would have written is
+    # first scored out and put back — after which zero is the only right answer.
+    measured = {(item["channel"], item["region"], item["receiver"]):
+                item["coarse"]["A"]["peak_to_median"]
+                for item in score_entry(entry)["observations"]
+                if item["arm"] == "target"}
+    manifest = json.loads((entry / "manifest.json").read_text())
+    for tuning in manifest["metadata"]["pre_dwell_survey"]["tunings"]:
+        for scored in tuning["receivers"]:
+            scored["peak_to_median"] = measured[
+                (tuning["channel"], tuning["region"], scored["receiver"])]
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+
+    payload = score_entry(entry)
+
+    assert payload["deployed_reproduction"]["checked"] == 4
+    assert payload["deployed_reproduction"]["worst_delta"] == 0.0
+    assert all(item["deployed"]["anchor_agreement"] is not None
+               for item in payload["observations"]
+               if item["arm"] == "target")
+
+
+def test_every_claim_names_a_place_and_says_how_hard_it_searched(tmp_path):
+    """A score cannot be checked by anything else; a certificate can.
+
+    ``search_cells`` travels with it because a maximum over 43,329 cells and an
+    evaluation at one are different statistics with thresholds 5.2 dB apart, and
+    a reader who pools them will conclude the opposite of the truth.
+    """
+    entry = _entry(tmp_path, "ch1-certificates")
+
+    payload = score_entry(entry)
+
+    target = [item for item in payload["observations"]
+              if item["arm"] == "target"]
+    assert len(target) == 4                    # two tunings, two receivers
+    methods = {certificate["method"]
+               for certificate in target[0]["certificates"]}
+    assert methods == {"coarse-A", "coarse-E", "anchor-8", "differential-16",
+                       "differential-32", "glrt-32", "glrt-64",
+                       "full-frame-300"}
+    for certificate in target[0]["certificates"]:
+        assert certificate["epoch_sample"] >= 0
+        assert certificate["cfo_hz"] is not None
+        assert certificate["search_cells"] >= 1
+        assert certificate["elapsed_ms"] > 0
+    assert target[0]["utc"].endswith("Z")
+
+
+def test_a_rolled_control_given_a_free_epoch_re_finds_the_signal_it_should_not():
+    """Rolling the pilot codes rolls the waveform, so the control is not a null.
+
+    The 17-roll template is the plain frame displaced ``17 * 11 = 187`` samples,
+    coherence 0.909, and a control allowed to choose its own epoch lands exactly
+    there — on the real signal. Its p99 on the corpus reaches 1.851 against the
+    cross-edge 1.252, and a threshold calibrated on it would have had the survey
+    fire on 1.8% of sky instead of 21%. This is why every certificate carries
+    ``control_epoch`` and why only pinned controls calibrate anything.
+    """
+    samples = _replica()
+
+    _, control = matched_pilot_control_scores(samples, RATE, edge="lower",
+                                              frequency_offsets_hz=(0.0,))
+    pinned = conditioned_full_frame(samples, RATE, 0, 0.0, edge="lower")
+
+    shift = rolled_control_shift_samples(RATE)
+    assert shift == 187
+    # Epoch zero minus 187 wraps to one frame period short of it.
+    assert control["sample_index"] == pytest.approx(round(PERIOD) - shift, abs=2)
+    assert control["score"] > 0.85              # it found the signal
+    assert pinned["control_score"] < 0.15       # held still, it finds nothing
+
+
+def test_the_searched_rolled_control_is_recorded_beside_the_pinned_one(tmp_path):
+    """Documented as an exhibit rather than merely avoided in the code.
+
+    The certificate keeps the honest pinned control for its margin and carries
+    the searched one and its epoch shift alongside, so the review can print the
+    gap and a later reader does not have to rediscover it.
+    """
+    entry = _entry(tmp_path, "ch1-trap")
+
+    payload = score_entry(entry)
+
+    full = next(certificate
+                for certificate in payload["observations"][0]["certificates"]
+                if certificate["method"] == "full-frame-300")
+    assert full["control_epoch"] == "pinned"
+    # Pinned and still not this score's null: the score is a maximum over every
+    # lag while the control sits at one.
+    assert full["epoch_searched"] is True
+    assert full["searched_control_score"] is not None
+    assert full["rolled_shift_samples"] == 187
+    assert full["margin"] == pytest.approx(
+        full["score"] - full["control_score"])
+    assert payload["rolled_control_shift_samples"] == 187
+    assert payload["probe_ms"] == pytest.approx(1000.0 * SAMPLES / RATE)
+    assert payload["deployed_threshold"] > 1.0
+
+
+def test_the_wrong_code_control_travels_with_every_candidate_claim(tmp_path):
+    """A score of 0.4 is evidence only if the rolled code does not also reach it.
+
+    The coarse banks are the exception and must say so: :mod:`fast_scan` has no
+    rolled-template path, so their false-alarm evidence rests on the cross-edge
+    arm alone and a null margin is honest where a zero would be a lie.
+    """
+    entry = _entry(tmp_path, "ch1-controls")
+
+    payload = score_entry(entry)
+
+    by_method = {certificate["method"]: certificate
+                 for certificate in payload["observations"][0]["certificates"]}
+    for method in ("anchor-8", "differential-32", "glrt-64", "full-frame-300"):
+        assert by_method[method]["control_score"] is not None
+        assert by_method[method]["margin"] == pytest.approx(
+            by_method[method]["score"] - by_method[method]["control_score"])
+    assert by_method["coarse-E"]["control_score"] is None
+    assert by_method["coarse-E"]["margin"] is None
+
+
+def test_the_cross_edge_null_scores_the_opposite_edges_code_on_this_probe(tmp_path):
+    """Target-pilot-free by construction: those codes sit 230 MHz away.
+
+    Run on the same IQ rather than on another probe, so the null shares this
+    tuning's gain and interference, and in both directions rather than only the
+    plan's lower-on-upper, with the direction recorded so either can be sliced
+    back out.
+    """
+    entry = _entry(tmp_path, "ch1-null")
+
+    payload = score_entry(entry, null_stride=1)
+
+    nulls = [item for item in payload["observations"]
+             if item["arm"] == "cross-edge-null"]
+    assert len(nulls) == 4
+    directions = {item["null_direction"] for item in nulls}
+    assert directions == {"upper-on-lower", "lower-on-upper"}
+    for item in nulls:
+        assert item["template_edge"] != item["edge"]
+
+
+def test_the_null_arm_can_be_thinned_without_thinning_the_target_arm(tmp_path):
+    """The null only has to accumulate; the target arm is what is being measured."""
+    entry = _entry(tmp_path, "ch1-stride")
+
+    payload = score_entry(entry, null_stride=2)
+
+    arms = [item["arm"] for item in payload["observations"]]
+    assert arms.count("target") == 4
+    assert 0 < arms.count("cross-edge-null") < 4
+
+
+def test_claims_naming_the_same_place_are_conditioned_once(tmp_path):
+    """Five candidates inherit one coarse epoch, so their claims collide often.
+
+    Epochs are compared modulo the frame period, the way two receivers are
+    compared in :mod:`analysis`: a claim one whole frame later is the same claim
+    about the same signal.
+    """
+    certificates = [
+        {"method": "coarse-E", "epoch_sample": 1000, "cfo_hz": 100.0},
+        {"method": "anchor-8", "epoch_sample": 1003, "cfo_hz": 150.0},
+        {"method": "glrt-32", "epoch_sample": 1000 + int(round(PERIOD)),
+         "cfo_hz": 100.0},
+        {"method": "glrt-64", "epoch_sample": 1000, "cfo_hz": 9_000.0},
+    ]
+
+    points = distinct_points(certificates, RATE)
+
+    assert len(points) == 2
+    merged = next(point for point in points if len(point["claimed_by"]) == 3)
+    assert sorted(merged["claimed_by"]) == ["anchor-8", "coarse-E", "glrt-32"]
+
+
+def test_every_method_is_asked_about_every_claimed_place(tmp_path):
+    """The point of the whole design: methods validate each other's claims.
+
+    A method that cannot acquire a weak signal may still confirm it firmly once
+    somebody else says where to look, and that is invisible if each method only
+    ever searches alone.
+    """
+    entry = _entry(tmp_path, "ch1-confirm")
+
+    payload = score_entry(entry, null_stride=1)
+
+    observation = payload["observations"][0]
+    assert observation["points"]
+    for point in observation["points"]:
+        assert set(point["methods"]) == {
+            "anchor-8", "differential-16", "differential-32", "glrt-32",
+            "glrt-64", "full-frame-300"}
+        for value in point["methods"].values():
+            assert value["control_score"] is not None
+            assert value["cross_edge_score"] is not None
+        assert point["claimed_by"]
+
+
+# --------------------------------------------------------------------------
+# the shared conditioned path, gated against the reference it replaces
+# --------------------------------------------------------------------------
+
+def test_the_shared_conditioned_path_reproduces_the_reference_detectors():
+    """One correlation set serving six statistics must equal six separate runs.
+
+    :func:`conditioned_suite` computes the widest contiguous run once and slices
+    it, which is five times cheaper and is exactly the kind of change that turns
+    into a silent redesign. So it is pinned against
+    :mod:`relative_phase`'s public functions on the same samples, at the
+    tolerance of the arithmetic rather than of the eye.
+    """
+    samples = _replica()
+
+    suite = conditioned_suite(samples, RATE, 0, 0.0, edge="lower")
+
+    for count in (16, 32):
+        reference = adjacent_differential(samples, RATE, 0, 0.0, edge="lower",
+                                          symbol_count=count)
+        shared = suite["scores"][f"differential-{count}"]
+        assert shared["score"] == pytest.approx(reference["score"], rel=1e-12)
+        assert shared["residual_frequency_offset_hz"] == pytest.approx(
+            reference["residual_frequency_offset_hz"], rel=1e-9, abs=1e-9)
+    anchor = anchor_relative_phase(samples, RATE, 0, 0.0, edge="lower",
+                                   search=False)
+    assert suite["scores"]["anchor-8"]["score"] == pytest.approx(
+        anchor["score"], rel=1e-12)
+
+
+def test_a_conditioned_glrt_is_the_searched_one_with_the_search_removed():
+    """Same S(f); the searched version reports its maximum, this one a value.
+
+    On a noiseless replica at zero residual the maximum *is* the value at zero,
+    which is the one input where the two must coincide exactly — and if they do
+    not, the conditioned column is measuring something else entirely.
+    """
+    samples = _replica()
+
+    searched = symbol_glrt(samples, RATE, 0, 0.0, edge="lower", symbol_count=32)
+    suite = conditioned_suite(samples, RATE, 0, 0.0, edge="lower")
+
+    assert searched["residual_frequency_offset_hz"] == pytest.approx(0.0, abs=1.0)
+    assert suite["scores"]["glrt-32"]["score"] == pytest.approx(
+        searched["score"], rel=1e-12)
+
+
+def test_the_conditioned_full_frame_is_the_reference_pinned_to_one_lag():
+    """Built by handing the reference a window exactly one frame long.
+
+    Composing the published detector rather than reimplementing it is what keeps
+    its conditioned number comparable with its searched one; a second
+    implementation of the same normalisation would be a second convention.
+    """
+    samples = _replica()
+    frame = edge_pilot_frame(RATE, "lower")
+
+    conditioned = conditioned_full_frame(samples, RATE, 0, 0.0, edge="lower")
+    reference = matched_pilot_score(samples[:frame.size], RATE, edge="lower",
+                                    frequency_offsets_hz=(0.0,))
+
+    # Both paths carry the correlation in complex64, so they agree to float32
+    # epsilon and no further; anything looser would stop being a gate.
+    assert conditioned["score"] == pytest.approx(reference["score"], rel=1e-5)
+    assert conditioned["score"] == pytest.approx(1.0, abs=1e-5)
+
+
+def test_a_conditioned_score_needs_no_search_and_says_so():
+    """One cell by definition, which is the whole reason it is worth recording.
+
+    An exponential-tailed statistic thresholded at 1% sits at 15.28 times the
+    mean after a 3,333-cell search and 4.61 times conditioned — 5.2 dB — so the
+    cell count is not bookkeeping, it is the size of the effect.
+    """
+    assert search_cells("coarse-A", RATE, 200_000) == 3 * round(PERIOD)
+    assert search_cells("coarse-E", RATE, 200_000) == 13 * round(PERIOD)
+    assert search_cells("differential-32", RATE, 200_000) == 1
+    assert search_cells("anchor-8", RATE, 200_000) == 1
+    assert search_cells("full-frame-300", RATE, 200_000) > 190_000
+
+
+def test_evaluating_where_the_signal_is_not_costs_almost_all_of_the_score():
+    """Conditioning is only meaningful if the statistic actually depends on it."""
+    samples = _replica()
+
+    on_point = conditioned_suite(samples, RATE, 0, 0.0, edge="lower")
+    off_point = conditioned_suite(samples, RATE, 0, 90_000.0, edge="lower")
+
+    assert on_point["scores"]["glrt-32"]["score"] > 0.9
+    assert off_point["scores"]["glrt-32"]["score"] < 0.5
+
+
+# --------------------------------------------------------------------------
+# checks the detector did not make itself
+# --------------------------------------------------------------------------
+
+def test_the_receivers_are_compared_the_way_the_dwell_path_compares_them():
+    """Same wrapped epoch difference and same offset difference, same words.
+
+    The antennas are co-located, so a real satellite lands on the same frame
+    epoch at both ports with offsets differing by exactly the measured LNB bias
+    — and the check needs neither absolute offset, which matters because the
+    calibration structurally cannot establish either one.
+    """
+    observations = [
+        {"arm": "target", "channel": 1, "region": "lower-edge", "receiver": 0,
+         "certificates": [{"method": "glrt-32", "epoch_sample": 1000,
+                           "cfo_hz": 434_000.0}]},
+        {"arm": "target", "channel": 1, "region": "lower-edge", "receiver": 1,
+         "certificates": [{"method": "glrt-32",
+                           "epoch_sample": 1002 + int(round(PERIOD)),
+                           "cfo_hz": 1_500.0}]},
+    ]
+
+    uncalibrated = cross_receiver_checks(observations, RATE)
+    calibrated = cross_receiver_checks(observations, RATE,
+                                       receiver_centers=(434_000.0, 0.0),
+                                       calibrated=True)
+
+    assert uncalibrated[0]["epoch_difference_samples"] == pytest.approx(2, abs=1)
+    assert uncalibrated[0]["cfo_difference_hz"] == pytest.approx(432_500.0)
+    assert uncalibrated[0]["agrees"] is False
+    assert calibrated[0]["cfo_residual_after_bias_hz"] == pytest.approx(1_500.0)
+    assert calibrated[0]["agrees"] is True
+
+
+def test_the_geometry_prior_carries_the_share_of_the_span_it_already_covers(
+        tmp_path):
+    """Otherwise a match reads as evidence when it may only be arithmetic.
+
+    The plan measures the prior covering ~74% of the search space, at which
+    point "a satellite was predicted there" is about 1.35:1 — and the way to
+    stop that being over-read is to print the coverage beside it, not to leave
+    the caveat in a document nobody has open.
+    """
+    from leo_tracker.radio.beacon.survey_scoring import geometry_checks
+
+    satellites = [{"norad_id": 1, "name": "STARLINK-1", "tolerance_hz": 20_000.0,
+                   "receivers": [{"receiver": 0, "predicted_offset_hz": 50_000.0}]},
+                  {"norad_id": 2, "name": "STARLINK-2", "tolerance_hz": 20_000.0,
+                   "receivers": [{"receiver": 0, "predicted_offset_hz": 60_000.0}]}]
+
+    report = geometry_checks(
+        [{"method": "glrt-32", "cfo_hz": 55_000.0},
+         {"method": "glrt-64", "cfo_hz": 400_000.0}],
+        satellites, 0, span_hz=100_000.0)
+
+    assert report["by_method"]["glrt-32"]["matches"] == 2
+    assert report["by_method"]["glrt-64"]["matches"] == 0
+    assert report["by_method"]["glrt-32"]["best"]["norad_id"] == 1
+    # 30 kHz to 80 kHz of a 200 kHz span, merged rather than double counted.
+    assert report["prior_coverage_fraction"] == pytest.approx(0.25)

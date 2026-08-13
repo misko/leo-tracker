@@ -284,6 +284,30 @@ def test_kalman_service_uses_sixteen_single_thread_workers_with_required_v2():
     assert "TimeoutStopSec=1800" in unit
 
 
+def test_the_detector_bake_off_runs_in_shadow_and_cannot_fail_a_capture():
+    """Scoring the corpus is an experiment; analysing a capture is the product.
+
+    The comparison needs a day of real sky rather than one sweep, so it runs on
+    every job — but a probe it could not score must cost a slower experiment and
+    never a recording nobody analysed. Same shape as the corpus stage beside it:
+    its own env switch, ``shadow_stage_failed`` on error, no ``return 1``. The
+    limit is load-bearing too: an entry costs about a minute, and without a bound one job
+    would inherit the whole backlog.
+    """
+    script = (ROOT / "scripts/starlink-analysis-server.sh").read_text()
+    stage = script.split('if [[ "${survey_score_mode:-on}" != off ]]', 1)[1]
+    stage = stage.split('emit "coverage_result', 1)[0]
+
+    assert 'survey_score_mode="${LEO_ANALYSIS_SURVEY_SCORE_MODE:-on}"' in script
+    assert "starlink-survey-score run" in stage
+    assert '--limit "${survey_score_limit:-1}"' in stage
+    assert '--maximum-seconds "${survey_score_maximum_s:-240}"' in stage
+    assert "return 1" not in stage
+    assert "shadow_stage_failed" in stage
+    assert "production_affected=false" in stage
+    assert "survey_score_mode=${survey_score_mode}" in script
+
+
 def test_server_publishes_atomic_v2_runtime_contract(tmp_path):
     uv_stub = tmp_path / "uv-stub"
     uv_stub.write_text("#!/usr/bin/env bash\nexit 0\n")

@@ -120,27 +120,64 @@ from .relative_phase import (CONTROL_SYMBOL_ROLL, DEFAULT_TRANSFORM_SIZE,
                              survey_anchor_symbols, symbol_glrt)
 from .structure import STARLINK_FRAME_DURATION_S
 
+#: The share-wide census the prose in this file and in :mod:`survey_comparison`
+#: is drawn from, and the moment it was taken.
+#:
+#: Here as data rather than sprinkled through the docstrings because the corpus
+#: grows under a live experiment and every absolute count goes stale by the
+#: hour: two reviews of one change, hours apart, measured this corpus at 431 and
+#: then 459, and the text under review quoted three different totals in four
+#: places — two of them in one file, disagreeing about the widened bank.  A
+#: figure that has to be re-derived from prose in three places will be wrong in
+#: at least one of them.
+#:
+#: So the prose quotes ratios and mechanisms, which stay true as the corpus
+#: grows, and the counts live here with their date.  The proportions have been
+#: steady across every census taken so far — roughly three fifths of the corpus
+#: on the narrow bank, roughly three quarters of it taken before the randomised
+#: draw went live, and roughly three quarters of the randomised part preserving
+#: more than it scored, which is what a uniform draw over four arms of which
+#: three preserve more than they score predicts.
+CORPUS_CENSUS = {
+    "taken_utc": "2026-08-13T09:25:54Z",
+    "entries": 459,
+    # Shape, span and gate, kept together: read as three sets they assert a
+    # pairing no capture ever ran.
+    "regimes": {"(3, 8) over +/-300 kHz gating at 1.33": 283,
+                "(13, 8) over +/-700 kHz gating at 1.252": 176},
+    # Taken before the randomised draw went live, so they carry no
+    # capture_config and scored everything they preserved.
+    "pre_draw": 355,
+    "randomised": 104,
+    "randomised_preserving_more_than_they_scored": 71,
+    "preserved_samples_per_tuning": {200_000: 388, 400_000: 51, 800_000: 20},
+    "sidecars": {"leo-tracker.survey-detector-comparison/v1": 136,
+                 "leo-tracker.survey-detector-comparison/v2": 0},
+    # What a re-score costs per entry, measured on this host under capture load.
+    "seconds_per_entry": (74.6, 66.2),
+}
+
 #: What a probe's score sidecar calls itself.  A reader must be able to tell one
 #: version from the next without inferring it from which keys are present.
 #:
 #: v2 states the bank the *capture* ran.  In v1 ``deployed_shape`` and
 #: ``deployed_threshold`` were this host's constants at scoring time, so every
-#: sidecar in a corpus spanning the bank widening claimed the same (13, 8) —
-#: 283 of the 375 manifests say [3, 8] — and the reproduction check below re-ran
-#: bank 46 of its observations could not represent.  The two keys keep their
-#: names and change their meaning, which is exactly the case a version exists
-#: for: a mixed corpus would otherwise hold two definitions under one spelling
-#: and the comparison would average them without a word.  Re-scoring the corpus
-#: is the price, and it has to be paid anyway because the v1 numbers are wrong.
+#: sidecar in a corpus spanning the bank widening claimed the same (13, 8) while
+#: three fifths of the corpus says [3, 8], and the reproduction check below
+#: re-ran a bank those could not represent.  The two keys keep their names and
+#: change their meaning, which is exactly the case a version exists for: a mixed
+#: corpus would otherwise hold two definitions under one spelling and the
+#: comparison would average them without a word.  Re-scoring is the price, and
+#: it has to be paid anyway because the v1 numbers are wrong.
 #:
 #: v2 also states the *window* each reproduction delta was computed over, and
 #: computes it over the capture's window rather than the whole preserved probe.
 #: That is a third key keeping its name and changing its meaning
 #: (``deployed_reproduction_delta``) and would earn a bump of its own, except
-#: that v2 has never been written to the share — the census reads 84 sidecars
-#: at v1 and 0 at v2 — so there is no mixed corpus to protect and extending the
-#: unshipped version is free.  Two bumps for one re-score would cost seven more
-#: hours and buy nothing.
+#: that v2 has never been written to the share — :data:`CORPUS_CENSUS` reads
+#: every sidecar on it at v1 and none at v2 — so there is no mixed corpus to
+#: protect and extending the unshipped version is free.  Two bumps for one
+#: re-score would cost another day of scoring and buy nothing.
 SCORES_SCHEMA = "leo-tracker.survey-detector-comparison/v2"
 
 #: Name of the sidecar written beside the preserved IQ.
@@ -299,18 +336,20 @@ def capture_bank(record: dict) -> dict:
 
     Read the way :func:`survey_sample_rate_hz` reads the rate — out of the
     capture's declarations, never out of this module's constants — and for the
-    same reason.  The corpus spans a widening: measured over all 375 manifests
-    on the share, 283 record a (3, 8) bank over +/-300 kHz gating at 1.33 and 92
-    record (13, 8) over +/-700 kHz gating at 1.252, and a sidecar that reported
-    this host's current pairing for both described neither.
+    same reason.  The corpus spans a widening and holds both regimes in bulk,
+    around three fifths of it on (3, 8) over +/-300 kHz gating at 1.33 and the
+    rest on (13, 8) over +/-700 kHz gating at 1.252 (:data:`CORPUS_CENSUS`), so
+    a sidecar that reported this host's current pairing for both described
+    neither.
 
-    The span cannot come from ``profile`` alone; only the 92 widened records
-    carry it there and all 283 narrow ones carry it at record level, so both are
-    consulted in that order — reading ``profile`` alone would call 283 of 375
-    captures unknown.  ``threshold`` is the gate the capture host
-    actually applied, which is not ``fast_scan.detection_threshold`` of the
-    shape: (3, 8) is not in :data:`fast_scan.NOISE_CEILING`, so asking for it
-    yields the 1.40 fallback while the capture gated at 1.33.
+    The span cannot come from ``profile`` alone; only the widened records carry
+    it there and every narrow one carries it at record level, so both are
+    consulted in that order — reading ``profile`` alone would call the whole
+    narrow majority of the corpus unknown.  ``threshold`` is the gate the
+    capture host actually applied, which is not
+    ``fast_scan.detection_threshold`` of the shape: (3, 8) is not in
+    :data:`fast_scan.NOISE_CEILING`, so asking for it yields the 1.40 fallback
+    while the capture gated at 1.33.
 
     Where the record is silent every field is None and ``known`` is False.  It
     is never filled in from anything else: a probe taken before the profile was
@@ -348,14 +387,16 @@ def capture_scored_samples(record: dict, preserved: int) -> tuple[int, str]:
     ``mean_power`` exactly, and the mean over all 400,000 is 84.8204, which is
     the recomputed one exactly.  Sixteen of sixteen target observations on that
     arm failed the reproduction check, worst delta 0.1555 and cheapest
-    6.945e-04, and the population grows with every capture: 23 of the 40
-    randomised entries on the share already preserve more than they scored, and
-    each new one has a three-in-four chance of joining them.
+    6.945e-04.  That population only grows, and it grows at a rate the draw
+    fixes rather than one that has to be re-counted: three of the four arms
+    preserve more than they score, so about three quarters of everything drawn
+    since joins it, and the share has matched that ratio at every census
+    (:data:`CORPUS_CENSUS`).
 
-    Where the record declares no window — 353 of the 393 manifests, every probe
-    taken before the draw went live — the capture scored everything it kept and
-    the whole preserved probe is the answer.  A declaration longer than the file
-    is also the whole file, because nothing can be scored past its end.
+    Where the record declares no window — every probe taken before the draw went
+    live, which is still most of the corpus — the capture scored everything it
+    kept and the whole preserved probe is the answer.  A declaration longer than
+    the file is also the whole file, because nothing can be scored past its end.
     """
     declared = (record.get("capture_config") or {}).get("scored_samples")
     if not declared:
@@ -754,6 +795,12 @@ def search_observation(
             "offset_contrast": float(scored["offset_contrast"]),
             "anchor_agreement": int(scored["anchor_agreement"]),
             "mean_power": float(scored["mean_power"]),
+            # Which window this row covers.  It is the whole preserved probe
+            # here and a bounded prefix in the reproduction row beside it, and
+            # the two used to be told apart only by which key they sat under —
+            # so a reader comparing them was comparing different sky without a
+            # word anywhere saying so.
+            "samples": count,
             "elapsed_ms": elapsed}
         # The bank has no rolled-template path, so the coarse statistic has no
         # wrong-code control and the review must not pretend otherwise: its
@@ -1262,6 +1309,13 @@ def score_entry(entry: Path, *, calibration: dict | None = None,
                         reproduces if arm == "target" else None),
                     "deployed_reproduction_samples": (
                         scored_samples if arm == "target" else None),
+                    # The row the delta above was computed from, kept beside
+                    # the whole-probe scan in ``coarse``. It used to be
+                    # computed, used and thrown away, which left a sidecar
+                    # claiming a delta of 0.0 next to the only row it carried
+                    # sitting 0.1555 from the deployed number, and no reader
+                    # could tell those were two different windows.
+                    "deployed_reproduction_coarse": reproduced,
                     "deployed_reproduction_excluded":
                         _reproduction_excluded(deployed.get(receiver),
                                                reproduced, arm, deployed_bank,
@@ -1406,24 +1460,43 @@ def _reproduction_coarse(samples: np.ndarray, banks: dict, config: str | None,
     of 16 target observations failed, worst delta 0.1555.
 
     Where the capture scored the whole probe the full scan already *is* the
-    right answer and is reused rather than recomputed — every entry taken
-    before the randomised draw went live, 353 of 393, and the 80ms-2.5MSps arm
-    besides — so this costs nothing on the corpus as it stands and one extra
-    fold per target observation on the three arms that need it.
+    right answer and is reused rather than recomputed — most of the corpus, and
+    the arm whose preserved length equals its scored length besides — so this
+    costs nothing on those and one extra fold per target observation on the arms
+    that preserve more than they scored.
+
+    The row is returned in one shape either way, carrying the window it covers,
+    because :func:`score_entry` writes it into the sidecar beside the
+    whole-probe scan.  The delta is a number about two rows, and a delta whose
+    rows are not both on the record cannot be checked by the reader it is
+    printed for.
     """
-    if config is None:
+    if config is None or config not in searched:
         return {}
     if scored_samples >= samples.size:
-        return searched
+        return {config: _reproduced_row(searched[config], samples.size)}
     scored = fast_scan.probe(samples[:scored_samples], banks[config])
-    return {config: {
-        "epoch_sample": int(scored["epoch_sample"]),
-        "frequency_offset_hz": float(scored["frequency_offset_hz"]),
-        "peak_to_median": float(scored["peak_to_median"]),
-        "folded_score": float(scored["folded_score"]),
-        "folded_median": float(scored["folded_median"]),
-        "mean_power": float(scored["mean_power"]),
-        "samples": int(scored_samples)}}
+    return {config: _reproduced_row(scored, scored_samples)}
+
+
+def _reproduced_row(scored: dict, samples: int) -> dict:
+    """One coarse row, in the same fields as the whole-probe row beside it.
+
+    Same keys and same order as :func:`search_observation` writes, minus the
+    timing, so the two rows in a sidecar can be compared field by field — which
+    is the whole point of keeping both — and ``samples`` says which window each
+    of them covers.
+    """
+    return {"epoch_sample": int(scored["epoch_sample"]),
+            "frequency_offset_hz": float(scored["frequency_offset_hz"]),
+            "peak_to_median": float(scored["peak_to_median"]),
+            "folded_score": float(scored["folded_score"]),
+            "folded_median": float(scored["folded_median"]),
+            "peak_to_second": float(scored["peak_to_second"]),
+            "offset_contrast": float(scored["offset_contrast"]),
+            "anchor_agreement": int(scored["anchor_agreement"]),
+            "mean_power": float(scored["mean_power"]),
+            "samples": int(samples)}
 
 
 def _reproduction_delta(scored: dict | None, coarse: dict, arm: str,
@@ -1440,11 +1513,11 @@ def _reproduction_delta(scored: dict | None, coarse: dict, arm: str,
     ``config`` is which coarse config reproduces the capture, from
     :func:`_reproduction_config`, and it is not optional.  Hard-wiring it to A
     made the check meaningless the moment the bank widened.  Measured over the
-    800 target observations the corpus's sidecars already hold: against each
-    capture's own bank 0 of 800 disagree by more than 1e-6, worst 5.165e-08;
-    against A always, 160 of 800 do, worst 5.604e-01.  Many of those sit at
-    offsets A has no hypothesis for — its three are 300 kHz apart — and the
-    fold's median does the rest, since it is taken over a curve already
+    800 target observations the corpus's sidecars held when the tolerance was
+    set: against each capture's own bank 0 of 800 disagree by more than 1e-6,
+    worst 5.165e-08; against A always, 160 of 800 do, worst 5.604e-01.  Many of
+    those sit at offsets A has no hypothesis for — its three are 300 kHz apart
+    — and the fold's median does the rest, since it is taken over a curve already
     maximised across the offset axis, so thirteen hypotheses lift it about 2%
     where three do not, which is why even a shared 0 Hz argmax disagrees.
 

@@ -14,6 +14,7 @@ optimisation agrees with the obvious implementation or it is a redesign, so it
 is gated against :mod:`relative_phase`'s public functions on the same input.
 """
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -43,9 +44,9 @@ def _record(tunings, *, order=True, peak=1.2, shape=(3, 8),
 
     The bank knobs default to the A-era configuration the corpus mostly holds:
     ``profile.shape`` [3, 8] with the span at record level only, which is how
-    all 283 of the narrow manifests are actually written. ``profile_span``
-    additionally puts the span inside ``profile``, as the 75 widened ones do,
-    and ``profile=False`` reproduces a record that never said at all.
+    every narrow record on the share is actually written. ``profile_span``
+    additionally puts the span inside ``profile``, as the widened ones do, and
+    ``profile=False`` reproduces a record that never said at all.
 
     ``capture_config`` is the randomised arm's block, absent on every entry
     taken before the draw went live and carrying ``scored_samples`` on every
@@ -127,6 +128,29 @@ def _replica(count=SAMPLES, *, epoch=0, edge="lower"):
 WIDE_SHAPE = (13, 8)
 WIDE_SPAN_HZ = 700_000.0
 WIDE_OFFSET_HZ = 4 * 2 * WIDE_SPAN_HZ / 12
+
+
+#: A window at which the fold's own bookkeeping moves for a single sample, so a
+#: truncation off by one is a different measurement rather than the same one
+#: rounded.  :func:`fast_scan.probe` divides each epoch by how many frame
+#: contributions landed inside ``count - taps + 1`` lags, and one sample moves
+#: that boundary for the epochs at the tail of the last folded frame.  Measured
+#: on the noiseless replica below at 2.5 MS/s: the peak is 0.999999928 at all
+#: three lengths and the *median* over epochs is 0.128223461 / 0.128262677 /
+#: 0.128282595 at 13,811 / 13,812 / 13,813, so peak-to-median reads 7.798884235
+#: / 7.796499740 / 7.795289194 — one sample short is 2.384e-03 away and one
+#: sample long is 1.211e-03 away, against a 1e-6 tolerance.  A flat or
+#: noise-only probe does not discriminate: its statistic moves by less than the
+#: tolerance for a whole sample, which is why both off-by-one mutants used to
+#: survive the entire file.
+BOUNDARY_WINDOW = 13_812
+
+#: A preserved probe longer than the 200,000-sample cap the capture host applies
+#: to itself, and longer by a whole frame so that capping it is a visibly
+#: different measurement rather than a rounding of the same one.  The corpus
+#: holds probes of 200,000, 400,000 and 800,000 samples, so "longer than the
+#: cap" is the normal case rather than a contrived one.
+LONG_SAMPLES = 203_334
 
 
 def _shifted(values, offset_hz):
@@ -327,15 +351,17 @@ def test_status_separates_scored_from_scorable(tmp_path):
 def test_the_sidecar_records_the_bank_the_capture_ran_not_this_hosts(tmp_path):
     """A capture's configuration is a fact about the capture, not about today.
 
-    Measured over all 375 corpus manifests: 283 record ``profile.shape``
-    [3, 8] over +/-300 kHz gating at 1.33 and 92 record [13, 8] over +/-700 kHz
-    gating at 1.252 — yet every sidecar written so far reports [13, 8], this
-    host's ``fast_scan.SURVEY_BANK`` at scoring time, consulted instead of the
-    capture. That is what made a two-regime corpus look homogeneous, and it hid
-    a reproduction check running against a bank 46 observations could not even
-    represent. The gate is the same defect and worse: ``detection_threshold``
-    has no entry for (3, 8) and emits the 1.40 fallback, a number no deployment
-    has ever used, under a key named for the deployment.
+    The corpus holds two regimes in bulk — roughly three fifths recording
+    ``profile.shape`` [3, 8] over +/-300 kHz gating at 1.33 and the rest [13, 8]
+    over +/-700 kHz gating at 1.252, counted in ``survey_scoring.CORPUS_CENSUS``
+    with the date it was counted — yet every sidecar written so far reports
+    [13, 8], this host's ``fast_scan.SURVEY_BANK`` at scoring time, consulted
+    instead of the capture. That is what made a two-regime corpus look
+    homogeneous, and it hid a reproduction check running against a bank a large
+    minority of observations could not even represent. The gate is the same
+    defect and worse: ``detection_threshold`` has no entry for (3, 8) and emits
+    the 1.40 fallback, a number no deployment has ever used, under a key named
+    for the deployment.
     """
     from leo_tracker.radio.beacon import fast_scan
     entry = _entry(tmp_path, "ch1-narrow", tunings=((1, "lower-edge"),),
@@ -472,12 +498,13 @@ def test_the_reproduction_scores_the_window_the_capture_host_scored(tmp_path):
     ``mean_power`` exactly, and the mean over all 400,000 is 84.8204, which is
     the recomputed one exactly. Over the sidecars that existed then, 16 of 16
     target observations on the long arms failed, worst delta 0.1555, cheapest
-    6.945e-04 — a permanent false alarm that the corpus grows: 23 of the 40
-    randomised entries already preserve more than they scored, and each new
-    capture has a 3-in-4 chance of joining them.
+    6.945e-04 — a permanent false alarm that the corpus grows into: three of
+    the four arms preserve more than they score, so about three quarters of
+    every new capture joins them, and every census so far has matched that
+    ratio (``survey_scoring.CORPUS_CENSUS``).
 
-    Where the record carries no ``capture_config`` at all — 353 of the 393
-    manifests, every probe taken before the draw went live — the whole probe is
+    Where the record carries no ``capture_config`` at all — every probe taken
+    before the draw went live, still most of the corpus — the whole probe is
     the window the capture scored, and that is what gets used.
     """
     from leo_tracker.radio.beacon.survey_scoring import receiver_samples
@@ -530,13 +557,89 @@ def test_the_reproduction_scores_the_window_the_capture_host_scored(tmp_path):
     assert block.size == whole.size
 
 
+def test_the_truncation_boundary_is_pinned_to_the_sample(tmp_path):
+    """One sample either side of the capture's window is a different number.
+
+    The window fix is one character from breaking. Both
+    ``samples[:scored_samples - 1]`` and ``samples[:scored_samples + 1]``
+    reproduce every other assertion in this file, because the probes those
+    assertions use are flat or noiseless enough that a whole sample moves
+    peak-to-median by less than the 1e-6 tolerance — so the boundary was
+    asserted nowhere and either slip would put the false "NOT EXACT" banner back
+    on real preserved IQ.
+
+    Pinned by behaviour rather than by reading the slice: the recompute has to
+    land on the capture host's number *bitwise* at exactly
+    :data:`BOUNDARY_WINDOW`, and has to miss it by more than the tolerance at
+    one sample either side. Both halves are needed. The first alone passes for
+    a probe whose statistic does not depend on the last sample; the second alone
+    passes for a check that reproduces nothing.
+    """
+    from leo_tracker.radio.beacon.survey_comparison import REPRODUCTION_TOLERANCE
+    from leo_tracker.radio.beacon.survey_scoring import (_banks,
+                                                         _reproduction_coarse,
+                                                         _reproduction_delta,
+                                                         read_probe,
+                                                         receiver_samples)
+    # One quantisation, sliced twice: the capture host's entry holds exactly the
+    # bytes this host will truncate to, so bitwise equality is a claim about the
+    # window and not about rounding the same waveform twice.
+    block = _int16_block(_replica())
+    host = _entry(tmp_path, "ch1-host-window", tunings=((1, "lower-edge"),),
+                  samples=BOUNDARY_WINDOW, block=block[:, :BOUNDARY_WINDOW])
+    measured = {item["receiver"]: item["coarse"]["A"]["peak_to_median"]
+                for item in score_entry(host)["observations"]
+                if item["arm"] == "target"}
+    entry = _entry(tmp_path, "ch1-boundary", tunings=((1, "lower-edge"),),
+                   samples=SAMPLES, block=block,
+                   capture_config={"name": "test-arm", "sample_rate_hz": RATE,
+                                   "samples_per_tuning": SAMPLES,
+                                   "scored_samples": BOUNDARY_WINDOW,
+                                   "scored_on": "capture host, bounded prefix"})
+    manifest = json.loads((entry / "manifest.json").read_text())
+    for tuning in manifest["metadata"]["pre_dwell_survey"]["tunings"]:
+        for scored in tuning["receivers"]:
+            scored["peak_to_median"] = measured[scored["receiver"]]
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+
+    payload = score_entry(entry)
+
+    # Bitwise, not within a tolerance: the same bytes through the same fold on
+    # the same host, so anything but zero is the wrong window rather than a
+    # different build of the kernel.
+    assert payload["deployed_reproduction"]["checked"] == 2
+    assert payload["deployed_reproduction"]["worst_delta"] == 0.0
+    assert all(item["deployed_reproduction_delta"] == 0.0
+               for item in payload["observations"] if item["arm"] == "target")
+
+    # And the same recompute one sample either way misses, so the zero above is
+    # a boundary rather than a statistic that cannot tell the difference.
+    samples = receiver_samples(read_probe(entry, manifest), 0, 0)
+    whole = next(item["coarse"] for item in payload["observations"]
+                 if item["arm"] == "target" and item["receiver"] == 0)
+    deltas = {step: _reproduction_delta(
+                  {"peak_to_median": measured[0]},
+                  _reproduction_coarse(samples, _banks("lower", RATE), "A",
+                                       BOUNDARY_WINDOW + step, whole),
+                  "target", "A")
+              for step in (-1, 0, 1)}
+
+    assert deltas[0] == 0.0
+    assert deltas[-1] > REPRODUCTION_TOLERANCE
+    assert deltas[1] > REPRODUCTION_TOLERANCE
+    # Measured, so a later reader can see how far off-by-one lands rather than
+    # trusting that it is far enough: 2.384e-03 and 1.211e-03 against 1e-6.
+    assert deltas[-1] == pytest.approx(2.384e-03, rel=0.05)
+    assert deltas[1] == pytest.approx(1.211e-03, rel=0.05)
+
+
 def test_a_capture_that_scored_its_whole_probe_is_not_truncated(tmp_path):
-    """353 of the 393 manifests predate the draw and carry no window at all.
+    """Most of the corpus predates the draw and carries no window at all.
 
     Absence of ``capture_config`` is not absence of a window: the capture host
     scored everything it kept, so the whole preserved probe *is* the window and
-    truncating to some default would break the 353 entries that are currently
-    the only ones the check passes on.
+    truncating to some default would break the pre-draw majority, which is
+    currently the part of the corpus the check passes on.
     """
     entry = _entry(tmp_path, "ch1-pre-draw", tunings=((1, "lower-edge"),),
                    block=_int16_block(_replica()))
@@ -555,6 +658,107 @@ def test_a_capture_that_scored_its_whole_probe_is_not_truncated(tmp_path):
     assert payload["deployed_reproduction"]["scored_samples"] == SAMPLES
     assert payload["deployed_reproduction"]["scored_samples_source"] == \
         "whole preserved probe; the record declares no scored_samples"
+
+
+def test_the_row_the_delta_came_from_is_kept_beside_the_whole_probe_one(
+        tmp_path):
+    """A delta nobody can recompute from the sidecar is not an auditable one.
+
+    The truncated re-run fed the delta and was then discarded, so a sidecar
+    reported ``deployed_reproduction_delta`` 0.0 while the only coarse row it
+    carried — the whole-probe scan — sat a long way from the deployed number it
+    was supposedly reproducing: up to 0.1555 apart on
+    ch1-lower-edge-narrow-pluto-5d4d-20260813T062858Z, with nothing anywhere in
+    the file saying the two were measured over different windows. A reader
+    checking the delta by hand recomputes it from the row that is there, gets a
+    number that is not zero, and concludes the check is broken.
+
+    So the row the delta was actually computed from is written down beside the
+    whole-probe one, and both say how many samples they cover. Either fix alone
+    is enough to stop the misreading; together the sidecar can be audited
+    without the IQ.
+    """
+    block = _int16_block(_replica())
+    host = _entry(tmp_path, "ch1-audit-host", tunings=((1, "lower-edge"),),
+                  samples=BOUNDARY_WINDOW, block=block[:, :BOUNDARY_WINDOW])
+    measured = {item["receiver"]: item["coarse"]["A"]["peak_to_median"]
+                for item in score_entry(host)["observations"]
+                if item["arm"] == "target"}
+    entry = _entry(tmp_path, "ch1-audit", tunings=((1, "lower-edge"),),
+                   samples=SAMPLES, block=block,
+                   capture_config={"name": "test-arm",
+                                   "scored_samples": BOUNDARY_WINDOW})
+    manifest = json.loads((entry / "manifest.json").read_text())
+    for tuning in manifest["metadata"]["pre_dwell_survey"]["tunings"]:
+        for scored in tuning["receivers"]:
+            scored["peak_to_median"] = measured[scored["receiver"]]
+    (entry / "manifest.json").write_text(json.dumps(manifest))
+
+    payload = score_entry(entry)
+
+    target = next(item for item in payload["observations"]
+                  if item["arm"] == "target" and item["receiver"] == 0)
+    reproduced = target["deployed_reproduction_coarse"]["A"]
+    whole = target["coarse"]["A"]
+
+    # The row the delta came from, and it reproduces the deployed number.
+    assert target["deployed_reproduction_delta"] == 0.0
+    assert reproduced["samples"] == BOUNDARY_WINDOW
+    assert reproduced["peak_to_median"] == measured[0]
+    # The row everything else came from, labelled with its own window so the
+    # two cannot be read as comparable.
+    assert whole["samples"] == SAMPLES
+    assert abs(whole["peak_to_median"] - measured[0]) > 1e-3
+    # The null arm reproduces nothing by design, and says so rather than
+    # carrying a row that would read as a failed check.
+    null = [item for item in payload["observations"] if item["arm"] != "target"]
+    assert null and all(not item["deployed_reproduction_coarse"]
+                        for item in null)
+
+
+def test_a_record_declaring_no_window_scores_the_whole_probe_however_long():
+    """The pre-draw window is the whole probe, as a value and not as a sentence.
+
+    Most of the corpus predates the randomised draw and carries no
+    ``capture_config`` at all, so ``capture_scored_samples`` answers "all of
+    it". That answer was pinned only by its source string, and a mutant
+    returning ``min(preserved, 200_000)`` while keeping the string byte-identical
+    reproduced the whole file — the sentence said "whole preserved probe" while
+    the number said 200,000, and only the sentence was checked. 200,000 is the
+    exact figure a mutant would reach for, being both the deployed
+    ``scored_samples`` and the cheapest arm's whole probe, and the corpus already
+    holds probes twice that long.
+
+    So the number is pinned here against a probe longer than the cap, and the
+    two are pinned to disagree: capping this one at 200,000 moves peak-to-median
+    by 1.201e-03, which is 1,201x the reproduction tolerance and would fail the
+    check on every pre-draw entry in the corpus.
+    """
+    from leo_tracker.radio.beacon import fast_scan
+    from leo_tracker.radio.beacon.survey_comparison import REPRODUCTION_TOLERANCE
+    from leo_tracker.radio.beacon.survey_scoring import (_banks,
+                                                         _reproduction_coarse,
+                                                         capture_scored_samples,
+                                                         receiver_samples)
+    record = _record(((1, "lower-edge"),))
+    assert "capture_config" not in record
+
+    window, source = capture_scored_samples(record, LONG_SAMPLES)
+
+    assert window == LONG_SAMPLES
+    assert source == ("whole preserved probe; the record declares no "
+                      "scored_samples")
+    # And the window is used, not merely reported: the reproduction row is the
+    # whole-probe number rather than a capped one.
+    samples = receiver_samples(_int16_block(_replica(LONG_SAMPLES)), 0, 0)
+    banks = _banks("lower", RATE)
+    whole = {"A": fast_scan.probe(samples, banks["A"])}
+    scored = _reproduction_coarse(samples, banks, "A", window, whole)
+    capped = _reproduction_coarse(samples, banks, "A", 200_000, whole)
+
+    assert scored["A"]["peak_to_median"] == whole["A"]["peak_to_median"]
+    assert abs(capped["A"]["peak_to_median"]
+               - whole["A"]["peak_to_median"]) > REPRODUCTION_TOLERANCE
 
 
 def test_a_capture_whose_bank_is_unknown_is_excluded_rather_than_failed(
@@ -655,6 +859,55 @@ def test_an_observation_this_host_cannot_re_run_is_counted_not_dropped():
     assert delta is None
     assert reason is not None
     assert (delta is None) != (reason is None)
+
+
+def test_the_corpus_figures_are_census_data_rather_than_prose():
+    """A total written into prose is wrong by the next capture.
+
+    The corpus is growing under a live experiment. Two reviews of the same
+    change, hours apart, measured it at 431 and then 459 entries, and the text
+    they were reviewing quoted three different totals for it in four places —
+    two of them inside one file, disagreeing with each other about how many
+    records carry the widened bank. Every one of those figures was true when it
+    was written.
+
+    So the census is data, taken once with the moment it was taken, and the
+    prose quotes ratios and mechanisms instead: "three of the four arms the draw
+    picks between preserve more than they scored" stays true as the corpus
+    grows, and "23 of the 40 randomised entries" was false within a day.
+    """
+    import re
+
+    from leo_tracker.radio.beacon import survey_comparison, survey_scoring
+    from leo_tracker.radio.beacon.presurvey import (PI_SCORE_SAMPLE_LIMIT,
+                                                    SURVEY_CONFIGS)
+    from leo_tracker.radio.beacon.survey_scoring import CORPUS_CENSUS
+
+    assert CORPUS_CENSUS["taken_utc"].endswith("Z")
+    assert sum(CORPUS_CENSUS["regimes"].values()) == CORPUS_CENSUS["entries"]
+    assert (CORPUS_CENSUS["pre_draw"] + CORPUS_CENSUS["randomised"]
+            == CORPUS_CENSUS["entries"])
+    assert (CORPUS_CENSUS["randomised_preserving_more_than_they_scored"]
+            <= CORPUS_CENSUS["randomised"])
+    # The mechanism the prose leans on instead of a count, pinned against the
+    # arm table it comes from: three of the four arms the draw picks between
+    # preserve more than they score, so about three quarters of every new
+    # capture joins the population the truncation exists for. Add a fifth arm
+    # and this is what says the sentence needs rewriting.
+    longer = [config for config in SURVEY_CONFIGS
+              if config["samples_per_tuning"] > PI_SCORE_SAMPLE_LIMIT]
+    assert (len(longer), len(SURVEY_CONFIGS)) == (3, 4)
+    # And no corpus total is written into the prose beside it, where the next
+    # reader cannot tell when it was true. Manifests, captures and sidecars are
+    # the corpus's own nouns and a number in front of one of them is always a
+    # census figure; "entries" is not on the list because it is also how a
+    # count is formatted for the report, and a rule has to be about the thing
+    # it is checking.
+    stale = re.compile(
+        r"\d[\d,]*\s+(?:\w+\s+){0,1}(?:manifests|captures|sidecars)\b")
+    for module in (survey_scoring, survey_comparison):
+        found = stale.findall(Path(module.__file__).read_text())
+        assert not found, f"{Path(module.__file__).name} quotes {found}"
 
 
 def test_every_claim_names_a_place_and_says_how_hard_it_searched(tmp_path):

@@ -37,7 +37,8 @@ def _certificate(method, score, *, control=None, epoch=1000, cfo=1000.0,
 
 def _observation(arm, *, receiver=0, channel=1, region="lower-edge",
                  certificates=(), utc="2026-08-12T20:00:00Z", points=(),
-                 geometry=None, delta=0.0, bank="A", excluded=None):
+                 geometry=None, delta=0.0, bank="A", excluded=None,
+                 samples=None):
     return {"arm": arm, "template_edge": "lower",
             "null_direction": None if arm == "target" else "upper-on-lower",
             "iq_index": 0, "channel": channel, "region": region,
@@ -47,6 +48,7 @@ def _observation(arm, *, receiver=0, channel=1, region="lower-edge",
             "deployed": {"peak_to_median": 1.2, "anchor_agreement": 0},
             "deployed_reproduction_delta": delta,
             "deployed_reproduction_bank": bank if arm == "target" else None,
+            "deployed_reproduction_samples": samples,
             "deployed_reproduction_excluded": excluded,
             "coarse": {}, "certificates": list(certificates),
             "points": list(points), "geometry": geometry}
@@ -520,8 +522,9 @@ def test_the_deployed_gate_is_shown_beside_a_calibrated_one(tmp_path):
     report = review(tmp_path)
     printed = format_review(report)
 
-    assert report["deployed"]["shape"] == [[13, 8]]
-    assert report["deployed"]["threshold"] == [1.252]
+    assert report["deployed"]["regimes"] == [
+        {"shape": [13, 8], "offset_span_hz": 700_000.0, "threshold": 1.252,
+         "entries": 1}]
     # Shape, span and gate travel together, so the line cannot assert a pairing
     # by accident of three sets being sorted independently.
     assert "1 entry: shape [13, 8] over +/-700 kHz gating at 1.252" in printed
@@ -535,9 +538,11 @@ def test_the_deployed_gate_is_shown_beside_a_calibrated_one(tmp_path):
 def test_the_capture_gate_line_keeps_shape_span_and_gate_paired(tmp_path):
     """Three sorted sets side by side assert a pairing nobody ever ran.
 
-    Ground truth over the 393 manifests on the share: 283 records are
-    (3, 8) over +/-300 kHz gating at 1.33 and 110 are (13, 8) over +/-700 kHz
-    gating at 1.252. Collected as three independent sets and printed in a row,
+    Ground truth on the share, counted with its date in
+    ``survey_scoring.CORPUS_CENSUS``: roughly three fifths of the records are
+    (3, 8) over +/-300 kHz gating at 1.33 and the rest are (13, 8) over
+    +/-700 kHz gating at 1.252, both in bulk. Collected as three independent
+    sets and printed in a row,
     that reads "bank shape [[3, 8], [13, 8]] over +/-300 kHz, +/-700 kHz, gating
     at 1.252/1.330" — which taken positionally says (3, 8) gated at 1.252 and
     (13, 8) at 1.330, the pairing reversed. This is the same flattening of a
@@ -577,18 +582,93 @@ def test_the_capture_gate_line_keeps_shape_span_and_gate_paired(tmp_path):
     assert "1 entry does not say" in printed
 
 
+def test_a_capture_lands_in_one_bank_bucket_or_the_other_and_never_both(
+        tmp_path):
+    """A regime count and an unknown count that overlap add up to more entries
+    than the corpus holds.
+
+    ``regimes`` reads the shape from ``deployed_shape`` *or* the capture bank
+    beside it, because a sidecar can carry either; ``unknown`` read
+    ``deployed_shape`` alone. So a payload recording its bank only under
+    ``capture_bank`` — which is exactly what a sidecar written before the
+    top-level copy existed looks like — was counted as a regime and as an
+    unknown at the same time, and a reader adding the printed lines up got one
+    more entry than the review said it read.
+
+    The two are the same predicate now, taken once: the regime it lands in, or
+    the count of entries that named no bank at all.
+    """
+    half = _payload("half-recorded", [_observation("target")])
+    # No ``deployed_shape`` key at all, and the bank recorded beside it.
+    half["capture_bank"] = {"shape": [3, 8], "offset_span_hz": 300_000.0,
+                            "threshold": 1.33, "known": True}
+    half["deployed_threshold"] = 1.33
+    _write(tmp_path, half)
+    _write(tmp_path, _payload("silent", [_observation("target", bank=None)]))
+
+    report = review(tmp_path)
+    deployed = report["deployed"]
+
+    assert report["entries"] == 2
+    assert deployed["regimes"] == [
+        {"shape": [3, 8], "offset_span_hz": 300_000.0, "threshold": 1.33,
+         "entries": 1}]
+    assert deployed["unknown"] == 1
+    assert sum(regime["entries"] for regime in deployed["regimes"]) \
+        + deployed["unknown"] == report["entries"]
+
+
+def test_the_machine_readable_gate_holds_no_unpaired_sets(tmp_path):
+    """The printed line was fixed; the JSON a script reads still held the trap.
+
+    Three independently sorted sets — shape ``[[3, 8], [13, 8]]``, span
+    ``[300000.0, 700000.0]``, gate ``[1.252, 1.33]`` — read positionally say
+    (3, 8) gated at 1.252 over +/-300 kHz. Ground truth is (3, 8) over
+    +/-300 kHz at **1.33** and (13, 8) over +/-700 kHz at 1.252, so the
+    positional reading has the gates swapped. The report text was rewritten to
+    print one line per regime; the machine-readable path kept all three sets,
+    and the machine-readable path is the one a later script reads with no human
+    in between.
+
+    They are gone rather than paired: ``regimes`` already carries every value
+    that was in them, with the pairing that makes each one checkable against
+    the manifests, so an unpaired copy beside it can only be read wrongly.
+    """
+    narrow = _payload("narrow", [_observation("target")])
+    narrow["deployed_shape"] = [3, 8]
+    narrow["deployed_threshold"] = 1.33
+    narrow["capture_bank"] = {"shape": [3, 8], "offset_span_hz": 300_000.0,
+                              "threshold": 1.33, "known": True}
+    wide = _payload("wide", [_observation("target", bank="E")])
+    wide["deployed_shape"] = [13, 8]
+    wide["deployed_threshold"] = 1.252
+    wide["capture_bank"] = {"shape": [13, 8], "offset_span_hz": 700_000.0,
+                            "threshold": 1.252, "known": True}
+    for payload in (narrow, wide):
+        _write(tmp_path, payload)
+
+    deployed = review(tmp_path)["deployed"]
+
+    assert deployed["regimes"] == [
+        {"shape": [3, 8], "offset_span_hz": 300_000.0, "threshold": 1.33,
+         "entries": 1},
+        {"shape": [13, 8], "offset_span_hz": 700_000.0, "threshold": 1.252,
+         "entries": 1}]
+    assert set(deployed) == {"regimes", "unknown", "scorer_threshold"}
+
+
 def test_sidecars_at_another_schema_are_counted_rather_than_vanishing(tmp_path):
-    """"Nothing scored yet" is false for a corpus holding 84 scored entries.
+    """"Nothing scored yet" is false for a corpus with scored entries on disk.
 
     A schema bump drops every existing sidecar from the aggregate — correctly,
     because the two versions mean different things by the same key — but
     ``load_scores`` drops them with a bare ``continue`` and no counter, so for
-    the whole re-score window the review reports an empty corpus. Measured on
-    the share as this was written: 84 v1 sidecars and 0 v2, still climbing, and
-    re-scoring costs 74.6 s and 66.2 s per entry under capture load — about
-    seven hours for the 378 entries that need it. For seven hours the report
-    would tell a reader nothing has been scored while a third of a day's
-    scoring sits on disk.
+    the whole re-score window the review reports an empty corpus. Every sidecar
+    on the share is at the old schema and none at the new one, counted with its
+    date in ``survey_scoring.CORPUS_CENSUS``, and re-scoring costs 74.6 s and
+    66.2 s per entry under capture load — the better part of a day for a corpus
+    this size, and it only gets longer. For that whole day the report would tell
+    a reader nothing has been scored while the scoring sits on disk.
     """
     stale = _write(tmp_path, _payload("stale", [_observation("target")]))
     (stale / "scores.json").write_text(json.dumps(
@@ -604,6 +684,82 @@ def test_sidecars_at_another_schema_are_counted_rather_than_vanishing(tmp_path):
     assert "nothing scored yet" not in printed
     assert ("1 sidecar at leo-tracker.survey-detector-comparison/v1 waiting to "
             "be re-scored") in printed
+
+
+def test_the_limit_bounds_what_is_read_and_never_the_census(tmp_path):
+    """A count printed as a corpus fact has to be over the corpus.
+
+    ``read_scores`` stopped scanning the moment it had ``limit`` sidecars of the
+    current schema, so the census only saw the off-schema files that happened to
+    sort before the break. Demonstrated here: three at the current schema and
+    five at the old one census as five unlimited and as **nothing** at
+    ``limit=2`` — and ``cli.py`` passes ``--limit`` straight through, so the very
+    count added to stop "nothing scored yet" being printed over a corpus holding
+    a hundred scored entries could itself report an empty backlog while the
+    backlog sat on disk.
+
+    The limit is what one analysis job reads. The census is what the corpus
+    holds, and it is taken over every entry either way — from the sidecar's
+    opening bytes past the limit, so bounding the job still bounds its cost.
+    The entry count is bounded too, so the number of current-schema sidecars the
+    limit left unread is printed beside it rather than left to be inferred from
+    a total that is not there.
+    """
+    for index in range(3):
+        _write(tmp_path, _payload(f"a-current-{index}",
+                                  [_observation("target")]))
+    for index in range(5):
+        stale = _write(tmp_path, _payload(f"z-stale-{index}",
+                                          [_observation("target")]))
+        (stale / "scores.json").write_text(json.dumps(
+            {"schema": "leo-tracker.survey-detector-comparison/v1",
+             "capture": f"z-stale-{index}", "observations": []}))
+
+    whole = review(tmp_path)
+    bounded = review(tmp_path, limit=2)
+    printed = format_review(bounded)
+
+    assert whole["entries"] == 3
+    assert whole["other_schema"] == {
+        "leo-tracker.survey-detector-comparison/v1": 5}
+    # The limit bounds the aggregate and nothing else.
+    assert bounded["entries"] == 2
+    assert bounded["other_schema"] == whole["other_schema"]
+    assert bounded["sidecars"]["scanned"] == 8
+    assert bounded["sidecars"]["read"] == 2
+    assert bounded["sidecars"]["beyond_limit"] == 1
+    assert ("5 at leo-tracker.survey-detector-comparison/v1, another schema "
+            "and not counted here") in printed
+    # And the reader is told the entry count is a limit rather than a total.
+    assert "1 more at this schema the limit did not read" in printed
+
+
+def test_a_sidecar_that_will_not_parse_is_counted_rather_than_dropped(tmp_path):
+    """The bare ``continue`` this function's own docstring rules out.
+
+    ``read_scores`` gained a census because dropping a sidecar of another schema
+    without counting it printed "nothing scored yet" over a corpus holding a
+    hundred scored entries — and then went on dropping every *unparseable*
+    sidecar with a second bare ``continue`` and no counter, in the same loop. A
+    half-written file and a file that never existed are different facts: the
+    first is damage and the second is simply an entry nobody has scored yet, and
+    most of a corpus is the second.
+    """
+    _write(tmp_path, _payload("good", [_observation("target")]))
+    broken = tmp_path / "broken"
+    broken.mkdir()
+    (broken / "scores.json").write_text("{ truncated")
+    # An entry with no sidecar at all: unscored, which is the normal state of
+    # most of the corpus and must not read as damage.
+    (tmp_path / "unscored").mkdir()
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["entries"] == 1
+    assert report["sidecars"]["scanned"] == 2
+    assert report["sidecars"]["unreadable"] == 1
+    assert "1 that would not parse" in printed
 
 
 def test_an_unsupported_threshold_is_marked_in_the_table(tmp_path):
@@ -777,6 +933,92 @@ def test_the_not_exact_banner_still_says_how_much_was_checked(tmp_path):
     assert report["deployed_reproduction"]["excluded"] == 1
     assert "1 more could not be checked at all" in printed
     assert "capture record does not say which bank it searched" in printed
+
+
+def test_the_review_schema_names_the_version_whose_keys_these_are(tmp_path):
+    """Keys that changed meaning under one version name is what a version is for.
+
+    ``report["deployed"]["threshold"]`` was a dict of this host's per-config
+    gates, became a list of the gates the captures applied, and is gone;
+    ``deployed_reproduction["exact"]`` became ``reproduced``; ``sidecars`` and
+    ``deployed_reproduction["scored_samples"]`` are new. A consumer holding a v1
+    document and a consumer holding this one disagree about what four keys mean
+    while both read "v1", which is the exact argument that earned
+    ``SCORES_SCHEMA`` its bump one layer down.
+
+    The version is asserted as a literal rather than against the constant. An
+    assertion that reads ``report["schema"] == REVIEW_SCHEMA`` passes whatever
+    the constant says, so it pins the plumbing and not the version.
+    """
+    _write(tmp_path, _payload("versioned", [_observation("target")]))
+
+    report = review(tmp_path)
+
+    assert report["schema"] == "leo-tracker.survey-detector-review/v2"
+    assert report["schema"] == REVIEW_SCHEMA
+    # The keys the bump is about, so a later reader can see what moved.
+    assert "threshold" not in report["deployed"]
+    assert "reproduced" in report["deployed_reproduction"]
+    assert "exact" not in report["deployed_reproduction"]
+    assert "scored_samples" in report["deployed_reproduction"]
+    assert "sidecars" in report
+
+
+def test_the_window_named_in_the_banner_is_one_something_was_checked_over(
+        tmp_path):
+    """A banner cannot name a window nothing in it was measured over.
+
+    The window set was collected from every target observation, excluded ones
+    included — and an excluded observation is one that produced no delta at all,
+    so its window contributed nothing to the statistic the banner is about. On
+    the live corpus that is not a corner case: whole entries are excluded for
+    naming a bank this comparison does not re-run, and they sit on the longest
+    arms, so the banner would read "over the capture's own 200,000/800,000-sample
+    window" when every delta behind it came from 200,000.
+    """
+    _write(tmp_path, _payload("windows", [
+        _observation("target", delta=2.0e-08, bank="E", samples=200_000,
+                     certificates=[_certificate("coarse-E", 1.4)]),
+        _observation("target", receiver=1, delta=None, bank=None,
+                     samples=800_000,
+                     excluded="capture record does not say which bank it "
+                              "searched",
+                     certificates=[_certificate("coarse-E", 1.3)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["deployed_reproduction"]["count"] == 1
+    assert report["deployed_reproduction"]["excluded"] == 1
+    assert report["deployed_reproduction"]["scored_samples"] == [200_000]
+    assert "200,000-sample window" in printed
+    assert "800,000" not in printed
+
+
+def test_two_pooled_windows_are_named_as_two(tmp_path):
+    """A singular noun over two windows is the pooling this file exists to stop.
+
+    The corpus holds several capture arms and the reproduction check runs over
+    whichever prefix each one scored, so a review across arms pools windows —
+    which is precisely what ``_reproduction``'s own docstring says two entries in
+    that list means. Printed under "the capture's own 200,000/400,000-sample
+    window" it reads as one window written oddly, and the reader has to notice a
+    slash to see that two populations were averaged.
+    """
+    _write(tmp_path, _payload("pooled", [
+        _observation("target", delta=1.0e-08, bank="E", samples=200_000,
+                     certificates=[_certificate("coarse-E", 1.4)]),
+        _observation("target", receiver=1, delta=2.0e-08, bank="E",
+                     samples=400_000,
+                     certificates=[_certificate("coarse-E", 1.3)])]))
+
+    report = review(tmp_path)
+    printed = format_review(report)
+
+    assert report["deployed_reproduction"]["scored_samples"] == [200_000,
+                                                                 400_000]
+    assert ("over the 2 different windows the captures scored "
+            "(200,000/400,000 samples, pooled)") in printed
 
 
 def test_an_empty_corpus_reviews_to_an_empty_report_rather_than_an_error(tmp_path):

@@ -12,8 +12,11 @@ import types
 import numpy as np
 import pytest
 
-from leo_tracker.radio.beacon.fast_scan import (SURVEY_BANK, SURVEY_PROFILE,
-                                                detection_threshold, scan_radio)
+from leo_tracker.radio.beacon.fast_scan import (SURVEY_BANK,
+                                                SURVEY_OFFSET_SPAN_HZ,
+                                                SURVEY_PROFILE,
+                                                detection_threshold, scan_radio,
+                                                survey_bank)
 from leo_tracker.radio.beacon.presurvey import (LOW_BAND_TUNINGS, run_survey,
                                                 summarise)
 from leo_tracker.radio.beacon.pilots import _edge_pilot_frame_cached
@@ -173,12 +176,18 @@ def test_the_survey_scores_both_receivers(fake_iio):
         assert [item["receiver"] for item in entry["receivers"]] == [0, 1]
 
 
-def test_an_offset_port_scores_far_lower_on_the_same_beacon(fake_iio):
-    """The search edge is real, and it is why a quiet verdict is not evidence.
+def test_an_offset_port_now_scores_beside_a_centred_one(fake_iio):
+    """The caveat this test used to defend has been paid off, and it is checked here.
 
-    Both ports carry the same beacon at the same strength here; only the LNB
-    disagreement differs.  If this margin ever narrows to nothing the caveat in
-    the record can go, and until then it must not be read as a quiet sky.
+    It asserted the opposite until the bank widened: both ports carrying the
+    same beacon at the same strength, the 436 kHz port scored less than half
+    what the centred one did (3.71 against 1.63), so a quiet verdict on an
+    offset port said nothing about the sky and the record had to say so.
+
+    Thirteen hypotheses over +/-700 kHz put that port 31 kHz from a hypothesis
+    instead of 136 kHz from one and the gap closes to 1.08x.  This is the
+    assertion that has to fail before ``quiet_verdict_caveat`` goes back into
+    the survey record, so it is inverted rather than deleted.
     """
     payloads, quiet = _tuning_payloads(rx1_offset_hz=436_000.0, seed=31)
 
@@ -186,7 +195,8 @@ def test_an_offset_port_scores_far_lower_on_the_same_beacon(fake_iio):
                          sample_rate_hz=SAMPLE_RATE_HZ)
 
     centred, offset = outcome["results"][0]["receivers"]
-    assert centred["peak_to_median"] > 2 * offset["peak_to_median"]
+    assert offset["peak_to_median"] > detection_threshold(SURVEY_BANK)
+    assert centred["peak_to_median"] < 1.4 * offset["peak_to_median"]
 
 
 def test_re_centring_the_survey_bank_does_not_rescue_the_offset_port(fake_iio):
@@ -194,12 +204,16 @@ def test_re_centring_the_survey_bank_does_not_rescue_the_offset_port(fake_iio):
 
     Moving every hypothesis onto the signal lifts the median as much as the
     peak, and the statistic is a ratio, so the score falls rather than rises.
+    A finer bank does not change that -- it is a property of the statistic, not
+    of the spacing -- so the comparison is made at the survey's own span on
+    both sides, which is the only way it compares one choice rather than two.
     """
     from leo_tracker.radio.beacon.fast_scan import build_bank, probe
 
     samples = _beacon(-3, seed=41, offset_hz=436_000.0)
-    as_it_stands = probe(samples, build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK))
+    as_it_stands = probe(samples, survey_bank("lower", SAMPLE_RATE_HZ))
     recentred = probe(samples, build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK,
+                                          SURVEY_OFFSET_SPAN_HZ,
                                           center_hz=436_000.0))
 
     assert recentred["peak_to_median"] < as_it_stands["peak_to_median"]
@@ -282,7 +296,7 @@ def test_anchor_agreement_is_zero_on_noise_and_positive_on_a_pilot(fake_iio):
     """
     from leo_tracker.radio.beacon.fast_scan import build_bank, probe
 
-    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
+    bank = survey_bank("lower", SAMPLE_RATE_HZ)
     quiet = sorted(probe(_noise(50_000, 800 + s), bank)["anchor_agreement"]
                    for s in range(8))
     loud = [probe(_beacon(-6, seed=810 + s), bank)["anchor_agreement"]
@@ -301,7 +315,7 @@ def test_offset_contrast_separates_narrowband_from_broadband(fake_iio):
     """
     from leo_tracker.radio.beacon.fast_scan import build_bank, probe
 
-    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
+    bank = survey_bank("lower", SAMPLE_RATE_HZ)
     localised = np.median([probe(_beacon(-6, seed=820 + s), bank)["offset_contrast"]
                            for s in range(8)])
     flat = np.median([probe(_noise(50_000, 830 + s), bank)["offset_contrast"]
@@ -314,7 +328,7 @@ def test_mean_power_is_the_one_absolute_quantity(fake_iio):
     """Every ratio divides gain away, so none can see a dead or clipping port."""
     from leo_tracker.radio.beacon.fast_scan import build_bank, probe
 
-    bank = build_bank("lower", SAMPLE_RATE_HZ, SURVEY_BANK)
+    bank = survey_bank("lower", SAMPLE_RATE_HZ)
     samples = _beacon(-6, seed=840)
 
     quiet = probe(samples, bank)
@@ -356,6 +370,48 @@ def test_the_record_carries_the_iq_ordering(fake_iio):
 
     assert record["sample_order"] == [(c, f"{e}-edge") for c, e in LOW_BAND_TUNINGS]
     assert len(record["sample_order"]) == outcome["samples"].shape[0]
+
+
+def test_the_record_says_which_span_the_scores_came_from(fake_iio):
+    """A shape without a span does not identify the search that produced a score.
+
+    Thirteen hypotheses mean 116.7 kHz spacing over +/-700 kHz and 50 kHz over
+    +/-300 kHz -- different detectors with different thresholds.  The scan used
+    to report the module-level default here rather than the profile's own span,
+    which was harmless only for as long as the two were the same number.
+    """
+    payloads, quiet = _tuning_payloads()
+    outcome = scan_radio(_context(payloads, quiet), LOW_BAND_TUNINGS,
+                         sample_rate_hz=SAMPLE_RATE_HZ)
+
+    record = summarise(outcome, dwell_channel=4, dwell_region="lower-edge")
+
+    assert record["offset_span_hz"] == SURVEY_OFFSET_SPAN_HZ
+    assert record["profile"]["offset_span_hz"] == SURVEY_OFFSET_SPAN_HZ
+    assert record["profile"]["shape"] == list(SURVEY_BANK)
+
+
+def test_the_record_states_how_its_threshold_was_measured(fake_iio):
+    """A stored verdict is only re-readable if its bar says what it meant.
+
+    The corpus holds probes written under a threshold calibrated on synthetic
+    Gaussian noise over 60 realisations, which cannot resolve a 1% tail, beside
+    probes written under one measured on the sky over a null population that
+    can.  Both are the field ``threshold``; only this string separates them.
+    """
+    from leo_tracker.radio.beacon.fast_scan import SURVEY_NULL_REALISATIONS
+
+    payloads, quiet = _tuning_payloads()
+    outcome = scan_radio(_context(payloads, quiet), LOW_BAND_TUNINGS,
+                         sample_rate_hz=SAMPLE_RATE_HZ)
+
+    record = summarise(outcome, dwell_channel=4, dwell_region="lower-edge")
+
+    assert str(SURVEY_NULL_REALISATIONS) in record["threshold_basis"]
+    assert "upper-edge" in record["threshold_basis"]
+    # The population bounds what the number can claim: an empirical quantile
+    # over N samples cannot speak below roughly 3/N.
+    assert 3 / SURVEY_NULL_REALISATIONS < 0.01
 
 
 def test_the_record_is_json_serialisable(fake_iio):

@@ -17,11 +17,17 @@ enough to run in the capture loop:
   - correlation, magnitude and folding are fused in a C kernel so the
     full-length correlation is never stored.
 
-Two bank sizes are offered.  ``SURVEY_BANK`` is the cheap first pass used to
-decide which channel to dwell on; ``FULL_BANK`` matches the reference search
-exactly.  A survey bank finds the same epoch as the full bank down to about
--10 dB and costs a seventh as much, so the scan is limited by how fast the
-radio retunes rather than by arithmetic.
+Two bank sizes are offered.  ``SURVEY_BANK`` is the first pass used to decide
+which channel to dwell on; ``FULL_BANK`` matches the reference search exactly.
+
+The survey bank was three hypotheses over +/-300 kHz until measurement caught
+up with it.  Three hypotheses over that span leaves 300 kHz between
+neighbours, and an injection sweep put the largest spacing that still holds
+Pd >= 0.9 at -12 dB at 150 kHz, so the bank was half as fine as the weakest
+signal it claimed to find needed.  It now spreads thirteen over +/-700 kHz.
+That is 3.76 times the arithmetic and none of the radio time; the survey's
+wall clock goes from a field-measured 1.7 s to about 3.1 s against the 120 s
+dwell it precedes.
 """
 from __future__ import annotations
 
@@ -43,46 +49,137 @@ from .channels import starlink_edge_pilot_if_hz
 from .pilots import OFDM_SYMBOL_DURATION_S, _edge_pilot_frame_cached
 from .structure import STARLINK_FRAME_DURATION_S
 
-#: Cheap first pass: frequency offsets x anchor symbols used while surveying.
-SURVEY_BANK = (3, 8)
+#: First pass used while surveying: frequency hypotheses x anchor symbols.
+#: Thirteen hypotheses across :data:`SURVEY_OFFSET_SPAN_HZ` put neighbouring
+#: hypotheses 116.7 kHz apart.  Spacing, not span, is what this buys: an
+#: injection sweep of 14,608 trials found that holding Pd >= 0.9 everywhere
+#: needs <=150 kHz spacing at -12 dB, and -12 dB is where the detector stops
+#: working at all.  ``Pd < 0.5 at worst CFO`` moves from -5.4 dB at three
+#: hypotheses to -13.3 dB at thirteen.
+#:
+#: On real sky, 1,696 windows from 106 corpus captures, each bank judged at its
+#: own measured 1% false-alarm rate: three hypotheses fire on 9.7% / 7.6% of
+#: lnb-a / lnb-b observations against 24.3% / 20.4% for thirteen.  Those two
+#: ports carry no LNB bias, so their pilots sat inside the old span already and
+#: **span cannot explain the gain** -- spacing is what it is.  The biased port
+#: gains most, as a span argument predicts and a spacing argument does not:
+#: lnb-c goes 3.1% to 11.8%.
+SURVEY_BANK = (13, 8)
 #: Full search, identical in coverage to the reference acquisition.
 FULL_BANK = (7, 24)
-#: Doppler search span; Ku-band LEO stays inside roughly +/-250 kHz.
+#: Doppler search span the *survey* uses, stated here rather than taken from
+#: :data:`DEFAULT_OFFSET_SPAN_HZ` because those two numbers answer different
+#: questions and moving one must not move the other.
+#:
+#: A 3-day sweep of the whole catalogue against this site -- 63,035,467
+#: satellite-instants -- puts all-sky Doppler p99.9 at 279,059 Hz on the top
+#: tuning, LNB bias uncertainty at 19,346 Hz and the margin to closed form at
+#: 21,595 Hz, so +/-320 kHz is the requirement.  The survey searches +/-700 kHz
+#: because it is buying *spacing*: thirteen hypotheses is what -12 dB needs,
+#: and once thirteen are paid for, widening the span to cover a biased port as
+#: well is free.
+SURVEY_OFFSET_SPAN_HZ = 700_000.0
+#: :func:`build_bank`'s default span.  **Do not move this to follow the
+#: survey.**  :data:`FULL_BANK` spreads seven hypotheses across it, which
+#: reproduces the reference acquisition's own
+#: ``arange(-300_000, 300_001, 100_000)`` grid exactly; widening the default
+#: would silently coarsen that agreement to 233 kHz spacing and the fast path
+#: would stop being an optimisation of the reference.
 DEFAULT_OFFSET_SPAN_HZ = 300_000.0
 #: Threads for the fused kernel.  Three leaves a core for the capture reader.
 DEFAULT_THREADS = 3
 #: Frames a probe must contain for the epoch fold to mean anything.
 MINIMUM_PROBE_FRAMES = 4
 
-#: Peak-to-median at the 99th percentile of pure noise, measured per bank over
-#: 60 realisations.  A smaller bank folds fewer independent scores together, so
-#: its noise floor sits higher and it needs a higher bar to hold the same false
-#: alarm rate.  Detection is then reliable to about -8 dB for the survey bank
-#: and -12 dB for the full one.
-NOISE_CEILING = {SURVEY_BANK: 1.33, FULL_BANK: 1.20}
+#: The survey bank's 1% point, measured on the sky.  See :data:`NOISE_CEILING`
+#: for the construction and :data:`SURVEY_NULL_REALISATIONS` for what it rests
+#: on.  Quoted to three decimals because the fourth is not resolved: the
+#: bootstrap 90% interval on the 99th percentile is [1.2444, 1.2570].
+#:
+#: Restricting to exactly the direction an earlier and independent measurement
+#: used -- a *lower*-edge bank on an *upper*-edge tuning, 848 of the 1,696 --
+#: gives 1.2547, reproducing that measurement's 1.255 to three figures.  The
+#: same run reproduces its 1.289 for the retired bank as 1.280, and its real-
+#: sky fire rates for that bank on lnb-a and lnb-b, 9.0% and 7.0%, as 8.6% and
+#: 6.9%.  Both directions are used here because the deployed bank runs on both
+#: edges and the larger population is the better estimate.
+SURVEY_NOISE_CEILING = 1.252
+#: Clean null windows the ceiling above was measured over, drawn from 106
+#: corpus captures whose manifests record ``sample_order`` -- 8 tunings x 2
+#: receivers each, scored in both cross-edge directions.  The empirical
+#: quantile of N samples cannot speak below roughly 3/N, so this population
+#: supports a 1% rate comfortably, a 0.2% rate marginally, and nothing finer.
+#: A *production* false-alarm figure for the whole search still needs its own
+#: harness; this is a comparison threshold measured honestly, not that.
+SURVEY_NULL_REALISATIONS = 1_696
+SURVEY_NULL_CAPTURES = 106
+#: The probe length the ceiling was measured at.  **It is not transferable to
+#: another length.**  The fold is incoherent across frames, so the statistic
+#: tightens as more of them are averaged: on synthetic Gaussian noise the
+#: 99th percentile of this bank runs 1.310 at 20 ms, 1.189 at 40 ms and 1.137
+#: at 80 ms.  One fixed bar therefore realises quite different false-alarm
+#: rates at different lengths.  :func:`verify_presence` applies this ceiling
+#: to whatever chunk it is handed and has no way to know the difference; that
+#: is a real gap and it is recorded here rather than papered over.
+SURVEY_CEILING_PROBE_S = 0.080
+
+#: Peak-to-median a probe must beat, per bank shape, for a 1% false alarm rate.
+#:
+#: :data:`SURVEY_BANK` is calibrated on the sky, not on synthetic noise, using
+#: windows that are **target-pilot-free by construction**: a lower-edge bank
+#: scored on an upper-edge tuning, whose pilot codes sit 230.6 MHz away.  No
+#: window is screened on the statistic being calibrated, so no real detection
+#: can be charged to the false-alarm budget.
+#:
+#: The construction matters more than the number.  Synthetic Gaussian noise is
+#: not this distribution: at 80 ms its 99th percentile for this bank is 1.137
+#: where the sky's is 1.252, because the sky carries interference and Gaussian
+#: noise does not.  A same-edge population is not it either, in the other
+#: direction, because 8-26% of those windows hold real pilots and charging a
+#: detection to the false-alarm budget inflates the bar.
+#:
+#: The retired 1.33 was inflated that way, and by more than was thought: on
+#: this clean null it realises **0.06%** false alarms rather than the 1% it
+#: claimed, so it was roughly seventeen times too strict rather than too lax.
+#: Adopting 1.252 is therefore a sensitivity change in its own right, on top
+#: of the bank -- the retired bank at 1.33 fires on 7.8% of real-sky windows,
+#: this bank at 1.252 on 21.0%.
+#:
+#: :data:`FULL_BANK`'s 1.20 predates all of this and is the 99th percentile of
+#: synthetic Gaussian noise over 60 realisations.  It has not been re-measured
+#: against the sky and should not be read as comparably grounded.
+NOISE_CEILING = {SURVEY_BANK: SURVEY_NOISE_CEILING, FULL_BANK: 1.20}
 #: Used when a bank shape has not been characterised; deliberately strict.
 FALLBACK_NOISE_CEILING = 1.40
 
 
 def detection_threshold(shape: tuple[int, int]) -> float:
-    """Peak-to-median a probe must beat for this bank shape."""
+    """Peak-to-median a probe must beat for this bank shape.
+
+    Keyed by shape alone, so it is only the right answer for a bank searching
+    the span its ceiling was measured at; :data:`SURVEY_PROFILE` is what pairs
+    :data:`SURVEY_BANK` with :data:`SURVEY_OFFSET_SPAN_HZ`.
+    """
     return NOISE_CEILING.get(tuple(shape), FALLBACK_NOISE_CEILING)
 
 
-#: Median peak-to-median of the survey bank against a beacon carrying a fixed
-#: frequency offset, over six realisations at each point.  The bank spreads
-#: three hypotheses across +/-300 kHz and its matched filter is one OFDM symbol
-#: wide, so it tolerates a signal between the hypotheses but degrades sharply
-#: past the outermost one.
+#: Median peak-to-median of the **retired** three-hypothesis survey bank
+#: against a beacon carrying a fixed frequency offset, over six realisations at
+#: each point.  Kept because it is the measurement that made the case for
+#: widening: a receiver whose LNB sat about 436 kHz from its twin scored 1.38
+#: at -6 dB against that bank's 1.33 threshold, where the same beacon
+#: on-centre scored 2.58.
 #:
-#: The consequence matters more than the numbers: a receiver whose LNB sits
-#: about 436 kHz from its twin scores 1.38 at -6 dB against a 1.33 threshold,
-#: where the same beacon on-centre scores 2.58.  **A quiet verdict on an
-#: offset port is therefore not evidence of a quiet sky.**  Widening to five
-#: hypotheses over +/-500 kHz measured 2.09 at the same point and is the fix,
-#: but it needs its own noise-ceiling characterisation and a re-measured
-#: compute constant, so it is deliberately not folded in here.
-OFFSET_SENSITIVITY_DB6 = {0: 2.58, 200_000: 1.78, 436_000: 1.38}
+#: The reason it is history rather than a live caveat is that its two named
+#: fixes have both been taken.  The bank now carries thirteen hypotheses over
+#: +/-700 kHz, so 436 kHz sits 31 kHz from a hypothesis instead of 136 kHz from
+#: one, and the same measurement repeated on that bank reads 2.46 / 2.41 / 2.37
+#: at 0 / 200 / 436 kHz -- flat, where this fell by half.  Both open items --
+#: "needs its own noise-ceiling characterisation and a re-measured compute
+#: constant" -- are what :data:`SURVEY_NOISE_CEILING` and
+#: ``ScanProfile.compute_ms_per_probe_s`` now are.  Do not read these numbers
+#: as describing what the survey does today.
+RETIRED_3X8_OFFSET_SENSITIVITY_DB6 = {0: 2.58, 200_000: 1.78, 436_000: 1.38}
 
 _SOURCE = Path(__file__).with_name("_scan_kernel.c")
 _CFLAGS = ["-O3", "-march=native", "-ffast-math", "-funroll-loops",
@@ -149,6 +246,10 @@ class ScanProfile:
     kernel_buffers: int = 1
     probe_s: float = 0.020
     shape: tuple[int, int] = SURVEY_BANK
+    #: The span the ``shape`` hypotheses are spread across.  A profile that
+    #: named only the shape would leave the spacing -- the thing the shape is
+    #: bought for -- undetermined.
+    offset_span_hz: float = SURVEY_OFFSET_SPAN_HZ
     #: Measured on a Pi 5 over a persistent USB context, writing a *different*
     #: frequency each time.  Rewriting the same value costs 0.5 ms because the
     #: driver skips the reprogram, which flatters a benchmark that hops nowhere.
@@ -157,7 +258,20 @@ class ScanProfile:
     #: prefetch.  At depth one nothing is prefetched, so each refill also pays
     #: the transfer it can no longer overlap.
     shallow_refill_ms: float = 12.8
-    compute_ms_per_probe_s: float = 400.0
+    #: Scoring costs a fixed part plus a part that grows with the bank, both
+    #: per second of probe.  The fixed part is the energy normaliser and the
+    #: running-power cumsum, which every probe pays whatever it is searching.
+    #:
+    #: Anchored on the field for its level and on this host for its shape.
+    #: Field: 234 deployed surveys of the 24-kernel bank report a median
+    #: 512.5 ms of scoring for 16 probes of 80 ms -- 400.4 ms per probe-second,
+    #: which these two constants reproduce exactly at 24 kernels.  Host: 80 ms
+    #: probes on a Pi 5 at three threads, best of nine, measured 28.2 ms at 24
+    #: kernels and 106.2 ms at 104, a ratio of **3.76x** rather than the 4.33x
+    #: a pure per-kernel model would predict.  Ignoring the fixed part would
+    #: have overstated the new bank's cost by 15%.
+    compute_ms_per_probe_s_fixed: float = 68.0
+    compute_ms_per_probe_s_per_kernel: float = 13.85
 
     def __post_init__(self) -> None:
         if self.block_size < 1 or self.settle_buffers < 0 or self.probe_s <= 0:
@@ -178,11 +292,33 @@ class ScanProfile:
     def buffer_s(self, sample_rate_hz: float) -> float:
         return self.block_size / float(sample_rate_hz)
 
+    @property
+    def kernel_count(self) -> int:
+        """Correlations one probe runs: hypotheses times anchor symbols."""
+        return int(self.shape[0]) * int(self.shape[1])
+
+    @property
+    def compute_ms_per_probe_s(self) -> float:
+        """Scoring cost per second of probe, for *this* profile's bank.
+
+        Derived rather than declared.  It read 400.0 for years because that is
+        what the deployed 24-kernel bank costs, and a bank of another size
+        would have inherited the number without inheriting the measurement.
+        """
+        return (self.compute_ms_per_probe_s_fixed
+                + self.compute_ms_per_probe_s_per_kernel * self.kernel_count)
+
     def cost_ms(self, sample_rate_hz: float = 2_500_000.0) -> dict:
         """Predicted per-tuning cost, split into what the radio charges for.
 
         Listening is quantised: a probe shorter than one buffer still costs a
         whole buffer, which is the entire reason block size dominates.
+
+        Scoring is charged for **one** probe.  The deployed survey scores both
+        receivers off the same capture, so its host time is twice this while
+        its radio time is exactly this; the two field measurements this model
+        is pinned to were taken against one probe and the convention is kept so
+        they still refer to something.
         """
         buffer_s = self.buffer_s(sample_rate_hz)
         listens = max(1, math.ceil(self.probe_s / buffer_s))
@@ -194,7 +330,7 @@ class ScanProfile:
         return {"tune_ms": self.tune_ms, "settle_ms": settle,
                 "listen_ms": listen, "compute_ms": compute,
                 "total_ms": self.tune_ms + settle + listen + compute,
-                "buffers_listened": listens,
+                "buffers_listened": listens, "kernel_count": self.kernel_count,
                 "signal_used_fraction": self.probe_s / (listens * buffer_s)}
 
     def sweep_ms(self, tunings: int = 8,
@@ -202,9 +338,20 @@ class ScanProfile:
         return tunings * self.cost_ms(sample_rate_hz)["total_ms"]
 
 
+#: The bank the two field cost measurements below were taken against: three
+#: hypotheses over +/-300 kHz by eight anchors, 24 kernels.  It is no longer
+#: what the survey searches, and it is named anyway, because a measurement
+#: belongs to the configuration it was made on.  Pointing those profiles at
+#: whatever the survey currently uses would silently restate a field number as
+#: a claim about hardware that was never run in that configuration.
+MEASURED_COST_BANK = (3, 8)
+MEASURED_COST_SPAN_HZ = 300_000.0
+
 #: What the capture path uses.  Correct for a 120 s dwell, eight times too
 #: coarse for a survey; kept so the comparison is explicit rather than implied.
-DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=3, kernel_buffers=4)
+DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=3,
+                            kernel_buffers=4, shape=MEASURED_COST_BANK,
+                            offset_span_hz=MEASURED_COST_SPAN_HZ)
 #: A survey retunes between every read, so it has nothing to gain from the
 #: driver's read-ahead and everything to lose: at depth 1 no buffer is
 #: pre-filled, so there is no stale data and no settle to pay for. Sizing the
@@ -216,11 +363,21 @@ DWELL_PROFILE = ScanProfile(block_size=262_144, settle_buffers=3, kernel_buffers
 #: of two, for about three times the sweep. That trade was taken because a
 #: 20 ms probe measured no separation at all between tunings whose dwell
 #: qualified something and tunings whose dwell did not.
-SURVEY_PROFILE = ScanProfile(probe_s=0.080, block_size=200_000)
+#:
+#: The bank is 104 kernels rather than 24, so scoring costs 3.76 times what it
+#: did.  That is the whole price of the change and it is paid in host time, not
+#: radio time: the sweep goes from a field-measured 1.70 s to about 3.1 s,
+#: against the 120 s dwell it runs before.
+SURVEY_PROFILE = ScanProfile(probe_s=0.080, block_size=200_000,
+                             shape=SURVEY_BANK,
+                             offset_span_hz=SURVEY_OFFSET_SPAN_HZ)
 #: The profile the model was validated against on hardware, kept because the
 #: measurement belongs to a specific configuration rather than to whichever
-#: one is currently deployed: 43.5 ms per tuning across eight tunings.
-MEASURED_PROFILE_20MS = ScanProfile(probe_s=0.020, block_size=50_000)
+#: one is currently deployed: 43.5 ms per tuning across eight tunings, on
+#: :data:`MEASURED_COST_BANK`.
+MEASURED_PROFILE_20MS = ScanProfile(probe_s=0.020, block_size=50_000,
+                                    shape=MEASURED_COST_BANK,
+                                    offset_span_hz=MEASURED_COST_SPAN_HZ)
 
 
 @dataclass(frozen=True)
@@ -241,6 +398,11 @@ class KernelBank:
     inverse_norm: np.ndarray
     local_start: np.ndarray
     taps: int
+    #: Nonzero on a wrong-code control bank.  Carried so a control cannot be
+    #: mistaken for a detector further downstream: its scores share a shape
+    #: with the real bank and would otherwise be judged against the real
+    #: bank's threshold.
+    symbol_roll: int = 0
 
     @property
     def size(self) -> int:
@@ -251,19 +413,37 @@ class KernelBank:
 def build_bank(edge: str = "lower", sample_rate_hz: float = 2_500_000.0,
                shape: tuple[int, int] = FULL_BANK,
                offset_span_hz: float = DEFAULT_OFFSET_SPAN_HZ,
-               center_hz: float = 0.0) -> KernelBank:
+               center_hz: float = 0.0, symbol_roll: int = 0) -> KernelBank:
     """Build (and cache) the kernel bank for one edge and search shape.
 
     ``center_hz`` places the search about a receiver's own local oscillator
     rather than about zero, which is what lets a port whose LNB disagrees with
     its twin be searched at all.
+
+    ``symbol_roll`` rotates the pilot code sequence before the kernels are cut.
+    It is the control the reference path uses (``symbol_roll=17``) and it is a
+    valid one **only at a fixed epoch**.
+
+    Every symbol is one symbol period long, so rolling the code sequence by
+    ``r`` symbols produces the same waveform shifted by ``r`` symbol periods:
+    measured coherence 0.909 between the 17-roll and the plain template
+    circularly shifted 187 samples, which is exactly 17 x 11.  :func:`probe`
+    searches every epoch, so it simply re-finds the true pilot 187 samples
+    away -- 2.80 against the real bank's 3.44 on a -3 dB beacon, which is not a
+    null by any reading.  ``conditioned_pilot_score`` in :mod:`.pilots`, which
+    holds the epoch, separates the same signal 0.585 to 0.019.
+
+    Use it for a conditioned control.  Do not use it as the null population for
+    an epoch-searching threshold; :data:`NOISE_CEILING` uses the cross-edge
+    construction instead, where the codes are unrelated rather than shifted.
     """
     offset_count, anchor_count = shape
     if offset_count < 1 or anchor_count < 1:
         raise ValueError("bank shape entries must be positive")
     if sample_rate_hz <= 0 or offset_span_hz <= 0:
         raise ValueError("sample rate and offset span must be positive")
-    template = _edge_pilot_frame_cached(float(sample_rate_hz), edge, 0)
+    template = _edge_pilot_frame_cached(float(sample_rate_hz), edge,
+                                        int(symbol_roll))
     symbol_period = sample_rate_hz * OFDM_SYMBOL_DURATION_S
     taps = max(2, round(symbol_period))
     offsets = np.linspace(-offset_span_hz, offset_span_hz, offset_count) + center_hz
@@ -289,7 +469,22 @@ def build_bank(edge: str = "lower", sample_rate_hz: float = 2_500_000.0,
         imag=np.ascontiguousarray(stacked.imag, np.float32).ravel(),
         inverse_norm=np.ascontiguousarray(
             1.0 / np.maximum(norms, 1e-30), np.float32),
-        local_start=np.ascontiguousarray(starts, np.int32), taps=taps)
+        local_start=np.ascontiguousarray(starts, np.int32), taps=taps,
+        symbol_roll=int(symbol_roll))
+
+
+def survey_bank(edge: str = "lower", sample_rate_hz: float = 2_500_000.0, *,
+                symbol_roll: int = 0) -> KernelBank:
+    """The bank the survey actually runs: its shape and its span together.
+
+    :func:`build_bank` takes the span as a separate argument defaulting to
+    :data:`DEFAULT_OFFSET_SPAN_HZ`, so asking it for :data:`SURVEY_BANK` and
+    nothing else builds thirteen hypotheses across +/-300 kHz -- a 50 kHz grid
+    no deployment uses and no threshold describes.  The shape is not the
+    configuration; this pairing is.
+    """
+    return build_bank(edge, sample_rate_hz, SURVEY_BANK, SURVEY_OFFSET_SPAN_HZ,
+                      0.0, symbol_roll)
 
 
 @lru_cache(maxsize=64)
@@ -432,7 +627,7 @@ def warm_kernel(profile: ScanProfile = SURVEY_PROFILE,
     to the radio.
     """
     started = time.perf_counter()
-    bank = build_bank(edge, sample_rate_hz, profile.shape)
+    bank = build_bank(edge, sample_rate_hz, profile.shape, profile.offset_span_hz)
     frames = max(MINIMUM_PROBE_FRAMES,
                  math.ceil(profile.probe_s / STARLINK_FRAME_DURATION_S))
     count = int(frames * STARLINK_FRAME_DURATION_S * sample_rate_hz) + bank.taps
@@ -442,6 +637,7 @@ def warm_kernel(profile: ScanProfile = SURVEY_PROFILE,
 
 def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
                  shape: tuple[int, int] = SURVEY_BANK,
+                 offset_span_hz: float = SURVEY_OFFSET_SPAN_HZ,
                  threads: int = DEFAULT_THREADS,
                  lnb_lo_hz: float = 9_750_000_000.0) -> list[dict]:
     """Survey several channel/edge tunings and rank them by pilot evidence.
@@ -457,7 +653,7 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
         samples = read_probe(centre)
         if samples is None:
             continue
-        bank = build_bank(edge, sample_rate_hz, shape)
+        bank = build_bank(edge, sample_rate_hz, shape, offset_span_hz)
         scored = probe(samples, bank, threads=threads)
         results.append({**scored, "channel": channel, "region": f"{edge}-edge",
                         "if_center_hz": centre,
@@ -490,11 +686,13 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
 
     Both are scored against the *same* bank, centred on zero.  Re-centring a
     port's search on its own local oscillator is what the analysis path had to
-    do, and it does not transfer here: this bank spreads three hypotheses over
-    the whole span, so moving them onto the signal raises the median as much as
-    the peak and the ratio falls.  Measured on a 436 kHz offset at -3 dB, 1.41
-    centred against 1.61 as it stands.  :data:`OFFSET_SENSITIVITY_DB6` records
-    what that leaves uncovered.
+    do, and it does not transfer here: a bank spread thinly over its span
+    raises its median as much as its peak when it is moved onto the signal, and
+    the statistic is a ratio, so the score falls.  Measured on a 436 kHz offset
+    at -3 dB against the retired three-hypothesis bank, 1.41 centred against
+    1.61 as it stood.  The answer is a finer bank rather than a moved one, and
+    :data:`SURVEY_BANK` is now that; recentring stays wrong for the same reason
+    it was wrong before.
 
     Timing is returned split by what the radio charges for, because the parts
     are not comparable to each other: retuning and draining are radio time that
@@ -524,7 +722,8 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     try:
         for channel_number, edge in tunings:
             centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
-            bank = build_bank(edge, sample_rate_hz, profile.shape)
+            bank = build_bank(edge, sample_rate_hz, profile.shape,
+                              profile.offset_span_hz)
 
             mark = time.perf_counter()
             lo.attrs["frequency"].value = str(int(centre))
@@ -582,12 +781,16 @@ def scan_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             "total_ms": total * 1000,
             "per_tuning_ms": total * 1000 / max(len(tunings), 1),
             "sample_rate_hz": float(sample_rate_hz),
-            "offset_span_hz": DEFAULT_OFFSET_SPAN_HZ,
+            # The profile's span, not the module default: those two are
+            # deliberately different numbers and a record that reported the
+            # wrong one would put the wrong spacing in the corpus.
+            "offset_span_hz": float(profile.offset_span_hz),
             "profile": {"block_size": profile.block_size,
                         "kernel_buffers": profile.kernel_buffers,
                         "settle_buffers": profile.settle_buffers,
                         "probe_s": profile.probe_s,
-                        "shape": list(profile.shape)}}
+                        "shape": list(profile.shape),
+                        "offset_span_hz": float(profile.offset_span_hz)}}
 
 
 def verify_presence(samples: np.ndarray, bank: KernelBank, *,
@@ -596,8 +799,13 @@ def verify_presence(samples: np.ndarray, bank: KernelBank, *,
     """Decide whether a dwell still sees its pilot.
 
     Used on a sampled subset of chunks during a dwell: the question is only
-    whether the signal is still present, so the cheap survey bank is enough and
-    the decision is one scalar against the bank's measured noise ceiling.
+    whether the signal is still present, so the survey bank is enough and the
+    decision is one scalar against the bank's measured noise ceiling.
+
+    That ceiling was measured at :data:`SURVEY_CEILING_PROBE_S`, and the
+    statistic depends on how many frames were folded, so a caller handing this
+    a much shorter chunk is using a bar that describes a different experiment.
+    Pass ``minimum_peak_to_median`` when the chunk length is not the survey's.
     """
     shape = (int(bank.offsets_hz.size), int(bank.anchors.size))
     threshold = (detection_threshold(shape) if minimum_peak_to_median is None

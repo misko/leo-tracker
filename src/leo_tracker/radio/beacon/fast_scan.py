@@ -41,6 +41,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 import numpy as np
 
@@ -358,6 +359,54 @@ def _library_path() -> Path:
     return cache / (f"{stem}.so" if digest is None else f"{stem}-{digest}.so")
 
 
+def kernel_path() -> Path:
+    """Where the compiled kernel is cached for this build.
+
+    Public because warming is something an operator now does deliberately --
+    once, in one process, before fanning out -- and "did it work" has to be
+    answerable by looking at a named file rather than by trusting an exit code.
+    """
+    return _library_path()
+
+
+def _compile_kernel(target: Path) -> None:
+    """Build the kernel and publish it at ``target`` in one indivisible step.
+
+    ``cc -o <target>`` creates and fills the object *in place*, which is fine
+    for one builder and wrong for several: for the length of a link the cached
+    path holds a truncated file, and anything reaching for the kernel in that
+    window gets ``OSError: ... file too short`` rather than a kernel.  Measured
+    on a cold cache with twelve builders at once, three died that way; the next
+    identical run, none did.  A schedule rather than a certainty is exactly what
+    makes it a bad thing to leave in the tree, and the loser of that race is not
+    always a backfill worker -- the live capture path loads this same object.
+
+    Compiling to a staging name in the same directory and renaming removes the
+    window rather than narrowing it: ``os.replace`` is atomic within a
+    filesystem, so a reader sees either the old object or the new one and never
+    half of either, and a reader that already has it open keeps the inode it
+    opened.  The staging name carries the builder's pid so N builders stage N
+    files instead of truncating each other's.  Compiler, flags and source are
+    untouched, so the published object is byte-identical to an in-place build.
+    """
+    compiler = _compiler()
+    staging = target.with_name(f"{target.name}.{os.getpid()}-"
+                               f"{uuid.uuid4().hex[:8]}.building")
+    try:
+        subprocess.run([compiler, *_CFLAGS, str(_SOURCE), "-o", str(staging)],
+                       check=True, capture_output=True)
+        os.replace(staging, target)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        staging.unlink(missing_ok=True)
+        detail = getattr(exc, "stderr", b"")
+        raise ScanKernelUnavailable(
+            f"cannot build {_SOURCE.name}: "
+            f"{detail.decode(errors='replace')[:400] or exc}") from exc
+    except BaseException:
+        staging.unlink(missing_ok=True)
+        raise
+
+
 @lru_cache(maxsize=1)
 def _load_kernel():
     """Compile the fused kernel on first use and return the bound library.
@@ -367,15 +416,7 @@ def _load_kernel():
     """
     target = _library_path()
     if not target.is_file() or target.stat().st_mtime < _SOURCE.stat().st_mtime:
-        compiler = _compiler()
-        try:
-            subprocess.run([compiler, *_CFLAGS, str(_SOURCE), "-o", str(target)],
-                           check=True, capture_output=True)
-        except (OSError, subprocess.CalledProcessError) as exc:
-            detail = getattr(exc, "stderr", b"")
-            raise ScanKernelUnavailable(
-                f"cannot build {_SOURCE.name}: "
-                f"{detail.decode(errors='replace')[:400] or exc}") from exc
+        _compile_kernel(target)
     library = ctypes.CDLL(str(target))
     f32 = np.ctypeslib.ndpointer(np.float32, flags="C_CONTIGUOUS")
     i32 = np.ctypeslib.ndpointer(np.int32, flags="C_CONTIGUOUS")

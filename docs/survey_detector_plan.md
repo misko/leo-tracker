@@ -116,10 +116,22 @@ probe length becomes irrelevant entirely and **revisit spacing is the only lever
 ### Thresholds — the current one is not what it claims
 
 Calibrated on windows that are **target-pilot-free by construction**: a *lower*-edge
-bank scored on an *upper*-edge tuning, whose pilot codes sit 230 MHz away. No
-screening on the statistic being calibrated, so no circularity. It is free of the
-*target pilot*, not of RF energy in general, and 230 MHz away the interference
-environment is not matched — hence the second null below.
+bank scored on an *upper*-edge tuning, whose pilot codes sit 230 MHz away. The bank
+*searches* those windows, so the null draws are maximised the same way the scores
+they calibrate are, and there is no circularity. It is free of the *target pilot*,
+not of RF energy in general, and 230 MHz away the interference environment is not
+matched — hence the second null below.
+
+**"No screening on the statistic being calibrated" is a claim about the whole
+construction, not about the template alone, and reading it as the latter cost
+this repository a null.** Pilot-free is not unscreened. The opposite-edge
+template read back at candidate points that the *target*-edge detectors selected
+is equally pilot-free and is not a null at all: the screening has moved into the
+point selection, so an unselected draw ends up pricing a maximised one. Measured
+on a genuinely empty channel that construction thresholds at 0.52× the truth for
+`full-frame-full` and 0.78–0.86× for the GLRTs while `anchor-8` and the
+differentials sit at 1.02–1.11 — a bias that reorders the ranking rather than
+shifting it. Any null in this plan has to be *run*, not read back.
 
 | | A | E | G |
 |---|---|---|---|

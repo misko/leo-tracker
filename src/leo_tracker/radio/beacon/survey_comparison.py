@@ -24,10 +24,23 @@ population    where it comes from                         what it calibrates
 ============  ==========================================  =====================
 searched      a method maximising over its own cells      searched thresholds
 conditioned   a method evaluated at someone else's claim  confirmation thresholds
-cross-edge    the opposite edge's code, same IQ           **every** null
+cross-edge    the opposite edge's code run as its own     **every** null
+              target: own bank, own search, own points
 wrong-code    the same code rolled 17, epoch **pinned**   nulls where the epoch
                                                           was not searched
 ============  ==========================================  =====================
+
+**"The opposite edge's code, same IQ" is not enough to make a null and that
+phrasing cost this file one.**  A null has to be drawn the way the population it
+judges was drawn, and every population here is *selected* — each score sits at
+some detector's argmax.  The cross-edge row above is a null because the whole
+arm is re-run: the opposite edge is searched as its own target and proposes its
+own candidates, so its scores are maximised too.  The ``cross_edge_score``
+recorded beside each conditioned point is the same pilot-free template read back
+at candidates the *target*-edge detectors selected — pilot-free, but screened
+somewhere else, and on genuinely empty input it thresholds at 0.52x truth for
+the full-frame family while ``anchor-8`` and the differentials come out within
+11%.  It is reported as ``cross_edge_at_claimed_points`` and calibrates nothing.
 
 A searcher over 43,342 cells and a confirmer over one do not share a threshold.
 The gap is **2.2 dB measured** — 0.02575 searched against 0.02000 conditioned
@@ -93,7 +106,18 @@ from .survey_scoring import (CLEAN_NULL_P99_BY_PROBE_MS,
 #: scored_samples`` and ``sidecars`` are new.  A consumer holding one of these
 #: documents and a consumer holding the other disagree about what those keys
 #: mean while both read "v1", and nothing but the version can tell them apart.
-REVIEW_SCHEMA = "leo-tracker.survey-detector-review/v2"
+#:
+#: v3 for the same reason again, one key further in.
+#: ``conditioned.<method>.cross_edge_null`` was drawn from ``cross_edge_score``
+#: — the opposite edge's template read back at candidates the *target*-edge
+#: detectors selected — and is now drawn from the cross-edge-null arm's own
+#: points, the way :func:`cross_radio.null_thresholds` draws it.  On empty input
+#: the two differ by 0.52-1.11x and differ *by method*, so a consumer holding a
+#: v2 document and a consumer holding this one would rank the detectors
+#: differently while both read "v2".  The old quantity is still here under
+#: ``cross_edge_at_claimed_points``, which says what it is conditioned on;
+#: ``conditioned.<method>.null_arm_points`` is new.
+REVIEW_SCHEMA = "leo-tracker.survey-detector-review/v3"
 
 #: How far a re-run may land from the capture host's own number and still be
 #: the same computation.
@@ -480,6 +504,26 @@ def conditioned_comparison(payloads: list[dict], *,
     point *another* method proposed is an independent test, and it is the one
     the architecture cares about, so ``self_claimed`` rows are excluded from the
     confirmation rate and counted separately.
+
+    **The cross-edge null is drawn from the null arm's own points**, exactly the
+    way :func:`cross_radio.null_thresholds` draws it: the opposite edge searched
+    as its own target, with its own bank, its own certificates and its own
+    candidate list.  A statistic has to be calibrated on points drawn the way
+    the points it will be judged at were drawn, and every point here is some
+    detector's argmax over its cells — a selected point, not an arbitrary one.
+
+    It used to be drawn from ``cross_edge_score`` instead: the opposite edge's
+    template read back at the candidates the *target*-edge detectors chose.
+    That population is target-pilot-free, and the claim made for it stopped
+    there — but **pilot-free is not unscreened**.  The screening had moved into
+    the point selection, so an unselected draw was thresholding a maximised one.
+    Measured on genuinely empty input it comes out at 0.52x truth for
+    ``full-frame-full`` and 0.78-0.86x for the GLRTs while ``anchor-8`` and the
+    differentials sit at 1.02-1.11 — the bias is *per method*, which corrupts a
+    ranking rather than merely shifting it, and the GLRT and full-frame families
+    are the ones it flatters.  The quantity is kept under
+    ``cross_edge_at_claimed_points``, which names what it is conditioned on;
+    nothing is thresholded on it and no rate is reported from it.
     """
     rows = [row for row in conditioned_rows(payloads)]
     methods = sorted({row["confirmer"] for row in rows})
@@ -487,8 +531,16 @@ def conditioned_comparison(payloads: list[dict], *,
     for method in methods:
         mine = [row for row in rows if row["confirmer"] == method]
         target = [row for row in mine if row["arm"] == "target"]
+        # The null arm's own candidates: the opposite edge run as its own
+        # target, so these points were selected the way the target arm's were.
+        null_arm = [row for row in mine if row["arm"] == "cross-edge-null"]
         others = [row for row in target if not row["self_claimed"]]
-        cross = threshold_from(
+        cross = threshold_from([row.get("score") for row in null_arm],
+                               false_alarm_rate=false_alarm_rate)
+        # Same pilot-free template, read back where somebody else was pointing.
+        # Conditional on that selection, named for it, and carried only as the
+        # exhibit for why it cannot be a null.
+        conditional = threshold_from(
             [row.get("cross_edge_score") for row in target],
             false_alarm_rate=false_alarm_rate)
         # Nothing conditioned searches an epoch, so every control here should be
@@ -502,10 +554,21 @@ def conditioned_comparison(payloads: list[dict], *,
         report[method] = {
             "conditioned_points": len(target),
             "on_other_methods_claims": len(others),
+            # How much null arm stood behind the threshold above it, which is a
+            # different population from ``conditioned_points`` and used to be
+            # invisible because it was not read at all.
+            "null_arm_points": len(null_arm),
             "score": describe(scores),
             "margin": describe([row.get("margin") for row in others]),
-            "cross_edge_null": {**cross,
-                                "confirms": _fires(scores, cross["threshold"])},
+            "cross_edge_null": {
+                **cross,
+                "drawn_from": "cross-edge-null arm's own candidate points",
+                "confirms": _fires(scores, cross["threshold"])},
+            "cross_edge_at_claimed_points": {
+                **conditional,
+                "conditional_on": "candidates the target-edge detectors "
+                                  "selected, which is not how a null is drawn",
+                "usable_as_null": False},
             "wrong_code_null": {**wrong,
                                 "confirms": _fires(scores, wrong["threshold"])},
             "elapsed_ms": describe([row.get("elapsed_ms") for row in mine]),
@@ -527,10 +590,14 @@ def confirmation_matrix(payloads: list[dict], conditioned: dict) -> dict:
     distinction; this is not.
 
     Each confirmer is held at its *conditioned* cross-edge threshold, which is
-    far below its searched one because a conditioned test pays no extreme-value
-    penalty.  A claim the proposer also made itself is excluded from its own
-    column: reading a maximisation back at its own argmax is not a second
-    opinion.
+    below its searched one because a conditioned test pays no extreme-value
+    penalty of its own — it still stands at a point something else maximised,
+    which is why :func:`conditioned_comparison` draws that threshold from the
+    null arm's own selected points rather than from an unselected read-back.
+    Every rate in this matrix moved when that changed, and moved by a different
+    amount per confirmer.  A claim the proposer also made itself is excluded
+    from its own column: reading a maximisation back at its own argmax is not a
+    second opinion.
     """
     thresholds = {method: summary["cross_edge_null"]["threshold"]
                   for method, summary in conditioned.items()}
@@ -1308,20 +1375,41 @@ def format_review(report: dict) -> str:
 
     lines.append("CONDITIONED — each method evaluated where another method "
                  "claimed, no search")
-    lines.append(f"{'method':>16} {'points':>7} {'others':>7} {'score p50':>10}"
+    lines.append(f"{'method':>16} {'points':>7} {'nullpts':>7} {'others':>7}"
+                 f" {'score p50':>10}"
                  f" {'t(cross)':>9} {'confirms':>9} {'t(wrong)':>9}"
-                 f" {'confirms':>9} {'ms p50':>8}")
+                 f" {'confirms':>9} {'t(sel)':>9} {'ms p50':>8}")
     for method, summary in sorted(report["conditioned"].items()):
         cross, wrong = summary["cross_edge_null"], summary["wrong_code_null"]
+        selected = summary.get("cross_edge_at_claimed_points") or {}
         lines.append(
             f"{method:>16} {summary['conditioned_points']:>7}"
+            f" {summary.get('null_arm_points', 0):>7}"
             f" {summary['on_other_methods_claims']:>7}"
             f" {_cell(summary['score'].get('p50'), '10.4f', '         -')}"
             f" {_cell(cross.get('threshold'), '9.4f', '        -')}"
             f" {_cell(cross['confirms'].get('rate'), '9.1%', '        -')}"
             f" {_cell(wrong.get('threshold'), '9.4f', '        -')}"
             f" {_cell(wrong['confirms'].get('rate'), '9.1%', '        -')}"
+            f" {_cell(selected.get('threshold'), '9.4f', '        -')}"
             f" {_cell(summary['elapsed_ms'].get('p50'), '8.1f')}")
+    lines.append("  t(cross) is drawn from the cross-edge-null ARM — the "
+                 "opposite edge searched as its own")
+    lines.append("  target, with its own candidate points, the way "
+                 "cross_radio.null_thresholds draws it.")
+    lines.append("  t(sel) is the same pilot-free template read back where the "
+                 "TARGET-edge detectors were")
+    lines.append("  pointing. It is not a null and nothing here is thresholded "
+                 "on it: the points were")
+    lines.append("  selected against a different statistic, so it prices an "
+                 "unselected draw against a")
+    lines.append("  maximised one. On empty input it lands at 0.52x t(cross) "
+                 "for full-frame-full and")
+    lines.append("  0.78-0.86x for the GLRTs while anchor-8 and the "
+                 "differentials sit at 1.02-1.11 — a bias")
+    lines.append("  that is per-method, and so reorders the table rather than "
+                 "shifting it. It is printed")
+    lines.append("  as the exhibit for that.")
     lines.append("  A conditioned test pays no extreme-value penalty, so its "
                  "threshold sits below the searched")
     lines.append("  one at the same rate — by 2.2 dB measured, not the 5.2 dB "

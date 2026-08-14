@@ -64,10 +64,30 @@ Two nulls, and they are not interchangeable
 * **Cross-edge — the primary calibration.**  The opposite edge's template on this
   tuning's own IQ.  Its pilot codes live 230 MHz away and cannot be in the band,
   and it is not a time-shifted copy of the target template, so it stays a null
-  even when the epoch is searched.  Target-pilot-free *by construction* — no
-  screening on the statistic being calibrated, which is the flaw that inflated
-  every earlier threshold in this repository.  Run in both directions, and which
-  one is recorded, because the plan's construction was lower-on-upper only.
+  even when the epoch is searched.  Target-pilot-free *by construction*, which
+  is what every earlier threshold in this repository lacked.  Run in both
+  directions, and which one is recorded, because the plan's construction was
+  lower-on-upper only.
+
+  **Pilot-free is not unscreened, and this is where a null gets lost.**  What
+  makes the ``cross-edge-null`` *arm* a null is that the whole arm is re-run:
+  the opposite edge is searched as its own target, with its own bank, its own
+  certificates and its own candidate points, so its scores are maximised the
+  way the scores it calibrates are.  The ``cross_edge_score`` recorded beside
+  every conditioned point is **not** that.  It is the same pilot-free template
+  read back at the candidates the *target*-edge detectors chose — a draw
+  nothing selected, being used to price draws that something did.  The
+  docstring here used to claim "no screening on the statistic being calibrated"
+  for the construction as a whole; for that column it is false, and the
+  screening sits in the point selection rather than in the template.  Measured
+  on a cabled loopback carrying a genuinely empty channel it thresholds at
+  0.52x truth for ``full-frame-full``, 0.55/0.64x for the other two full-frame
+  blocks and 0.78/0.84x for the GLRTs, while ``anchor-8`` and the
+  differentials land at 1.02-1.11 — so it inflates *differentially by method*
+  and would reorder a ranking.  The column is still written, because it is a
+  real conditional measurement; ``survey_comparison.conditioned_comparison``
+  calibrates on the null arm and reports this one under a name that says what
+  it is conditioned on.
 * **Wrong code — valid only with the epoch pinned.**  Rolling the pilot sequence
   by ``r`` symbols shifts the waveform by ``r`` symbol periods, so the rolled
   template *is* the plain frame displaced ``r * 11`` samples: measured coherence
@@ -974,9 +994,19 @@ def confirm_points(samples: np.ndarray, sample_rate_hz: float, points: list[dict
     claimed, the rolled template is a genuinely absent code on the same IQ at
     the same gain — 0.585 exact against 0.019 control, measured.
 
-    Together they give the conditioned statistic a threshold of its own instead
-    of borrowing the searched one, which is 2.2 dB too strict for it — smaller
-    than an exponential tail predicts, and still the whole point of asking.
+    The rolled control gives the conditioned statistic a threshold of its own
+    instead of borrowing the searched one, which is 2.2 dB too strict for it —
+    smaller than an exponential tail predicts, and still the whole point of
+    asking.
+
+    ``cross_edge_score`` does not.  It is recorded, it is pilot-free, and it is
+    **conditional on where the target-edge detectors were pointing**: this
+    function never chooses a point, it is handed the target arm's candidate
+    list, so that column is an unselected draw sitting among selected ones.  The
+    cross-edge null that calibrates anything is the separate ``cross-edge-null``
+    arm, which searches the opposite edge as its own target and proposes its own
+    points.  See :func:`survey_comparison.conditioned_comparison`, which is
+    where confusing the two cost 0.52x on the full-frame family.
     """
     kwargs = {"differential_counts": differential_counts,
               "glrt_counts": glrt_counts, "anchor_count": anchor_count}

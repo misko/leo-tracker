@@ -1,0 +1,995 @@
+{
+  "figure": "edge-agreement",
+  "question": "does a channel's upper edge fire when its lower edge does, and what costs that agreement: the scan gap, the edge, the receiver, or the radio?",
+  "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*",
+  "census": {
+    "frozen_at_start": {
+      "measured_utc": "2026-08-14T16:01:22+00:00",
+      "sweeps_on_share": 7054,
+      "corpus_entries": 13215,
+      "scored_sidecars": 2547,
+      "scored_digest": "3e0d0ecdf2915ee1"
+    },
+    "paired_sweeps": 1258,
+    "paired_sweeps_by_geometry": {
+      "same-edge": 602,
+      "opposite-edge": 656
+    },
+    "matched_arm_paired_sweeps": 1137,
+    "scored_sidecars_in_a_pair": 2516,
+    "load_pairs_census": {
+      "scanned": 2547,
+      "read": 2547,
+      "unreadable": 0,
+      "no_manifest": 0,
+      "other_schema": {},
+      "not_synchronised": 0,
+      "unpaired_sweeps": 31,
+      "irregular_geometry": 0,
+      "beyond_limit": 0
+    },
+    "excluded_receivers": {
+      "lnb-a": 15104
+    },
+    "threshold_keys": 96
+  },
+  "statistic": "mean phi across the eight algorithms; each algorithm is judged against the threshold null_thresholds drew for its own (sample rate, probe length) from the cross-edge null arms",
+  "methods": [
+    "anchor-8",
+    "differential-16",
+    "differential-32",
+    "full-frame-acquire",
+    "full-frame-full",
+    "full-frame-verify",
+    "glrt-32",
+    "glrt-64"
+  ],
+  "rungs": {
+    "same-receiver-two-edges": {
+      "what": "one receiver chain sees both edges of a channel, one dwell apart in its own scan order",
+      "a_is": "lower edge",
+      "b_is": "upper edge",
+      "n": 15096,
+      "sweeps": 1258,
+      "phi_methods_mean": 0.6047926282711928,
+      "phi_methods_min": 0.5732535992635457,
+      "phi_methods_max": 0.6574583705574636,
+      "phi_any_method": 0.45375250178897836,
+      "phi_per_rule": {
+        "anchor-8": 0.6238862516909652,
+        "differential-16": 0.6090108017976498,
+        "differential-32": 0.5922223000655641,
+        "full-frame-acquire": 0.5732535992635457,
+        "full-frame-full": 0.5740689033215476,
+        "full-frame-verify": 0.5779653325516868,
+        "glrt-32": 0.6574583705574636,
+        "glrt-64": 0.6304754669211204,
+        "any-method": 0.45375250178897836
+      },
+      "counts_any_method": {
+        "n": 15096,
+        "a_fires": 6339,
+        "b_fires": 5885,
+        "both": 4120,
+        "neither": 6992,
+        "a_only": 2219,
+        "b_only": 1765
+      },
+      "counts_per_method": {
+        "anchor-8": {
+          "n": 15096,
+          "a_fires": 4921,
+          "b_fires": 4495,
+          "both": 3484,
+          "neither": 9164,
+          "a_only": 1437,
+          "b_only": 1011
+        },
+        "differential-16": {
+          "n": 15096,
+          "a_fires": 5135,
+          "b_fires": 4736,
+          "both": 3632,
+          "neither": 8857,
+          "a_only": 1503,
+          "b_only": 1104
+        },
+        "differential-32": {
+          "n": 15096,
+          "a_fires": 5207,
+          "b_fires": 4781,
+          "both": 3626,
+          "neither": 8734,
+          "a_only": 1581,
+          "b_only": 1155
+        },
+        "full-frame-acquire": {
+          "n": 15096,
+          "a_fires": 5198,
+          "b_fires": 4852,
+          "both": 3591,
+          "neither": 8637,
+          "a_only": 1607,
+          "b_only": 1261
+        },
+        "full-frame-full": {
+          "n": 15096,
+          "a_fires": 5211,
+          "b_fires": 4843,
+          "both": 3595,
+          "neither": 8637,
+          "a_only": 1616,
+          "b_only": 1248
+        },
+        "full-frame-verify": {
+          "n": 15096,
+          "a_fires": 5200,
+          "b_fires": 4824,
+          "both": 3595,
+          "neither": 8667,
+          "a_only": 1605,
+          "b_only": 1229
+        },
+        "glrt-32": {
+          "n": 15096,
+          "a_fires": 4887,
+          "b_fires": 4435,
+          "both": 3551,
+          "neither": 9325,
+          "a_only": 1336,
+          "b_only": 884
+        },
+        "glrt-64": {
+          "n": 15096,
+          "a_fires": 4993,
+          "b_fires": 4590,
+          "both": 3578,
+          "neither": 9091,
+          "a_only": 1415,
+          "b_only": 1012
+        }
+      },
+      "per_channel": {
+        "1": {
+          "phi_methods_mean": 0.6115645020708531,
+          "phi_any_method": 0.4477142770039879,
+          "phi_per_rule": {
+            "anchor-8": 0.6365821362718547,
+            "differential-16": 0.6077065519569882,
+            "differential-32": 0.6074913693975286,
+            "full-frame-acquire": 0.5806316546403583,
+            "full-frame-full": 0.5841263978572827,
+            "full-frame-verify": 0.5835627855121892,
+            "glrt-32": 0.6597434523139338,
+            "glrt-64": 0.6326716686166902,
+            "any-method": 0.4477142770039879
+          },
+          "counts_any_method": {
+            "n": 3774,
+            "a_fires": 1516,
+            "b_fires": 1360,
+            "both": 944,
+            "neither": 1842,
+            "a_only": 572,
+            "b_only": 416
+          }
+        },
+        "2": {
+          "phi_methods_mean": 0.6178504247687664,
+          "phi_any_method": 0.4664566000419317,
+          "phi_per_rule": {
+            "anchor-8": 0.638029156136549,
+            "differential-16": 0.626053785208039,
+            "differential-32": 0.5919555431497685,
+            "full-frame-acquire": 0.5883233662964317,
+            "full-frame-full": 0.5812904141941935,
+            "full-frame-verify": 0.5972039834038598,
+            "glrt-32": 0.6685853307216301,
+            "glrt-64": 0.65136181903966,
+            "any-method": 0.4664566000419317
+          },
+          "counts_any_method": {
+            "n": 3774,
+            "a_fires": 1678,
+            "b_fires": 1504,
+            "both": 1097,
+            "neither": 1689,
+            "a_only": 581,
+            "b_only": 407
+          }
+        },
+        "3": {
+          "phi_methods_mean": 0.610392726766469,
+          "phi_any_method": 0.45887043860044235,
+          "phi_per_rule": {
+            "anchor-8": 0.6351456685792755,
+            "differential-16": 0.6141401762509071,
+            "differential-32": 0.6011475459121313,
+            "full-frame-acquire": 0.5691343243859032,
+            "full-frame-full": 0.5820704782070323,
+            "full-frame-verify": 0.5749544260616849,
+            "glrt-32": 0.6716524953081996,
+            "glrt-64": 0.6348966994266192,
+            "any-method": 0.45887043860044235
+          },
+          "counts_any_method": {
+            "n": 3774,
+            "a_fires": 1615,
+            "b_fires": 1527,
+            "both": 1074,
+            "neither": 1706,
+            "a_only": 541,
+            "b_only": 453
+          }
+        },
+        "4": {
+          "phi_methods_mean": 0.5810566474659304,
+          "phi_any_method": 0.44068452216400267,
+          "phi_per_rule": {
+            "anchor-8": 0.5869181965597552,
+            "differential-16": 0.5887239067686637,
+            "differential-32": 0.5696087106358437,
+            "full-frame-acquire": 0.557039613532948,
+            "full-frame-full": 0.5505967122255025,
+            "full-frame-verify": 0.557669408138081,
+            "glrt-32": 0.6327712324355709,
+            "glrt-64": 0.6051253994310783,
+            "any-method": 0.44068452216400267
+          },
+          "counts_any_method": {
+            "n": 3774,
+            "a_fires": 1530,
+            "b_fires": 1494,
+            "both": 1005,
+            "neither": 1755,
+            "a_only": 525,
+            "b_only": 489
+          }
+        }
+      },
+      "bootstrap": {
+        "mean": 0.6041861646779884,
+        "sd": 0.008016336251782054,
+        "ci95": [
+          0.5902326351808742,
+          0.6199894902339151
+        ]
+      }
+    },
+    "two-receivers-one-radio": {
+      "what": "the two live receivers of pluto-19f2 on the same tuning at the same instant: different LNB front-end, shared clock and bus. pluto-5d4d cannot supply this rung, its other port is the dead lnb-a",
+      "a_is": "lnb-c",
+      "b_is": "lnb-d",
+      "n": 10064,
+      "sweeps": 1258,
+      "phi_methods_mean": 0.5179881649997643,
+      "phi_methods_min": 0.49150765996653967,
+      "phi_methods_max": 0.562195662499973,
+      "phi_any_method": 0.38580741012543573,
+      "phi_per_rule": {
+        "anchor-8": 0.5390859713187915,
+        "differential-16": 0.5104060437893191,
+        "differential-32": 0.5036743332902996,
+        "full-frame-acquire": 0.49630597280151395,
+        "full-frame-full": 0.49150765996653967,
+        "full-frame-verify": 0.4950120830827916,
+        "glrt-32": 0.562195662499973,
+        "glrt-64": 0.5457175932488859,
+        "any-method": 0.38580741012543573
+      },
+      "counts_any_method": {
+        "n": 10064,
+        "a_fires": 3711,
+        "b_fires": 4625,
+        "both": 2639,
+        "neither": 4367,
+        "a_only": 1072,
+        "b_only": 1986
+      },
+      "counts_per_method": {
+        "anchor-8": {
+          "n": 10064,
+          "a_fires": 2752,
+          "b_fires": 3686,
+          "both": 2173,
+          "neither": 5799,
+          "a_only": 579,
+          "b_only": 1513
+        },
+        "differential-16": {
+          "n": 10064,
+          "a_fires": 2915,
+          "b_fires": 3860,
+          "both": 2251,
+          "neither": 5540,
+          "a_only": 664,
+          "b_only": 1609
+        },
+        "differential-32": {
+          "n": 10064,
+          "a_fires": 2968,
+          "b_fires": 3882,
+          "both": 2270,
+          "neither": 5484,
+          "a_only": 698,
+          "b_only": 1612
+        },
+        "full-frame-acquire": {
+          "n": 10064,
+          "a_fires": 2989,
+          "b_fires": 3868,
+          "both": 2259,
+          "neither": 5466,
+          "a_only": 730,
+          "b_only": 1609
+        },
+        "full-frame-full": {
+          "n": 10064,
+          "a_fires": 3015,
+          "b_fires": 3868,
+          "both": 2261,
+          "neither": 5442,
+          "a_only": 754,
+          "b_only": 1607
+        },
+        "full-frame-verify": {
+          "n": 10064,
+          "a_fires": 3014,
+          "b_fires": 3850,
+          "both": 2262,
+          "neither": 5462,
+          "a_only": 752,
+          "b_only": 1588
+        },
+        "glrt-32": {
+          "n": 10064,
+          "a_fires": 2723,
+          "b_fires": 3647,
+          "both": 2195,
+          "neither": 5889,
+          "a_only": 528,
+          "b_only": 1452
+        },
+        "glrt-64": {
+          "n": 10064,
+          "a_fires": 2823,
+          "b_fires": 3736,
+          "both": 2240,
+          "neither": 5745,
+          "a_only": 583,
+          "b_only": 1496
+        }
+      },
+      "per_channel": {
+        "1": {
+          "phi_methods_mean": 0.5277837850381417,
+          "phi_any_method": 0.3954826736875874,
+          "phi_per_rule": {
+            "anchor-8": 0.5577059897545018,
+            "differential-16": 0.5192335941674536,
+            "differential-32": 0.5207081340238884,
+            "full-frame-acquire": 0.506672188765446,
+            "full-frame-full": 0.5076139490422495,
+            "full-frame-verify": 0.5044249612838421,
+            "glrt-32": 0.5592781277917676,
+            "glrt-64": 0.546633335475984,
+            "any-method": 0.3954826736875874
+          },
+          "counts_any_method": {
+            "n": 2516,
+            "a_fires": 864,
+            "b_fires": 1078,
+            "both": 604,
+            "neither": 1178,
+            "a_only": 260,
+            "b_only": 474
+          }
+        },
+        "2": {
+          "phi_methods_mean": 0.5288052696596962,
+          "phi_any_method": 0.3961948024946452,
+          "phi_per_rule": {
+            "anchor-8": 0.5401116296553463,
+            "differential-16": 0.5137078356995329,
+            "differential-32": 0.4989384725197207,
+            "full-frame-acquire": 0.5180834921090155,
+            "full-frame-full": 0.5143778878571975,
+            "full-frame-verify": 0.5183456660830159,
+            "glrt-32": 0.5704643468925777,
+            "glrt-64": 0.5564128264611629,
+            "any-method": 0.3961948024946452
+          },
+          "counts_any_method": {
+            "n": 2516,
+            "a_fires": 933,
+            "b_fires": 1204,
+            "both": 687,
+            "neither": 1066,
+            "a_only": 246,
+            "b_only": 517
+          }
+        },
+        "3": {
+          "phi_methods_mean": 0.5088450481495765,
+          "phi_any_method": 0.3828484362263788,
+          "phi_per_rule": {
+            "anchor-8": 0.5391564342519986,
+            "differential-16": 0.5078599985750712,
+            "differential-32": 0.5061199370872617,
+            "full-frame-acquire": 0.4794493824661034,
+            "full-frame-full": 0.4714132362811712,
+            "full-frame-verify": 0.46846110178871636,
+            "glrt-32": 0.5579114809090058,
+            "glrt-64": 0.5403888138372838,
+            "any-method": 0.3828484362263788
+          },
+          "counts_any_method": {
+            "n": 2516,
+            "a_fires": 961,
+            "b_fires": 1210,
+            "both": 696,
+            "neither": 1041,
+            "a_only": 265,
+            "b_only": 514
+          }
+        },
+        "4": {
+          "phi_methods_mean": 0.5070658439740425,
+          "phi_any_method": 0.36699944214268654,
+          "phi_per_rule": {
+            "anchor-8": 0.519492411046943,
+            "differential-16": 0.5014112621414911,
+            "differential-32": 0.48989065541155263,
+            "full-frame-acquire": 0.4806615875627471,
+            "full-frame-full": 0.472799246214102,
+            "full-frame-verify": 0.48944178728946447,
+            "glrt-32": 0.5622143322018116,
+            "glrt-64": 0.540615469924229,
+            "any-method": 0.36699944214268654
+          },
+          "counts_any_method": {
+            "n": 2516,
+            "a_fires": 953,
+            "b_fires": 1133,
+            "both": 652,
+            "neither": 1082,
+            "a_only": 301,
+            "b_only": 481
+          }
+        }
+      },
+      "bootstrap": {
+        "mean": 0.5180723860165045,
+        "sd": 0.009173207719736088,
+        "ci95": [
+          0.5017497646318894,
+          0.5354886212099749
+        ]
+      }
+    },
+    "two-radios-same-edge": {
+      "what": "two radios on the SAME edge of one channel at one instant (the hardware control)",
+      "a_is": "radio A",
+      "b_is": "radio B",
+      "n": 9632,
+      "sweeps": 602,
+      "phi_methods_mean": 0.5226243664317598,
+      "phi_methods_min": 0.5023650244002013,
+      "phi_methods_max": 0.5621417101402307,
+      "phi_any_method": 0.4005121920173116,
+      "phi_per_rule": {
+        "anchor-8": 0.5371974597734174,
+        "differential-16": 0.5156236571673967,
+        "differential-32": 0.516318147747256,
+        "full-frame-acquire": 0.5025729689993719,
+        "full-frame-full": 0.5023650244002013,
+        "full-frame-verify": 0.5042119518029843,
+        "glrt-32": 0.5621417101402307,
+        "glrt-64": 0.54056401142322,
+        "any-method": 0.4005121920173116
+      },
+      "counts_any_method": {
+        "n": 9632,
+        "a_fires": 3945,
+        "b_fires": 3656,
+        "both": 2418,
+        "neither": 4449,
+        "a_only": 1527,
+        "b_only": 1238
+      },
+      "counts_per_method": {
+        "anchor-8": {
+          "n": 9632,
+          "a_fires": 3029,
+          "b_fires": 2792,
+          "both": 1968,
+          "neither": 5779,
+          "a_only": 1061,
+          "b_only": 824
+        },
+        "differential-16": {
+          "n": 9632,
+          "a_fires": 3218,
+          "b_fires": 2940,
+          "both": 2061,
+          "neither": 5535,
+          "a_only": 1157,
+          "b_only": 879
+        },
+        "differential-32": {
+          "n": 9632,
+          "a_fires": 3246,
+          "b_fires": 2978,
+          "both": 2090,
+          "neither": 5498,
+          "a_only": 1156,
+          "b_only": 888
+        },
+        "full-frame-acquire": {
+          "n": 9632,
+          "a_fires": 3241,
+          "b_fires": 2980,
+          "both": 2060,
+          "neither": 5471,
+          "a_only": 1181,
+          "b_only": 920
+        },
+        "full-frame-full": {
+          "n": 9632,
+          "a_fires": 3252,
+          "b_fires": 2946,
+          "both": 2049,
+          "neither": 5483,
+          "a_only": 1203,
+          "b_only": 897
+        },
+        "full-frame-verify": {
+          "n": 9632,
+          "a_fires": 3252,
+          "b_fires": 2944,
+          "both": 2052,
+          "neither": 5488,
+          "a_only": 1200,
+          "b_only": 892
+        },
+        "glrt-32": {
+          "n": 9632,
+          "a_fires": 3011,
+          "b_fires": 2770,
+          "both": 2002,
+          "neither": 5853,
+          "a_only": 1009,
+          "b_only": 768
+        },
+        "glrt-64": {
+          "n": 9632,
+          "a_fires": 3086,
+          "b_fires": 2866,
+          "both": 2029,
+          "neither": 5709,
+          "a_only": 1057,
+          "b_only": 837
+        }
+      },
+      "per_channel": {
+        "1": {
+          "phi_methods_mean": 0.5346140985971444,
+          "phi_any_method": 0.40503064032293506,
+          "phi_per_rule": {
+            "anchor-8": 0.5472455775983387,
+            "differential-16": 0.534571701825351,
+            "differential-32": 0.5394366202719566,
+            "full-frame-acquire": 0.5115930865649633,
+            "full-frame-full": 0.5203760975606057,
+            "full-frame-verify": 0.5120408831908848,
+            "glrt-32": 0.5725214129002077,
+            "glrt-64": 0.539127408864847,
+            "any-method": 0.40503064032293506
+          },
+          "counts_any_method": {
+            "n": 2408,
+            "a_fires": 937,
+            "b_fires": 850,
+            "both": 558,
+            "neither": 1179,
+            "a_only": 379,
+            "b_only": 292
+          }
+        },
+        "2": {
+          "phi_methods_mean": 0.5415789699286278,
+          "phi_any_method": 0.4195212259777422,
+          "phi_per_rule": {
+            "anchor-8": 0.5495019458251029,
+            "differential-16": 0.5496421013181474,
+            "differential-32": 0.5265554737389564,
+            "full-frame-acquire": 0.526146194969542,
+            "full-frame-full": 0.5189890278160109,
+            "full-frame-verify": 0.5258560511377605,
+            "glrt-32": 0.5740223256309986,
+            "glrt-64": 0.5619186389925038,
+            "any-method": 0.4195212259777422
+          },
+          "counts_any_method": {
+            "n": 2408,
+            "a_fires": 1004,
+            "b_fires": 1008,
+            "both": 666,
+            "neither": 1062,
+            "a_only": 338,
+            "b_only": 342
+          }
+        },
+        "3": {
+          "phi_methods_mean": 0.5063060028051241,
+          "phi_any_method": 0.38473270864456405,
+          "phi_per_rule": {
+            "anchor-8": 0.5346330046220127,
+            "differential-16": 0.49502316231915783,
+            "differential-32": 0.5029986754514864,
+            "full-frame-acquire": 0.4807254292751634,
+            "full-frame-full": 0.4769051377582773,
+            "full-frame-verify": 0.4802937808768577,
+            "glrt-32": 0.5478477203736088,
+            "glrt-64": 0.5320211117644285,
+            "any-method": 0.38473270864456405
+          },
+          "counts_any_method": {
+            "n": 2408,
+            "a_fires": 1032,
+            "b_fires": 922,
+            "both": 618,
+            "neither": 1072,
+            "a_only": 414,
+            "b_only": 304
+          }
+        },
+        "4": {
+          "phi_methods_mean": 0.5081984974667796,
+          "phi_any_method": 0.3912883181531647,
+          "phi_per_rule": {
+            "anchor-8": 0.5190152568653863,
+            "differential-16": 0.48369196092453265,
+            "differential-32": 0.4954761965327831,
+            "full-frame-acquire": 0.49109689490448155,
+            "full-frame-full": 0.4942452265172196,
+            "full-frame-verify": 0.4989061884587969,
+            "glrt-32": 0.5545635065240494,
+            "glrt-64": 0.5285927490069877,
+            "any-method": 0.3912883181531647
+          },
+          "counts_any_method": {
+            "n": 2408,
+            "a_fires": 972,
+            "b_fires": 876,
+            "both": 576,
+            "neither": 1136,
+            "a_only": 396,
+            "b_only": 300
+          }
+        }
+      },
+      "bootstrap": {
+        "mean": 0.5223053558344649,
+        "sd": 0.013048335992172767,
+        "ci95": [
+          0.4972927633760315,
+          0.5455346812895032
+        ]
+      }
+    },
+    "two-radios-opposite-edges": {
+      "what": "two radios on OPPOSITE edges of one channel at one instant",
+      "a_is": "radio A",
+      "b_is": "radio B",
+      "n": 10496,
+      "sweeps": 656,
+      "phi_methods_mean": 0.522624180567933,
+      "phi_methods_min": 0.4952790239522723,
+      "phi_methods_max": 0.564568430134071,
+      "phi_any_method": 0.4012223897209686,
+      "phi_per_rule": {
+        "anchor-8": 0.5361747817314735,
+        "differential-16": 0.5214337167332792,
+        "differential-32": 0.515911502904192,
+        "full-frame-acquire": 0.4952790239522723,
+        "full-frame-full": 0.495855018573504,
+        "full-frame-verify": 0.5036923149482624,
+        "glrt-32": 0.564568430134071,
+        "glrt-64": 0.5480786555664103,
+        "any-method": 0.4012223897209686
+      },
+      "counts_any_method": {
+        "n": 10496,
+        "a_fires": 4391,
+        "b_fires": 4120,
+        "both": 2738,
+        "neither": 4723,
+        "a_only": 1653,
+        "b_only": 1382
+      },
+      "counts_per_method": {
+        "anchor-8": {
+          "n": 10496,
+          "a_fires": 3409,
+          "b_fires": 3164,
+          "both": 2237,
+          "neither": 6160,
+          "a_only": 1172,
+          "b_only": 927
+        },
+        "differential-16": {
+          "n": 10496,
+          "a_fires": 3557,
+          "b_fires": 3252,
+          "both": 2300,
+          "neither": 5987,
+          "a_only": 1257,
+          "b_only": 952
+        },
+        "differential-32": {
+          "n": 10496,
+          "a_fires": 3604,
+          "b_fires": 3298,
+          "both": 2326,
+          "neither": 5920,
+          "a_only": 1278,
+          "b_only": 972
+        },
+        "full-frame-acquire": {
+          "n": 10496,
+          "a_fires": 3616,
+          "b_fires": 3406,
+          "both": 2330,
+          "neither": 5804,
+          "a_only": 1286,
+          "b_only": 1076
+        },
+        "full-frame-full": {
+          "n": 10496,
+          "a_fires": 3631,
+          "b_fires": 3396,
+          "both": 2333,
+          "neither": 5802,
+          "a_only": 1298,
+          "b_only": 1063
+        },
+        "full-frame-verify": {
+          "n": 10496,
+          "a_fires": 3612,
+          "b_fires": 3376,
+          "both": 2335,
+          "neither": 5843,
+          "a_only": 1277,
+          "b_only": 1041
+        },
+        "glrt-32": {
+          "n": 10496,
+          "a_fires": 3359,
+          "b_fires": 3134,
+          "both": 2268,
+          "neither": 6271,
+          "a_only": 1091,
+          "b_only": 866
+        },
+        "glrt-64": {
+          "n": 10496,
+          "a_fires": 3473,
+          "b_fires": 3182,
+          "both": 2297,
+          "neither": 6138,
+          "a_only": 1176,
+          "b_only": 885
+        }
+      },
+      "per_channel": {
+        "1": {
+          "phi_methods_mean": 0.510039944205162,
+          "phi_any_method": 0.3846764087265538,
+          "phi_per_rule": {
+            "anchor-8": 0.5294509812813126,
+            "differential-16": 0.5001514235869241,
+            "differential-32": 0.499359191566492,
+            "full-frame-acquire": 0.4880811448659109,
+            "full-frame-full": 0.47863004269249776,
+            "full-frame-verify": 0.5032679972039337,
+            "glrt-32": 0.5466013271607463,
+            "glrt-64": 0.5347774452834787,
+            "any-method": 0.3846764087265538
+          },
+          "counts_any_method": {
+            "n": 2624,
+            "a_fires": 1005,
+            "b_fires": 1018,
+            "both": 629,
+            "neither": 1230,
+            "a_only": 376,
+            "b_only": 389
+          }
+        },
+        "2": {
+          "phi_methods_mean": 0.5488516042064041,
+          "phi_any_method": 0.4248347255979268,
+          "phi_per_rule": {
+            "anchor-8": 0.5662320624965658,
+            "differential-16": 0.539031472601163,
+            "differential-32": 0.548403750758727,
+            "full-frame-acquire": 0.5229705905962038,
+            "full-frame-full": 0.5169180786729372,
+            "full-frame-verify": 0.5251778100035728,
+            "glrt-32": 0.5847253951205259,
+            "glrt-64": 0.5873536734015379,
+            "any-method": 0.4248347255979268
+          },
+          "counts_any_method": {
+            "n": 2624,
+            "a_fires": 1133,
+            "b_fires": 1082,
+            "both": 739,
+            "neither": 1148,
+            "a_only": 394,
+            "b_only": 343
+          }
+        },
+        "3": {
+          "phi_methods_mean": 0.5250671832041187,
+          "phi_any_method": 0.41366563760505104,
+          "phi_per_rule": {
+            "anchor-8": 0.5393269962032827,
+            "differential-16": 0.5413088995208561,
+            "differential-32": 0.5231546071149391,
+            "full-frame-acquire": 0.49312990023839537,
+            "full-frame-full": 0.5000154415538219,
+            "full-frame-verify": 0.49272931551503024,
+            "glrt-32": 0.5751650744036345,
+            "glrt-64": 0.5357072310829895,
+            "any-method": 0.41366563760505104
+          },
+          "counts_any_method": {
+            "n": 2624,
+            "a_fires": 1139,
+            "b_fires": 1020,
+            "both": 705,
+            "neither": 1170,
+            "a_only": 434,
+            "b_only": 315
+          }
+        },
+        "4": {
+          "phi_methods_mean": 0.5044433143793965,
+          "phi_any_method": 0.3817488577886398,
+          "phi_per_rule": {
+            "anchor-8": 0.5075153783250159,
+            "differential-16": 0.5039969829461248,
+            "differential-32": 0.4898329551584571,
+            "full-frame-acquire": 0.4751106030967408,
+            "full-frame-full": 0.48525353190225884,
+            "full-frame-verify": 0.492053046168331,
+            "glrt-32": 0.5495410206557011,
+            "glrt-64": 0.5322429967825423,
+            "any-method": 0.3817488577886398
+          },
+          "counts_any_method": {
+            "n": 2624,
+            "a_fires": 1114,
+            "b_fires": 1000,
+            "both": 665,
+            "neither": 1175,
+            "a_only": 449,
+            "b_only": 335
+          }
+        }
+      },
+      "bootstrap": {
+        "mean": 0.5223341645837584,
+        "sd": 0.012186652270804678,
+        "ci95": [
+          0.4996511660397938,
+          0.5460240517804943
+        ]
+      }
+    }
+  },
+  "bootstrap": {
+    "draws": 400,
+    "seed": 20260814,
+    "resampled": "paired sweeps",
+    "statistic": "mean phi across the eight algorithms",
+    "differences": {
+      "two-radios-opposite-edges - two-radios-same-edge": {
+        "meaning": "THE EDGE, at a fixed hardware boundary and zero time gap",
+        "observed": -1.858638267737689e-07,
+        "bootstrap_mean": 2.8808749293334352e-05,
+        "sd": 0.018297572586616268,
+        "ci95": [
+          -0.0354306322272138,
+          0.03723496253623946
+        ],
+        "crosses_zero": true
+      },
+      "two-radios-same-edge - two-receivers-one-radio": {
+        "meaning": "THE RADIO BOUNDARY, at a fixed edge; both sides already use two different LNBs",
+        "observed": 0.004636201431995501,
+        "bootstrap_mean": 0.004232969817960456,
+        "sd": 0.013238058077946929,
+        "ci95": [
+          -0.02124494532885121,
+          0.029561804568921407
+        ],
+        "crosses_zero": true
+      },
+      "two-receivers-one-radio - same-receiver-two-edges": {
+        "meaning": "swapping to a different LNB while REMOVING the scan gap",
+        "observed": -0.08680446327142854,
+        "bootstrap_mean": -0.0861137786614838,
+        "sd": 0.008440080804727619,
+        "ci95": [
+          -0.10133238678911306,
+          -0.06969114682030801
+        ],
+        "crosses_zero": false
+      },
+      "two-radios-opposite-edges - same-receiver-two-edges": {
+        "meaning": "the brief's two cases: removing the gap while also crossing the hardware boundary",
+        "observed": -0.08216844770325982,
+        "bootstrap_mean": -0.08185200009423,
+        "sd": 0.011304543950452927,
+        "ci95": [
+          -0.10415375971173829,
+          -0.061455584084389746
+        ],
+        "crosses_zero": false
+      }
+    }
+  },
+  "headline_checks": {
+    "earlier_finding": "removing the time gap made agreement WORSE, implying receiver-to-receiver variation dominates over timing",
+    "still_holds": true,
+    "brief_two_cases_delta": -0.08216844770325982,
+    "edge_alone_delta": -1.858638267737689e-07,
+    "edge_alone_ci95": [
+      -0.0354306322272138,
+      0.03723496253623946
+    ],
+    "edge_alone_indistinguishable_from_zero": true,
+    "radio_boundary_delta": 0.004636201431995501,
+    "radio_boundary_ci95": [
+      -0.02124494532885121,
+      0.029561804568921407
+    ],
+    "radio_boundary_indistinguishable_from_zero": true,
+    "receiver_change_delta": -0.08680446327142854,
+    "receiver_change_ci95": [
+      -0.10133238678911306,
+      -0.06969114682030801
+    ],
+    "verdict": "CONFIRMED and sharpened. The earlier finding stands: the same receiver across the scan gap agrees at phi 0.605, better than two simultaneous chains at 0.523. But the cause is now separable: the EDGE costs -0.0000 (CI -0.035 to +0.037, crosses zero) and the RADIO boundary costs +0.0046 (CI -0.021 to +0.030, crosses zero), while swapping the LNB costs -0.0868 even with the gap removed. Receiver-to-receiver variation is the whole effect"
+  },
+  "census_drift_at_end": {
+    "frozen_at_start": {
+      "measured_utc": "2026-08-14T16:01:22+00:00",
+      "sweeps_on_share": 7054,
+      "corpus_entries": 13215,
+      "scored_sidecars": 2547,
+      "scored_digest": "3e0d0ecdf2915ee1"
+    },
+    "measured_at_end": {
+      "measured_utc": "2026-08-14T16:31:59+00:00",
+      "sweeps_on_share": 7054,
+      "corpus_entries": 13215,
+      "scored_sidecars": 2693,
+      "scored_digest": "902ab6b4e11cca89"
+    },
+    "delta": {
+      "sweeps_on_share": 0,
+      "sweeps_committed": 0,
+      "corpus_entries": 0,
+      "scored_sidecars": 146
+    },
+    "scored_added": 146,
+    "scored_removed": 0,
+    "sweeps_added": 0,
+    "identical": false,
+    "note": "every figure in this set was computed on the FROZEN list. Sidecars that landed after it are not in any figure; none were removed, and radio collection stayed paused (0 new sweeps)."
+  }
+}

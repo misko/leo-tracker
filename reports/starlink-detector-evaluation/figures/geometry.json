@@ -1,0 +1,259 @@
+{
+  "figure": "geometry",
+  "finding": "The independent per-radio edge-order draw splits the corpus almost exactly in half: 3,461 same-edge (replication) and 3,593 opposite-edge (both edges of one channel at one instant) over 7,054 captured sweeps. The authoritative run's 1,167 pairs / 558 / 609 cannot be reproduced exactly because scoring has advanced; the same filter on today's corpus gives more pairs in the same proportion.",
+  "sources": {
+    "collector_record": "/mnt/qnap01/mouse9911/leo-scans/sync-*/sweep.json",
+    "corpus_manifests": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/manifest.json",
+    "authoritative_review": "/home/satpi01/leo-tracker/reports/sync-scan-cross-radio-2026-08-14/review-full-corpus.txt",
+    "repository_functions": [
+      "leo_tracker.radio.beacon.cross_radio.sweep_geometry",
+      "leo_tracker.radio.beacon.cross_radio.DEAD_RECEIVERS"
+    ]
+  },
+  "census_at_start": {
+    "measured_utc": "20260814T164320Z",
+    "sweeps_on_share": 7054,
+    "corpus_sync_dirs": 13215,
+    "scored_sidecars_sync": 2732
+  },
+  "census_at_end": {
+    "measured_utc": "20260814T164444Z",
+    "sweeps_on_share": 7054,
+    "corpus_sync_dirs": 13215,
+    "scored_sidecars_sync": 2737
+  },
+  "census_drift": {
+    "sweeps_on_share": 0,
+    "corpus_sync_dirs": 0,
+    "scored_sidecars_sync": 5
+  },
+  "cache_meta": {
+    "started_utc": "20260814T160201Z",
+    "finished_utc": "20260814T160317Z",
+    "scans_root": "/mnt/qnap01/mouse9911/leo-scans",
+    "corpus_root": "/mnt/qnap01/mouse9911/leo/surveys/corpus",
+    "sweeps_read": 7054,
+    "sweep_skipped": {
+      "no_sweep_json": 0,
+      "unreadable": 0,
+      "not_two_radios": 0
+    },
+    "corpus_census": {
+      "dirs": 13215,
+      "no_manifest": 0,
+      "unreadable": 0,
+      "not_synchronised": 0,
+      "no_scores": 10661,
+      "other_schema": 0,
+      "scored": 2554
+    },
+    "dead_receivers": [
+      "lnb-a"
+    ],
+    "scores_schema": "leo-tracker.survey-detector-comparison/v2",
+    "guard_hz": {
+      "1.25": -312500.0,
+      "2.5": 312500.0,
+      "5.0": 1562500.0,
+      "10.0": 4062500.0
+    }
+  },
+  "plotted_counts": {
+    "captured_sweeps": {
+      "n": 7054,
+      "same_edge": 3461,
+      "opposite_edge": 3593,
+      "same_edge_pct": 49.064360646441735
+    },
+    "imported_pairs": {
+      "n": 6161,
+      "same_edge": 3002,
+      "opposite_edge": 3159,
+      "same_edge_pct": 48.72585619217659
+    },
+    "scored_pairs": {
+      "n": 1261,
+      "same_edge": 603,
+      "opposite_edge": 658,
+      "same_edge_pct": 47.81919111816019
+    },
+    "cells_scored": {
+      "same_edge": 9648,
+      "opposite_edge": 10528,
+      "total": 20176
+    },
+    "cells_imported": {
+      "same_edge": 48032,
+      "opposite_edge": 50544,
+      "total": 98576
+    }
+  },
+  "pairing_drops": {
+    "unpaired_sweeps": 893,
+    "irregular_geometry": 0
+  },
+  "edge_order_draw": {
+    "radio_a_L": 3539,
+    "radio_a_U": 3515,
+    "radio_b_L": 3516,
+    "radio_b_U": 3538,
+    "fairness_check_same_edge": {
+      "same_edge": 3461,
+      "n": 7054,
+      "share": 0.49064360646441735,
+      "expected_share": 0.5,
+      "mc_draws": 20000,
+      "mc_seed": 20260814,
+      "p_value_two_sided_mc": 0.1153
+    }
+  },
+  "geometry_derivation_audit": {
+    "declared_vs_derived_disagreements": 0,
+    "pairs_checked": 6161,
+    "distinct_sample_orders_in_corpus": [
+      "1:lower,1:upper,2:lower,2:upper,3:lower,3:upper,4:lower,4:upper",
+      "1:upper,1:lower,2:upper,2:lower,3:upper,3:lower,4:upper,4:lower"
+    ],
+    "instants_per_sweep": [
+      8
+    ],
+    "live_receiver_pairs_per_pair": [
+      2
+    ],
+    "dead_receivers": [
+      "lnb-a"
+    ]
+  },
+  "authoritative_review_line": {
+    "available": true,
+    "path": "/home/satpi01/leo-tracker/reports/sync-scan-cross-radio-2026-08-14/review-full-corpus.txt",
+    "line_number": 17,
+    "pairs": 1167,
+    "same_edge": 558,
+    "opposite_edge": 609,
+    "matched_arm_pairs": 1054,
+    "cells": 18672,
+    "cells_same_edge": 8928,
+    "cells_opposite_edge": 9744
+  },
+  "authoritative_comparison": {
+    "then_pairs": 1167,
+    "now_pairs": 1261,
+    "pairs_added": 94,
+    "then_same_edge_pct": 47.81491002570694,
+    "now_same_edge_pct": 47.81919111816019,
+    "reproduced_exactly": false,
+    "why": "scoring is running and the scored corpus grew between the authoritative run and this one; the load_pairs filter is unchanged and the geometry mixture is unchanged"
+  },
+  "counts_by_geometry_and_arm": {
+    "imported": {
+      "160ms-1.25MSps": {
+        "same-edge": 214,
+        "opposite-edge": 246
+      },
+      "160ms-10.00MSps": {
+        "same-edge": 231,
+        "opposite-edge": 246
+      },
+      "160ms-2.50MSps": {
+        "same-edge": 237,
+        "opposite-edge": 238
+      },
+      "160ms-5.00MSps": {
+        "same-edge": 253,
+        "opposite-edge": 256
+      },
+      "640ms-1.25MSps": {
+        "same-edge": 226,
+        "opposite-edge": 234
+      },
+      "640ms-10.00MSps": {
+        "same-edge": 227,
+        "opposite-edge": 210
+      },
+      "640ms-2.50MSps": {
+        "same-edge": 206,
+        "opposite-edge": 247
+      },
+      "640ms-5.00MSps": {
+        "same-edge": 213,
+        "opposite-edge": 234
+      },
+      "80ms-1.25MSps": {
+        "same-edge": 225,
+        "opposite-edge": 244
+      },
+      "80ms-10.00MSps": {
+        "same-edge": 224,
+        "opposite-edge": 227
+      },
+      "80ms-2.50MSps": {
+        "same-edge": 221,
+        "opposite-edge": 244
+      },
+      "80ms-5.00MSps": {
+        "same-edge": 216,
+        "opposite-edge": 231
+      },
+      "mixed-arm": {
+        "same-edge": 309,
+        "opposite-edge": 302
+      }
+    },
+    "scored": {
+      "160ms-1.25MSps": {
+        "same-edge": 51,
+        "opposite-edge": 45
+      },
+      "160ms-10.00MSps": {
+        "same-edge": 50,
+        "opposite-edge": 45
+      },
+      "160ms-2.50MSps": {
+        "same-edge": 38,
+        "opposite-edge": 58
+      },
+      "160ms-5.00MSps": {
+        "same-edge": 50,
+        "opposite-edge": 56
+      },
+      "640ms-1.25MSps": {
+        "same-edge": 42,
+        "opposite-edge": 55
+      },
+      "640ms-10.00MSps": {
+        "same-edge": 45,
+        "opposite-edge": 49
+      },
+      "640ms-2.50MSps": {
+        "same-edge": 36,
+        "opposite-edge": 37
+      },
+      "640ms-5.00MSps": {
+        "same-edge": 46,
+        "opposite-edge": 50
+      },
+      "80ms-1.25MSps": {
+        "same-edge": 43,
+        "opposite-edge": 60
+      },
+      "80ms-10.00MSps": {
+        "same-edge": 44,
+        "opposite-edge": 44
+      },
+      "80ms-2.50MSps": {
+        "same-edge": 40,
+        "opposite-edge": 47
+      },
+      "80ms-5.00MSps": {
+        "same-edge": 55,
+        "opposite-edge": 54
+      },
+      "mixed-arm": {
+        "same-edge": 63,
+        "opposite-edge": 58
+      }
+    }
+  },
+  "markdown_table": "| arm | imported same-edge | imported opposite-edge | imported total | scored same-edge | scored opposite-edge | scored total |\n|---|---:|---:|---:|---:|---:|---:|\n| 160ms-1.25MSps | 214 | 246 | 460 | 51 | 45 | 96 |\n| 160ms-10.00MSps | 231 | 246 | 477 | 50 | 45 | 95 |\n| 160ms-2.50MSps | 237 | 238 | 475 | 38 | 58 | 96 |\n| 160ms-5.00MSps | 253 | 256 | 509 | 50 | 56 | 106 |\n| 640ms-1.25MSps | 226 | 234 | 460 | 42 | 55 | 97 |\n| 640ms-10.00MSps | 227 | 210 | 437 | 45 | 49 | 94 |\n| 640ms-2.50MSps | 206 | 247 | 453 | 36 | 37 | 73 |\n| 640ms-5.00MSps | 213 | 234 | 447 | 46 | 50 | 96 |\n| 80ms-1.25MSps | 225 | 244 | 469 | 43 | 60 | 103 |\n| 80ms-10.00MSps | 224 | 227 | 451 | 44 | 44 | 88 |\n| 80ms-2.50MSps | 221 | 244 | 465 | 40 | 47 | 87 |\n| 80ms-5.00MSps | 216 | 231 | 447 | 55 | 54 | 109 |\n| mixed-arm | 309 | 302 | 611 | 63 | 58 | 121 |\n| **all** | **3002** | **3159** | **6161** | **603** | **658** | **1261** |"
+}

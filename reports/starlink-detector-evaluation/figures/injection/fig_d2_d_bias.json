@@ -1,0 +1,352 @@
+{
+ "title": "D2: with two genuinely independent chains the solver's d carries no detectable bias",
+ "points": [
+  {
+   "side": "A",
+   "method": "anchor-8",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.715483870967742
+  },
+  {
+   "side": "B",
+   "method": "anchor-8",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.715483870967742
+  },
+  {
+   "side": "A",
+   "method": "differential-16",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.6660606060606062
+  },
+  {
+   "side": "B",
+   "method": "differential-16",
+   "f_true": 0.15,
+   "direct": 0.5303030303030303,
+   "solved": 0.5400000000000001
+  },
+  {
+   "side": "A",
+   "method": "differential-32",
+   "f_true": 0.15,
+   "direct": 0.5757575757575758,
+   "solved": 0.6361111111111111
+  },
+  {
+   "side": "B",
+   "method": "differential-32",
+   "f_true": 0.15,
+   "direct": 0.5303030303030303,
+   "solved": 0.5128888888888888
+  },
+  {
+   "side": "A",
+   "method": "full-frame-acquire",
+   "f_true": 0.15,
+   "direct": 0.5606060606060606,
+   "solved": 0.58
+  },
+  {
+   "side": "B",
+   "method": "full-frame-acquire",
+   "f_true": 0.15,
+   "direct": 0.5303030303030303,
+   "solved": 0.58
+  },
+  {
+   "side": "A",
+   "method": "full-frame-full",
+   "f_true": 0.15,
+   "direct": 0.5606060606060606,
+   "solved": 0.6666666666666669
+  },
+  {
+   "side": "B",
+   "method": "full-frame-full",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.5535000000000001
+  },
+  {
+   "side": "A",
+   "method": "full-frame-verify",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.6127777777777778
+  },
+  {
+   "side": "B",
+   "method": "full-frame-verify",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.5967567567567568
+  },
+  {
+   "side": "A",
+   "method": "glrt-32",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.604
+  },
+  {
+   "side": "B",
+   "method": "glrt-32",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.6393939393939395
+  },
+  {
+   "side": "A",
+   "method": "glrt-64",
+   "f_true": 0.15,
+   "direct": 0.5606060606060606,
+   "solved": 0.6266141732283466
+  },
+  {
+   "side": "B",
+   "method": "glrt-64",
+   "f_true": 0.15,
+   "direct": 0.5454545454545454,
+   "solved": 0.6098774885145484
+  },
+  {
+   "side": "A",
+   "method": "anchor-8",
+   "f_true": 0.3,
+   "direct": 0.6729559748427673,
+   "solved": 0.722
+  },
+  {
+   "side": "B",
+   "method": "anchor-8",
+   "f_true": 0.3,
+   "direct": 0.5534591194968553,
+   "solved": 0.5705882352941176
+  },
+  {
+   "side": "A",
+   "method": "differential-16",
+   "f_true": 0.3,
+   "direct": 0.660377358490566,
+   "solved": 0.6265168539325843
+  },
+  {
+   "side": "B",
+   "method": "differential-16",
+   "f_true": 0.3,
+   "direct": 0.559748427672956,
+   "solved": 0.5492156862745098
+  },
+  {
+   "side": "A",
+   "method": "differential-32",
+   "f_true": 0.3,
+   "direct": 0.6855345911949685,
+   "solved": 0.6583720930232557
+  },
+  {
+   "side": "B",
+   "method": "differential-32",
+   "f_true": 0.3,
+   "direct": 0.5471698113207547,
+   "solved": 0.5236697247706422
+  },
+  {
+   "side": "A",
+   "method": "full-frame-acquire",
+   "f_true": 0.3,
+   "direct": 0.6666666666666666,
+   "solved": 0.6481395348837209
+  },
+  {
+   "side": "B",
+   "method": "full-frame-acquire",
+   "f_true": 0.3,
+   "direct": 0.559748427672956,
+   "solved": 0.5444660194174757
+  },
+  {
+   "side": "A",
+   "method": "full-frame-full",
+   "f_true": 0.3,
+   "direct": 0.6666666666666666,
+   "solved": 0.6570454545454544
+  },
+  {
+   "side": "B",
+   "method": "full-frame-full",
+   "f_true": 0.3,
+   "direct": 0.559748427672956,
+   "solved": 0.5862626262626262
+  },
+  {
+   "side": "A",
+   "method": "full-frame-verify",
+   "f_true": 0.3,
+   "direct": 0.6666666666666666,
+   "solved": 0.6373033707865168
+  },
+  {
+   "side": "B",
+   "method": "full-frame-verify",
+   "f_true": 0.3,
+   "direct": 0.5723270440251572,
+   "solved": 0.5482692307692307
+  },
+  {
+   "side": "A",
+   "method": "glrt-32",
+   "f_true": 0.3,
+   "direct": 0.6729559748427673,
+   "solved": 0.621505376344086
+  },
+  {
+   "side": "B",
+   "method": "glrt-32",
+   "f_true": 0.3,
+   "direct": 0.5723270440251572,
+   "solved": 0.5793999999999999
+  },
+  {
+   "side": "A",
+   "method": "glrt-64",
+   "f_true": 0.3,
+   "direct": 0.660377358490566,
+   "solved": 0.6548208469055375
+  },
+  {
+   "side": "B",
+   "method": "glrt-64",
+   "f_true": 0.3,
+   "direct": 0.5534591194968553,
+   "solved": 0.5544432254525509
+  },
+  {
+   "side": "A",
+   "method": "anchor-8",
+   "f_true": 0.5,
+   "direct": 0.6108786610878661,
+   "solved": 0.6267605633802817
+  },
+  {
+   "side": "B",
+   "method": "anchor-8",
+   "f_true": 0.5,
+   "direct": 0.6234309623430963,
+   "solved": 0.6354285714285716
+  },
+  {
+   "side": "A",
+   "method": "differential-16",
+   "f_true": 0.5,
+   "direct": 0.6234309623430963,
+   "solved": 0.6153642384105961
+  },
+  {
+   "side": "B",
+   "method": "differential-16",
+   "f_true": 0.5,
+   "direct": 0.6443514644351465,
+   "solved": 0.6443055555555556
+  },
+  {
+   "side": "A",
+   "method": "differential-32",
+   "f_true": 0.5,
+   "direct": 0.6192468619246861,
+   "solved": 0.6022516556291391
+  },
+  {
+   "side": "B",
+   "method": "differential-32",
+   "f_true": 0.5,
+   "direct": 0.6317991631799164,
+   "solved": 0.6348251748251749
+  },
+  {
+   "side": "A",
+   "method": "full-frame-acquire",
+   "f_true": 0.5,
+   "direct": 0.6192468619246861,
+   "solved": 0.6170469798657718
+  },
+  {
+   "side": "B",
+   "method": "full-frame-acquire",
+   "f_true": 0.5,
+   "direct": 0.6276150627615062,
+   "solved": 0.6420979020979021
+  },
+  {
+   "side": "A",
+   "method": "full-frame-full",
+   "f_true": 0.5,
+   "direct": 0.6150627615062761,
+   "solved": 0.6186394557823129
+  },
+  {
+   "side": "B",
+   "method": "full-frame-full",
+   "f_true": 0.5,
+   "direct": 0.6317991631799164,
+   "solved": 0.6353846153846154
+  },
+  {
+   "side": "A",
+   "method": "full-frame-verify",
+   "f_true": 0.5,
+   "direct": 0.6108786610878661,
+   "solved": 0.6083561643835618
+  },
+  {
+   "side": "B",
+   "method": "full-frame-verify",
+   "f_true": 0.5,
+   "direct": 0.6234309623430963,
+   "solved": 0.596510067114094
+  },
+  {
+   "side": "A",
+   "method": "glrt-32",
+   "f_true": 0.5,
+   "direct": 0.6192468619246861,
+   "solved": 0.6019867549668874
+  },
+  {
+   "side": "B",
+   "method": "glrt-32",
+   "f_true": 0.5,
+   "direct": 0.6401673640167364,
+   "solved": 0.6260689655172413
+  },
+  {
+   "side": "A",
+   "method": "glrt-64",
+   "f_true": 0.5,
+   "direct": 0.6150627615062761,
+   "solved": 0.6287320666925165
+  },
+  {
+   "side": "B",
+   "method": "glrt-64",
+   "f_true": 0.5,
+   "direct": 0.6234309623430963,
+   "solved": 0.6417623762376238
+  }
+ ],
+ "radio_a": ".183 (radio A)",
+ "radio_b": ".165 (radio B)",
+ "summary": {
+  "cases": 48,
+  "reads_low": 20,
+  "median_bias": 0.005329204089770889,
+  "worst_bias": 0.1700293255131966,
+  "prior_low": 15,
+  "prior_cases": 16,
+  "prior_worst": 0.1
+ }
+}

@@ -1,0 +1,37 @@
+{
+ "title": "D3: the algorithms disagree about f by as much as they do on sky, on data where f is one number by construction",
+ "levels": [
+  {
+   "f_true": 0.15,
+   "cells": 500,
+   "spread": 0.05693097962194962,
+   "p05": 0.04139943595210491,
+   "p95": 0.10606942396126968
+  },
+  {
+   "f_true": 0.3,
+   "cells": 500,
+   "spread": 0.0508953341740227,
+   "p05": 0.041015844202992535,
+   "p95": 0.09508389286572011
+  },
+  {
+   "f_true": 0.5,
+   "cells": 500,
+   "spread": 0.04603103943586295,
+   "p05": 0.03564236285590722,
+   "p95": 0.08294351430982555
+  }
+ ],
+ "draws": 200,
+ "references": [
+  {
+   "value": 0.048,
+   "label": "single-rig loopback (0.048)"
+  },
+  {
+   "value": 0.04,
+   "label": "sky corpus (0.040)"
+  }
+ ]
+}

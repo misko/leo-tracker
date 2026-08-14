@@ -1273,19 +1273,33 @@ Three occupancy levels, three different non-consistent verdicts, and not once
 does it return the passing token. The check does not merely fail to detect a
 broken model — **it declines to certify a correct one.**
 
-The reason is in the spread it measures:
+It is worth being precise about *why*, because the three verdicts have three
+different causes and none of them is "the model is wrong".
 
-| `f` set | Across-algorithm spread | On sky, for comparison |
-|---:|---:|---:|
-| 0.15 | 0.0569 | 0.040 |
-| 0.30 | 0.0509 | 0.040 |
-| 0.50 | 0.0460 | 0.040 |
+| `f` set | Real join | Scrambled | Shifted | Why the check failed |
+|---:|---|---|---|---|
+| 0.15 | spread 0.0569, 8 solvable | 0.3818, 8 solvable | 0.4539, 2 solvable | the controls **separate cleanly** — the check rejected the *real* join on its own spread before reaching them |
+| 0.30 | 0.0509, 8 solvable | 0.0, **1 solvable** | 0.1568, 8 solvable | one solvable method has zero spread by definition; the check read that degenerate case as a control agreeing more tightly |
+| 0.50 | 0.0460, 8 solvable | **0 solvable** | **0 solvable** | no control could be fitted at all |
 
-**Every spread measured where `f` is one number by construction is wider than
-the spread observed on sky.** The sky figure this report opens by treating as a
-symptom is, if anything, unusually *tight*. A spread of 0.05 is what a correct
-model produces with eight near-duplicate detectors and finite samples, and the
+Note the first row especially. Here the negative controls did **exactly what a
+negative control should**: breaking the pairing drove `f` from 0.124 to 0.566
+and 0.752, destroying it. The controls worked. The check still refused to
+certify, because it had already rejected the real join for a spread of 0.057 —
+on data where the model is correct.
+
+That spread is the deeper problem. **Every spread measured where `f` is one
+number by construction — 0.0569, 0.0509, 0.0460 — is wider than the 0.040
+observed on sky.** The sky figure this report opens by treating as a symptom is,
+if anything, unusually *tight*. A spread of 0.05 is simply what a correct model
+produces with eight near-duplicate detectors and finite samples; the
 single-radio run reached the same conclusion independently at 0.048.
+
+So the check has at least three independent ways to fail on a correct model: it
+rejects real data whose spread is normal, it misreads a degenerate single-method
+control as agreement, and it cannot handle controls that do not fit. A
+diagnostic with three failure modes and no demonstrated success mode is not
+measuring the thing it names.
 
 This is the strongest available statement of
 [section 6](#6-did-it-work-the-negative-controls)'s result, and it is stronger

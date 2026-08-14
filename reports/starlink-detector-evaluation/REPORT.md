@@ -1137,6 +1137,96 @@ probe length, one sample rate, and a single occupancy and SNR for 11b. And no
 LNB, antenna or sky anywhere in the path.
 
 
+## 12. What the cliff actually is
+
+[Section 11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
+established by injection that the 350–400 kHz collapse is not the detectors,
+the banks, the search span or the analogue filter. That left the sky, the LNBs,
+or the offset estimation. It is the third, and it is not what it looks like.
+
+**The obvious suspicion was wrong.** Since the banks search *raw* offset about
+each receiver's LO while the cliff is plotted on a *bias-corrected* axis, the
+correction looked like a candidate for manufacturing the feature. It is the
+opposite. `lnb-b` and `lnb-d` carry `receiver_centers_hz` of **exactly zero** —
+verified elementwise, so for those two ports the raw and corrected axes are the
+same array and the correction has no leverage at all. They show the cliff at
+full depth regardless:
+
+| Port | Recorded centre | Raw axis | Corrected axis |
+|---|---:|---|---|
+| `lnb-b` | 0.0 Hz | 15.8% → 2.1% (**7.5×**) | identical by construction |
+| `lnb-d` | 0.0 Hz | 19.6% → 2.9% (**6.9×**) | identical by construction |
+| `lnb-c` | +604,159.8 Hz | 15.4% → 41.1% — **no cliff**, rises to 76% at 475–500 kHz | 22.2% → 1.6% (**14×**) |
+
+The cliff sits at the same *corrected* offset for all three ports and at
+different *raw* offsets. Correcting is what makes them agree, and `lnb-b` and
+`lnb-d` — the two the correction cannot touch — carry 76% of the pre-cliff bin.
+Independent confirmation that the `pluto-19f2` correction is sound: re-deriving
+it from the corpus with `lnb_calibration`'s own rx0−rx1 estimator gives
++603,312.6 Hz against the recorded +604,159.8, agreeing to **847 Hz**.
+
+### The window is one-sided, and it is not centred on zero
+
+Unfolding the `abs()` changes the question. On refined points — those no coarse
+proposer claimed, so their offset is a continuous estimate rather than a grid
+tooth — the live region is a band, not a symmetric tolerance:
+
+| Port | Live window (≥10% fire), signed corrected offset |
+|---|---|
+| `lnb-b` | −300 … 0 kHz |
+| `lnb-c` | −350 … 0 kHz |
+| `lnb-d` | −300 … +50 kHz |
+
+**0 fires in 25,370 refined points at corrected ≥ 350 kHz, and 0 fires in
+35,655 refined points outside signed [−350, +50] kHz.** So the "collapse between
+350 and 400 kHz" is the folded far edge of a **~300 kHz window centred near
+−150 kHz** — not a symmetric ±350 kHz tolerance, and not a Doppler population:
+the centre is stable hour by hour through the whole corpus (`lnb-b` −131 / −146
+/ −146 / −144 kHz across quartiles).
+
+That −150 kHz is precisely the quantity the calibration cannot see.
+`lnb_calibration` measures **rx0 − rx1 only**, and its own docstring states that
+the absolute error "is not recoverable here and is not needed". A common-mode
+offset shared by both radios is invisible to a differential estimator, so it is
+never corrected — and what earlier sections read as a symmetric frequency
+tolerance is a ±175 kHz window about a centre that is wrong by roughly
+−150 kHz. **The tuning plan, or the assumed beacon frequency, is off by about
+150 kHz.**
+
+![Detection against raw and corrected offset, split by receiver](figures/injection/raw-vs-corrected.png)
+
+*Detection against raw and bias-corrected offset per receiver, with bank edges
+marked. The two zero-centre ports show the cliff identically on both axes.*
+
+### Two defects this exposed
+
+**`lnb-a`'s calibration is stale by 567 kHz.** The same rx0−rx1 estimator gives
+`pluto-5d4d` = **+568,436 Hz** against a recorded `receiver_centers_hz` of
++1,170 Hz. Its "corrected" axis is therefore effectively uncorrected, which is
+why its live window sits at +250…+550 kHz — the same window displaced by the
+calibration error. `lnb-a` is otherwise plainly live, firing 48–80% inside its
+own window, which independently confirms
+[the exclusion was wrong](#the-corpus); but **its centre must be re-measured
+before it can be pooled into any offset-binned figure.** The receiver-agreement
+and occupancy figures in this report are fire-based and do not use this axis, so
+they are unaffected.
+
+**The cliff's height is inflated by grid teeth.** The 300–350 kHz bin contains
+the coarse-A tooth at exactly 300.0 kHz and the 350–400 bin the coarse-E tooth
+at 350.0. Pooled over `lnb-b`, `lnb-c` and `lnb-d`, 79% of the pre-cliff bin is
+tooth points firing at 23.2%, while refined points in the same bin fire at
+**2.8%**. The cliff exists and is sharp; the plateau it appears to fall from is
+mostly grid.
+
+### What is still unexplained
+
+What sets the −150 kHz common-mode offset — a tuning-plan or assumed-beacon
+error, or a shared LO family error across both LNB models — cannot be separated
+by a differential calibration, and distinguishing them needs hardware. And what
+sets the ~±175 kHz half-width remains open, given that injection shows the
+detectors themselves flat out to ±700 kHz.
+
+
 ## Figures and provenance
 
 Every figure is computed from the read-only corpus at

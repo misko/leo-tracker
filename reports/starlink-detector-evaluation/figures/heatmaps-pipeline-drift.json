@@ -1,0 +1,27 @@
+{
+  "frozen_at_start": {
+    "measured_utc": "2026-08-14T16:01:22+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2547,
+    "scored_digest": "3e0d0ecdf2915ee1"
+  },
+  "measured_at_end": {
+    "measured_utc": "2026-08-14T16:31:59+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2693,
+    "scored_digest": "902ab6b4e11cca89"
+  },
+  "delta": {
+    "sweeps_on_share": 0,
+    "sweeps_committed": 0,
+    "corpus_entries": 0,
+    "scored_sidecars": 146
+  },
+  "scored_added": 146,
+  "scored_removed": 0,
+  "sweeps_added": 0,
+  "identical": false,
+  "note": "every figure in this set was computed on the FROZEN list. Sidecars that landed after it are not in any figure; none were removed, and radio collection stayed paused (0 new sweeps)."
+}

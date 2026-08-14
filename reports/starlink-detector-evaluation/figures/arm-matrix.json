@@ -1,0 +1,355 @@
+{
+  "figure": "arm-matrix",
+  "finding": "The 12-arm randomised draw came out flat over 7,054 captured sweeps; the 1.25 MS/s column is handicapped because the 1.875 MHz pilot band does not fit in a 1.25 MHz captured band at any probe length, not because it was under-sampled.",
+  "sources": {
+    "collector_record": "/mnt/qnap01/mouse9911/leo-scans/sync-*/sweep.json",
+    "corpus_manifests": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/manifest.json",
+    "repository_functions": [
+      "leo_tracker.radio.beacon.cross_radio.pilot_guard_hz",
+      "leo_tracker.radio.beacon.cross_radio.sweep_geometry",
+      "leo_tracker.radio.beacon.cross_radio.PILOT_BAND_HZ",
+      "leo_tracker.radio.beacon.cross_radio.DEAD_RECEIVERS"
+    ]
+  },
+  "census_at_start": {
+    "measured_utc": "20260814T164558Z",
+    "sweeps_on_share": 7054,
+    "corpus_sync_dirs": 13215,
+    "scored_sidecars_sync": 2742
+  },
+  "census_at_end": {
+    "measured_utc": "20260814T164720Z",
+    "sweeps_on_share": 7054,
+    "corpus_sync_dirs": 13215,
+    "scored_sidecars_sync": 2748
+  },
+  "census_drift": {
+    "sweeps_on_share": 0,
+    "corpus_sync_dirs": 0,
+    "scored_sidecars_sync": 6
+  },
+  "census_note": "scored_sidecars_sync counts a scores.json being present; the cache's corpus_census.scored additionally applies the SCORES_SCHEMA gate at freeze time. Sweep and pair counts are fixed at capture and do not drift; the scored column does.",
+  "cache_meta": {
+    "started_utc": "20260814T160201Z",
+    "finished_utc": "20260814T160317Z",
+    "scans_root": "/mnt/qnap01/mouse9911/leo-scans",
+    "corpus_root": "/mnt/qnap01/mouse9911/leo/surveys/corpus",
+    "sweeps_read": 7054,
+    "sweep_skipped": {
+      "no_sweep_json": 0,
+      "unreadable": 0,
+      "not_two_radios": 0
+    },
+    "corpus_census": {
+      "dirs": 13215,
+      "no_manifest": 0,
+      "unreadable": 0,
+      "not_synchronised": 0,
+      "no_scores": 10661,
+      "other_schema": 0,
+      "scored": 2554
+    },
+    "dead_receivers": [
+      "lnb-a"
+    ],
+    "scores_schema": "leo-tracker.survey-detector-comparison/v2",
+    "guard_hz": {
+      "1.25": -312500.0,
+      "2.5": 312500.0,
+      "5.0": 1562500.0,
+      "10.0": 4062500.0
+    }
+  },
+  "authoritative_review_arm_axis": {
+    "available": true,
+    "path": "/home/satpi01/leo-tracker/reports/sync-scan-cross-radio-2026-08-14/review-full-corpus.txt",
+    "line_number": 67,
+    "levels": 12,
+    "levels_total": 12,
+    "cells": 16864,
+    "f_low": 0.12,
+    "f_high": 0.525,
+    "lowest": {
+      "arm": "1.25 MS/s 80 ms",
+      "n_cells": 1504,
+      "f": 0.12,
+      "algorithms_low": 0.09,
+      "algorithms_high": 0.161,
+      "algorithms_solved": 6
+    },
+    "highest": {
+      "arm": "10 MS/s 80 ms",
+      "n_cells": 1296,
+      "f": 0.525,
+      "algorithms_low": 0.49,
+      "algorithms_high": 0.539,
+      "algorithms_solved": 8
+    }
+  },
+  "totals": {
+    "sweeps_captured": 7054,
+    "matched_arm_sweeps": 6364,
+    "matched_arm_fraction": 0.902183158491636,
+    "mismatched_arm_sweeps": 690,
+    "matched_arm_pairs_imported": 5550,
+    "matched_arm_pairs_scored": 1140
+  },
+  "uniformity_check": {
+    "n_total": 6364,
+    "expected_per_arm": 530.3333333333334,
+    "chi_square": 6.993086109365179,
+    "df": 11,
+    "mc_draws": 20000,
+    "mc_seed": 20260814,
+    "p_value_mc": 0.7988,
+    "observed_min": 508,
+    "observed_max": 575,
+    "sd_binomial": 22.048557523994372
+  },
+  "pilot_band_flag_audit": [
+    {
+      "rate_msps": 1.25,
+      "collector_flag": false,
+      "guard_hz": -312500.0,
+      "recomputed": false
+    },
+    {
+      "rate_msps": 2.5,
+      "collector_flag": true,
+      "guard_hz": 312500.0,
+      "recomputed": true
+    },
+    {
+      "rate_msps": 5.0,
+      "collector_flag": true,
+      "guard_hz": 1562500.0,
+      "recomputed": true
+    },
+    {
+      "rate_msps": 10.0,
+      "collector_flag": true,
+      "guard_hz": 4062500.0,
+      "recomputed": true
+    }
+  ],
+  "pilot_band_flag_agrees_with_guard": true,
+  "pilot_band_hz": 1875000.0,
+  "plotted_grid": {
+    "rows_probe_ms": [
+      80.0,
+      160.0,
+      640.0
+    ],
+    "columns_rate_msps": [
+      1.25,
+      2.5,
+      5.0,
+      10.0
+    ],
+    "values_matched_sweeps": [
+      [
+        540.0,
+        536.0,
+        523.0,
+        517.0
+      ],
+      [
+        528.0,
+        527.0,
+        575.0,
+        542.0
+      ],
+      [
+        541.0,
+        508.0,
+        517.0,
+        510.0
+      ]
+    ],
+    "colour_vmin": 464.18766076135023,
+    "colour_vmax": 596.4790059053165
+  },
+  "arms": [
+    {
+      "probe_ms": 80.0,
+      "rate_msps": 1.25,
+      "arm_name": "80ms-1.25MSps",
+      "matched_sweeps": 540,
+      "solo_captures_a": 46,
+      "solo_captures_b": 60,
+      "radio_captures": 1186,
+      "samples_per_tuning": 100000,
+      "iq_bytes_per_radio": 6400000,
+      "pilot_band_fits": false,
+      "pilot_guard_hz": -312500.0,
+      "imported_pairs": 469,
+      "scored_pairs": 103
+    },
+    {
+      "probe_ms": 80.0,
+      "rate_msps": 2.5,
+      "arm_name": "80ms-2.50MSps",
+      "matched_sweeps": 536,
+      "solo_captures_a": 67,
+      "solo_captures_b": 66,
+      "radio_captures": 1205,
+      "samples_per_tuning": 200000,
+      "iq_bytes_per_radio": 12800000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 312500.0,
+      "imported_pairs": 465,
+      "scored_pairs": 87
+    },
+    {
+      "probe_ms": 80.0,
+      "rate_msps": 5.0,
+      "arm_name": "80ms-5.00MSps",
+      "matched_sweeps": 523,
+      "solo_captures_a": 55,
+      "solo_captures_b": 50,
+      "radio_captures": 1151,
+      "samples_per_tuning": 400000,
+      "iq_bytes_per_radio": 25600000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 1562500.0,
+      "imported_pairs": 447,
+      "scored_pairs": 109
+    },
+    {
+      "probe_ms": 80.0,
+      "rate_msps": 10.0,
+      "arm_name": "80ms-10.00MSps",
+      "matched_sweeps": 517,
+      "solo_captures_a": 48,
+      "solo_captures_b": 55,
+      "radio_captures": 1137,
+      "samples_per_tuning": 800000,
+      "iq_bytes_per_radio": 51200000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 4062500.0,
+      "imported_pairs": 451,
+      "scored_pairs": 88
+    },
+    {
+      "probe_ms": 160.0,
+      "rate_msps": 1.25,
+      "arm_name": "160ms-1.25MSps",
+      "matched_sweeps": 528,
+      "solo_captures_a": 49,
+      "solo_captures_b": 60,
+      "radio_captures": 1165,
+      "samples_per_tuning": 200000,
+      "iq_bytes_per_radio": 12800000,
+      "pilot_band_fits": false,
+      "pilot_guard_hz": -312500.0,
+      "imported_pairs": 460,
+      "scored_pairs": 96
+    },
+    {
+      "probe_ms": 160.0,
+      "rate_msps": 2.5,
+      "arm_name": "160ms-2.50MSps",
+      "matched_sweeps": 527,
+      "solo_captures_a": 58,
+      "solo_captures_b": 60,
+      "radio_captures": 1172,
+      "samples_per_tuning": 400000,
+      "iq_bytes_per_radio": 25600000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 312500.0,
+      "imported_pairs": 475,
+      "scored_pairs": 96
+    },
+    {
+      "probe_ms": 160.0,
+      "rate_msps": 5.0,
+      "arm_name": "160ms-5.00MSps",
+      "matched_sweeps": 575,
+      "solo_captures_a": 64,
+      "solo_captures_b": 52,
+      "radio_captures": 1266,
+      "samples_per_tuning": 800000,
+      "iq_bytes_per_radio": 51200000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 1562500.0,
+      "imported_pairs": 509,
+      "scored_pairs": 106
+    },
+    {
+      "probe_ms": 160.0,
+      "rate_msps": 10.0,
+      "arm_name": "160ms-10.00MSps",
+      "matched_sweeps": 542,
+      "solo_captures_a": 56,
+      "solo_captures_b": 65,
+      "radio_captures": 1205,
+      "samples_per_tuning": 1600000,
+      "iq_bytes_per_radio": 102400000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 4062500.0,
+      "imported_pairs": 477,
+      "scored_pairs": 95
+    },
+    {
+      "probe_ms": 640.0,
+      "rate_msps": 1.25,
+      "arm_name": "640ms-1.25MSps",
+      "matched_sweeps": 541,
+      "solo_captures_a": 64,
+      "solo_captures_b": 57,
+      "radio_captures": 1203,
+      "samples_per_tuning": 800000,
+      "iq_bytes_per_radio": 51200000,
+      "pilot_band_fits": false,
+      "pilot_guard_hz": -312500.0,
+      "imported_pairs": 460,
+      "scored_pairs": 97
+    },
+    {
+      "probe_ms": 640.0,
+      "rate_msps": 2.5,
+      "arm_name": "640ms-2.50MSps",
+      "matched_sweeps": 508,
+      "solo_captures_a": 66,
+      "solo_captures_b": 58,
+      "radio_captures": 1140,
+      "samples_per_tuning": 1600000,
+      "iq_bytes_per_radio": 102400000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 312500.0,
+      "imported_pairs": 453,
+      "scored_pairs": 73
+    },
+    {
+      "probe_ms": 640.0,
+      "rate_msps": 5.0,
+      "arm_name": "640ms-5.00MSps",
+      "matched_sweeps": 517,
+      "solo_captures_a": 53,
+      "solo_captures_b": 54,
+      "radio_captures": 1141,
+      "samples_per_tuning": 3200000,
+      "iq_bytes_per_radio": 204800000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 1562500.0,
+      "imported_pairs": 447,
+      "scored_pairs": 96
+    },
+    {
+      "probe_ms": 640.0,
+      "rate_msps": 10.0,
+      "arm_name": "640ms-10.00MSps",
+      "matched_sweeps": 510,
+      "solo_captures_a": 64,
+      "solo_captures_b": 53,
+      "radio_captures": 1137,
+      "samples_per_tuning": 6400000,
+      "iq_bytes_per_radio": 409600000,
+      "pilot_band_fits": true,
+      "pilot_guard_hz": 4062500.0,
+      "imported_pairs": 437,
+      "scored_pairs": 94
+    }
+  ],
+  "markdown_table": "| arm | probe (ms) | rate (MS/s) | sweeps, both radios | solo captures | samples/tuning | IQ bytes per radio | pilot guard (kHz) | pilot band fits | imported pairs | scored pairs |\n|---|---:|---:|---:|---:|---:|---:|---:|:--:|---:|---:|\n| 80ms-1.25MSps | 80 | 1.25 | 540 | 106 | 100,000 | 6,400,000 | -312.5 | NO | 469 | 103 |\n| 80ms-2.50MSps | 80 | 2.5 | 536 | 133 | 200,000 | 12,800,000 | +312.5 | yes | 465 | 87 |\n| 80ms-5.00MSps | 80 | 5 | 523 | 105 | 400,000 | 25,600,000 | +1562.5 | yes | 447 | 109 |\n| 80ms-10.00MSps | 80 | 10 | 517 | 103 | 800,000 | 51,200,000 | +4062.5 | yes | 451 | 88 |\n| 160ms-1.25MSps | 160 | 1.25 | 528 | 109 | 200,000 | 12,800,000 | -312.5 | NO | 460 | 96 |\n| 160ms-2.50MSps | 160 | 2.5 | 527 | 118 | 400,000 | 25,600,000 | +312.5 | yes | 475 | 96 |\n| 160ms-5.00MSps | 160 | 5 | 575 | 116 | 800,000 | 51,200,000 | +1562.5 | yes | 509 | 106 |\n| 160ms-10.00MSps | 160 | 10 | 542 | 121 | 1,600,000 | 102,400,000 | +4062.5 | yes | 477 | 95 |\n| 640ms-1.25MSps | 640 | 1.25 | 541 | 121 | 800,000 | 51,200,000 | -312.5 | NO | 460 | 97 |\n| 640ms-2.50MSps | 640 | 2.5 | 508 | 124 | 1,600,000 | 102,400,000 | +312.5 | yes | 453 | 73 |\n| 640ms-5.00MSps | 640 | 5 | 517 | 107 | 3,200,000 | 204,800,000 | +1562.5 | yes | 447 | 96 |\n| 640ms-10.00MSps | 640 | 10 | 510 | 117 | 6,400,000 | 409,600,000 | +4062.5 | yes | 437 | 94 |"
+}

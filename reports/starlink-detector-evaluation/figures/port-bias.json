@@ -1,0 +1,756 @@
+{
+  "figure": "port-bias",
+  "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/",
+  "snapshot": {
+    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_digest": "ec5505611f5f1fdf"
+  },
+  "census": {
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_sidecars_in_a_pair": 2292,
+    "paired_sweeps": 1146,
+    "candidate_points_read": 363004,
+    "previous_snapshot_for_comparison": {
+      "paired_sweeps": 176,
+      "scored_sidecars": 320,
+      "cells": 2464
+    }
+  },
+  "method": "differential-32",
+  "sample_rate_hz": 5000000.0,
+  "false_alarm_rate": 0.01,
+  "excluded_receivers": [
+    "lnb-a"
+  ],
+  "dead_receiver_audit": {
+    "lnb-a": {
+      "target_n": 60095,
+      "fire_pct": 15.52042599217905,
+      "null_n": 31030,
+      "null_median": 0.018011968845523245,
+      "null_p99": 0.08139843572356034
+    },
+    "lnb-b": {
+      "target_n": 59604,
+      "fire_pct": 17.98369236963962,
+      "null_n": 31156,
+      "null_median": 0.01868908041563449,
+      "null_p99": 0.08540572598790837
+    },
+    "lnb-c": {
+      "target_n": 59967,
+      "fire_pct": 16.173895642603433,
+      "null_n": 32318,
+      "null_median": 0.018228613057283825,
+      "null_p99": 0.08510955240193148
+    },
+    "lnb-d": {
+      "target_n": 58828,
+      "fire_pct": 22.83266471748147,
+      "null_n": 30006,
+      "null_median": 0.018793943917763074,
+      "null_p99": 0.08834700904361899
+    }
+  },
+  "dead_receiver_audit_note": "lnb-a is excluded because cross_radio.DEAD_RECEIVERS says it reads 'flat ~1.19 at every tuning since 04:44 UTC'. On differential-32 this corpus shows lnb-a firing and nulling like the live ports; the exclusion is followed here but is not reproduced by the data.",
+  "receiver_centre_khz": {
+    "lnb-b": 0.0,
+    "lnb-c": 604.1598,
+    "lnb-d": 0.0,
+    "lnb-a": 1.17
+  },
+  "bin_edges_khz": [
+    0.0,
+    100.0,
+    200.0,
+    300.0,
+    400.0,
+    500.0,
+    700.0,
+    1000.0,
+    1500.0
+  ],
+  "min_bin_n_plotted": 25,
+  "thresholds": {
+    "1250000Hz/80.0ms": 0.10885811212065716,
+    "1250000Hz/160.0ms": 0.09242078571237285,
+    "1250000Hz/640.0ms": 0.056460503559079084,
+    "2500000Hz/80.0ms": 0.10845687080912379,
+    "2500000Hz/160.0ms": 0.08392207178701999,
+    "2500000Hz/640.0ms": 0.04979588872336514,
+    "5000000Hz/80.0ms": 0.10377058826440116,
+    "5000000Hz/160.0ms": 0.07376516725067435,
+    "5000000Hz/640.0ms": 0.05045308714046816,
+    "10000000Hz/80.0ms": 0.10240674628732356,
+    "10000000Hz/160.0ms": 0.08365347685037482,
+    "10000000Hz/640.0ms": 0.045545555569027195
+  },
+  "raw_axis": {
+    "lnb-b": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 3240,
+        "fired": 641,
+        "rate_pct": 19.78395061728395,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 4791,
+        "fired": 2099,
+        "rate_pct": 43.8113128783135,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 2864,
+        "fired": 842,
+        "rate_pct": 29.399441340782122,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 2877,
+        "fired": 289,
+        "rate_pct": 10.045185957594716,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 1001,
+        "fired": 9,
+        "rate_pct": 0.8991008991008991,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1089,
+        "fired": 6,
+        "rate_pct": 0.5509641873278237,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 427,
+        "fired": 5,
+        "rate_pct": 1.17096018735363,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-c": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 2535,
+        "fired": 14,
+        "rate_pct": 0.5522682445759369,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 2050,
+        "fired": 30,
+        "rate_pct": 1.4634146341463414,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 1719,
+        "fired": 28,
+        "rate_pct": 1.6288539848749273,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 3687,
+        "fired": 913,
+        "rate_pct": 24.76267968538107,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 3619,
+        "fired": 2208,
+        "rate_pct": 61.01132909643548,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1861,
+        "fired": 527,
+        "rate_pct": 28.31810854379366,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 849,
+        "fired": 19,
+        "rate_pct": 2.237926972909305,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-d": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 3157,
+        "fired": 1016,
+        "rate_pct": 32.182451694646815,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 4817,
+        "fired": 2470,
+        "rate_pct": 51.276728254100064,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 2636,
+        "fired": 916,
+        "rate_pct": 34.749620637329286,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 2603,
+        "fired": 382,
+        "rate_pct": 14.675374567806378,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 724,
+        "fired": 12,
+        "rate_pct": 1.6574585635359116,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1271,
+        "fired": 4,
+        "rate_pct": 0.3147128245476003,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 749,
+        "fired": 13,
+        "rate_pct": 1.7356475300400533,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ]
+  },
+  "corrected_axis": {
+    "lnb-b": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 3240,
+        "fired": 641,
+        "rate_pct": 19.78395061728395,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 4791,
+        "fired": 2099,
+        "rate_pct": 43.8113128783135,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 2864,
+        "fired": 842,
+        "rate_pct": 29.399441340782122,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 2877,
+        "fired": 289,
+        "rate_pct": 10.045185957594716,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 1001,
+        "fired": 9,
+        "rate_pct": 0.8991008991008991,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1089,
+        "fired": 6,
+        "rate_pct": 0.5509641873278237,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 427,
+        "fired": 5,
+        "rate_pct": 1.17096018735363,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-c": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 1627,
+        "fired": 481,
+        "rate_pct": 29.563614013521818,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 3352,
+        "fired": 2208,
+        "rate_pct": 65.87112171837708,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 1357,
+        "fired": 688,
+        "rate_pct": 50.700073691967575,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 1782,
+        "fired": 289,
+        "rate_pct": 16.217732884399553,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 1020,
+        "fired": 17,
+        "rate_pct": 1.6666666666666667,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 2540,
+        "fired": 14,
+        "rate_pct": 0.5511811023622047,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 3363,
+        "fired": 24,
+        "rate_pct": 0.7136485280999108,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 1279,
+        "fired": 18,
+        "rate_pct": 1.4073494917904612,
+        "plotted": true
+      }
+    ],
+    "lnb-d": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 3157,
+        "fired": 1016,
+        "rate_pct": 32.182451694646815,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 4817,
+        "fired": 2470,
+        "rate_pct": 51.276728254100064,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 2636,
+        "fired": 916,
+        "rate_pct": 34.749620637329286,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 2603,
+        "fired": 382,
+        "rate_pct": 14.675374567806378,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 724,
+        "fired": 12,
+        "rate_pct": 1.6574585635359116,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1271,
+        "fired": 4,
+        "rate_pct": 0.3147128245476003,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 749,
+        "fired": 13,
+        "rate_pct": 1.7356475300400533,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ]
+  },
+  "reference_reported": {
+    "corrected_100_200_khz_at_5MSps": {
+      "lnb-c": 61.4,
+      "lnb-c_n": 347,
+      "lnb-b": 41.7,
+      "lnb-b_n": 458
+    }
+  },
+  "strongest_port_once_corrected": {
+    "bin_khz": [
+      100,
+      200
+    ],
+    "sample_rate_hz": 5000000.0,
+    "ranking": [
+      {
+        "port": "lnb-c",
+        "rate_pct": 65.87112171837708,
+        "n": 3352
+      },
+      {
+        "port": "lnb-d",
+        "rate_pct": 51.276728254100064,
+        "n": 4817
+      },
+      {
+        "port": "lnb-b",
+        "rate_pct": 43.8113128783135,
+        "n": 4791
+      }
+    ],
+    "verdict": "lnb-c is the strongest port on the corrected axis"
+  },
+  "corpus_says": {
+    "corrected_100_200_khz_at_5MSps": {
+      "lnb-b": {
+        "rate_pct": 43.8113128783135,
+        "n": 4791
+      },
+      "lnb-c": {
+        "rate_pct": 65.87112171837708,
+        "n": 3352
+      },
+      "lnb-d": {
+        "rate_pct": 51.276728254100064,
+        "n": 4817
+      }
+    },
+    "raw_100_200_khz_at_5MSps": {
+      "lnb-b": {
+        "rate_pct": 43.8113128783135,
+        "n": 4791
+      },
+      "lnb-c": {
+        "rate_pct": 1.4634146341463414,
+        "n": 2050
+      },
+      "lnb-d": {
+        "rate_pct": 51.276728254100064,
+        "n": 4817
+      }
+    }
+  },
+  "all_rates_pooled_corrected": {
+    "lnb-b": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "n": 12936,
+        "rate_pct": 14.440321583178726
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "n": 14169,
+        "rate_pct": 40.15809160844096
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "n": 7645,
+        "rate_pct": 29.744931327665142
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "n": 10938,
+        "rate_pct": 7.094532821356738
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "n": 4614,
+        "rate_pct": 0.8452535760728218
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "n": 6835,
+        "rate_pct": 0.5852231163130943
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "n": 2467,
+        "rate_pct": 1.2971220105391164
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "n": 0,
+        "rate_pct": null
+      }
+    ],
+    "lnb-c": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "n": 5888,
+        "rate_pct": 20.601222826086957
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "n": 9850,
+        "rate_pct": 56.233502538071065
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "n": 5336,
+        "rate_pct": 36.03823088455772
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "n": 5284,
+        "rate_pct": 12.698713096139288
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "n": 3579,
+        "rate_pct": 1.3970382788488405
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "n": 11712,
+        "rate_pct": 0.5806010928961749
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "n": 11153,
+        "rate_pct": 0.824890164081413
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "n": 7165,
+        "rate_pct": 1.9958129797627355
+      }
+    ],
+    "lnb-d": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "n": 12485,
+        "rate_pct": 23.884661593912696
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "n": 14706,
+        "rate_pct": 46.41642866857065
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "n": 7657,
+        "rate_pct": 32.58456314483479
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "n": 10019,
+        "rate_pct": 9.851282563130052
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "n": 3884,
+        "rate_pct": 1.235839340885685
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "n": 6681,
+        "rate_pct": 0.6436162251160006
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "n": 3396,
+        "rate_pct": 1.5017667844522968
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "n": 0,
+        "rate_pct": null
+      }
+    ]
+  }
+}

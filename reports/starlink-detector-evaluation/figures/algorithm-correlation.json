@@ -1,0 +1,214 @@
+{
+  "figure": "algorithm-correlation",
+  "question": "do the eight algorithms make the same fire / no-fire decision on the same observations?",
+  "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*",
+  "census": {
+    "frozen_at_start": {
+      "measured_utc": "2026-08-14T16:01:22+00:00",
+      "sweeps_on_share": 7054,
+      "corpus_entries": 13215,
+      "scored_sidecars": 2547,
+      "scored_digest": "3e0d0ecdf2915ee1"
+    },
+    "paired_sweeps": 1258,
+    "paired_sweeps_by_geometry": {
+      "same-edge": 602,
+      "opposite-edge": 656
+    },
+    "matched_arm_paired_sweeps": 1137,
+    "scored_sidecars_in_a_pair": 2516,
+    "load_pairs_census": {
+      "scanned": 2547,
+      "read": 2547,
+      "unreadable": 0,
+      "no_manifest": 0,
+      "other_schema": {},
+      "not_synchronised": 0,
+      "unpaired_sweeps": 31,
+      "irregular_geometry": 0,
+      "beyond_limit": 0
+    },
+    "excluded_receivers": {
+      "lnb-a": 15104
+    },
+    "threshold_keys": 96
+  },
+  "population": "every live target observation in the paired corpus (lnb-a excluded: dead port), all eight verdicts present",
+  "observations": 30192,
+  "n_per_cell": 30192,
+  "n_is_identical_in_every_cell": true,
+  "observations_with_a_missing_verdict": 0,
+  "methods_alphabetical": [
+    "anchor-8",
+    "differential-16",
+    "differential-32",
+    "full-frame-acquire",
+    "full-frame-full",
+    "full-frame-verify",
+    "glrt-32",
+    "glrt-64"
+  ],
+  "order": [
+    "anchor-8",
+    "glrt-32",
+    "glrt-64",
+    "full-frame-verify",
+    "full-frame-full",
+    "full-frame-acquire",
+    "differential-32",
+    "differential-16"
+  ],
+  "order_basis": "maximises adjacent phi, exhaustive over 8! = 40320 orderings; total adjacent phi 6.4027",
+  "fire_rate": {
+    "anchor-8": 0.3118706942236354,
+    "differential-16": 0.32694091149973503,
+    "differential-32": 0.33081611022787494,
+    "full-frame-acquire": 0.3328696343402226,
+    "full-frame-full": 0.33300211976682564,
+    "full-frame-verify": 0.3320084790673026,
+    "glrt-32": 0.3087572866984632,
+    "glrt-64": 0.3174019607843137
+  },
+  "phi": {
+    "anchor-8": {
+      "anchor-8": 1.0,
+      "glrt-32": 0.879931810116022,
+      "glrt-64": 0.8700576707521096,
+      "full-frame-verify": 0.8554701873021564,
+      "full-frame-full": 0.8582641295076414,
+      "full-frame-acquire": 0.855656253623329,
+      "differential-32": 0.8498990018453454,
+      "differential-16": 0.8470439640483043
+    },
+    "glrt-32": {
+      "anchor-8": 0.879931810116022,
+      "glrt-32": 1.0,
+      "glrt-64": 0.9363577965230402,
+      "full-frame-verify": 0.8940986075455851,
+      "full-frame-full": 0.8968872955241088,
+      "full-frame-acquire": 0.89305681627243,
+      "differential-32": 0.8853279555223993,
+      "differential-16": 0.8756313169946688
+    },
+    "glrt-64": {
+      "anchor-8": 0.8700576707521096,
+      "glrt-32": 0.9363577965230402,
+      "glrt-64": 1.0,
+      "full-frame-verify": 0.9028695552048551,
+      "full-frame-full": 0.9093612541826601,
+      "full-frame-acquire": 0.898620561851106,
+      "differential-32": 0.8815218525468576,
+      "differential-16": 0.8734249373503381
+    },
+    "full-frame-verify": {
+      "anchor-8": 0.8554701873021564,
+      "glrt-32": 0.8940986075455851,
+      "glrt-64": 0.9028695552048551,
+      "full-frame-verify": 1.0,
+      "full-frame-full": 0.9453835469439522,
+      "full-frame-acquire": 0.9094089530776011,
+      "differential-32": 0.8814662795591122,
+      "differential-16": 0.877648412783688
+    },
+    "full-frame-full": {
+      "anchor-8": 0.8582641295076414,
+      "glrt-32": 0.8968872955241088,
+      "glrt-64": 0.9093612541826601,
+      "full-frame-verify": 0.9453835469439522,
+      "full-frame-full": 1.0,
+      "full-frame-acquire": 0.9427321558418973,
+      "differential-32": 0.886492791839,
+      "differential-16": 0.8849595723041918
+    },
+    "full-frame-acquire": {
+      "anchor-8": 0.855656253623329,
+      "glrt-32": 0.89305681627243,
+      "glrt-64": 0.898620561851106,
+      "full-frame-verify": 0.9094089530776011,
+      "full-frame-full": 0.9427321558418973,
+      "full-frame-acquire": 1.0,
+      "differential-32": 0.8779652518821205,
+      "differential-16": 0.8740063204865006
+    },
+    "differential-32": {
+      "anchor-8": 0.8498990018453454,
+      "glrt-32": 0.8853279555223993,
+      "glrt-64": 0.8815218525468576,
+      "full-frame-verify": 0.8814662795591122,
+      "full-frame-full": 0.886492791839,
+      "full-frame-acquire": 0.8779652518821205,
+      "differential-32": 1.0,
+      "differential-16": 0.917427482559027
+    },
+    "differential-16": {
+      "anchor-8": 0.8470439640483043,
+      "glrt-32": 0.8756313169946688,
+      "glrt-64": 0.8734249373503381,
+      "full-frame-verify": 0.877648412783688,
+      "full-frame-full": 0.8849595723041918,
+      "full-frame-acquire": 0.8740063204865006,
+      "differential-32": 0.917427482559027,
+      "differential-16": 1.0
+    }
+  },
+  "phi_off_diagonal": {
+    "min": 0.8470439640483043,
+    "max": 0.9453835469439522,
+    "mean": 0.8878918476425017,
+    "pairs": 28,
+    "lowest_pair": [
+      "anchor-8",
+      "differential-16"
+    ],
+    "highest_pair": [
+      "full-frame-verify",
+      "full-frame-full"
+    ]
+  },
+  "reported_in_retraction_report": {
+    "phi_min": 0.82,
+    "phi_max": 0.94,
+    "observations": 2160
+  },
+  "headline_checks": {
+    "expected_band_0_82_to_0_94": [
+      0.82,
+      0.94
+    ],
+    "observed_band": [
+      0.8470439640483043,
+      0.9453835469439522
+    ],
+    "every_pair_above_0_8": true,
+    "observed_floor_above_reported_floor": true,
+    "observed_ceiling_above_reported_ceiling": true,
+    "verdict": "VERIFIED and tighter: at 14.0x the observations every pair sits at phi 0.847-0.945, above the reported 0.82-0.94 floor"
+  },
+  "census_drift_at_end": {
+    "frozen_at_start": {
+      "measured_utc": "2026-08-14T16:01:22+00:00",
+      "sweeps_on_share": 7054,
+      "corpus_entries": 13215,
+      "scored_sidecars": 2547,
+      "scored_digest": "3e0d0ecdf2915ee1"
+    },
+    "measured_at_end": {
+      "measured_utc": "2026-08-14T16:31:59+00:00",
+      "sweeps_on_share": 7054,
+      "corpus_entries": 13215,
+      "scored_sidecars": 2693,
+      "scored_digest": "902ab6b4e11cca89"
+    },
+    "delta": {
+      "sweeps_on_share": 0,
+      "sweeps_committed": 0,
+      "corpus_entries": 0,
+      "scored_sidecars": 146
+    },
+    "scored_added": 146,
+    "scored_removed": 0,
+    "sweeps_added": 0,
+    "identical": false,
+    "note": "every figure in this set was computed on the FROZEN list. Sidecars that landed after it are not in any figure; none were removed, and radio collection stayed paused (0 new sweeps)."
+  }
+}

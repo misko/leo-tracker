@@ -1,0 +1,155 @@
+{
+  "figure": "topology-165",
+  "radio": "ip:192.168.1.165",
+  "rig": "CABLED LOOPBACK, no antenna",
+  "geometry": {
+    "phase": "header",
+    "arm": "80ms-5.00MSps",
+    "sample_rate_hz": 5000000.0,
+    "probe_ms": 80.0,
+    "probe_samples": 400000,
+    "rx_gain_db": 40.0,
+    "lo_hz": 1190312500,
+    "rf_bandwidth_hz": 5000000,
+    "tx_gains_db": [
+      -50.0,
+      -40.0,
+      -30.0,
+      -20.0
+    ]
+  },
+  "baseline_rms": {
+    "1": 1.439234773317973,
+    "2": 1.402607798576355
+  },
+  "baseline_matched_ptm": 4.241239945093791,
+  "ideal_matched_ptm": 65.08,
+  "summary": {
+    "top_gain_db": -20.0,
+    "rx_split_db": 0.5243892081466028,
+    "tx1_coupling_below_tx2_db": {
+      "1": 43.7158701824919,
+      "2": 47.89711101772131
+    },
+    "tx2_rms_counts": {
+      "1": 32.485801696777344,
+      "2": 30.58258056640625
+    },
+    "tx2_matched_ptm": {
+      "1": 64.13851928710938,
+      "2": 64.14250183105469
+    },
+    "peak_lag_mod_buffer": {
+      "1": 5940,
+      "2": 5940
+    },
+    "phases_agree": true
+  },
+  "paths": {
+    "TX1 \u2192 RX1": {
+      "tx_gain_db": [
+        -50.0,
+        -40.0,
+        -30.0,
+        -20.0
+      ],
+      "rms_counts": [
+        1.4375361204147339,
+        1.4367358684539795,
+        1.4367637634277344,
+        1.4554483890533447
+      ],
+      "rms_above_floor_counts": [
+        0.001,
+        0.001,
+        0.001,
+        0.21664090211762763
+      ],
+      "matched_peak_to_median": [
+        4.3673810958862305,
+        4.359381675720215,
+        8.006450653076172,
+        21.844684600830078
+      ]
+    },
+    "TX1 \u2192 RX2": {
+      "tx_gain_db": [
+        -50.0,
+        -40.0,
+        -30.0,
+        -20.0
+      ],
+      "rms_counts": [
+        1.3941036462783813,
+        1.4040210247039795,
+        1.4040628671646118,
+        1.4073832035064697
+      ],
+      "rms_above_floor_counts": [
+        0.001,
+        0.06297937109565169,
+        0.06390538571436356,
+        0.11583973793532337
+      ],
+      "matched_peak_to_median": [
+        4.583207130432129,
+        4.293797492980957,
+        5.322110652923584,
+        13.593245506286621
+      ]
+    },
+    "TX2 \u2192 RX1": {
+      "tx_gain_db": [
+        -50.0,
+        -40.0,
+        -30.0,
+        -20.0
+      ],
+      "rms_counts": [
+        1.7573004961013794,
+        3.539987325668335,
+        10.308197021484375,
+        32.485801696777344
+      ],
+      "rms_above_floor_counts": [
+        1.0083195430370857,
+        3.234209877723586,
+        10.207229256806752,
+        32.45390446694533
+      ],
+      "matched_peak_to_median": [
+        55.961830139160156,
+        63.58187484741211,
+        64.0399398803711,
+        64.13851928710938
+      ]
+    },
+    "TX2 \u2192 RX2": {
+      "tx_gain_db": [
+        -50.0,
+        -40.0,
+        -30.0,
+        -20.0
+      ],
+      "rms_counts": [
+        1.698765754699707,
+        3.3456976413726807,
+        9.694414138793945,
+        30.58258056640625
+      ],
+      "rms_above_floor_counts": [
+        0.9583822059665217,
+        3.0374963491104823,
+        9.592411420379172,
+        30.55039975948109
+      ],
+      "matched_peak_to_median": [
+        55.34065628051758,
+        63.21296310424805,
+        64.08240509033203,
+        64.14250183105469
+      ]
+    }
+  },
+  "finding": "TX2 drives both receivers at equal level (0.52 dB apart) with a matched-filter peak/median of 64.1 against a noiseless ceiling of 65.1, and both receivers see it at the same phase modulo the transmitted buffer (lag 5940 on both). TX1 raises no port's level above its own noise floor and couples 43.7-47.9 dB below TX2. The topology is TX2 -> split -> RX1 + RX2, a closed path with no antenna, the same as sibling rig .183."
+}

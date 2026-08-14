@@ -1,0 +1,53 @@
+{
+ "figure": "detector-ranking",
+ "note": "CABLED LOOPBACK (TX2 -> tee -> 2x30 dB -> RX1,RX2): this tests the detectors and the digital pipeline, NOT the LNBs, the antenna, or real sky.",
+ "measured_ranking_best_first": [
+  "glrt-32",
+  "full-frame-verify",
+  "full-frame-acquire",
+  "full-frame-full",
+  "glrt-64",
+  "anchor-8",
+  "differential-32",
+  "differential-16"
+ ],
+ "model_d_ranking_best_first": [
+  "glrt-32",
+  "glrt-64",
+  "anchor-8",
+  "differential-16",
+  "differential-32",
+  "full-frame-verify",
+  "full-frame-full",
+  "full-frame-acquire"
+ ],
+ "fire_count_ranking_most_first": [
+  "full-frame-full",
+  "full-frame-acquire",
+  "full-frame-verify",
+  "differential-32",
+  "differential-16",
+  "glrt-64",
+  "anchor-8",
+  "glrt-32"
+ ],
+ "snr50_db": {
+  "anchor-8": -17.614855279102187,
+  "differential-16": -17.04182382939002,
+  "differential-32": -17.501565365425126,
+  "glrt-32": -18.689777557837612,
+  "glrt-64": -18.222035100580882,
+  "full-frame-full": -18.29311394474056,
+  "full-frame-acquire": -18.504134020689484,
+  "full-frame-verify": -18.57176747075651
+ },
+ "snr50_spread_db": 1.6479537284475931,
+ "pairs_resolved_at_95pc": 21,
+ "pairs_total": 28,
+ "spearman": {
+  "measured_vs_model_d": -0.047619047619047616,
+  "measured_vs_fire_count": 0.047619047619047616,
+  "model_d_vs_fire_count": -0.9523809523809523
+ },
+ "reported_spearman_model_vs_fire": -0.952
+}

@@ -1,7 +1,7 @@
 {
  "figure": "fire-rate-problem",
  "question": "can a fire count rank detectors when there is no injection?",
- "answer": "no: fire rate tracks the measured empty-sky rate, and the ranking changes under every correction",
+ "answer": "no: fire rate tracks the measured cross-edge target-code null rate, and the ranking changes under every correction -- but only the MODEL's correction reverses it, and its own consistency check is unmet on this corpus",
  "cache": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/summary/cache/firerate-coincidence.npz",
  "census": {
   "measured_utc": "2026-08-14T16:00:31+00:00",
@@ -49,7 +49,7 @@
  },
  "units": {
   "fire_rate": "fraction of live target observations where the detector fired (max over the cell's candidates)",
-  "false_alarm_rate_p": "fraction of live cross-edge NULL observations where it fired, same decision",
+  "false_alarm_rate_p": "fraction of live CROSS-EDGE TARGET-CODE NULL observations where it fired, same decision. Target-code-free by construction, not physically empty sky: same sky, same hardware, same instant, and it may still hold other Starlink energy, interference and receiver structure",
   "d": "MODEL OUTPUT of solve_coincidence, not a measurement"
  },
  "methods": [
@@ -245,7 +245,69 @@
   "slope": 1.9909179315222256,
   "intercept": 0.19811772116662094,
   "pearson_r": 0.8395502987694081,
-  "r_squared": 0.7048447041638024
+  "r_squared": 0.7048447041638024,
+  "stability": {
+   "question": "is the r^2 on fire-rate-problem a stable coefficient?",
+   "answer": "no. It is a least-squares fit over eight points: it reads 0.70 and 0.69 on two frozen censuses an hour apart, and a bootstrap over whole paired sweeps puts its middle 90% at 0.33 to 0.84. Two decimals overstate it; 'about two thirds of the spread' is what the corpus supports.",
+   "basis": "least squares of raw fire rate on the measured cross-edge target-code null rate p, over the eight algorithms",
+   "across_censuses": [
+    {
+     "label": "the census this figure is drawn on",
+     "source": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/summary/cache/firerate-coincidence.npz",
+     "scored_sidecars": 2544,
+     "measured_utc": "2026-08-14T16:00:31+00:00",
+     "scored_digest": "8cec1405bfbca027",
+     "r_squared": 0.7048447041638024,
+     "fire_rate": {
+      "anchor-8": 0.31182047202333596,
+      "differential-16": 0.32700212145319546,
+      "differential-32": 0.3308804030761071,
+      "full-frame-acquire": 0.3328692654468311,
+      "full-frame-full": 0.33303500397772473,
+      "full-frame-verify": 0.3319079819676478,
+      "glrt-32": 0.3088703261734288,
+      "glrt-64": 0.3174887297798992
+     }
+    },
+    {
+     "label": "the census one hour earlier",
+     "source": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/refresh/work/cells.json.gz",
+     "scored_sidecars": 2339,
+     "measured_utc": "2026-08-14T14:55:19+00:00",
+     "scored_digest": "ec5505611f5f1fdf",
+     "r_squared": 0.6943070970493453,
+     "fire_rate": {
+      "anchor-8": 0.30831878999418266,
+      "differential-16": 0.32344386271087844,
+      "differential-32": 0.3273342059336824,
+      "full-frame-acquire": 0.3300610820244328,
+      "full-frame-full": 0.33027923211169286,
+      "full-frame-verify": 0.3285340314136126,
+      "glrt-32": 0.30511925538103546,
+      "glrt-64": 0.31406340895869694
+     }
+    }
+   ],
+   "census_range": [
+    0.6943070970493453,
+    0.7048447041638024
+   ],
+   "sweep_cluster_bootstrap": {
+    "on_census": 2339,
+    "note": "run on the earlier census because it is the one whose per-sweep cell table is still on disk; the two censuses agree on the point estimate to 0.011, so the interval is representative of both",
+    "unit": "paired sweep (16 cells share arm, sky, hardware, order)",
+    "sweeps": 1146,
+    "draws": 2000,
+    "seed": 20260814,
+    "point": 0.6943070970493453,
+    "p05": 0.33190385640340725,
+    "p50": 0.6387545932522984,
+    "p95": 0.8425821846663134,
+    "min": 0.07710368062139555,
+    "max": 0.9533785962170264
+   }
+  },
+  "how_to_state_it": "about two thirds of the spread; the coefficient is a fit on eight points and is not stable to two decimals"
  },
  "ranks": {
   "fire_rate": {
@@ -279,9 +341,69 @@
    "full-frame-acquire": 8
   }
  },
+ "rank_moves_against_the_fire_count": {
+  "excess_fire_rate": {
+   "per_method": {
+    "anchor-8": 1,
+    "differential-16": 0,
+    "differential-32": -3,
+    "full-frame-acquire": 1,
+    "full-frame-full": 1,
+    "full-frame-verify": 1,
+    "glrt-32": -1,
+    "glrt-64": 0
+   },
+   "largest_move": 3,
+   "moved_furthest": "differential-32",
+   "from": 4,
+   "to": 1
+  },
+  "d_mean": {
+   "per_method": {
+    "anchor-8": -4,
+    "differential-16": -1,
+    "differential-32": 1,
+    "full-frame-acquire": 6,
+    "full-frame-full": 6,
+    "full-frame-verify": 3,
+    "glrt-32": -7,
+    "glrt-64": -4
+   },
+   "largest_move": 7,
+   "moved_furthest": "glrt-32",
+   "from": 8,
+   "to": 1
+  }
+ },
+ "top_of_the_fire_count_column": {
+  "first": "full-frame-full",
+  "second": "full-frame-acquire",
+  "gap": 0.00016573853089363322,
+  "places_inside_one_ci95": 4,
+  "gap_as_fraction_of_own_ci95": 0.03116335528767687,
+  "ci95_half_width": 0.0053183788896817635,
+  "same_pair_on_joined_matched_arm_cells": {
+   "leader": "full-frame-acquire",
+   "gap": 0.00011003521126762283,
+   "swaps": true
+  },
+  "excess_gap_between_the_same_two": 3.304214023547303e-05,
+  "top_of_the_column_on_the_other_census": {
+   "census_scored_sidecars": 2339,
+   "measured_utc": "2026-08-14T14:55:19+00:00",
+   "top": "full-frame-full",
+   "order": [
+    "full-frame-full",
+    "full-frame-acquire",
+    "full-frame-verify"
+   ]
+  },
+  "verdict": "the top of the fire-count column is not separable: read the first column as three tied detectors, not as places 1, 2, 3"
+ },
  "spearman": {
   "fire_rate_vs_excess": 0.8333333333333335,
   "fire_rate_vs_d_mean": -0.9523809523809524,
   "excess_vs_d_mean": -0.7619047619047621
- }
+ },
+ "what_the_rankings_say": "the two MEASURED rankings agree with each other (rho = +0.83); only the model output inverts them, and it inverts against either measurement (rho = -0.95 against the raw count, -0.76 against the model-free excess). The reordering is the model's, not the correction's."
 }

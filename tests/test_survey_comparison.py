@@ -16,12 +16,13 @@ not possible if the input is a real probe.
 """
 import json
 
+import numpy as np
 import pytest
 
 from leo_tracker.radio.beacon.survey_comparison import (
-    MINIMUM_EXCEEDANCES, PREAMBLE, REVIEW_SCHEMA, describe, format_review,
-    load_scores, pairwise_agreement, review, rolled_control_trap,
-    searched_comparison, threshold_from, time_continuity)
+    MINIMUM_EXCEEDANCES, PREAMBLE, REVIEW_SCHEMA, conditioned_comparison,
+    describe, format_review, load_scores, pairwise_agreement, review,
+    rolled_control_trap, searched_comparison, threshold_from, time_continuity)
 from leo_tracker.radio.beacon.survey_scoring import SCORES_SCHEMA
 
 
@@ -339,6 +340,84 @@ def test_conditioning_at_a_claim_the_method_made_itself_is_not_confirmation(
     assert conditioned["differential-32"]["on_other_methods_claims"] == 1
 
 
+def _conditioned_point(point_id, *, score, cross_edge, claimed_by=("coarse-E",)):
+    return {"point_id": point_id, "epoch_sample": 1000 + point_id,
+            "cfo_hz": 1000.0, "claimed_by": list(claimed_by),
+            "correlation_ms": 90.0,
+            "methods": {"glrt-32": {"score": score, "control_score": 0.01,
+                                    "margin": score - 0.01,
+                                    "cross_edge_score": cross_edge,
+                                    "control_epoch": "pinned",
+                                    "residual_cfo_hz": 0.0, "elapsed_ms": 0.2}}}
+
+
+def test_the_conditioned_cross_edge_null_is_drawn_at_points_the_null_arm_chose(
+        tmp_path):
+    """A statistic is calibrated at points drawn the way its own were drawn.
+
+    Every conditioned point is *selected* — some detector's argmax over its
+    cells — so a null for it has to be selected too. The cross-edge-null arm is:
+    the opposite edge is searched as its own target, proposes its own
+    candidates, and its scores are maximised the same way. That is what
+    ``cross_radio.null_thresholds`` reads and it is what this reads now.
+
+    ``cross_edge_score`` is not. It is the same pilot-free opposite-edge
+    template read back at the candidates the *target*-edge detectors picked —
+    equally free of the target pilot, and screened somewhere else entirely, so
+    it prices an unselected draw against a maximised one. The population here
+    says so out loud: the null arm's own points reach 0.38 while the read-back
+    column sits at 0.05, and a threshold of 0.05 would confirm all four target
+    claims that a threshold of 0.38 refuses.
+    """
+    null_points = [_conditioned_point(index, score=score, cross_edge=None,
+                                      claimed_by=["coarse-E"])
+                   for index, score in enumerate([0.30, 0.32, 0.34, 0.36, 0.38])]
+    target_points = [_conditioned_point(index, score=score, cross_edge=0.05)
+                     for index, score in enumerate([0.20, 0.21, 0.22, 0.23])]
+    _write(tmp_path, _payload("provenance", [
+        _observation("target", points=target_points,
+                     certificates=[_certificate("glrt-32", 0.9, control=0.1)]),
+        _observation("cross-edge-null", points=null_points,
+                     certificates=[_certificate("glrt-32", 0.2, control=0.1)])]))
+
+    summary = review(tmp_path)["conditioned"]["glrt-32"]
+
+    assert summary["cross_edge_null"]["threshold"] == pytest.approx(0.38)
+    assert summary["cross_edge_null"]["samples"] == 5
+    assert summary["cross_edge_null"]["confirms"]["count"] == 0
+    assert summary["null_arm_points"] == 5
+    # The read-back column survives, under a name that says what it is
+    # conditioned on, and it decides nothing.
+    selected = summary["cross_edge_at_claimed_points"]
+    assert selected["threshold"] == pytest.approx(0.05)
+    assert selected["usable_as_null"] is False
+    assert "confirms" not in selected
+
+
+def test_the_report_says_the_read_back_cross_edge_score_is_not_a_null(tmp_path):
+    """The false claim travelled in prose, so the correction has to travel too.
+
+    What was written down was that the cross-edge construction has "no screening
+    on the statistic being calibrated". That is true of the null *arm* and false
+    of the column read back at target-selected points, and the difference is
+    invisible unless it is said. It is said in the output, because the output is
+    what gets pasted into a discussion.
+    """
+    _write(tmp_path, _payload("prose", [
+        _observation("target",
+                     points=[_conditioned_point(0, score=0.2, cross_edge=0.05)],
+                     certificates=[_certificate("glrt-32", 0.9, control=0.1)]),
+        _observation("cross-edge-null",
+                     points=[_conditioned_point(0, score=0.3, cross_edge=None)],
+                     certificates=[_certificate("glrt-32", 0.2, control=0.1)])]))
+
+    printed = format_review(review(tmp_path))
+
+    assert "t(sel)" in printed
+    assert "It is not a null" in printed
+    assert "cross-edge-null ARM" in printed
+
+
 # --------------------------------------------------------------------------
 # what the printed report has to say out loud
 # --------------------------------------------------------------------------
@@ -350,6 +429,13 @@ def test_confirmation_is_counted_per_proposer_not_pooled(tmp_path):
     look and something sharp to settle it — and a pooled confirmation rate
     cannot tell them apart. A proposer never confirms its own claim: reading a
     maximisation back at its own argmax is not a second opinion.
+
+    The corpus has to carry a cross-edge-null arm for any of this to be
+    counted, because that arm's own points are where the confirmer's threshold
+    comes from. It used to come from the target arm's ``cross_edge_score``
+    column, so this test used to need no null arm at all — which is precisely
+    the defect: a confirmation rate was being produced for a corpus that had
+    never had a null drawn on it.
     """
     def _point(point_id, claimed_by, glrt, diff):
         return {"point_id": point_id, "epoch_sample": 1000 + point_id,
@@ -367,6 +453,11 @@ def test_confirmation_is_counted_per_proposer_not_pooled(tmp_path):
     observations = [_observation("target", channel=index, points=[
         _point(index, ["coarse-E"], glrt=0.9 if index < 8 else 0.001,
                diff=0.001)]) for index in range(10)]
+    # The null arm both methods are calibrated on: its own points, its own
+    # scores, and a 99th percentile of 0.02 for each.
+    observations += [_observation("cross-edge-null", channel=index, points=[
+        _point(index, ["coarse-E"], glrt=0.02, diff=0.02)])
+        for index in range(10)]
     _write(tmp_path, _payload("confirm", observations))
 
     matrix = review(tmp_path)["confirmation"]
@@ -1185,15 +1276,27 @@ def test_the_review_schema_names_the_version_whose_keys_these_are(tmp_path):
     while both read "v1", which is the exact argument that earned
     ``SCORES_SCHEMA`` its bump one layer down.
 
+    v3 is one key further in and the sharpest case yet:
+    ``conditioned.<method>.cross_edge_null`` kept its name and changed its
+    population, from the opposite template read back at target-selected points
+    to the cross-edge-null arm's own points. On empty input the two differ by
+    0.5-1.1x *and differ by method*, so two consumers both reading "v2" would
+    rank the detectors differently. The old quantity is still published, under
+    a name that says what it is conditioned on.
+
     The version is asserted as a literal rather than against the constant. An
     assertion that reads ``report["schema"] == REVIEW_SCHEMA`` passes whatever
     the constant says, so it pins the plumbing and not the version.
     """
-    _write(tmp_path, _payload("versioned", [_observation("target")]))
+    _write(tmp_path, _payload("versioned", [
+        _observation("target",
+                     points=[_conditioned_point(0, score=0.2, cross_edge=0.05)]),
+        _observation("cross-edge-null",
+                     points=[_conditioned_point(0, score=0.3, cross_edge=None)])]))
 
     report = review(tmp_path)
 
-    assert report["schema"] == "leo-tracker.survey-detector-review/v2"
+    assert report["schema"] == "leo-tracker.survey-detector-review/v3"
     assert report["schema"] == REVIEW_SCHEMA
     # The keys the bump is about, so a later reader can see what moved.
     assert "threshold" not in report["deployed"]
@@ -1201,6 +1304,10 @@ def test_the_review_schema_names_the_version_whose_keys_these_are(tmp_path):
     assert "exact" not in report["deployed_reproduction"]
     assert "scored_samples" in report["deployed_reproduction"]
     assert "sidecars" in report
+    conditioned = report["conditioned"]["glrt-32"]
+    assert conditioned["cross_edge_null"]["drawn_from"].startswith("cross-edge-null")
+    assert "cross_edge_at_claimed_points" in conditioned
+    assert "null_arm_points" in conditioned
 
 
 def test_the_window_named_in_the_banner_is_one_something_was_checked_over(
@@ -1355,3 +1462,150 @@ def test_describe_reports_nothing_rather_than_zero_for_an_empty_population():
     assert describe([]) == {"count": 0}
     assert describe([None, None]) == {"count": 0}
     assert describe([1.0, 2.0, 3.0])["p50"] == pytest.approx(2.0)
+
+
+# --------------------------------------------------------------------------
+# the whole pipeline, on input that is genuinely empty
+# --------------------------------------------------------------------------
+
+#: Rate, probe length and realisation count of the empty-input reproduction.
+#:
+#: 2.5 MS/s and 20 ms are a corpus configuration, so the kernel taps, the epoch
+#: count and the fold depth are the ones the survey actually runs.  24
+#: realisations is what a 5% threshold can be drawn and then judged on with the
+#: ~7 candidate points a probe yields — ~165 points, which supports a rate down
+#: to 1.8% — and it costs about 50 s, which is the price of running the real
+#: detectors rather than a model of them.
+EMPTY_INPUT_RATE_HZ = 2_500_000.0
+EMPTY_INPUT_PROBE_S = 0.020
+EMPTY_INPUT_REALISATIONS = 24
+EMPTY_INPUT_FALSE_ALARM_RATE = 0.05
+
+#: The families the read-back null flatters, measured on a cabled loopback and
+#: reproduced here on Gaussian noise.  ``anchor-8`` and the differentials are
+#: near-unbiased, which is the point: the bias is not a common offset but a
+#: per-method one, so it reorders a ranking rather than shifting it.
+SELECTION_SENSITIVE = ("full-frame-full", "full-frame-acquire",
+                       "full-frame-verify", "glrt-32", "glrt-64")
+
+
+def _empty_probe(rng, count):
+    """Circular complex Gaussian noise: no pilot, no carrier, no sky."""
+    real, imag = rng.standard_normal(count), rng.standard_normal(count)
+    return ((real + 1j * imag) / np.sqrt(2.0)).astype(np.complex64)
+
+
+def _empty_input_payloads(realisations=EMPTY_INPUT_REALISATIONS):
+    """Score empty probes the way ``survey_scoring`` scores real ones.
+
+    Two arms per probe and the same construction in each: a search, the distinct
+    points that search proposed, and every confirmer read at those points. The
+    target arm additionally carries the opposite edge's template read back at
+    *its* points, which is the column under test.
+    """
+    from leo_tracker.radio.beacon import survey_scoring
+
+    rate = EMPTY_INPUT_RATE_HZ
+    banks = {"lower": survey_scoring._banks("lower", rate),
+             "upper": survey_scoring._banks("upper", rate)}
+    count = int(EMPTY_INPUT_PROBE_S * rate)
+    payloads = []
+    for index in range(realisations):
+        samples = _empty_probe(np.random.default_rng(20260814 + index), count)
+        observations = []
+        for arm, template_edge in (("target", "lower"),
+                                   ("cross-edge-null", "upper")):
+            searched = survey_scoring.search_observation(
+                samples, rate, edge=template_edge, banks=banks[template_edge])
+            points = survey_scoring.distinct_points(searched["certificates"], rate)
+            confirmed = survey_scoring.confirm_points(
+                samples, rate, points, edge=template_edge,
+                null_edge=("upper" if arm == "target" else None))
+            observations.append(_observation(
+                arm, certificates=searched["certificates"], points=confirmed))
+        payloads.append(_payload(f"empty-{index:03d}", observations,
+                                 rate=EMPTY_INPUT_RATE_HZ))
+    return payloads
+
+
+def _per_cell_firing(payloads, thresholds):
+    """Share of empty target cells where some candidate cleared the threshold.
+
+    Per cell rather than per point, because that is the decision: a cell holds
+    ~7 candidates and firing means any one of them cleared. A per-point quantile
+    understates it by that factor, which is the factor an over-fitted threshold
+    hides behind.
+    """
+    fired, cells = {}, {}
+    for payload in payloads:
+        for observation in payload["observations"]:
+            if observation["arm"] != "target":
+                continue
+            for method, threshold in thresholds.items():
+                if threshold is None:
+                    continue
+                scores = [(point["methods"].get(method) or {}).get("score")
+                          for point in observation["points"]]
+                scores = [value for value in scores if value is not None]
+                if not scores:
+                    continue
+                cells[method] = cells.get(method, 0) + 1
+                fired[method] = fired.get(method, 0) + int(max(scores) > threshold)
+    return {method: fired.get(method, 0) / total
+            for method, total in cells.items()}
+
+
+def test_on_genuinely_empty_input_the_conditioned_threshold_holds_its_rate():
+    """The defect, end to end, on input that cannot contain a signal.
+
+    No antenna, no transmitter, no corpus: circular complex Gaussian noise at a
+    corpus sample rate and probe length, scored by the real detectors through
+    the real ``search -> distinct_points -> confirm_points`` path. Whatever a
+    threshold does here is false alarms, all of it.
+
+    A 5% per-point threshold on ~7 candidates per cell should fire on
+    ``1 - 0.95^7`` = 30% of empty cells. Drawn from the null arm's own points it
+    does: 1.0-1.3x nominal across every method and every block of 24
+    realisations measured. Drawn from ``cross_edge_score`` — the opposite edge's
+    template read back where the *target*-edge detectors were pointing — the
+    GLRT and full-frame families come out at **2.3-2.8x nominal**, because that
+    population was never selected and the scores it judges were. ``anchor-8``
+    and the differentials barely move, which is what makes it a ranking defect
+    rather than a scale error.
+
+    This is the cabled-loopback measurement in
+    ``reports/starlink-detector-evaluation`` reproduced without the cable: that
+    one put the read-back threshold at 0.52x truth for ``full-frame-full``
+    against 1.02-1.11x for ``anchor-8`` and the differentials; 120 realisations
+    of this construction put it at 0.50x against 1.09x on the same detectors.
+
+    Costs ~50 s. Nothing cheaper runs the detectors, and a model of them could
+    only reproduce the defect that was put into the model.
+    """
+    payloads = _empty_input_payloads()
+    conditioned = conditioned_comparison(
+        payloads, false_alarm_rate=EMPTY_INPUT_FALSE_ALARM_RATE)
+
+    points_per_cell = np.mean([len(observation["points"])
+                               for payload in payloads
+                               for observation in payload["observations"]
+                               if observation["arm"] == "target"])
+    nominal = 1.0 - (1.0 - EMPTY_INPUT_FALSE_ALARM_RATE) ** points_per_cell
+    firing = _per_cell_firing(
+        payloads, {method: summary["cross_edge_null"]["threshold"]
+                   for method, summary in conditioned.items()})
+
+    assert set(SELECTION_SENSITIVE) <= set(firing)
+    worst = max(firing[method] for method in SELECTION_SENSITIVE)
+    assert worst <= 1.8 * nominal, (
+        f"empty input fires on {worst:.1%} of cells against a nominal "
+        f"{nominal:.1%}: the threshold is calibrated on a population drawn "
+        f"differently from the one it judges")
+
+    # The read-back column is kept as the exhibit, and on the same empty input
+    # it over-fires by what the loopback measured — for these families only.
+    exhibit = _per_cell_firing(
+        payloads, {method: summary["cross_edge_at_claimed_points"]["threshold"]
+                   for method, summary in conditioned.items()})
+    assert min(exhibit[method] for method in SELECTION_SENSITIVE) >= 2.0 * nominal
+    assert exhibit["anchor-8"] < 1.8 * nominal

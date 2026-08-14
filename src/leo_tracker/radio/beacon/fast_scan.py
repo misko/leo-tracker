@@ -303,6 +303,89 @@ class ScanKernelUnavailable(RuntimeError):
     """Raised when the fused kernel cannot be built for this machine."""
 
 
+class TuningMisfiled(ValueError):
+    """The tuning a probe would be published under is not the one it holds.
+
+    Raised rather than guessed, for the reason ``survey_scoring.tuning_plan``
+    raises :class:`~.survey_scoring.ProbeUnusable` rather than infer which IQ
+    block belongs to which tuning: a probe of ch2-upper filed as ch1-lower is
+    worse than a missing probe, because nothing downstream can tell and it will
+    be believed.  Every timing number a sweep produces is identical either way.
+    """
+
+
+#: How far the oscillator may land from where it was sent and still be that
+#: tuning.
+#:
+#: The eight low-band edge tunings are 19.375 MHz apart at their closest -- 959.6875,
+#: 1190.3125, 1209.6875, 1440.3125, 1459.6875, 1690.3125, 1709.6875 and
+#: 1940.3125 MHz -- so anything inside a megahertz resolves to exactly one of
+#: them and nothing else.  A real fractional-N synthesiser lands a few Hz from
+#: the request, which is why the read-back is recorded rather than asserted to
+#: equal it; a driver that clamped, a channel table off by one or a write that
+#: did not take lands hundreds of megahertz away, which is what this refuses.
+TUNING_LANDING_TOLERANCE_HZ = 1_000_000.0
+
+
+@lru_cache(maxsize=8)
+def _known_edge_tunings(lnb_lo_hz: float) -> tuple[tuple[float, int, str], ...]:
+    """Every published edge-pilot tuning this LNB can reach, by frequency."""
+    found = []
+    for channel in range(1, 9):
+        for edge in ("lower", "upper"):
+            try:
+                found.append((starlink_edge_pilot_if_hz(channel, edge, lnb_lo_hz),
+                              channel, edge))
+            except ValueError:                     # below this LNB's oscillator
+                continue
+    return tuple(sorted(found))
+
+
+def landed_tuning(landed_hz: float, requested: tuple[int, str], *,
+                  lnb_lo_hz: float = 9_750_000_000.0) -> dict:
+    """Which tuning the oscillator actually reached, from the read-back.
+
+    The **outcome** of the tune, never the request.  ``deployed_shape`` recorded
+    what the scorer believed rather than what the capture did, and a
+    heterogeneous corpus looked uniform for days underneath it; the request and
+    the outcome agree on every healthy tuning, which is exactly what makes
+    substituting one for the other invisible.
+
+    The label is **resolved from the read-back** -- the nearest published edge
+    tuning to where the oscillator actually went -- and then required to be the
+    one that was asked for.  Resolving first and checking second is what makes
+    the returned label a reading of the radio rather than an echo of the
+    request; the check is what stops it being a guess.
+
+    Raises :class:`TuningMisfiled` when the read-back resolves to no published
+    tuning within :data:`TUNING_LANDING_TOLERANCE_HZ`, or resolves to a
+    different one from the request, naming where it was sent, where it landed
+    and which published tuning that is instead.
+    """
+    channel, edge = int(requested[0]), str(requested[1])
+    asked = starlink_edge_pilot_if_hz(channel, edge, lnb_lo_hz)
+    offset = float(landed_hz) - asked
+    nearest = min(_known_edge_tunings(float(lnb_lo_hz)),
+                  key=lambda item: abs(item[0] - float(landed_hz)),
+                  default=None)
+    resolved = (None if nearest is None or abs(nearest[0] - float(landed_hz))
+                > TUNING_LANDING_TOLERANCE_HZ else (nearest[1], nearest[2]))
+    if resolved != (channel, edge):
+        instead = ("no published edge tuning" if resolved is None
+                   else f"which is {resolved!r}")
+        raise TuningMisfiled(
+            f"the oscillator was sent to {asked:.0f} Hz for tuning "
+            f"{(channel, edge)!r} and read back at {float(landed_hz):.0f} Hz, "
+            f"{offset:+.0f} Hz away -- {instead}. A probe whose tuning cannot "
+            "be trusted is worse than a missing probe, so it is refused rather "
+            "than published under a label it does not hold")
+    return {"channel": resolved[0], "edge": resolved[1],
+            "requested_if_center_hz": asked,
+            "if_center_hz": float(landed_hz),
+            "rf_center_hz": float(landed_hz) + lnb_lo_hz,
+            "tuning_offset_hz": offset}
+
+
 def _compiler() -> str:
     """The compiler the kernel is built with, so the key names the same one."""
     return os.environ.get("CC", "cc")
@@ -888,9 +971,21 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
     return results
 
 
+def _sample_clock(tuning_index: int, event: str) -> int:
+    """Host UTC in nanoseconds, read in the calling reader's own thread.
+
+    Both arguments are ignored.  They exist so a paired sweep can pin what each
+    radio stamped, at which tuning, and at which event, and check that the
+    offset it reports is the difference of two stamps rather than a constant.
+    """
+    return time.time_ns()
+
+
 def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
                   sample_rate_hz: float = 2_500_000.0,
-                  lnb_lo_hz: float = 9_750_000_000.0) -> dict:
+                  lnb_lo_hz: float = 9_750_000_000.0,
+                  before_tuning=None, before_listen=None, after_tuning=None,
+                  sample_clock=_sample_clock) -> dict:
     """Tune, listen, and hand the IQ back.  Nothing here scores anything.
 
     This is everything that needs the radio and nothing else.  The split is the
@@ -901,11 +996,23 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     with the bank; separated, the Pi pays only for the seconds the antenna is
     pointed somewhere.
 
-    **Radio time depends on probe duration, not on sample rate.**  A block is
-    sized to the probe by :func:`survey_profile`, so 80 ms costs one 80 ms read
-    whether that is 200,000 samples or 400,000 of them.  What the rate changes
-    is bytes -- 8 tunings x samples x 2 receivers x 2 components x 2 bytes --
-    and arithmetic downstream.
+    **Radio time scales with sample rate as well as with probe duration.**
+    This said the opposite for as long as nobody had measured it.  A block is
+    sized to the probe by :func:`survey_profile`, so 80 ms is one 80 ms read
+    whatever the sample count -- but the read does not run at real time, and
+    how far off it runs is a function of the rate.  Measured on this host for
+    an 80 ms probe::
+
+        1.25 MS/s -> 108 ms   (1.35x real time)
+         2.5 MS/s -> 137 ms   (1.71x)
+         5.0 MS/s -> 193 ms   (2.41x)
+        10.0 MS/s -> 309 ms   (3.87x)
+
+    So the dearest arm of a twelve-arm grid is not four times the cheapest, it
+    is closer to thirty, and anything sizing a timeout or a cadence from the
+    old claim was sizing it against a number that was never true.  What the
+    rate *also* changes is bytes -- 8 tunings x samples x 2 receivers x 2
+    components x 2 bytes -- and arithmetic downstream.
 
     The raw ci16 comes back shaped ``(tuning, sample, receiver, component)``:
     the capture path's own layout with a tuning axis in front, kept as the
@@ -916,6 +1023,46 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     The radio is configured from the profile rather than from whatever the
     capture path left behind: a survey wants a shallow queue and a block the
     size of its probe, which is the opposite of what a long dwell wants.
+
+    **Every tuning label is the outcome of the tune, never the request.**  The
+    local oscillator is read back after it is written and the label resolved
+    from where it actually went; a read-back that resolves to a different
+    published tuning raises :class:`TuningMisfiled` rather than publishing the
+    probe under the label it was asked for.  The two agree on every healthy
+    tuning, which is exactly why substituting one for the other is invisible --
+    ``deployed_shape`` recorded the belief rather than the event and made a
+    heterogeneous corpus look uniform for days.  Each entry also carries
+    ``iq_index``, the block of the returned array its probe was written into,
+    so ``sample_order`` states that mapping instead of implying it from
+    position; an off-by-one there publishes every probe under its neighbour's
+    label with every count, stamp and timing still perfect.
+
+    The read-back costs one attribute read per tuning and is taken inside the
+    tune, before ``before_listen``, so a paired sweep never pays for it inside
+    the offset it is trying to make small.
+
+    Three optional hooks, and **which one a paired sweep meets at is the whole
+    design**.  ``before_tuning`` fires with the tuning index before the local
+    oscillator is written; ``before_listen`` fires once the oscillator is
+    written and the settle buffers are drained, with the radio parked on
+    frequency and one statement away from its first sample; ``after_tuning``
+    fires with the index and that tuning's entry once its probe is in hand.
+    The survey passes none of them.
+
+    A rendezvous belongs at ``before_listen``, not at ``before_tuning``.  The
+    oscillator write is not free and is not constant -- it costs about 6 ms and
+    it costs *different* amounts on the two radios whenever they are moving to
+    different frequencies, which on an opposite-order paired sweep is every
+    tuning.  Meeting before the write leaves that difference inside the
+    interval the sweep is trying to make small, and leaves it correlated with
+    the edge order, which is the variable under study.  Meeting after it puts
+    both radios on frequency first and rendezvous immediately before sampling;
+    see :mod:`.synchronised_scan`.
+
+    ``sample_clock`` is read in this reader's own thread at the instant
+    sampling begins and again when it ends, and both stamps travel in the
+    tuning's entry.  That is what a paired sweep reports as its offset, because
+    it is the only stamp taken when the radio is actually observing.
     """
     import iio                                    # kept local: host-only import
 
@@ -935,22 +1082,58 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     stream.set_kernel_buffers_count(profile.kernel_buffers)
     buffer = iio.Buffer(stream, profile.block_size, False)
     wanted = int(round(profile.probe_s * sample_rate_hz))
-    plan, retained = [], []
+    ordered = [tuple(item) for item in tunings]
+    # Allocated once, up front, and filled in place.  Appending each probe to a
+    # list and calling ``np.stack`` at the end builds a second copy of the
+    # whole sweep while the first is still held by the list, so the reader
+    # transiently needs twice what it returns -- on the dearest arm that is a
+    # second 410 MB, on both radios at once, on a 4 GB host already running two
+    # capture services.  Measured peak RSS for a matched 640 ms / 10 MS/s
+    # sweep: 1,862 MB stacking, 1,080 MB filling this array.  The bound is now
+    # arithmetic rather than hope: tunings x samples x 2 x 2 x 2 bytes per
+    # radio, knowable before the sweep starts.
+    retained = (np.empty((len(ordered), wanted, 2, 2), "<i2")
+                if ordered else None)
+    plan = []
     timing = {"tune": 0.0, "settle": 0.0, "listen": 0.0}
     try:
-        for channel_number, edge in tunings:
+        # The destination row is iterated *with* the tuning rather than indexed
+        # by a counter the tuning shares.  There is no arithmetic between the
+        # two to be off by one, and ``strict`` refuses a pairing that has been
+        # shifted or shortened instead of quietly dropping the odd end.
+        for tuning_index, ((channel_number, edge), destination) in enumerate(
+                zip(ordered, retained if retained is not None else (),
+                    strict=True)):
             centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
+
+            if before_tuning is not None:
+                before_tuning(tuning_index)
 
             mark = time.perf_counter()
             lo.attrs["frequency"].value = str(int(centre))
-            timing["tune"] += time.perf_counter() - mark
+            # Read back inside the tune, because it is radio time spent tuning
+            # and because it is the only evidence of where the oscillator went.
+            # It is before the rendezvous, so a paired sweep never pays for it
+            # inside the offset it is trying to make small.
+            landed = landed_tuning(float(lo.attrs["frequency"].value),
+                                   (channel_number, edge), lnb_lo_hz=lnb_lo_hz)
+            tune_s = time.perf_counter() - mark
+            timing["tune"] += tune_s
 
             mark = time.perf_counter()
             for _ in range(profile.settle_buffers):
                 buffer.refill()
-            timing["settle"] += time.perf_counter() - mark
+            settle_s = time.perf_counter() - mark
+            timing["settle"] += settle_s
+
+            # On frequency and settled.  Everything that costs a different
+            # amount on the two radios has now been paid, so this is where a
+            # paired sweep meets -- not before the write above.
+            if before_listen is not None:
+                before_listen(tuning_index)
 
             mark = time.perf_counter()
+            sample_started_ns = int(sample_clock(tuning_index, "sample_start"))
             pieces, remaining = [], wanted
             while remaining > 0:
                 buffer.refill()
@@ -962,29 +1145,86 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             # so keeping both costs no radio time at all -- and the capture this
             # precedes keeps both, so a survey of one port could not be set
             # beside what that capture found.
-            raw = np.concatenate(pieces).reshape(-1, 2, 2)[:wanted]
-            # Copied rather than kept as a view, so a read that overshot the
-            # probe releases the surplus instead of pinning it for the whole
-            # survey.
-            retained.append(raw.copy())
-            timing["listen"] += time.perf_counter() - mark
+            #
+            # One copy, straight into the slice: a read that overshot the probe
+            # releases its surplus here rather than pinning it for the whole
+            # sweep, and a read that needed exactly one block is not
+            # concatenated with itself first.
+            block = pieces[0] if len(pieces) == 1 else np.concatenate(pieces)
+            destination[:] = block.reshape(-1, 2, 2)[:wanted]
+            del pieces, block, raw
+            sample_ended_ns = int(sample_clock(tuning_index, "sample_end"))
+            listen_s = time.perf_counter() - mark
+            timing["listen"] += listen_s
 
-            plan.append({"channel": channel_number, "region": f"{edge}-edge",
-                         "edge": edge, "if_center_hz": centre,
-                         "rf_center_hz": centre + lnb_lo_hz})
+            entry = {"channel": landed["channel"],
+                     "region": f"{landed['edge']}-edge",
+                     "edge": landed["edge"],
+                     # Where the oscillator actually went, and where it was
+                     # sent, kept apart so a reader can see the difference
+                     # rather than having to assume there was none.
+                     "if_center_hz": landed["if_center_hz"],
+                     "rf_center_hz": landed["rf_center_hz"],
+                     "requested_if_center_hz": landed["requested_if_center_hz"],
+                     "tuning_offset_hz": landed["tuning_offset_hz"],
+                     "tuning_index": tuning_index,
+                     # Which block of the retained array holds this probe.
+                     # Written down rather than left to be inferred from this
+                     # entry's position, which is what ``sample_order`` agreed
+                     # with only because one loop filled both.
+                     "iq_index": tuning_index,
+                     # Stamped in this reader's own thread the instant sampling
+                     # began, which is the only instant at which "the two
+                     # radios were observing together" is a statement about the
+                     # radios rather than about the scheduler.
+                     "sample_start_utc_ns": sample_started_ns,
+                     "sample_end_utc_ns": sample_ended_ns,
+                     "tune_ms": tune_s * 1000,
+                     "settle_ms": settle_s * 1000,
+                     "listen_ms": listen_s * 1000,
+                     # Radio time for this tuning, and nothing else: any wait
+                     # at a rendezvous belongs to the rendezvous, which records
+                     # it separately, and adding it here would hide the cost of
+                     # one radio inside the timing of the other.
+                     "tuning_ms": (tune_s + settle_s + listen_s) * 1000}
+            plan.append(entry)
+            # Published per tuning rather than only at the end, so a sweep that
+            # dies on its fourth tuning still records the three it finished.
+            if after_tuning is not None:
+                after_tuning(tuning_index, entry)
     finally:
         # The binding has no explicit close: the buffer is freed when its last
         # reference goes, and a leaked one holds the context so that whatever
         # opens the radio next fails with EBUSY.
         del buffer
-    samples = np.stack(retained) if retained else None
+    # A view onto the rows that were actually filled, so a sweep that stopped
+    # early never hands back uninitialised memory as if it were sky.
+    samples = None if retained is None or not plan else retained[:len(plan)]
+    # The mapping from IQ block to tuning, checked rather than assumed.  A gap,
+    # a duplicate or a shift means some block would be published under another
+    # block's label, and there is no way to tell afterwards which one is right.
+    filed = [item["iq_index"] for item in plan]
+    if filed != list(range(len(plan))):
+        raise TuningMisfiled(
+            f"{len(plan)} probes were filed into IQ blocks {filed}, which is "
+            "not one probe per block in order; some probe would be published "
+            "under another probe's tuning")
+    if samples is not None and int(samples.shape[0]) != len(plan):
+        raise TuningMisfiled(
+            f"{len(plan)} probes were collected into {samples.shape[0]} IQ "
+            "blocks; the two cannot be lined up")
+    order: list[tuple] = [None] * len(plan)
+    for item in plan:
+        order[item["iq_index"]] = (item["channel"], item["region"])
     radio_s = sum(timing.values())
     return {
         "samples": samples, "plan": plan,
-        # The retained IQ stays in the order it was collected.  Every consumer
-        # indexes it by this, never by the score-sorted result list, so the two
-        # cannot be mismatched.
-        "sample_order": [(item["channel"], item["region"]) for item in plan],
+        # The retained IQ stays in the order it was collected, and this is
+        # keyed by the block index each probe recorded for itself rather than
+        # by its position in ``plan``.  Every consumer indexes the IQ by this,
+        # never by the score-sorted result list, so the two cannot be
+        # mismatched.
+        "sample_order": order,
         "tunings": len(plan),
         "timing_ms": {key: value * 1000 for key, value in timing.items()},
         "radio_ms": radio_s * 1000,

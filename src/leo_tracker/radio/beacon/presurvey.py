@@ -31,10 +31,15 @@ survey's wall clock scale with the bank *and* with the configuration.  Measured
 on the capture Pi itself, a full sweep costs 2.0 s of arithmetic at the cheapest
 arm and 11.6 s at the dearest -- 23.9 s if all four ran, and nearly a tenth of a
 120 s dwell for one arm alone.  The radio work now stands alone in
-:func:`fast_scan.collect_radio`, whose cost follows probe *duration* only
-(0.79 s at 80 ms, 1.43 s at 160 ms, both rates alike), and what the capture host
-still scores is bounded by :data:`PI_SCORE_SAMPLE_LIMIT`.  The full comparison
-runs on the analysis host, over the preserved probes, with sixteen workers.
+:func:`fast_scan.collect_radio` -- a full sweep measured 0.79 s at an 80 ms
+probe and 1.43 s at 160 ms, both at 2.5 MS/s -- and what the capture host still
+scores is bounded by :data:`PI_SCORE_SAMPLE_LIMIT`.  The full comparison runs
+on the analysis host, over the preserved probes, with sixteen workers.
+
+Those two figures were once quoted as holding for *both* rates alike.  They do
+not: a read does not run at real time and how far off it runs is a function of
+the sample rate, so an 80 ms probe costs 108 ms at 1.25 MS/s and 309 ms at 10.
+:func:`fast_scan.collect_radio` carries the measurement.
 """
 from __future__ import annotations
 

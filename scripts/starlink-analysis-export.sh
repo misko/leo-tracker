@@ -76,19 +76,30 @@ sync_context() {
   echo "published analysis context ${context_bundle}"
 }
 
+# Reconciliation is a side errand; draining the queue is the job.
+#
+# This runs under `set -e`, and both commands below exit non-zero when any one
+# recording reports an error. A single unreadable manifest, or one written by a
+# capture loop newer than this checkout, therefore used to take the exporter
+# down -- and `Restart=always` then reconciled again, failed again, and stopped
+# ALL offload for every capture type over one directory. The failure is logged
+# and the loop carries on to the captures that are waiting.
 reconcile_exports() {
-  local force="${1:-0}" now
+  local force="${1:-0}" now reconcile_failed=0
   now="$(date +%s)"
   if (( force == 0 && now - reconciled_at < reconcile_s )); then
     return
   fi
   env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
     python -m leo_tracker.radio.beacon.offload recover-stale "${source_root}" \
-    --minimum-age-s "${stale_capture_age_s}" --summary-only
+    --minimum-age-s "${stale_capture_age_s}" --summary-only || reconcile_failed=1
   env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
     python -m leo_tracker.radio.beacon.offload enqueue-export-backfill \
     "${source_root}" "${shared_root}" --pipeline-id "${pipeline_id}" \
-    --archive-root "${archive_root}" --summary-only
+    --archive-root "${archive_root}" --summary-only || reconcile_failed=1
+  if (( reconcile_failed == 1 )); then
+    printf '{"reconcile_warning":true,"detail":"a reconciliation pass reported errors; the queue drain continues"}\n' >&2
+  fi
   reconciled_at="${now}"
 }
 

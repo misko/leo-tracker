@@ -1,0 +1,24 @@
+{
+ "false_alarm_rate": 0.01,
+ "calibrated_on": "TX2 -89.75 dB, cabled loopback, genuinely empty, 300 held-out observations",
+ "empty_channel": {
+  "anchor-8": 0.2757987619173665,
+  "differential-16": 0.24589536167138354,
+  "differential-32": 0.1690601804918028,
+  "glrt-32": 0.0867862195483363,
+  "glrt-64": 0.04791508060801688,
+  "full-frame-full": 0.031845029315572114,
+  "full-frame-acquire": 0.04163718232871282,
+  "full-frame-verify": 0.03565721170526924
+ },
+ "cross_edge_on_empty": {
+  "anchor-8": 0.2814548958715438,
+  "differential-16": 0.27227788179513013,
+  "differential-32": 0.18132074996957706,
+  "glrt-32": 0.07310676715019669,
+  "glrt-64": 0.03716520705338331,
+  "full-frame-full": 0.016546751197421012,
+  "full-frame-acquire": 0.02272171665286343,
+  "full-frame-verify": 0.022652851354040302
+ }
+}

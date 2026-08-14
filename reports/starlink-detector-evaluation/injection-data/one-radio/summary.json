@@ -1,0 +1,357 @@
+{
+ "title": "Injected-signal characterisation of the eight Starlink pilot detectors",
+ "note": "CABLED LOOPBACK (TX2 -> tee -> 2x30 dB -> RX1,RX2): this tests the detectors and the digital pipeline, NOT the LNBs, the antenna, or real sky.",
+ "radio": "PlutoSDR Rev.C ip:192.168.1.183, serial 104000bac495...",
+ "configuration": {
+  "sample_rate_hz": 5000000.0,
+  "lo_hz": 1190312500.0,
+  "rf_bandwidth_hz": 5000000.0,
+  "rx_gain_db": 40.0,
+  "rx_gain_mode": "manual",
+  "probe_ms": 20.0,
+  "frames_per_probe": 15,
+  "waveform": "leo_tracker.radio.beacon.pilots.edge_pilot_frame(5e6, 'lower')",
+  "scoring_path": "survey_scoring.search_observation -> distinct_points -> confirm_points; cross_radio.observation_fires for the per-cell decision"
+ },
+ "E1_smoke": {
+  "reference": {
+   "rms": 83.6,
+   "peak_to_median": 60.3,
+   "tx2_gain_db": -20.0
+  },
+  "measured_rms_counts": 82.6113052368164,
+  "measured_peak_to_median": 62.08879470825195,
+  "transmitter_off_peak_to_median": 4.4151482582092285,
+  "highest_rx_peak_counts": 212.00234985351562,
+  "passed": true
+ },
+ "E2_roc": {
+  "snr50_db": {
+   "anchor-8": -17.614855279102187,
+   "differential-16": -17.04182382939002,
+   "differential-32": -17.501565365425126,
+   "glrt-32": -18.689777557837612,
+   "glrt-64": -18.222035100580882,
+   "full-frame-full": -18.29311394474056,
+   "full-frame-acquire": -18.504134020689484,
+   "full-frame-verify": -18.57176747075651
+  },
+  "snr50_ci": {
+   "anchor-8": [
+    -17.966148374164504,
+    -17.26005697159308
+   ],
+   "differential-16": [
+    -17.287952612206936,
+    -16.790724779165142
+   ],
+   "differential-32": [
+    -17.835968210887952,
+    -17.16834349813844
+   ],
+   "glrt-32": [
+    -19.239086649431503,
+    -18.26653864352547
+   ],
+   "glrt-64": [
+    -18.76453657271541,
+    -17.72448524157296
+   ],
+   "full-frame-full": [
+    -18.921224761963853,
+    -17.74655085975509
+   ],
+   "full-frame-acquire": [
+    -19.019029996779,
+    -17.93554435821163
+   ],
+   "full-frame-verify": [
+    -19.128207741891995,
+    -18.002703417993914
+   ]
+  },
+  "measured_ranking_best_first": [
+   "glrt-32",
+   "full-frame-verify",
+   "full-frame-acquire",
+   "full-frame-full",
+   "glrt-64",
+   "anchor-8",
+   "differential-32",
+   "differential-16"
+  ],
+  "spread_db": 1.6479537284475931,
+  "pairs_resolved": 21,
+  "pairs_total": 28,
+  "spearman_vs_model_d": -0.047619047619047616,
+  "spearman_vs_fire_count": 0.047619047619047616,
+  "cells_per_rung": 160,
+  "rungs": 19
+ },
+ "E3_false_alarm": {
+  "per_point_rate_range": [
+   0.005946481665014866,
+   0.011397423191278493
+  ],
+  "per_cell_rate_range": [
+   0.04,
+   0.07666666666666666
+  ],
+  "sky_per_cell_range": [
+   0.0547,
+   0.0674
+  ],
+  "nominal_per_point": 0.01,
+  "points_per_cell": 6.735,
+  "minus_89_75_is_empty": "-89.75 dB with the cyclic buffer running is indistinguishable from no waveform at all",
+  "conditioned_cross_edge_threshold_ratio": [
+   0.5196023226560418,
+   1.1072916542403284
+  ],
+  "per_cell_at_conditioned_cross_edge_threshold": {
+   "anchor-8": 0.06666666666666667,
+   "differential-16": 0.02,
+   "differential-32": 0.03333333333333333,
+   "glrt-32": 0.25333333333333335,
+   "glrt-64": 0.35,
+   "full-frame-full": 0.5333333333333333,
+   "full-frame-acquire": 0.38333333333333336,
+   "full-frame-verify": 0.4066666666666667
+  },
+  "null_arm_threshold_ratio": [
+   0.9164498254763638,
+   1.3433263164382125
+  ],
+  "per_cell_at_null_arm_threshold": {
+   "anchor-8": 0.07666666666666666,
+   "differential-16": 0.06333333333333334,
+   "differential-32": 0.06,
+   "glrt-32": 0.09333333333333334,
+   "glrt-64": 0.07333333333333333,
+   "full-frame-full": 0.056666666666666664,
+   "full-frame-acquire": 0.06,
+   "full-frame-verify": 0.05
+  }
+ },
+ "E4_offset": {
+  "sky_claim_hz": [
+   350000.0,
+   400000.0
+  ],
+  "passes": [
+   {
+    "snr_db": 4.7,
+    "tx2_gain_db": -50.0,
+    "collapse_hz_at_pd_50": {
+     "anchor-8": null,
+     "differential-16": null,
+     "differential-32": null,
+     "glrt-32": null,
+     "glrt-64": null,
+     "full-frame-full": null,
+     "full-frame-acquire": null,
+     "full-frame-verify": null
+    },
+    "pd_at_350_400khz": {
+     "anchor-8": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "differential-16": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "differential-32": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "glrt-32": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "glrt-64": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "full-frame-full": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "full-frame-acquire": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "full-frame-verify": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "snr_db": -13.5,
+    "tx2_gain_db": -68.0,
+    "collapse_hz_at_pd_50": {
+     "anchor-8": 745454.5454545454,
+     "differential-16": 746341.4634146341,
+     "differential-32": 745238.0952380953,
+     "glrt-32": 744186.0465116279,
+     "glrt-64": 743181.8181818182,
+     "full-frame-full": 745238.0952380953,
+     "full-frame-acquire": 745238.0952380953,
+     "full-frame-verify": 743181.8181818182
+    },
+    "pd_at_350_400khz": {
+     "anchor-8": [
+      0.8166666666666667,
+      0.8333333333333334
+     ],
+     "differential-16": [
+      0.8166666666666667,
+      0.8333333333333334
+     ],
+     "differential-32": [
+      0.8333333333333334,
+      0.8166666666666667
+     ],
+     "glrt-32": [
+      0.8333333333333334,
+      0.8166666666666667
+     ],
+     "glrt-64": [
+      0.8333333333333334,
+      0.8
+     ],
+     "full-frame-full": [
+      0.8166666666666667,
+      0.8
+     ],
+     "full-frame-acquire": [
+      0.8166666666666667,
+      0.8
+     ],
+     "full-frame-verify": [
+      0.8333333333333334,
+      0.8
+     ]
+    }
+   }
+  ],
+  "coarse_search_spans_hz": {
+   "A": 300000.0,
+   "E": 700000.0
+  }
+ },
+ "E5_coincidence": {
+  "f_true": 0.2775,
+  "tx2_gain_db": -71.0,
+  "cells": 400,
+  "f_recovered": {
+   "anchor-8": 0.3106172117771299,
+   "differential-16": 0.3309367153177166,
+   "differential-32": 0.3256810873069581,
+   "glrt-32": 0.28821802799745,
+   "glrt-64": 0.30189735874289536,
+   "full-frame-full": 0.3006629918503384,
+   "full-frame-acquire": 0.3203388379028339,
+   "full-frame-verify": 0.28314137239019926
+  },
+  "f_ci": {
+   "anchor-8": [
+    0.23589593764748207,
+    0.41064509051194664
+   ],
+   "differential-16": [
+    0.2510936470552854,
+    0.4302389923316095
+   ],
+   "differential-32": [
+    0.2347120973120745,
+    0.43183344970124754
+   ],
+   "glrt-32": [
+    0.2183044237368421,
+    0.3721954485141363
+   ],
+   "glrt-64": [
+    0.22927932582495167,
+    0.3752927376512778
+   ],
+   "full-frame-full": [
+    0.2241698293565867,
+    0.38421034449482927
+   ],
+   "full-frame-acquire": [
+    0.24613600603024383,
+    0.41149500916093956
+   ],
+   "full-frame-verify": [
+    0.21492626911008103,
+    0.34978714051736043
+   ]
+  },
+  "every_interval_covers_truth": true,
+  "d_a_model_minus_measured": {
+   "anchor-8": -0.0828224135549519,
+   "differential-16": -0.07053366646176629,
+   "differential-32": -0.05441022909347637,
+   "glrt-32": -0.0005196678791228315,
+   "glrt-64": -0.052394499762920765,
+   "full-frame-full": -0.009438372569537057,
+   "full-frame-acquire": -0.054849418179293674,
+   "full-frame-verify": -0.03457804812716381
+  },
+  "d_b_model_minus_measured": {
+   "anchor-8": -0.026251158836728905,
+   "differential-16": -0.10013875393369404,
+   "differential-32": -0.09950603379133177,
+   "glrt-32": -0.03953435248399284,
+   "glrt-64": -0.034648904559478,
+   "full-frame-full": -0.0731681660036857,
+   "full-frame-acquire": -0.08779316452691283,
+   "full-frame-verify": 0.012620967180472564
+  },
+  "independence_excess_on_empty_cells": {
+   "anchor-8": 0.0033285042085224076,
+   "differential-16": -0.0031129895475389426,
+   "differential-32": 0.001628332994097293,
+   "glrt-32": 0.006788711820979154,
+   "glrt-64": -0.0002035416242621613,
+   "full-frame-full": -0.0008500856072125567,
+   "full-frame-acquire": -0.001724117287867722,
+   "full-frame-verify": 0.0037355874570467315
+  },
+  "independence_excess_on_occupied_cells": {
+   "anchor-8": -0.03311419527635745,
+   "differential-16": -0.04041879717555391,
+   "differential-32": -0.04967129291453609,
+   "glrt-32": -0.03116630143657173,
+   "glrt-64": -0.022157292427562758,
+   "full-frame-full": -0.02580959337716099,
+   "full-frame-acquire": -0.037578118659199744,
+   "full-frame-verify": -0.012580147715282819
+  },
+  "f_spread_measured": 0.04779534292751736,
+  "f_spread_ci": [
+   0.03334775466543908,
+   0.15963239647533695
+  ],
+  "report_sky_f_spread": 0.04,
+  "probability_loopback_spread_exceeds_sky": 0.9230769230769231
+ },
+ "figures": [
+  "coincidence-recovery.png",
+  "detection-vs-snr.png",
+  "detector-ranking.png",
+  "false-alarm-empty-channel.png",
+  "offset-cliff.png",
+  "smoke-test.png"
+ ]
+}

@@ -1,10 +1,19 @@
 # Evaluating Starlink edge-pilot detectors with two radios
 
 Date: 2026-08-14 UTC
-Status: **the apparatus works; the coincidence estimator is sound but the check
-used to validate it is uninformative; and a cabled injection rig now measures
-what the model could only infer — giving a detector ranking that matches neither
-of the rankings this report previously offered**
+Status: **the apparatus works; the closed-form coincidence solver recovers
+occupancy under the controlled, homogeneous loopback conditions tested, while
+the check used to validate it is uninformative and its use on the heterogeneous
+sky corpus remains unvalidated; and a cabled injection rig now measures what the
+model could only infer, giving a detector ranking — for one test condition — that
+matches neither of the rankings this report previously offered**
+
+**How to read this document.** It is written in the order the work happened.
+Sections 1–10 are the sky analysis and the contradictions it ran into; sections
+11–14 are controlled injection, which supersedes several of the earlier
+conclusions and says so at each point. Where the two disagree, **the injection
+sections are current.** Section 9's surviving-findings table carries a status
+column for exactly this reason.
 
 ## Executive summary
 
@@ -60,8 +69,9 @@ questions from inference into measurement.
 [Section 11](#11-ground-truth-at-last-measured-detection-probability) reports
 it: the measured detector ranking is uncorrelated with both the model's ranking
 (rho −0.048) and the fire-count ranking (+0.048); the coincidence estimator
-recovers a known `f` without bias, so the machinery is sound and only its
-diagnostic fails; the 350–400 kHz cliff does not exist against a *known* offset,
+recovers a known `f` without bias under those controlled conditions, so the
+solver works and its diagnostic does not — though nothing here validates the
+pooled model on the heterogeneous sky corpus; the 350–400 kHz cliff does not exist against a *known* offset,
 falling instead at the 700 kHz bank edge; and the thresholds are calibrated on
 truly empty input.
 
@@ -193,7 +203,7 @@ about this geometry and not about noise.
 | Pilot band | 1.875 MHz | `PILOT_BANDWIDTH_HZ` |
 | Pilot subcarriers per edge | 8 | `STARLINK_EDGE_PILOT_SUBCARRIERS` |
 | Subcarrier spacing | 234.375 kHz | `STARLINK_SUBCARRIER_SPACING_HZ` |
-| OFDM symbol duration | 4.4 us, a 227.3 kHz single-symbol lobe | `OFDM_SYMBOL_DURATION_S` |
+| OFDM symbol duration | 4.4 us total; useful interval 4.26667 us after the 0.13333 us cyclic prefix, whose reciprocal is 234.375 kHz — exactly the subcarrier spacing | `OFDM_SYMBOL_DURATION_S` |
 | Band lift, best of 2,136 real captures | **+0.0588 dB** (1 sigma 0.0040, n = 769 bins) | `edge-pilots.json` |
 | Band lift, noiseless reference | **+16.235 dB** | `edge-pilots.json` |
 | Next shoulder out, same capture | −0.121 dB | `edge-pilots.json` |
@@ -839,7 +849,15 @@ instrumental.
 Two findings that do not depend on the coincidence model, do not depend on the
 detector bank being independent, and are directly actionable.
 
-### 9a. A rate-independent ~350 kHz offset tolerance, and it is not the guard band
+### 9a. A detection cliff near 350–400 kHz — later shown not to be a tolerance at all
+
+> **Superseded.** This section reports the observation. Injection against a
+> *known* imposed offset
+> ([section 11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search))
+> shows every detector is flat straight through this band, and
+> [section 12](#12-what-the-cliff-actually-is) identifies the feature as the
+> folded far edge of a one-sided window, not a symmetric tolerance. The
+> observation below stands; the word "tolerance" does not.
 
 The pipeline computes a bias-corrected frequency offset for every candidate.
 Binned on that axis, `differential-32`'s detection rate collapses in the
@@ -932,13 +950,13 @@ record.*
 
 | Finding | The number it rests on | Status |
 |---|---|---|
-| A rate-independent ~350 kHz offset tolerance | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
+| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
 | `lnb-c` needs a +604.2 kHz configured centre correction; corrected, it has the highest fire rate in the examined slice | `receiver_centers_hz` = +604,159.8, applied at scoring; 65.9% (n = 3,352) against `lnb-b` 43.8% (n = 4,791) | **stands** |
-| The 1.25 MS/s arm cannot work at any probe length | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
+| The 1.25 MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
 | The eight detectors produce highly redundant verdicts on identical IQ | phi 0.847–0.945 over 30,192 observations | **stands** |
 | A per-point 1% threshold yields 5.47–6.74% per cell after maximising over ~7 candidates, as expected | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
 | Recorded skew is a lower bound and is blind to geometry | barrier-release stamp; 0.0437 against 0.0446 ms across geometries whose true offsets differ ~5x | **stands** |
-| `lnb-a` is excluded as a dead port | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.52% of 60,095 against `lnb-b`'s 17.98% of 59,604) | applied, **unexplained** |
+| ~~`lnb-a` is excluded as a dead port~~ **withdrawn — its LO moved 567 kHz out of the search grid ([14](#14-the-dead-port-and-the-stale-calibration-are-one-fault))** | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.52% of 60,095 against `lnb-b`'s 17.98% of 59,604) | applied, **unexplained** |
 | Cross-radio beats within-radio | not shown: the radio boundary costs phi +0.0046, CI −0.021…+0.030 | **not established** |
 
 **Takeaway.** The instrument findings are the practical payoff of this corpus:
@@ -1002,7 +1020,7 @@ model output into a measurement — for the detectors and the digital pipeline,
 though **not** for the LNBs, the antenna or the sky, none of which the cable
 contains.
 
-### 11a. The measured ranking matches neither of the rankings in this report
+### 11a. Measured ranking under one condition — 20 ms, 5 MS/s, cabled loopback
 
 SNR at 50% detection, 20 ms probes at 5 MS/s, thresholds set to 1% per point on
 a genuinely empty channel, 160 cells per rung across 18 rungs:
@@ -1015,12 +1033,28 @@ a genuinely empty channel, 160 cells per rung across 18 rungs:
 | 4 | `full-frame-full` | −18.29 dB | | 8 | `differential-16` | −17.04 dB |
 
 Against the model's `d` ranking, Spearman rho = **−0.048**. Against the raw
-fire-count ranking, **+0.048**. Both are indistinguishable from zero: **neither
-ranking in this report carries information about which detector is more
-sensitive.**
+fire-count ranking, **+0.048**. Both are indistinguishable from zero on eight
+points: **neither ranking in this report carries information about which
+detector was more sensitive under this condition.**
 
-The measured order is nonetheless real. The spread is only 1.65 dB, but **21 of
-28 pairs resolve at 95%** under a paired bootstrap. The model's second most
+Read the measured order as a **partial** one. The spread is only 1.65 dB; 21 of
+28 pairs resolve at 95% under a paired bootstrap, but that is 28 comparisons
+from 200 draws with no family-wise correction, and rank uncertainty is not
+propagated into the Spearman figures. What survives that caution is: `glrt-32`
+and the three full-frame variants form the leading group, `differential-16` is
+materially worst, and several internal orderings — including `glrt-32` against
+`full-frame-acquire` — are unresolved.
+
+**And the comparison is not yet at equal operational cost.** Every threshold is
+calibrated to 1% per candidate *point*, but the methods' measured empty-channel
+*cell* rates differ (4.0–7.7%), so they are not being compared at a common
+false-alarm rate. Re-running at fixed cell-level FAR is the right form of this
+experiment and has not been done.
+
+This ranking holds for 20 ms probes at 5 MS/s, on a cabled loopback, at one
+occupancy schedule, with near-zero natural carrier offset. It should not be read
+as a general statement across 80–640 ms, 2.5–10 MS/s, sparse occupancy, Doppler
+rate, LO drift, timing error, or anything involving an LNB or an antenna. The model's second most
 confident claim — `full-frame-acquire` worst of eight — is exactly inverted: it
 measures third, and its gap from `glrt-32` is not resolvable. The differentials
 the model placed mid-field measure worst, and `differential-16` is significantly
@@ -1041,10 +1075,16 @@ and +0.048 respectively.*
 
 With occupancy set by hand to `f_true` = 0.2775 at an SNR where Pd ~ 0.6:
 
-- The estimator recovers **0.283–0.331**, and every 95% interval covers the
-  truth. It is not biased.
-- Conditional independence — the assumption everything rests on — **holds**:
-  on known-empty cells, P(AB) − P(A)P(B) <= 0.007.
+- The eight point estimates span **0.283–0.331** and bracket the truth. Per
+  method they are noisier than that range suggests, and the plotted intervals
+  are 5th–95th percentiles — central 90%, not 95%.
+- **Null** false alarms are approximately independent: on known-empty cells,
+  P(AB) − P(A)P(B) <= 0.007. That is *not* conditional independence, which the
+  model also requires on **occupied** cells, where P(AB | T=1) must equal
+  d_A·d_B. On this single-radio rig the occupied-cell excess is materially
+  negative — about −0.033 for `anchor-8`, −0.040 for `differential-16`, −0.050
+  for `differential-32` — consistent with the shared oscillator biasing the
+  recovered `d`. The occupied-cell test on independent radios has not been run.
 - And the eight algorithms disagree about `f` by **0.048 on data where `f` is
   one number by construction** — *larger* than the 0.040 spread this report
   observes on sky, and larger in 92.3% of bootstrap resamples.
@@ -1052,8 +1092,10 @@ With occupancy set by hand to `f_true` = 0.2775 at an SNR where Pd ~ 0.6:
 That last line reframes [section 6](#6-did-it-work-the-negative-controls). The
 negative controls showed the agreement check cannot fail. This shows the
 quantity it measures was never diagnostic: **a spread of that size is what a
-correct model produces.** The machinery is sound; the instrument used to police
-it reads nothing.
+correct model produces.** The solver works under these conditions; the
+instrument used to police it reads nothing. Neither statement extends to the sky
+corpus, whose heterogeneity in `p`, `d`, arm, receiver and time is listed in
+[section 5b](#5b-what-the-model-assumes-and-what-this-corpus-already-contradicts).
 
 One systematic bias appeared here — the solver reading `d` **low** against
 direct measurement in 15 of 16 cases — but it does **not** survive independent
@@ -1190,9 +1232,16 @@ That −150 kHz is precisely the quantity the calibration cannot see.
 the absolute error "is not recoverable here and is not needed". A common-mode
 offset shared by both radios is invisible to a differential estimator, so it is
 never corrected — and what earlier sections read as a symmetric frequency
-tolerance is a ±175 kHz window about a centre that is wrong by roughly
-−150 kHz. **The tuning plan, or the assumed beacon frequency, is off by about
-150 kHz.**
+tolerance is a ±175 kHz window about a centre that is not zero.
+
+**A common tuning or reference error is one hypothesis for that −150 kHz, not an
+identified cause.** The axis is built from carrier offsets *estimated by the
+same pipeline under test*, and the population is conditioned on candidates that
+fired, so estimator bias, a stable aggregate Doppler distribution, and geometry
+or beam-selection effects are all live alternatives. Stability by hour rules out
+a drifting cause, not a stationary one. Identifying it needs an external
+reference: the residual between measured carrier offset and TLE-predicted
+Doppler per detection, or an absolute signal injected through the LNB chain.
 
 ![Detection against raw and corrected offset, split by receiver](figures/injection/raw-vs-corrected.png)
 
@@ -1247,14 +1296,18 @@ unknown becomes a dial.
 500 cells per level, at an SNR where detection is partial so coincidence carries
 information:
 
-| `f` set | `f` realised | Recovered across the eight | Covers truth? |
+| `f` set | `f` realised | Range across the eight | Brackets truth? |
 |---:|---:|---|:--:|
-| 0.15 | 0.132 | 0.089 – 0.146 | **yes** |
-| 0.30 | 0.318 | 0.291 – 0.341 | **yes** |
-| 0.50 | 0.478 | 0.460 – 0.506 | **yes** |
+| 0.15 | 0.132 | 0.089 – 0.146 | yes |
+| 0.30 | 0.318 | 0.291 – 0.341 | yes |
+| 0.50 | 0.478 | 0.460 – 0.506 | yes |
 
-The coincidence machinery works. On two radios that share nothing but a
-schedule, it returns the occupancy it was given at every level tried.
+The eight estimates collectively **bracket** the realised occupancy at every
+level. Per method they are not uniformly accurate: the plotted intervals are
+central 90% (5th–95th percentile), and at the lowest occupancy `anchor-8`'s
+interval is roughly 0.062–0.116, which does **not** contain the realised 0.132.
+The solver tracks occupancy on two radios sharing nothing but a schedule, with
+per-method noise worst where occupancy is lowest.
 
 ![Recovered f against the f that was set, three levels](figures/injection/fig_d1_recovered_f.png)
 
@@ -1288,12 +1341,20 @@ and 0.752, destroying it. The controls worked. The check still refused to
 certify, because it had already rejected the real join for a spread of 0.057 —
 on data where the model is correct.
 
-That spread is the deeper problem. **Every spread measured where `f` is one
-number by construction — 0.0569, 0.0509, 0.0460 — is wider than the 0.040
-observed on sky.** The sky figure this report opens by treating as a symptom is,
-if anything, unusually *tight*. A spread of 0.05 is simply what a correct model
-produces with eight near-duplicate detectors and finite samples; the
-single-radio run reached the same conclusion independently at 0.048.
+That spread is the deeper problem, with one caveat that must travel with it.
+**Every spread measured where `f` is one number by construction — 0.0569,
+0.0509, 0.0460 — is wider than the 0.040 observed on sky.** But those rest on
+**500 cells each** against roughly **16,560** for the sky join, and spread
+across noisy estimates shrinks with sample size. Comparing 0.05 at n=500 with
+0.04 at n=16,560 therefore does **not** establish that the sky figure is
+unusually tight; equalising n — subsampling the sky join to 500 cells and
+comparing spread distributions — is the test that would, and it has not been
+run.
+
+What the comparison supports without any n correction is the weaker and
+sufficient claim: **a spread of that order is what a correct model produces**
+with eight near-duplicate detectors and finite samples. The single-radio run
+reached the same order independently at 0.048.
 
 So the check has at least three independent ways to fail on a correct model: it
 rejects real data whose spread is normal, it misreads a degenerate single-method
@@ -1470,3 +1531,28 @@ and import implementations at `/mnt/leo-nvme/leo-tracker/bin/`. The
 authoritative full-corpus estimator run that this report checks itself against
 is preserved beside the detailed record as
 [`review-full-corpus.txt`](../sync-scan-cross-radio-2026-08-14/review-full-corpus.txt).
+
+### Injection provenance (sections 11, 13, 14)
+
+The sky provenance above does not cover the injection sections, whose raw
+records are archived separately at
+[`injection-data/`](injection-data/) with a README giving the full rig
+description. Summary:
+
+| | |
+|---|---|
+| Radios | ADALM-Pluto Rev.C, fw `v0.38-plutoplus-spf-libiio-metadata-v5`. `104000bac495…` at `ip:192.168.1.183`; `1040007c4a94…` at `ip:192.168.1.165` |
+| Topology | `TX2 → SMA splitter → 2× 30 dB → RX1 and RX2`, closed path, no antenna, no LNB, no RF path between the two radios |
+| Waveform | `leo_tracker.radio.beacon.pilots.edge_pilot_frame` — the repository's own pilot frame, not a tone |
+| LO / rate / probe | 1,190,312,500 Hz; 5 MS/s; 20 ms |
+| Gains | RX manual 40 dB; digital drive 0.3048 FS on `.183`; `.165` carries 8.2 dB more cable loss |
+| Thresholds | 1% per candidate point, drawn on TX-off input verified indistinguishable from a dark DAC |
+| Carrier offset | ~0.07 Hz natural (shared reference); offsets in 11c and T3 are **imposed** on the waveform |
+| Records | `injection-data/{one-radio,radio-165,two-radio}/*.jsonl.gz`, plus the harnesses and the `analysis.py` helper the figure scripts import |
+| Software | this repository at the commit that adds these records |
+
+**Two gaps to be honest about.** The occupancy schedule's seed is recorded in
+the run files but the schedule is not separately tabulated here; and no
+environmental conditions were logged, which matters for any later attempt to
+reproduce a level-dependent result on different hardware.
+

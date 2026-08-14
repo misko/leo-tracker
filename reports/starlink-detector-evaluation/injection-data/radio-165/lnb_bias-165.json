@@ -1,0 +1,14 @@
+{
+ "source": "corpus scores.json receiver_centers_hz, 125 entries",
+ "note": "coarse banks are built with center_hz=0 (fast_scan.build_bank default), so the search is over RAW offset about each receiver LO, while the sky cliff axis is abs(cfo - center)",
+ "bias_hz": {
+  "lnb-a": 1170.0,
+  "lnb-b": 0.0,
+  "lnb-c": 604159.8,
+  "lnb-d": 0.0
+ },
+ "bank_span_hz": {
+  "coarse-A": 300000,
+  "coarse-E": 700000
+ }
+}

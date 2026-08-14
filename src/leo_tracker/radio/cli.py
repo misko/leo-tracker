@@ -1120,6 +1120,21 @@ def command_starlink_sync_import(args: argparse.Namespace) -> int:
                          rebuild=args.rebuild, link=not args.copy,
                          sweeps=listed),
                      indent=2, sort_keys=True))
+def command_starlink_cross_radio(args: argparse.Namespace) -> int:
+    """Occupancy and detection probability from two radios on one sky.
+
+    The first measurement here that is not self-referential: two chains that
+    share nothing but the sky make a coincidence model identifiable, so this
+    reports a detection probability where every earlier comparison could only
+    report a firing rate. The spread of the sky occupancy across the eight
+    algorithms is its own consistency check and leads the output.
+    """
+    from .beacon.cross_radio import format_review, review
+    corpus = args.corpus_root or (Path(args.root) / "surveys" / "corpus")
+    report = review(corpus, limit=args.limit,
+                    false_alarm_rate=args.false_alarm_rate)
+    print(json.dumps(report, indent=2, sort_keys=True, default=str) if args.json
+          else format_review(report))
     return 0
 
 
@@ -2815,6 +2830,21 @@ def build_parser() -> argparse.ArgumentParser:
              "corpus and the sweeps are on different filesystems, which the "
              "importer detects and falls back to on its own")
     sync_import.set_defaults(handler=command_starlink_sync_import)
+    cross_radio = commands.add_parser("starlink-cross-radio",
+        help="occupancy and detection probability from synchronised paired "
+             "sweeps: two radios, one sky, one instant")
+    cross_radio.add_argument("action", choices=("review",))
+    cross_radio.add_argument("root", type=Path, help="shared root")
+    cross_radio.add_argument("--corpus-root", type=Path,
+        help="where scored probes are preserved; defaults to ROOT/surveys/corpus")
+    cross_radio.add_argument("--limit", type=_entries_to_read,
+        help="paired sweeps to read; at least 1 -- omit it to read every pair")
+    cross_radio.add_argument("--false-alarm-rate", type=float, default=0.01,
+        help="per-point rate the null thresholds are calibrated at; the "
+             "per-CELL rate the model uses is measured from it and reported")
+    cross_radio.add_argument("--json", action="store_true",
+        help="print the whole report as JSON rather than as text")
+    cross_radio.set_defaults(handler=command_starlink_cross_radio)
     probe_index = commands.add_parser("starlink-probe-index",
         help="project per-probe facts into day-partitioned parquet")
     probe_index.add_argument("action", choices=("build", "status", "query"))

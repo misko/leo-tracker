@@ -22,7 +22,14 @@ OUTPUT_SCHEMAS = {
     "decoded": "leo-tracker.starlink-edge-decode/v1",
     "association": "leo-tracker.starlink-tle-association/v2",
 }
-OBSERVATION_MODES = frozenset({"narrow", "wide", "oversample", "hop"})
+# `sync-scan` is a synchronised paired sweep of the eight low-band edge
+# tunings, not a dwell: eight probes per radio with a tuning axis in front and
+# its own manifest schema, which `BeaconCapture.open` deliberately refuses. It
+# is registered here so the exporter's reconciliation walk can queue one for
+# the copy to shared storage; the analysis-host pipeline for the mode is not
+# written yet, so today these are preserved rather than processed.
+OBSERVATION_MODES = frozenset({"narrow", "wide", "oversample", "hop",
+                               "sync-scan"})
 # Hop children record the capture-side name for the same pipeline mode. The
 # live watcher passes `hop` explicitly, so only backfill saw the mismatch.
 OBSERVATION_MODE_ALIASES = {"channel-hop": "hop"}
@@ -33,7 +40,8 @@ def observation_mode(name: str, metadata: dict) -> str:
     mode = str(metadata.get("observation_mode") or
                ("oversample" if "oversample" in name else
                 "wide" if "wide" in name else
-                "hop" if name.startswith("hop-") else "narrow"))
+                "hop" if name.startswith("hop-") else
+                "sync-scan" if name.startswith("sync-") else "narrow"))
     mode = OBSERVATION_MODE_ALIASES.get(mode, mode)
     if mode not in OBSERVATION_MODES:
         raise ValueError(f"unknown observation mode {mode!r}")

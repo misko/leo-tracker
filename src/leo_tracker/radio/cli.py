@@ -446,6 +446,54 @@ def command_starlink_beacon_hop_capture(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_synchronised_scan(args: argparse.Namespace) -> int:
+    """Sweep both Plutos in lockstep once, write both records, queue both."""
+    from .beacon.synchronised_scan import RadioSpec, run_sweep
+
+    if len(args.radio) != 2:
+        raise ValueError("a synchronised sweep pairs exactly two radios; "
+                         "pass --radio twice")
+    radios = tuple(
+        RadioSpec(radio_id=item[0], uri=item[1],
+                  serial=item[2] or None, receiver_labels=(item[3], item[4]))
+        for item in args.radio)
+    if len({spec.radio_id for spec in radios}) != 2:
+        raise ValueError("the two radios must have distinct radio ids")
+    if len({spec.serial for spec in radios}) != 2:
+        raise ValueError("the two radios must have distinct serials; a sweep "
+                         "filed against one radio twice is worse than none")
+    # Drawn in the shell and passed in, following the survey's precedent: the
+    # shell draws and logs, the mapping is decided here where it is tested.
+    # Anything absent is drawn from the same kernel pool rather than defaulted,
+    # so a sweep is never silently un-randomised.
+    orders = dict(zip((spec.radio_id for spec in radios),
+                      args.edge_order_draw_u32 or [], strict=False))
+    record = run_sweep(
+        radios, storage_root=args.storage, sweep_id=args.sweep_id,
+        draws={"arm": args.arm_draw_u32, "pairing": args.pairing_draw_u32,
+               "second_arm": args.second_arm_draw_u32, "edge_order": orders},
+        barrier_timeout_s=args.barrier_timeout_s, lnb_lo_hz=args.lnb_lo_hz,
+        enqueue=not args.no_enqueue)
+    print(json.dumps({
+        "sweep_id": args.sweep_id,
+        "sweep_mode": record["sweep_mode"],
+        "solo": record["solo"],
+        "arm": record["experiment"]["arm"]["assigned_arm"],
+        "pairing": record["experiment"]["pairing"]["outcome"],
+        "arms": record["experiment"]["pairing"]["assigned_arms"],
+        "edge_orders": [item["edge_order"] for item in record["radios"]],
+        "radio_states": [item["state"] for item in record["radios"]],
+        "pilot_band_clipped": record["pilot_band"]["clipped_radios"],
+        "skew_median_ms": record["skew"]["median_ms"],
+        "skew_max_ms": record["skew"]["max_ms"],
+        "paired_tuning_count": record["paired_tuning_count"],
+        "wall_ms": record["wall_ms"],
+        "bytes": record["written"]["bytes"],
+        "captures": [item["name"] for item in record["written"]["captures"]],
+    }, sort_keys=True))
+    return 0
+
+
 def _calibration_status_for(args: argparse.Namespace) -> dict:
     """Why this capture was, or was not, frequency-corrected.
 
@@ -2238,6 +2286,31 @@ def build_parser() -> argparse.ArgumentParser:
         default=1_700_000_000_000_000_000)
     beacon_hop.add_argument("--seed", type=int, default=0)
     beacon_hop.set_defaults(handler=command_starlink_beacon_hop_capture)
+    sync_scan = commands.add_parser("starlink-synchronised-scan",
+        help="sweep two Plutos across the eight low-band edge tunings in "
+             "lockstep, one barrier per tuning, and queue both for offload")
+    sync_scan.add_argument("--storage", type=Path,
+        default=Path("/mnt/leo-nvme/leo-tracker"),
+        help="capture volume; never the network share, which the exporter owns")
+    sync_scan.add_argument("--sweep-id", required=True,
+        help="stamp shared by both radios' recordings from this sweep")
+    sync_scan.add_argument("--radio", action="append", nargs=5, default=[],
+        metavar=("RADIO_ID", "URI", "SERIAL", "RX0_LABEL", "RX1_LABEL"),
+        help="pass exactly twice; SERIAL may be empty for a non-USB context")
+    sync_scan.add_argument("--arm-draw-u32", type=int,
+        help="raw 32 bits selecting the arm; drawn here if omitted")
+    sync_scan.add_argument("--pairing-draw-u32", type=int,
+        help="raw 32 bits deciding matched or mismatched arms")
+    sync_scan.add_argument("--second-arm-draw-u32", type=int,
+        help="raw 32 bits selecting the second radio's arm when mismatched")
+    sync_scan.add_argument("--edge-order-draw-u32", type=int, action="append",
+        help="raw 32 bits per radio, in --radio order; never shared")
+    sync_scan.add_argument("--lnb-lo-hz", type=float, default=9_750_000_000)
+    sync_scan.add_argument("--barrier-timeout-s", type=float, default=30.0,
+        help="bounded so a radio that died cannot hold the survivor")
+    sync_scan.add_argument("--no-enqueue", action="store_true",
+        help="write the recordings but do not hand them to the offload queue")
+    sync_scan.set_defaults(handler=command_starlink_synchronised_scan)
     beacon_analyze = commands.add_parser("starlink-beacon-analyze",
         help="verify and score a beacon IQ artifact for the published 750 Hz frame cadence")
     beacon_analyze.add_argument("capture", type=Path)

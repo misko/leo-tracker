@@ -1,0 +1,45 @@
+[Unit]
+Description=Synchronised paired Starlink edge scans across both Plutos
+Documentation=file:/home/satpi01/leo-tracker/docs/multi_pluto_operations.md
+After=network-online.target mnt-leo\x2dnvme.mount
+Wants=network-online.target
+Requires=mnt-leo\x2dnvme.mount
+# One process opens both radios, and a USB context is an exclusive claim, so
+# this cannot share a host with anything that owns either of them. The former
+# per-radio watchers are left in the tree and merely refused, not removed:
+# stopping this unit and starting those two puts the old loop back.
+Conflicts=leo-tracker-beacon-watch@pluto-new.service leo-tracker-beacon-watch@pluto-old.service leo-tracker-beacon-watch.service
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+WorkingDirectory=/home/satpi01/leo-tracker
+# RADIO_ID URI SERIAL RX0_LABEL RX1_LABEL. Serials rather than bus addresses:
+# a bus address moves across a firmware load and a sweep filed against the
+# wrong radio is worse than no sweep.
+Environment=LEO_SYNC_RADIO_A=pluto-19f2 pluto://usb: 10400056f695001322002d0010ad1719f2 lnb-c lnb-d
+Environment=LEO_SYNC_RADIO_B=pluto-5d4d pluto://usb: 1040005e0b100007100010000bf33a5d4d lnb-a lnb-b
+# The capture volume. The copy to shared storage belongs to
+# leo-tracker-analysis-export.service, which is already running and already
+# drains this queue; a network write inside the sweep would cost radio time.
+Environment=LEO_SYNC_STORAGE=/mnt/leo-nvme/leo-tracker
+Environment=LEO_SYNC_MINIMUM_FREE_GB=200
+# Bounded so a radio somebody unplugged releases the survivor rather than
+# holding it. The dearest arm costs a few seconds per tuning; this clears it.
+Environment=LEO_SYNC_BARRIER_TIMEOUT_S=30
+# 30 sweeps an hour is the cadence the storage budget was computed at.
+Environment=LEO_SYNC_SWEEP_INTERVAL_S=120
+Environment=UV_CACHE_DIR=/home/satpi01/leo-tracker/.uv-cache
+ExecStart=/home/satpi01/leo-tracker/scripts/starlink-sync-scan-watch.sh
+Restart=always
+RestartSec=10
+SyslogIdentifier=leo-sync-scan
+# Let the sweep in flight finish writing and checksumming its probes before the
+# process is taken down; an unfinished capture directory is not exportable.
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

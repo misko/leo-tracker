@@ -890,7 +890,8 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
 
 def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
                   sample_rate_hz: float = 2_500_000.0,
-                  lnb_lo_hz: float = 9_750_000_000.0) -> dict:
+                  lnb_lo_hz: float = 9_750_000_000.0,
+                  before_tuning=None, after_tuning=None) -> dict:
     """Tune, listen, and hand the IQ back.  Nothing here scores anything.
 
     This is everything that needs the radio and nothing else.  The split is the
@@ -901,11 +902,23 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     with the bank; separated, the Pi pays only for the seconds the antenna is
     pointed somewhere.
 
-    **Radio time depends on probe duration, not on sample rate.**  A block is
-    sized to the probe by :func:`survey_profile`, so 80 ms costs one 80 ms read
-    whether that is 200,000 samples or 400,000 of them.  What the rate changes
-    is bytes -- 8 tunings x samples x 2 receivers x 2 components x 2 bytes --
-    and arithmetic downstream.
+    **Radio time scales with sample rate as well as with probe duration.**
+    This said the opposite for as long as nobody had measured it.  A block is
+    sized to the probe by :func:`survey_profile`, so 80 ms is one 80 ms read
+    whatever the sample count -- but the read does not run at real time, and
+    how far off it runs is a function of the rate.  Measured on this host for
+    an 80 ms probe::
+
+        1.25 MS/s -> 108 ms   (1.35x real time)
+         2.5 MS/s -> 137 ms   (1.71x)
+         5.0 MS/s -> 193 ms   (2.41x)
+        10.0 MS/s -> 309 ms   (3.87x)
+
+    So the dearest arm of a twelve-arm grid is not four times the cheapest, it
+    is closer to thirty, and anything sizing a timeout or a cadence from the
+    old claim was sizing it against a number that was never true.  What the
+    rate *also* changes is bytes -- 8 tunings x samples x 2 receivers x 2
+    components x 2 bytes -- and arithmetic downstream.
 
     The raw ci16 comes back shaped ``(tuning, sample, receiver, component)``:
     the capture path's own layout with a tuning axis in front, kept as the
@@ -916,6 +929,14 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     The radio is configured from the profile rather than from whatever the
     capture path left behind: a survey wants a shallow queue and a block the
     size of its probe, which is the opposite of what a long dwell wants.
+
+    ``before_tuning`` is called with the tuning index **before** the local
+    oscillator is written, and ``after_tuning`` with the index and that
+    tuning's plan entry once its probe is in hand.  Both are optional and the
+    survey passes neither.  They exist so two radios in one process can be held
+    at a barrier and change frequency together rather than merely start
+    together, and so a radio that dies half way still leaves a record of the
+    tunings it completed; see :mod:`.synchronised_scan`.
     """
     import iio                                    # kept local: host-only import
 
@@ -938,8 +959,14 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     plan, retained = [], []
     timing = {"tune": 0.0, "settle": 0.0, "listen": 0.0}
     try:
-        for channel_number, edge in tunings:
+        for tuning_index, (channel_number, edge) in enumerate(tunings):
             centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
+
+            # Before the retune, not after it: what a paired sweep needs is
+            # that both radios move the local oscillator at one instant.
+            if before_tuning is not None:
+                before_tuning(tuning_index)
+            tuning_started = time.perf_counter()
 
             mark = time.perf_counter()
             lo.attrs["frequency"].value = str(int(centre))
@@ -969,9 +996,16 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             retained.append(raw.copy())
             timing["listen"] += time.perf_counter() - mark
 
-            plan.append({"channel": channel_number, "region": f"{edge}-edge",
-                         "edge": edge, "if_center_hz": centre,
-                         "rf_center_hz": centre + lnb_lo_hz})
+            entry = {"channel": channel_number, "region": f"{edge}-edge",
+                     "edge": edge, "if_center_hz": centre,
+                     "rf_center_hz": centre + lnb_lo_hz,
+                     "tuning_index": tuning_index,
+                     "tuning_ms": (time.perf_counter() - tuning_started) * 1000}
+            plan.append(entry)
+            # Published per tuning rather than only at the end, so a sweep that
+            # dies on its fourth tuning still records the three it finished.
+            if after_tuning is not None:
+                after_tuning(tuning_index, entry)
     finally:
         # The binding has no explicit close: the buffer is freed when its last
         # reference goes, and a leaked one holds the context so that whatever

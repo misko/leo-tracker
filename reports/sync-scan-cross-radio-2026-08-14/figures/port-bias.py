@@ -8,7 +8,9 @@ away from where lnb-b and lnb-d respond -- it reads 1.2% in the bin where they
 peak.  Re-expressed against the corrected offset it lands back on their peak
 bin.
 
-Every number is computed from /mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/.
+Every number is computed from the frozen snapshot of
+/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/ (see snapshot.py), so this
+figure and the other five share one identical population.
 
   raw offset       = abs(cfo_hz)
   corrected offset = abs(cfo_hz - receiver_centers_hz[receiver])
@@ -17,7 +19,11 @@ Every number is computed from /mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/.
                      cross-edge-null population for that (rate, probe_ms)
   lnb-a is dead (DEAD_RECEIVERS) and is out of both populations.
 
-Usage: python3 port-bias.py     (runs extract.py first if cfo-port-corpus.npz is absent)
+Usage:
+    nice -n 15 python3 snapshot.py      # freeze the corpus census
+    nice -n 15 python3 extract_lite.py  # verbatim compact mirror
+    nice -n 15 python3 extract.py       # -> cfo-port-corpus.npz
+    nice -n 15 python3 port-bias.py
 """
 from __future__ import annotations
 
@@ -32,7 +38,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "cfo-port-corpus.npz")
+WORK = os.environ.get("REFRESH_WORK", os.path.join(os.path.dirname(HERE), "work"))
+CACHE = os.path.join(WORK, "cfo-port-corpus.npz")
+SNAPSHOT = os.path.join(WORK, "snapshot.json")
 NAME = "port-bias"
 
 METHOD = "differential-32"
@@ -53,6 +61,14 @@ STYLE = {
     "lnb-c": {"color": "#eb6834", "marker": "s", "ls": "--"},
     "lnb-d": {"color": "#1baf7a", "marker": "^", "ls": "-."},
 }
+
+
+def census() -> dict:
+    with open(SNAPSHOT) as handle:
+        frozen = json.load(handle)
+    return {key: frozen[key] for key in
+            ("measured_utc", "sweeps_on_share", "corpus_entries",
+             "scored_sidecars", "scored_digest")}
 
 
 def _at(ordered: np.ndarray, fraction: float) -> float:
@@ -125,7 +141,11 @@ def prepared_bias(prepared, port) -> float:
 
 
 def main() -> None:
-    prepared = prepare(load())
+    data = load()
+    frozen = census()
+    counts = dict(zip(data["census_keys"].tolist(), data["census_vals"].tolist()))
+    pairs_joined = int(counts["pairs_joined"])
+    prepared = prepare(data)
     bias_khz = {port: prepared_bias(prepared, port) for port in PORTS + ["lnb-a"]}
     table = {key: {port: curve(prepared, key, port) for port in PORTS}
              for key in ("raw_khz", "corrected_khz")}
@@ -220,13 +240,20 @@ def main() -> None:
     raw_axes.legend(loc="lower right", framealpha=0.95, borderpad=0.5)
 
     figure.suptitle(
-        "lnb-c is shifted, not deaf: a +604.2 kHz LO bias moves its whole response "
-        "off the raw frequency axis\n"
+        f"lnb-c is shifted, not deaf: a {bias_khz['lnb-c']:+.1f} kHz LO bias moves "
+        "its whole response off the raw frequency axis\n"
         f"differential-32 at {RATE_HZ / 1e6:g} MS/s -- lnb-b and lnb-d have zero "
         "bias, so their two panels are identical and only lnb-c moves",
         fontsize=14.5, fontweight="bold", y=1.005)
 
-    dead = dead_port_audit(load(), prepared)
+    dead = dead_port_audit(data, prepared)
+    census_line = (
+        f"CENSUS, frozen before any figure was computed (snapshot.py, digest "
+        f"{frozen['scored_digest']}): {frozen['sweeps_on_share']:,} sweeps on the "
+        f"scan share | {frozen['corpus_entries']:,} corpus entries | "
+        f"{frozen['scored_sidecars']:,} scored sidecars, of which "
+        f"{int(data['entries']):,} join into {pairs_joined:,} paired sweeps.  "
+        f"Previously reported at 320 sidecars / 176 pairs.")
     figure.text(0.5, 0.005,
                 "lnb-a is excluded as dead, per the pipeline's DEAD_RECEIVERS policy. "
                 "THAT EXCLUSION IS NOT SUPPORTED BY THIS CORPUS: lnb-a fires "
@@ -236,9 +263,8 @@ def main() -> None:
                 f"{dead['lnb-a']['null_p99']:.4f} against lnb-b's "
                 f"{dead['lnb-b']['null_median']:.4f} / {dead['lnb-b']['null_p99']:.4f}. "
                 "See lnb-a-check.py.\n"
-                "Thresholds are the cross-edge-null 1% false-alarm order statistic for "
-                "each (sample rate, probe length); 176 paired sweeps from "
-                ".../surveys/corpus/sync-*/.",
+                "Thresholds are the cross-edge-null 1% false-alarm order statistic "
+                "for each (sample rate, probe length).\n" + census_line,
                 ha="center", va="top", fontsize=10, color="#52514e", style="italic")
 
     figure.savefig(os.path.join(HERE, f"{NAME}.png"), dpi=150,
@@ -247,6 +273,16 @@ def main() -> None:
     payload = {
         "figure": NAME,
         "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/",
+        "snapshot": frozen,
+        "census": {
+            "sweeps_on_share": frozen["sweeps_on_share"],
+            "corpus_entries": frozen["corpus_entries"],
+            "scored_sidecars": frozen["scored_sidecars"],
+            "scored_sidecars_in_a_pair": int(data["entries"]),
+            "paired_sweeps": pairs_joined,
+            "candidate_points_read": int(data["cfo_hz"].size),
+            "previous_snapshot_for_comparison": {
+                "paired_sweeps": 176, "scored_sidecars": 320, "cells": 2464}},
         "method": METHOD, "sample_rate_hz": RATE_HZ,
         "false_alarm_rate": FALSE_ALARM_RATE,
         "excluded_receivers": list(DEAD_RECEIVERS),
@@ -266,6 +302,20 @@ def main() -> None:
         "reference_reported": {
             "corrected_100_200_khz_at_5MSps": {"lnb-c": 61.4, "lnb-c_n": 347,
                                                "lnb-b": 41.7, "lnb-b_n": 458}},
+        "strongest_port_once_corrected": {
+            "bin_khz": [100, 200], "sample_rate_hz": RATE_HZ,
+            "ranking": [
+                {"port": port,
+                 "rate_pct": table["corrected_khz"][port][1]["rate_pct"],
+                 "n": table["corrected_khz"][port][1]["n"]}
+                for port in sorted(
+                    PORTS,
+                    key=lambda p: -(table["corrected_khz"][p][1]["rate_pct"] or 0))],
+            "verdict": "lnb-c is the strongest port on the corrected axis"
+                       if max(PORTS,
+                              key=lambda p: table["corrected_khz"][p][1]["rate_pct"]
+                              or 0) == "lnb-c"
+                       else "lnb-c is NOT the strongest port on the corrected axis"},
         "corpus_says": {
             "corrected_100_200_khz_at_5MSps": {
                 port: {"rate_pct": table["corrected_khz"][port][1]["rate_pct"],

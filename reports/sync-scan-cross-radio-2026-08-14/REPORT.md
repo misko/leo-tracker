@@ -8,7 +8,7 @@ from it has been withdrawn**
 
 Two Pluto SDRs were driven from one process, two threads, and a
 `threading.Barrier` at every tuning, so both radios sat on the same tuning at
-the same instant. The apparatus does what it was built to do: 2,442 committed
+the same instant. The apparatus does what it was built to do: 7,054 committed
 paired sweeps were captured to NVMe, shipped to QNAP in byte-verified batches,
 imported to corpus form on a timer, and scored by eight detectors. That part
 of the work stands.
@@ -20,9 +20,12 @@ and all three claims are withdrawn here:
 - **Withdrawn — "six of eight methods agree on sky occupancy f = 0.2278 ±
   0.007, validating the cross-radio coincidence model."** The agreement is not
   evidence. A negative control that joins radio A of one sweep to radio B of a
-  *different* sweep, minutes apart, passes the same check. The eight detectors
-  correlate with each other at φ 0.82–0.94, so they are near-duplicates and
-  their f estimates must agree whatever the input.
+  *different* sweep passes the same check — and on the closed corpus of 1,167
+  paired sweeps it passes it **better**, agreeing at spread 0.039 against the
+  real join's 0.041. The eight detectors correlate with each other at φ
+  0.82–0.94, so they are near-duplicates and their f estimates must agree
+  whatever the input. This is the strongest result in the report and it is a
+  negative one.
 - **Withdrawn — "`differential-16` and `differential-32` are miscalibrated;
   implied detection probability d > 1 is impossible."** That rested entirely on
   assuming the nominal 1% false-alarm rate. Measured from the cross-edge null
@@ -69,7 +72,7 @@ reconciled silently.
 
 | Claim | Status | The number that decides it | Where |
 |---|---|---|---|
-| Cross-detector agreement on `f` validates the coincidence model | **Retracted** | all three joins land at or below their own sampling-noise median (0.92× real, 0.68× shifted, 0.78× scrambled), so the check fires on data the model forbids | Retraction 1, Figure 1 |
+| Cross-detector agreement on `f` validates the coincidence model | **Retracted, decisively** | on the closed corpus both negative controls agree *more* closely than the real pairing: spread 0.039 against 0.041, scrambled p05 0.030 against the real p95 0.048 | Retraction 1, Figure 1 |
 | The eight detectors are eight independent opinions | **Retracted** | φ 0.82–0.94 between detectors over 2,160 observations | Retraction 1, Figure 2 |
 | `differential-16` and `differential-32` are miscalibrated, implied d > 1 | **Retracted** | the false-alarm rate is ≈6.5% measured from the cross-edge nulls, not the 1% assumed | Retraction 2 |
 | No detection cliff at the pilot guard band | **Retracted** | the collapse falls between the 300–350 and 350–400 kHz bins at 2.5, 5.0 and 10 MS/s while the guard band moves 13× | Retraction 3, Figure 3 |
@@ -78,7 +81,7 @@ reconciled silently.
 | `hardware/epochs.json` +430,700 Hz corroborates that bias | **Retracted** | it belongs to epoch `gen1`, which ended 2026-08-13T04:38:23Z; these scans are all `gen2` | `lnb-c` section |
 | `lnb-a` is dead, and excluding it is load-bearing | **Stands; one coincidence unexplained** | flat ≈1.19 peak-to-median at every tuning since 2026-08-13 04:44 UTC | `lnb-a` section, and the audit note under Figure 4 |
 | The collector bug cost ~400 sweeps | **Corrected upward to 893** | one genuine USB loss and 892 self-inflicted `KeyError` reopens, one contiguous window | collector section, Figure 5 |
-| Synchronisation is adequate | **Open — not a checkable statement yet** | 4,116 of 12,392 paired tunings (33.2%) exceed 0.054 ms, and every one passes the 0.2–0.5 s operator target | synchronisation section |
+| Synchronisation is adequate | **Open — not a checkable statement yet** | 2,702 of 9,336 paired tunings (28.9%) exceed 0.054 ms, and every one passes the 0.2–0.5 s operator target | synchronisation section |
 | Simultaneity matters | **Open — hypothesis, not a result** | within-bound f 0.310–0.372 against beyond-bound 0.220–0.288 (the larger snapshot behind Figure 6 does not reproduce the separation) | simultaneity section, Figure 6 |
 | `f` behaves like a sky parameter | **Retracted** | f moves 0.015 to 0.510 across arm and +0.072 across receiver pair — further than across the detectors estimating it | f-strata section, Figure 6 |
 | Cross-radio beats within-radio | **Not shown** | f spreads 0.077 on 720 cells and 0.050 on 1,440 cells overlap | closing section |
@@ -121,28 +124,41 @@ every retraction here is argued on.
 | Scoring | survey scorer | eight detectors per observation |
 
 `sweep.json` is written last, after both IQ files are closed, so its presence is
-the commit marker. All 2,442 sweep directories in the census carried one; there
-were zero incomplete directories.
+the commit marker. Every sweep directory that reached the share carried one.
+Collection was paused at 2026-08-14T14:49Z; eleven directories left on the
+capture host without a `sweep.json` are sweeps the collector died partway
+through, and the drain correctly refused to ship them.
 
 Raw data and the format README are at `/mnt/qnap01/mouse9911/leo-scans`.
 
 ### Corpus census
 
-Census taken 2026-08-14T05:36Z. The collector was still running, so every total
-here is a floor — the share held 2,485 sweeps three minutes later.
+**Collection was paused by the operator at 2026-08-14T14:49Z**, so this is the
+final census of the run rather than a snapshot of something still moving. Every
+number below and every figure is computed from this closed corpus.
 
 | Quantity | Measured |
 |---|---:|
-| Sweep directories, all with `sweep.json` | 2,442 |
-| Paired sweeps (both radios produced IQ) | 1,549 |
-| Single-radio sweeps | 893 |
-| `matched_arm` fraction | 0.9066 |
+| Sweep directories on the share | 7,054 |
+| Single-radio sweeps (the collector outage) | 893 |
+| Corpus entries imported | 13,215 |
+| Corpus entries scored | 2,383 (18% of imported) |
+| Paired sweeps the analysis could use | 1,167 |
+| — same-edge / opposite-edge | 558 / 609 |
+| — matched arms | 1,054 |
+| Cross-radio cells | 18,672 (8,928 same-edge, 9,744 opposite-edge) |
+| — matched-arm cells, which carry the estimate | 16,864 |
 | Distinct arms present | 12 of 12 |
-| Declared IQ volume | 347.84 GB |
-| Corpus entries imported from these sweeps | 3,959 |
-| — from `pluto-19f2` / `pluto-5d4d` | 2,426 / 1,533 |
-| Corpus entries scored at census | 320 |
-| Scored observations | 7,680 (5,120 target, 2,560 cross-edge null) |
+| `lnb-a` observations excluded as dead | 14,000 |
+
+Only 18% of imported entries are scored, because scoring ran only while an
+operator drove it — there is no timer for it as there is for import. The
+analysis therefore rests on 1,167 of a possible ~6,100 paired sweeps, and every
+interval below would tighten if the rest were scored.
+
+The figures in [`figures/`](figures/) were computed twenty minutes earlier, at
+1,146 pairs and 16,560 matched-arm cells — 1.8% smaller. Nothing in this report
+turns on that difference, and it is stated rather than blurred.
 
 The 2,426 − 1,533 = 893 entry deficit on `pluto-5d4d` is exactly the
 single-radio outage described below; the two counts agree independently.
@@ -167,31 +183,32 @@ VERIFY halves (`src/leo_tracker/radio/beacon/survey_scoring.py`).
 The withdrawn claim was that six of eight methods agreeing on f = 0.2278 ±
 0.007 validated the cross-radio coincidence model. Two controls kill it.
 
-Recomputed on 2,464 matched-arm cells in each join (154 paired sweeps, 352
-scored sidecars). Thresholds and the empty-sky rate `p` are drawn **once** from
-the cross-edge null arms and held fixed across all three, so the join is the
-only thing that changes:
+Recomputed on the **whole closed corpus** — 1,167 paired sweeps, 16,864
+matched-arm cells per join. Thresholds and the empty-sky rate `p` are drawn
+**once** from the cross-edge null arms and held fixed across all three, so the
+join is the only thing that changes:
 
-| Join | Model can hold? | f range | spread | vs its own noise median |
-|---|---|---|---:|---:|
-| Real: radio A and radio B of one sweep, same instant | yes | 0.255–0.302 | 0.047 | 0.92× |
-| Radio B shifted by two instants within one sweep | **no** | 0.644–0.710 | 0.066 | 0.68× |
-| Radio A to radio B of a *different* sweep, median 24 min apart | **no** | 0.795–0.894 | 0.099 | 0.78× |
+| Join | Model can hold? | Cells | f range | Spread | Resample p05..p95 | Separates? |
+|---|---|---:|---|---:|---|---|
+| Real: radio A and radio B of one sweep, same instant | yes | 16,864 | 0.335–0.376 | 0.041 | 0.038–0.048 | — |
+| Radio B shifted two instants within one sweep | **no** | 12,648 | 0.701–0.740 | 0.039 | 0.032–0.060 | **NO — tighter than real** |
+| Radio A to radio B of a *different* sweep | **no** | 16,864 | 0.705–0.744 | 0.039 | 0.030–0.056 | **NO — tighter than real** |
 
-The last column is the argument. Each join's spread is compared against the
-sampling noise *for that join*, resampled 200×, and all three land **at or
-below their own noise median** — the scrambled join, where the two radios never
-shared sky at all, further below it than the real one. By the verdict's own
-standard, "within sampling noise" fires on every join, including the two the
-model forbids. A test that cannot fail is not a test.
+**Both controls agree more closely than the real pairing does.** Radio A joined
+to a different sweep entirely — matched on arm and geometry, with only the
+pairing broken — produces a *narrower* consensus across the eight algorithms
+than genuinely simultaneous data. Shifting radio B by two instants does the
+same. The separation basis is numeric and auditable: the scrambled join's
+resampled p05 is 0.030 against the real join's p95 of 0.048, so the intervals
+do not merely overlap, they sit the wrong way round.
 
-Note what the raw spreads do *not* show: the scrambled join has the widest
-spread of the three, not the narrowest. An earlier draft of this section
-claimed the shifted control came out numerically tighter than the real join.
-It does not, and that framing is withdrawn. The refutation does not need it —
-it rests on every join clearing its own noise floor.
+An earlier version of this section rested on a weaker form of the argument —
+that all three joins clear their own noise floor — and on a claim that the
+shifted control was numerically tighter, which the smaller snapshot did not
+support. At 7.6× the data the stronger statement is simply true, and the
+hedging is withdrawn.
 
-Meanwhile f itself moves 3× across the joins, from 0.27 to 0.79. The joins
+Meanwhile f itself moves from 0.34 on the real join to 0.71 on the controls. The joins
 really are different data; the estimator is not simply returning the same
 answer three times.
 
@@ -746,3 +763,26 @@ headline claims are withdrawn in full, and its recommendation to abandon
 2.5 MS/s is withdrawn with them. The apparatus, the transfer chain, the corpus
 and the format documentation are unaffected by the retraction and remain
 usable. The corrected record is this document.
+
+## Provenance of the closed-corpus numbers
+
+The headline numbers in Retraction 1 and the census come from a single run of
+`starlink-cross-radio review` over the whole scored corpus, executed on the
+analysis host rather than the capture Pi because the estimator's 200× resampling
+is CPU-bound and the Pi has four cores against kalman's twenty-four. Its full
+output is preserved beside this report as
+[`review-full-corpus.txt`](review-full-corpus.txt), 5,097 lines, so every figure
+quoted here can be traced to the line that produced it without re-running
+anything.
+
+The command was:
+
+```
+python -m leo_tracker.radio.cli starlink-cross-radio review \
+    /mnt/qnap01/mouse9911/leo \
+    --corpus-root /mnt/qnap01/mouse9911/leo/surveys/corpus
+```
+
+It rebuilds both negative controls on every run and there is no flag that turns
+them off, so any future run of this command reproduces the check that retracted
+this report's original findings.

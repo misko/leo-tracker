@@ -24,6 +24,7 @@ Every number comes from ``/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*``.
 Run ``extract_lite.py`` first; it streams the corpus into a compact mirror
 because the full sidecars do not fit in this host's memory.
 
+    nice -n 15 python3 snapshot.py
     nice -n 15 python3 extract_lite.py
     nice -n 15 python3 method-correlation.py
 """
@@ -45,7 +46,9 @@ sys.path.insert(0, "/home/satpi01/leo-tracker/src")
 from leo_tracker.radio.beacon import cross_radio as cr  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-LITE = Path(os.environ.get("LITE_ROOT", HERE.parent / "lite"))
+WORK = Path(os.environ.get("REFRESH_WORK", HERE.parent / "work"))
+LITE = Path(os.environ.get("LITE_ROOT", WORK / "lite"))
+SNAPSHOT = WORK / "snapshot.json"
 OUT_PNG = HERE / "method-correlation.png"
 OUT_JSON = HERE / "method-correlation.json"
 
@@ -112,6 +115,14 @@ def seriate(matrix: np.ndarray, names: list[str]) -> tuple:
     return order, total
 
 
+def frozen_census() -> dict:
+    with open(SNAPSHOT) as handle:
+        snapshot = json.load(handle)
+    return {key: snapshot[key] for key in
+            ("measured_utc", "sweeps_on_share", "corpus_entries",
+             "scored_sidecars", "scored_digest")}
+
+
 def compute() -> dict:
     pairs, _ = cr.load_pairs(LITE)
     if not pairs:
@@ -134,6 +145,19 @@ def compute() -> dict:
     return {
         "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*",
         "mirror": str(LITE),
+        "snapshot": frozen_census(),
+        "census": {
+            **frozen_census(),
+            "paired_sweeps": len(pairs),
+            "matched_arm_paired_sweeps": sum(1 for pair in pairs
+                                             if pair["matched_arm"]),
+            "scored_sidecars_in_a_pair": len(entries),
+            "live_target_observations": int(fired.shape[0]),
+            "matched_arm_cells": sum(len(cr.join_cells(pair)) for pair in pairs
+                                     if pair["matched_arm"]),
+            "previous_snapshot_for_comparison": {
+                "paired_sweeps": 176, "scored_sidecars": 320,
+                "observations": REPORTED["observations"], "cells": 2464}},
         "pairs": len(pairs), "entries": len(entries),
         "observations": int(fired.shape[0]),
         "observations_with_a_missing_verdict": partial,
@@ -176,7 +200,7 @@ def plot(data: dict) -> None:
     })
     cmap = LinearSegmentedColormap.from_list("phi-blue", BLUE)
     cmap.set_bad(DIAGONAL)
-    fig, ax = plt.subplots(figsize=(11.8, 10.4), dpi=150, facecolor=SURFACE)
+    fig, ax = plt.subplots(figsize=(11.8, 11.2), dpi=150, facecolor=SURFACE)
 
     shown = np.ma.masked_array(matrix, mask=np.eye(size, dtype=bool))
     image = ax.imshow(shown, cmap=cmap, vmin=lo, vmax=hi)
@@ -254,18 +278,28 @@ def plot(data: dict) -> None:
         f"{data['observations']:,} observations",
         fontsize=15.5, color=INK, y=0.982)
 
+    census = data.get("snapshot") or {}
     fig.text(0.5, 0.015,
              f"{data['observations']:,} live target observations "
-             f"({data['pairs']} paired sweeps, {data['entries']} scored sidecars; "
-             "lnb-a excluded as a dead port).  Each detector is judged\n"
+             f"({data['pairs']:,} paired sweeps, {data['entries']:,} scored "
+             "sidecars; lnb-a excluded as a dead port).  Each detector is judged\n"
              "against the threshold drawn for its own sample rate and probe length "
              "from the cross-edge null arms, so every cell is one identical\n"
              "population.  Row order maximises adjacent $\\varphi$ over all 8! "
              "orderings.  Diagonal (self-correlation = 1) is masked.\n"
+             "CENSUS frozen before any figure was computed and shared with all six "
+             f"(digest {census.get('scored_digest', '?')}): "
+             f"{census.get('sweeps_on_share', 0):,} sweeps | "
+             f"{census.get('corpus_entries', 0):,} corpus entries | "
+             f"{census.get('scored_sidecars', 0):,} scored sidecars.\n"
+             f"Previously reported: $\\varphi$ "
+             f"{REPORTED['phi_min']:.2f}\u2013{REPORTED['phi_max']:.2f} on "
+             f"{REPORTED['observations']:,} observations \u2014 recomputed here "
+             "at 12.7\u00d7 the observations, not replaced by it.\n"
              "Decisions from leo_tracker.radio.beacon.cross_radio, unmodified.",
              ha="center", va="bottom", fontsize=9.5, color=MUTED,
              linespacing=1.55)
-    fig.subplots_adjust(left=0.170, right=0.885, top=0.830, bottom=0.245)
+    fig.subplots_adjust(left=0.170, right=0.885, top=0.830, bottom=0.285)
     fig.savefig(OUT_PNG, dpi=150, facecolor=SURFACE)
     print(f"wrote {OUT_PNG}")
 

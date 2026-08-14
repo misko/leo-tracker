@@ -1,11 +1,36 @@
 {
   "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*",
-  "mirror": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/lite",
-  "pairs": 176,
-  "entries": 352,
-  "observations": 4224,
+  "mirror": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/refresh/work/lite",
+  "snapshot": {
+    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_digest": "ec5505611f5f1fdf"
+  },
+  "census": {
+    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_digest": "ec5505611f5f1fdf",
+    "paired_sweeps": 1146,
+    "matched_arm_paired_sweeps": 1035,
+    "scored_sidecars_in_a_pair": 2292,
+    "live_target_observations": 27504,
+    "matched_arm_cells": 16560,
+    "previous_snapshot_for_comparison": {
+      "paired_sweeps": 176,
+      "scored_sidecars": 320,
+      "observations": 2160,
+      "cells": 2464
+    }
+  },
+  "pairs": 1146,
+  "entries": 2292,
+  "observations": 27504,
   "observations_with_a_missing_verdict": 0,
-  "unique_observations": 4224,
+  "unique_observations": 27504,
   "population": "every live target observation in the paired corpus (lnb-a excluded: dead port), all eight verdicts present",
   "methods_alphabetical": [
     "anchor-8",
@@ -24,114 +49,114 @@
     "full-frame-verify",
     "full-frame-full",
     "full-frame-acquire",
-    "differential-16",
-    "differential-32"
+    "differential-32",
+    "differential-16"
   ],
-  "order_basis": "maximises adjacent phi, exhaustive over 8! = 40320 orderings; total adjacent phi 6.2373",
+  "order_basis": "maximises adjacent phi, exhaustive over 8! = 40320 orderings; total adjacent phi 6.3975",
   "fire_rate": {
-    "anchor-8": 0.2675189393939394,
-    "differential-16": 0.28290719696969696,
-    "differential-32": 0.2857481060606061,
-    "full-frame-acquire": 0.2852746212121212,
-    "full-frame-full": 0.28764204545454547,
-    "full-frame-verify": 0.28764204545454547,
-    "glrt-32": 0.2589962121212121,
-    "glrt-64": 0.27178030303030304
+    "anchor-8": 0.30831878999418266,
+    "differential-16": 0.32344386271087844,
+    "differential-32": 0.3273342059336824,
+    "full-frame-acquire": 0.3300610820244328,
+    "full-frame-full": 0.33027923211169286,
+    "full-frame-verify": 0.3285340314136126,
+    "glrt-32": 0.30511925538103546,
+    "glrt-64": 0.31406340895869694
   },
   "phi": {
     "anchor-8": {
-      "anchor-8": 0.9999999999999999,
-      "glrt-32": 0.8549664804672703,
-      "glrt-64": 0.8329589996981016,
-      "full-frame-verify": 0.8258105217022209,
-      "full-frame-full": 0.8293549529364027,
-      "full-frame-acquire": 0.8191800235335638,
-      "differential-16": 0.8101692925635671,
-      "differential-32": 0.808668410545441
+      "anchor-8": 1.0,
+      "glrt-32": 0.8801669333021527,
+      "glrt-64": 0.8698145940540133,
+      "full-frame-verify": 0.8547451752881371,
+      "full-frame-full": 0.8571430100530875,
+      "full-frame-acquire": 0.854582582324628,
+      "differential-32": 0.8503741325544001,
+      "differential-16": 0.8472857509720422
     },
     "glrt-32": {
-      "anchor-8": 0.8549664804672703,
-      "glrt-32": 0.9999999999999999,
-      "glrt-64": 0.9179362080979352,
-      "full-frame-verify": 0.8694925111005384,
-      "full-frame-full": 0.8766555135109139,
-      "full-frame-acquire": 0.866367823483288,
-      "differential-16": 0.8488591688499411,
-      "differential-32": 0.8521588574476092
+      "anchor-8": 0.8801669333021527,
+      "glrt-32": 1.0,
+      "glrt-64": 0.9352318453622398,
+      "full-frame-verify": 0.8942054187003162,
+      "full-frame-full": 0.8955788823024718,
+      "full-frame-acquire": 0.8923421195073474,
+      "differential-32": 0.885968207974822,
+      "differential-16": 0.8765014317648953
     },
     "glrt-64": {
-      "anchor-8": 0.8329589996981016,
-      "glrt-32": 0.9179362080979353,
+      "anchor-8": 0.8698145940540133,
+      "glrt-32": 0.9352318453622398,
       "glrt-64": 1.0,
-      "full-frame-verify": 0.8626418828753062,
-      "full-frame-full": 0.876749115023546,
-      "full-frame-acquire": 0.8668025750498332,
-      "differential-16": 0.8332060099777122,
-      "differential-32": 0.8433502566781278
+      "full-frame-verify": 0.9021487681548525,
+      "full-frame-full": 0.9065841718036929,
+      "full-frame-acquire": 0.8960552856159836,
+      "differential-32": 0.8808521138766017,
+      "differential-16": 0.8719615854979914
     },
     "full-frame-verify": {
-      "anchor-8": 0.8258105217022209,
-      "glrt-32": 0.8694925111005383,
-      "glrt-64": 0.8626418828753062,
+      "anchor-8": 0.8547451752881372,
+      "glrt-32": 0.8942054187003162,
+      "glrt-64": 0.9021487681548523,
       "full-frame-verify": 1.0,
-      "full-frame-full": 0.9237448149379018,
-      "full-frame-acquire": 0.8772430356582386,
-      "differential-16": 0.8467946376787693,
-      "differential-32": 0.8414104400102864
+      "full-frame-full": 0.9451979447303567,
+      "full-frame-acquire": 0.9083116653814057,
+      "differential-32": 0.8814723191068936,
+      "differential-16": 0.877114014630763
     },
     "full-frame-full": {
-      "anchor-8": 0.8293549529364027,
-      "glrt-32": 0.8766555135109139,
-      "glrt-64": 0.876749115023546,
-      "full-frame-verify": 0.9237448149379018,
+      "anchor-8": 0.8571430100530876,
+      "glrt-32": 0.895578882302472,
+      "glrt-64": 0.906584171803693,
+      "full-frame-verify": 0.9451979447303567,
       "full-frame-full": 1.0,
-      "full-frame-acquire": 0.9270474746303126,
-      "differential-16": 0.8653731557845001,
-      "differential-32": 0.8541447691787775
+      "full-frame-acquire": 0.9422957152696064,
+      "differential-32": 0.8852749854177369,
+      "differential-16": 0.8839435396750299
     },
     "full-frame-acquire": {
-      "anchor-8": 0.8191800235335638,
-      "glrt-32": 0.866367823483288,
-      "glrt-64": 0.866802575049833,
-      "full-frame-verify": 0.8772430356582386,
-      "full-frame-full": 0.9270474746303126,
+      "anchor-8": 0.854582582324628,
+      "glrt-32": 0.8923421195073475,
+      "glrt-64": 0.8960552856159836,
+      "full-frame-verify": 0.9083116653814057,
+      "full-frame-full": 0.9422957152696063,
       "full-frame-acquire": 1.0,
-      "differential-16": 0.8521847638364539,
-      "differential-32": 0.8502919008370771
-    },
-    "differential-16": {
-      "anchor-8": 0.810169292563567,
-      "glrt-32": 0.8488591688499411,
-      "glrt-64": 0.8332060099777122,
-      "full-frame-verify": 0.8467946376787693,
-      "full-frame-full": 0.8653731557845001,
-      "full-frame-acquire": 0.8521847638364539,
-      "differential-16": 1.0,
-      "differential-32": 0.898803910516657
+      "differential-32": 0.8768490151191153,
+      "differential-16": 0.8736687585596501
     },
     "differential-32": {
-      "anchor-8": 0.8086684105454411,
-      "glrt-32": 0.8521588574476091,
-      "glrt-64": 0.8433502566781278,
-      "full-frame-verify": 0.8414104400102864,
-      "full-frame-full": 0.8541447691787775,
-      "full-frame-acquire": 0.8502919008370771,
-      "differential-16": 0.8988039105166571,
-      "differential-32": 0.9999999999999999
+      "anchor-8": 0.8503741325544002,
+      "glrt-32": 0.885968207974822,
+      "glrt-64": 0.8808521138766018,
+      "full-frame-verify": 0.8814723191068936,
+      "full-frame-full": 0.8852749854177369,
+      "full-frame-acquire": 0.8768490151191153,
+      "differential-32": 1.0,
+      "differential-16": 0.9156472035881917
+    },
+    "differential-16": {
+      "anchor-8": 0.8472857509720422,
+      "glrt-32": 0.8765014317648953,
+      "glrt-64": 0.8719615854979913,
+      "full-frame-verify": 0.877114014630763,
+      "full-frame-full": 0.8839435396750298,
+      "full-frame-acquire": 0.8736687585596501,
+      "differential-32": 0.9156472035881917,
+      "differential-16": 1.0
     }
   },
   "phi_off_diagonal": {
-    "min": 0.808668410545441,
-    "max": 0.9270474746303126,
-    "mean": 0.8582988395217962,
+    "min": 0.8472857509720422,
+    "max": 0.9451979447303567,
+    "mean": 0.8871898989495867,
     "pairs": 28,
     "lowest_pair": [
       "anchor-8",
-      "differential-32"
+      "differential-16"
     ],
     "highest_pair": [
-      "full-frame-full",
-      "full-frame-acquire"
+      "full-frame-verify",
+      "full-frame-full"
     ]
   },
   "reported_in_retraction_report": {

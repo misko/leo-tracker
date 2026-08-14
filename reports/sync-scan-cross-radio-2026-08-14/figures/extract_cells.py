@@ -12,12 +12,20 @@ The join, the thresholds, the false-alarm rate and the estimator are the ones in
 src/leo_tracker/radio/beacon/cross_radio.py, imported rather than re-implemented
 wherever the shape of the data allows it.
 
-Output: cells.json.gz in this directory, consumed by f-strata.py.
+CHANGED FOR THE FULL-CORPUS PASS (2026-08-14), plumbing only: the source is the
+verbatim mirror ``extract_lite.py`` writes from ``snapshot.py``'s frozen
+directory list, not a live glob.  ``leo-sync-import.timer`` is still draining,
+so a per-script glob would give this figure a different population from the
+other five.  Scores in the mirror are copied verbatim and manifests are
+byte-identical, so nothing about the numbers changes.
+
+Output: cells.json.gz under the work directory, consumed by f-strata.py.
 """
 from __future__ import annotations
 
 import gzip
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -29,8 +37,11 @@ from leo_tracker.radio.beacon.cross_radio import (  # noqa: E402
     sweep_geometry,
 )
 
-CORPUS = Path("/mnt/qnap01/mouse9911/leo/surveys/corpus")
-OUT = Path(__file__).resolve().parent / "cells.json.gz"
+HERE = Path(__file__).resolve().parent
+WORK = Path(os.environ.get("REFRESH_WORK", HERE.parent / "work"))
+CORPUS = Path(os.environ.get("LITE_ROOT", WORK / "lite"))
+SNAPSHOT = WORK / "snapshot.json"
+OUT = WORK / "cells.json.gz"
 
 
 def compact(directory: Path) -> dict | None:
@@ -102,8 +113,11 @@ def main() -> None:
     census = {"scanned": 0, "read": 0, "unreadable": 0, "other_schema": 0,
               "not_synchronised": 0, "unpaired_sweeps": 0,
               "irregular_geometry": 0}
+    frozen = json.loads(SNAPSHOT.read_text())
+    census["snapshot_scored_sidecars"] = len(frozen["scored"])
     grouped: dict[str, list[dict]] = defaultdict(list)
-    for directory in sorted(CORPUS.iterdir()):
+    for name in frozen["scored"]:
+        directory = CORPUS / name
         if not (directory / SCORES_FILENAME).is_file():
             continue
         census["scanned"] += 1
@@ -139,7 +153,11 @@ def main() -> None:
     import datetime as dt
     stamp = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     with gzip.open(OUT, "wt") as handle:
-        json.dump({"read_utc": stamp, "census": census, "pairs": pairs}, handle)
+        json.dump({"read_utc": stamp, "census": census, "pairs": pairs,
+                   "snapshot": {k: frozen[k] for k in
+                                ("measured_utc", "sweeps_on_share",
+                                 "corpus_entries", "scored_sidecars",
+                                 "scored_digest")}}, handle)
     print(json.dumps(census, indent=2))
     print("pairs", len(pairs), "->", OUT)
 

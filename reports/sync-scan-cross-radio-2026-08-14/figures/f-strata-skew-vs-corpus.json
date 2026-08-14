@@ -1,0 +1,449 @@
+{
+  "question": "does the reviewer's non-overlapping skew split survive as the corpus grows?",
+  "generated_utc": "2026-08-14T06:52:21+00:00",
+  "design_max_skew_ms": 0.054,
+  "reviewer_claim": "within 0.310-0.372 (n=1054) vs beyond 0.220-0.288 (n=386), NON-OVERLAPPING",
+  "answer": "no. The split is disjoint up to about 90 paired sweeps, is already overlapping by 80, and stays overlapping at every larger size through 227. The reviewer's snapshot sits on the boundary, which is what a sampling artefact looks like.",
+  "last_disjoint_step": {
+    "paired_sweeps_used": 90,
+    "matched_arm_cells": 1280,
+    "within_bound": {
+      "cells": 912,
+      "f_min": 0.32496493991797215,
+      "f_max": 0.41904098569751824
+    },
+    "beyond_bound": {
+      "cells": 368,
+      "f_min": 0.2539004852991259,
+      "f_max": 0.29899534191205696
+    },
+    "disjoint": true,
+    "across_algorithms": {
+      "f_min": 0.307879505166039,
+      "f_max": 0.3839462445238791,
+      "spread": 0.07606673935784009
+    }
+  },
+  "first_overlapping_step": {
+    "paired_sweeps_used": 80,
+    "matched_arm_cells": 1168,
+    "within_bound": {
+      "cells": 822,
+      "f_min": 0.3094208388429637,
+      "f_max": 0.3927307899543539
+    },
+    "beyond_bound": {
+      "cells": 346,
+      "f_min": 0.2258480287184532,
+      "f_max": 0.3104696553561819
+    },
+    "disjoint": false,
+    "across_algorithms": {
+      "f_min": 0.2939258085699208,
+      "f_max": 0.3552701194200377,
+      "spread": 0.061344310850116934
+    }
+  },
+  "sweep_up_the_corpus": [
+    {
+      "paired_sweeps_used": 40,
+      "matched_arm_cells": 608,
+      "within_bound": {
+        "cells": 414,
+        "f_min": 0.3915313605234004,
+        "f_max": 0.49730231076059933
+      },
+      "beyond_bound": {
+        "cells": 194,
+        "f_min": 0.28936680541889703,
+        "f_max": 0.38290110800656735
+      },
+      "disjoint": true,
+      "across_algorithms": {
+        "f_min": 0.36960192493139726,
+        "f_max": 0.45257922115664484,
+        "spread": 0.08297729622524758
+      }
+    },
+    {
+      "paired_sweeps_used": 50,
+      "matched_arm_cells": 720,
+      "within_bound": {
+        "cells": 482,
+        "f_min": 0.3826584097821291,
+        "f_max": 0.4918748729443754
+      },
+      "beyond_bound": {
+        "cells": 238,
+        "f_min": 0.2553773017897596,
+        "f_max": 0.2988582497752433
+      },
+      "disjoint": true,
+      "across_algorithms": {
+        "f_min": 0.3542592026698552,
+        "f_max": 0.416577214230028,
+        "spread": 0.062318011560172804
+      }
+    },
+    {
+      "paired_sweeps_used": 60,
+      "matched_arm_cells": 848,
+      "within_bound": {
+        "cells": 578,
+        "f_min": 0.37007984172922304,
+        "f_max": 0.4474586068413853
+      },
+      "beyond_bound": {
+        "cells": 270,
+        "f_min": 0.2513579485195078,
+        "f_max": 0.31391275564501864
+      },
+      "disjoint": true,
+      "across_algorithms": {
+        "f_min": 0.3417288064928074,
+        "f_max": 0.3967009884642189,
+        "spread": 0.054972181971411516
+      }
+    },
+    {
+      "paired_sweeps_used": 70,
+      "matched_arm_cells": 1008,
+      "within_bound": {
+        "cells": 722,
+        "f_min": 0.31395642258483963,
+        "f_max": 0.390269104551292
+      },
+      "beyond_bound": {
+        "cells": 286,
+        "f_min": 0.24337013946668576,
+        "f_max": 0.2971999325460181
+      },
+      "disjoint": true,
+      "across_algorithms": {
+        "f_min": 0.30050234227586464,
+        "f_max": 0.3555735545707912,
+        "spread": 0.055071212294926564
+      }
+    },
+    {
+      "paired_sweeps_used": 80,
+      "matched_arm_cells": 1168,
+      "within_bound": {
+        "cells": 822,
+        "f_min": 0.3094208388429637,
+        "f_max": 0.3927307899543539
+      },
+      "beyond_bound": {
+        "cells": 346,
+        "f_min": 0.2258480287184532,
+        "f_max": 0.3104696553561819
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.2939258085699208,
+        "f_max": 0.3552701194200377,
+        "spread": 0.061344310850116934
+      }
+    },
+    {
+      "paired_sweeps_used": 90,
+      "matched_arm_cells": 1280,
+      "within_bound": {
+        "cells": 912,
+        "f_min": 0.32496493991797215,
+        "f_max": 0.41904098569751824
+      },
+      "beyond_bound": {
+        "cells": 368,
+        "f_min": 0.2539004852991259,
+        "f_max": 0.29899534191205696
+      },
+      "disjoint": true,
+      "across_algorithms": {
+        "f_min": 0.307879505166039,
+        "f_max": 0.3839462445238791,
+        "spread": 0.07606673935784009
+      }
+    },
+    {
+      "paired_sweeps_used": 100,
+      "matched_arm_cells": 1424,
+      "within_bound": {
+        "cells": 1038,
+        "f_min": 0.2973594174712024,
+        "f_max": 0.38213735966479695
+      },
+      "beyond_bound": {
+        "cells": 386,
+        "f_min": 0.24928844607405048,
+        "f_max": 0.29924179485729324
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.2874461813510323,
+        "f_max": 0.3559439184200732,
+        "spread": 0.06849773706904094
+      }
+    },
+    {
+      "paired_sweeps_used": 110,
+      "matched_arm_cells": 1536,
+      "within_bound": {
+        "cells": 1130,
+        "f_min": 0.2882306839439136,
+        "f_max": 0.3670457998034154
+      },
+      "beyond_bound": {
+        "cells": 406,
+        "f_min": 0.2337869424395701,
+        "f_max": 0.2973515800211667
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.27907726009070727,
+        "f_max": 0.3432023382949799,
+        "spread": 0.06412507820427266
+      }
+    },
+    {
+      "paired_sweeps_used": 120,
+      "matched_arm_cells": 1664,
+      "within_bound": {
+        "cells": 1246,
+        "f_min": 0.2897342475644314,
+        "f_max": 0.3738932264577885
+      },
+      "beyond_bound": {
+        "cells": 418,
+        "f_min": 0.2350302957615781,
+        "f_max": 0.29287377470887876
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.27860236442854047,
+        "f_max": 0.34935728201217014,
+        "spread": 0.07075491758362967
+      }
+    },
+    {
+      "paired_sweeps_used": 130,
+      "matched_arm_cells": 1792,
+      "within_bound": {
+        "cells": 1360,
+        "f_min": 0.2700107069854969,
+        "f_max": 0.36519834068935547
+      },
+      "beyond_bound": {
+        "cells": 432,
+        "f_min": 0.22649862270405263,
+        "f_max": 0.29088576422084234
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.2616797840212318,
+        "f_max": 0.340778072781485,
+        "spread": 0.07909828876025315
+      }
+    },
+    {
+      "paired_sweeps_used": 140,
+      "matched_arm_cells": 1952,
+      "within_bound": {
+        "cells": 1490,
+        "f_min": 0.26381344468249773,
+        "f_max": 0.3433778648570799
+      },
+      "beyond_bound": {
+        "cells": 462,
+        "f_min": 0.24268988472421513,
+        "f_max": 0.2887163498208247
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.26003651440150455,
+        "f_max": 0.326928635723693,
+        "spread": 0.06689212132218847
+      }
+    },
+    {
+      "paired_sweeps_used": 150,
+      "matched_arm_cells": 2080,
+      "within_bound": {
+        "cells": 1604,
+        "f_min": 0.26211097830319297,
+        "f_max": 0.3301388609326166
+      },
+      "beyond_bound": {
+        "cells": 476,
+        "f_min": 0.23733171644799644,
+        "f_max": 0.2847609528789575
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.25644108257924136,
+        "f_max": 0.3153631553850449,
+        "spread": 0.05892207280580353
+      }
+    },
+    {
+      "paired_sweeps_used": 160,
+      "matched_arm_cells": 2224,
+      "within_bound": {
+        "cells": 1726,
+        "f_min": 0.25506745288062155,
+        "f_max": 0.316276216421648
+      },
+      "beyond_bound": {
+        "cells": 498,
+        "f_min": 0.25459789141574235,
+        "f_max": 0.28511153727546035
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.2564667331641038,
+        "f_max": 0.307226913767747,
+        "spread": 0.050760180603643235
+      }
+    },
+    {
+      "paired_sweeps_used": 170,
+      "matched_arm_cells": 2384,
+      "within_bound": {
+        "cells": 1858,
+        "f_min": 0.2678323679070548,
+        "f_max": 0.32394553841056
+      },
+      "beyond_bound": {
+        "cells": 526,
+        "f_min": 0.24899954332546204,
+        "f_max": 0.2951778842402909
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.26458878351776455,
+        "f_max": 0.3175923409353881,
+        "spread": 0.053003557417623526
+      }
+    },
+    {
+      "paired_sweeps_used": 180,
+      "matched_arm_cells": 2512,
+      "within_bound": {
+        "cells": 1964,
+        "f_min": 0.25683387834140053,
+        "f_max": 0.3148917151672105
+      },
+      "beyond_bound": {
+        "cells": 548,
+        "f_min": 0.2445770197967577,
+        "f_max": 0.29204513783544306
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.25416712622274906,
+        "f_max": 0.30962288946582317,
+        "spread": 0.05545576324307411
+      }
+    },
+    {
+      "paired_sweeps_used": 190,
+      "matched_arm_cells": 2624,
+      "within_bound": {
+        "cells": 2058,
+        "f_min": 0.24757970273097538,
+        "f_max": 0.3033697134189132
+      },
+      "beyond_bound": {
+        "cells": 566,
+        "f_min": 0.2442464370000935,
+        "f_max": 0.2858973308032387
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.24687602534589448,
+        "f_max": 0.299199738500901,
+        "spread": 0.0523237131550065
+      }
+    },
+    {
+      "paired_sweeps_used": 200,
+      "matched_arm_cells": 2784,
+      "within_bound": {
+        "cells": 2188,
+        "f_min": 0.24943513219645772,
+        "f_max": 0.30473040437336135
+      },
+      "beyond_bound": {
+        "cells": 596,
+        "f_min": 0.2619898975530198,
+        "f_max": 0.2914200303328176
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.25205864103964726,
+        "f_max": 0.30126263800725994,
+        "spread": 0.049203996967612684
+      }
+    },
+    {
+      "paired_sweeps_used": 210,
+      "matched_arm_cells": 2928,
+      "within_bound": {
+        "cells": 2318,
+        "f_min": 0.25088826536276326,
+        "f_max": 0.31269611256666985
+      },
+      "beyond_bound": {
+        "cells": 610,
+        "f_min": 0.2541597950457171,
+        "f_max": 0.2944338526018393
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.2515413747672914,
+        "f_max": 0.304816103840958,
+        "spread": 0.053274729073666593
+      }
+    },
+    {
+      "paired_sweeps_used": 220,
+      "matched_arm_cells": 3072,
+      "within_bound": {
+        "cells": 2446,
+        "f_min": 0.2574751448759206,
+        "f_max": 0.3203726291508456
+      },
+      "beyond_bound": {
+        "cells": 626,
+        "f_min": 0.25448910161327565,
+        "f_max": 0.2993252672532946
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.26174183630727094,
+        "f_max": 0.311836862094082,
+        "spread": 0.050095025786811076
+      }
+    },
+    {
+      "paired_sweeps_used": 227,
+      "matched_arm_cells": 3184,
+      "within_bound": {
+        "cells": 2544,
+        "f_min": 0.24840625228384405,
+        "f_max": 0.3199589941821613
+      },
+      "beyond_bound": {
+        "cells": 640,
+        "f_min": 0.2461538461538461,
+        "f_max": 0.29754464772100864
+      },
+      "disjoint": false,
+      "across_algorithms": {
+        "f_min": 0.253194149485488,
+        "f_max": 0.30870435613074143,
+        "spread": 0.05551020664525341
+      }
+    }
+  ]
+}

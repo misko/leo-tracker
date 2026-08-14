@@ -1,0 +1,18 @@
+[Unit]
+Description=Ship completed synchronised sweeps to QNAP in verified batches
+After=network.target
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+Nice=15
+IOSchedulingClass=idle
+ExecStart=/mnt/leo-nvme/leo-tracker/bin/syncdrain.sh
+StandardOutput=append:/mnt/leo-nvme/leo-tracker/sync-scans/drain.log
+StandardError=append:/mnt/leo-nvme/leo-tracker/sync-scans/drain.log
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

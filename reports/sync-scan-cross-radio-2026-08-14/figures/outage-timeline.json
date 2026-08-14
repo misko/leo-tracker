@@ -1,17 +1,24 @@
 {
   "figure": "outage-timeline",
-  "generated_utc": "2026-08-14T06:51:04+00:00",
+  "generated_utc": "2026-08-14T15:12:53+00:00",
   "sources": {
     "sweeps": "/mnt/qnap01/mouse9911/leo-scans/sync-*/sweep.json",
     "collector_log": "/mnt/leo-nvme/leo-tracker/sync-scans/collector.log"
   },
+  "snapshot": {
+    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_digest": "ec5505611f5f1fdf"
+  },
   "census": {
-    "committed_sweeps": 3069,
-    "paired": 2176,
+    "committed_sweeps": 7054,
+    "paired": 6161,
     "single_radio": 893,
     "first_sweep_utc": "20260814T000315Z",
-    "last_sweep_utc": "20260814T065001Z",
-    "note": "the collector is live; totals are a floor"
+    "last_sweep_utc": "20260814T144922Z",
+    "note": "collection is PAUSED (leo-sync-scan stopped); the scan share is frozen and these totals are final, not floors"
   },
   "outage": {
     "single_radio_sweeps": 893,
@@ -37,8 +44,8 @@
   },
   "recovery": {
     "first_paired_after_utc": "20260814T050756Z",
-    "sweeps_after_the_fix": 840,
-    "paired_after_the_fix": 840,
+    "sweeps_after_the_fix": 4825,
+    "paired_after_the_fix": 4825,
     "single_after_the_fix": 0
   },
   "at_the_reports_snapshot": {
@@ -62,13 +69,13 @@
     },
     {
       "state": "paired",
-      "sweeps": 840,
+      "sweeps": 4825,
       "from_utc": "20260814T050756Z",
-      "to_utc": "20260814T065001Z"
+      "to_utc": "20260814T144922Z"
     }
   ],
   "cumulative_endpoints": {
-    "paired": 2176,
+    "paired": 6161,
     "single_radio": 893
   }
 }

@@ -12,8 +12,13 @@ Sources, all read-only:
 
     nice -n 15 python3 outage-timeline.py
 
-The collector is live, so the sweep total is a floor and the census instant is
-printed on the figure.  Nothing here is typed in by hand.
+CHANGED FOR THE FULL-CORPUS PASS (2026-08-14): radio collection is PAUSED
+(leo-sync-scan stopped by the operator), so the scan share is frozen and the
+sweep total is no longer a floor -- it is the final count.  The population is
+still taken from snapshot.py rather than a fresh glob, so this figure and the
+other five agree on how many sweeps exist.  Nothing here is typed in by hand
+except REVIEWED_SWEEPS, which is the report's own snapshot size, kept so the
+reproduction can be checked against it rather than asserted.
 """
 from __future__ import annotations
 
@@ -33,6 +38,8 @@ from matplotlib.lines import Line2D  # noqa: E402
 SCANS = "/mnt/qnap01/mouse9911/leo-scans"
 LOG = Path("/mnt/leo-nvme/leo-tracker/sync-scans/collector.log")
 HERE = Path(__file__).resolve().parent
+WORK = Path(os.environ.get("REFRESH_WORK", HERE.parent / "work"))
+SNAPSHOT = WORK / "snapshot.json"
 PNG = HERE / "outage-timeline.png"
 JSON_OUT = HERE / "outage-timeline.json"
 
@@ -52,9 +59,15 @@ def parse(stamp: str) -> dt.datetime:
         tzinfo=dt.timezone.utc)
 
 
-def read_sweeps() -> list[dict]:
+def frozen() -> dict:
+    with open(SNAPSHOT) as handle:
+        return json.load(handle)
+
+
+def read_sweeps(names: list[str]) -> list[dict]:
     rows = []
-    for directory in sorted(glob.glob(os.path.join(SCANS, "sync-*"))):
+    for name in names:
+        directory = os.path.join(SCANS, name)
         path = os.path.join(directory, "sweep.json")
         if not os.path.exists(path):
             continue                      # no commit marker: not a sweep yet
@@ -88,7 +101,8 @@ def runs(rows: list[dict]) -> list[dict]:
 
 
 def main() -> None:
-    rows = read_sweeps()
+    snapshot = frozen()
+    rows = read_sweeps(snapshot["sweeps"])
     census = dt.datetime.now(dt.timezone.utc)
     stretches = runs(rows)
     paired = [row for row in rows if len(row["live"]) == 2]
@@ -132,7 +146,7 @@ def main() -> None:
                          "xtick.color": MUTED, "ytick.color": INK,
                          "figure.facecolor": "white", "axes.facecolor": "white"})
     figure, (strip, cumulative) = plt.subplots(
-        2, 1, figsize=(10.0, 7.0), height_ratios=[1.0, 1.55], sharex=True,
+        2, 1, figsize=(11.6, 7.6), height_ratios=[1.0, 1.55], sharex=True,
         gridspec_kw={"hspace": 0.16})
 
     lane = {"paired": 1.0, "single": 0.0}
@@ -148,7 +162,7 @@ def main() -> None:
     strip.set_yticklabels(["both radios\n(paired sweep)",
                            "one radio only\n(no pair possible)"], fontsize=10)
     strip.tick_params(axis="y", length=0, pad=6)
-    strip.set_ylim(-0.75, 1.85)
+    strip.set_ylim(-1.20, 1.85)
     strip.grid(axis="x", color=GRID, lw=0.6, zorder=0)
     strip.set_axisbelow(True)
     for spine in ("top", "right", "left"):
@@ -173,7 +187,7 @@ def main() -> None:
                str(block["end"] - block["start"]).rsplit(".", 1)[0],
                len(keyerror)),
             xy=(block["start"] + (block["end"] - block["start"]) / 2, -0.24),
-            xytext=(block["start"] + (block["end"] - block["start"]) / 2, -0.56),
+            xytext=(block["start"] + (block["end"] - block["start"]) / 2, -0.78),
             fontsize=9.5, color=SINGLE, ha="center", va="center",
             arrowprops=dict(arrowstyle="->", color=SINGLE, lw=1.2,
                             shrinkA=2, shrinkB=2))
@@ -211,9 +225,9 @@ def main() -> None:
 
     cumulative.axhline(len(single), color=SINGLE, lw=0.9, ls=(0, (2, 3)),
                        zorder=2)
-    cumulative.text(rows[0]["when"] + dt.timedelta(minutes=4), len(single) + 45,
+    cumulative.text(rows[-1]["when"] - dt.timedelta(minutes=8), len(single) + 70,
                     "%d single-radio sweeps in total" % len(single),
-                    fontsize=9.5, color=SINGLE, ha="left", va="bottom")
+                    fontsize=9.5, color=SINGLE, ha="right", va="bottom")
     if block:
         cumulative.annotate(
             "flat: not one pair for %s"
@@ -226,11 +240,12 @@ def main() -> None:
             arrowprops=dict(arrowstyle="->", color=PAIRED, lw=1.2,
                             shrinkA=2, shrinkB=3))
         cumulative.annotate(
-            "no single-radio sweep\nsince %s" % (resumed["utc"] if resumed
-                                                 else "the fix"),
-            xy=(rows[-1]["when"] - dt.timedelta(minutes=20), len(single)),
-            xytext=(block["end"] + dt.timedelta(minutes=16),
-                    len(single) - max(pair_total) * 0.22),
+            "no single-radio sweep\nsince %s\n(%d paired sweeps, 0 single)"
+            % (resumed["utc"] if resumed else "the fix",
+               sum(1 for row in after if len(row["live"]) == 2)),
+            xy=(rows[-1]["when"] - dt.timedelta(minutes=25), len(single)),
+            xytext=(block["end"] + (rows[-1]["when"] - block["end"]) * 0.16,
+                    max(pair_total) * 0.055),
             fontsize=9.5, color=SINGLE, ha="left", va="center",
             arrowprops=dict(arrowstyle="->", color=SINGLE, lw=1.2,
                             shrinkA=2, shrinkB=3))
@@ -238,7 +253,10 @@ def main() -> None:
     cumulative.set_ylabel("sweeps committed, cumulative")
     cumulative.set_xlabel("wall clock, UTC (%s)"
                           % rows[0]["when"].strftime("%Y-%m-%d"))
-    cumulative.xaxis.set_major_locator(mdates.MinuteLocator(byminute=range(0, 60, 30)))
+    span_h = (rows[-1]["when"] - rows[0]["when"]).total_seconds() / 3600.0
+    cumulative.xaxis.set_major_locator(
+        mdates.HourLocator(interval=1) if span_h > 6
+        else mdates.MinuteLocator(byminute=range(0, 60, 30)))
     cumulative.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
     cumulative.set_xlim(rows[0]["when"] - dt.timedelta(minutes=4),
                         rows[-1]["when"] + dt.timedelta(minutes=4))
@@ -258,13 +276,25 @@ def main() -> None:
                 "before it could retry" % len(single),
                 fontsize=13.5, weight="bold", color=INK, ha="left", va="top")
     figure.text(0.019, 0.955,
-                "%d committed sweeps on the share: %d paired, %d single-radio; "
-                "census %s (collector live, so these are floors)"
-                % (len(rows), len(paired), len(single),
-                   census.strftime("%Y-%m-%dT%H:%MZ")),
+                "%d committed sweeps on the share: %d paired, %d single-radio.  "
+                "Collection is PAUSED, so this is the final count, not a floor."
+                % (len(rows), len(paired), len(single)),
                 fontsize=9.5, color=MUTED, ha="left", va="top")
+    figure.text(0.019, 0.934,
+                "CENSUS, frozen before any figure was computed and shared with all "
+                "six (snapshot.py, digest %s, taken %s):\n"
+                "%s sweeps on the scan share  |  %s corpus entries  |  %s scored "
+                "sidecars.  The report reviewed the first %s sweeps of this same "
+                "share."
+                % (snapshot["scored_digest"], snapshot["measured_utc"],
+                   f"{snapshot['sweeps_on_share']:,}",
+                   f"{snapshot['corpus_entries']:,}",
+                   f"{snapshot['scored_sidecars']:,}",
+                   f"{REVIEWED_SWEEPS:,}"),
+                fontsize=9.5, color=MUTED, ha="left", va="top",
+                linespacing=1.5)
 
-    figure.subplots_adjust(left=0.135, right=0.975, top=0.855, bottom=0.088)
+    figure.subplots_adjust(left=0.125, right=0.980, top=0.822, bottom=0.090)
     figure.savefig(PNG, dpi=150)
     print("wrote", PNG)
 
@@ -274,12 +304,16 @@ def main() -> None:
         "generated_utc": census.isoformat(timespec="seconds"),
         "sources": {"sweeps": SCANS + "/sync-*/sweep.json",
                     "collector_log": str(LOG)},
+        "snapshot": {key: snapshot[key] for key in
+                     ("measured_utc", "sweeps_on_share", "corpus_entries",
+                      "scored_sidecars", "scored_digest")},
         "census": {
             "committed_sweeps": len(rows),
             "paired": len(paired),
             "single_radio": len(single),
             "first_sweep_utc": rows[0]["utc"], "last_sweep_utc": rows[-1]["utc"],
-            "note": "the collector is live; totals are a floor"},
+            "note": "collection is PAUSED (leo-sync-scan stopped); the scan "
+                    "share is frozen and these totals are final, not floors"},
         "outage": {
             "single_radio_sweeps": len(single),
             "window_utc": [block["first_utc"], block["last_utc"]] if block else None,

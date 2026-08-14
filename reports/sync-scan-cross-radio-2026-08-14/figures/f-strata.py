@@ -157,6 +157,17 @@ def main() -> None:
     skew_in, skew_out = rows[-2], rows[-1]
     flatter = [axis for axis, item in excursion.items()
                if axis != "Algorithm" and item["paired_median"] < certified]
+    ranked = sorted(excursion, key=lambda name: excursion[name]["paired_median"])
+    rank = ranked.index("Algorithm") + 1
+    ordinal = {1: "flattest", 2: "second flattest", 3: "third flattest",
+               4: "fourth flattest", 5: "widest"}[rank]
+    # Does the skew split separate, and if so which way round?  The report has
+    # it separating with the within-bound stratum HIGHER; both halves of that
+    # have to be re-tested, not just the fact of a gap.
+    skew_disjoint = (skew_in["min"] > skew_out["max"]
+                     or skew_out["min"] > skew_in["max"])
+    skew_direction = ("within-bound higher" if skew_in["median"] > skew_out["median"]
+                      else "beyond-bound higher")
 
     # ---------------------------------------------------------------- figure
     plt.rcParams.update({"font.size": 11, "axes.edgecolor": GRID,
@@ -207,7 +218,8 @@ def main() -> None:
     top.set_yticklabels([row["label"] for row in order], fontsize=10.5)
     top.tick_params(axis="y", length=0, pad=6)
     top.set_ylim(-1.9, max(ypos) + 2.1)
-    top.set_xlim(0.0, 0.50)
+    top.set_xlim(0.0, max(row["max"] for row in rows
+                          if row["max"] is not None) * 1.07)
     top.set_xlabel("occupancy  f   (bar = min–max over the 8 detectors, "
                    "marker = median, ticks = each detector)")
     top.text(1.012, 1.012, " cells  solved", transform=top.transAxes,
@@ -233,19 +245,26 @@ def main() -> None:
                                  shrinkA=2, shrinkB=3))
 
     arm_low = rows[3]
-    top.annotate("1.25 MS/s — pilot band does not fit:\nf collapses to %.3f–%.3f"
-                 % (arm_low["min"], arm_low["max"]),
+    arm_rest = [row for row in rows[4:7] if row["min"] is not None]
+    top.annotate("1.25 MS/s — pilot band does not fit:\nf %.3f–%.3f (%d/8 solvable),\n"
+                 "against %.3f–%.3f on the other three arms"
+                 % (arm_low["min"], arm_low["max"], arm_low["methods_solved"],
+                    min(row["min"] for row in arm_rest),
+                    max(row["max"] for row in arm_rest)),
                  xy=(arm_low["max"], place[id(arm_low)]),
                  xytext=(0.015, place[id(arm_low)] + 1.55),
                  fontsize=9.5, color=ALERT, ha="left", va="center",
                  arrowprops=dict(arrowstyle="->", color=ALERT, lw=1.3,
                                  shrinkA=0, shrinkB=4))
 
-    top.annotate("skew strata now sit on top of each other;\n"
-                 "disjoint at 90 sweeps, overlapping at %d"
-                 % len({c["sweep"] for c in cells}),
+    top.annotate(("skew strata are %s at %s sweeps \u2014 and the %s\nstratum "
+                  "reads HIGHER, the opposite of the reported ordering"
+                  % ("disjoint" if skew_disjoint else "overlapping",
+                     f"{len({c['sweep'] for c in cells}):,}",
+                     "beyond-bound" if skew_direction == "beyond-bound higher"
+                     else "within-bound")),
                  xy=(skew_out["min"], place[id(skew_out)]),
-                 xytext=(0.012, place[id(skew_out)] - 1.25),
+                 xytext=(0.012, place[id(skew_out)] - 1.10),
                  fontsize=9.5, color=MUTED, ha="left", va="center",
                  arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.1,
                                  shrinkA=0, shrinkB=4))
@@ -303,10 +322,15 @@ def main() -> None:
     bottom.set_axisbelow(True)
     for spine in ("top", "right", "left"):
         bottom.spines[spine].set_visible(False)
-    bottom.set_title("The certified axis is the second flattest of the five",
+    bottom.set_title("The certified axis is the %s of the five" % ordinal,
                      fontsize=12, loc="left", pad=10, weight="bold")
-    bottom.annotate("only skew moves less than the detectors do",
-                    xy=(excursion["Skew"]["paired_median"], ypos2[-1] - 0.28),
+    nearest = min((name for name in excursion if name != "Algorithm"),
+                  key=lambda name: excursion[name]["paired_median"])
+    bottom.annotate(("no axis moves less than the detectors do; %s comes closest"
+                     % nearest) if not flatter else
+                    ("%s move%s less than the detectors do"
+                     % (" and ".join(flatter), "" if len(flatter) > 1 else "s")),
+                    xy=(excursion[nearest]["paired_median"], ypos2[-1] - 0.28),
                     xytext=(0.075, ypos2[-1] - 0.85),
                     fontsize=9.5, color=MUTED, ha="left", va="center",
                     arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.1,
@@ -320,12 +344,19 @@ def main() -> None:
                 "and arm than across the eight detectors the report certified "
                 "it on",
                 fontsize=13.5, weight="bold", color=INK, ha="left", va="top")
+    snap = payload.get("snapshot") or {}
     figure.text(0.019, 0.934,
-                "cross-radio occupancy, %d matched-arm cells / %d paired sweeps "
-                "/ %d scored corpus entries; corpus read %s"
-                % (len(cells), len({c["sweep"] for c in cells}),
-                   model["entries"], read_at),
-                fontsize=9.5, color=MUTED, ha="left", va="top")
+                "cross-radio occupancy: %s matched-arm cells / %s matched-arm "
+                "sweeps / %s paired sweeps read / %s scored entries in a pair\n"
+                "CENSUS frozen and shared with all six (digest %s): %s sweeps | "
+                "%s corpus entries | %s scored sidecars"
+                % (f"{len(cells):,}", f"{len({c['sweep'] for c in cells}):,}",
+                   f"{len(payload['pairs']):,}", f"{model['entries']:,}",
+                   snap.get("scored_digest", "?"),
+                   f"{snap.get('sweeps_on_share', 0):,}",
+                   f"{snap.get('corpus_entries', 0):,}",
+                   f"{snap.get('scored_sidecars', 0):,}"),
+                fontsize=9.5, color=MUTED, ha="left", va="top", linespacing=1.5)
 
     figure.subplots_adjust(left=0.205, right=0.845, top=0.885, bottom=0.072)
     figure.savefig(PNG, dpi=150)
@@ -342,6 +373,7 @@ def main() -> None:
                      "thresholds from the cross-edge null arm at "
                      "false_alarm_rate 0.01; p = per-cell null firing rate; "
                      "matched-arm cells only; lnb-a excluded as dead",
+        "snapshot": payload.get("snapshot"),
         "population": {
             "scored_corpus_entries": model["entries"],
             "paired_sweeps_read": len(payload["pairs"]),
@@ -373,9 +405,15 @@ def main() -> None:
             "cluster_bootstrap_over_sweeps": boot},
         "reviewer_comparison": {
             "note": "the reviewer's figures were taken when ~90-102 paired "
-                    "sweeps were scored; more of the corpus is scored now, so "
-                    "levels have moved. Structure reproduces on every axis "
-                    "except skew.",
+                    "sweeps were scored; the whole corpus is scored now (%d "
+                    "paired sweeps, %d matched-arm cells), so levels have "
+                    "moved. Reproduces: the receiver-pair gap (same sign, 8/8), "
+                    "the channel ordering, and 1.25 MS/s being the weakest arm. "
+                    "Does NOT reproduce: the skew split, which is %s here and "
+                    "runs %s."
+                    % (len(payload["pairs"]), len(cells),
+                       "disjoint" if skew_disjoint else "overlapping",
+                       skew_direction),
             "algorithms": {"reviewer_min_max_spread": [0.307, 0.362, 0.050],
                            "here_min_max_spread": [lo, hi, certified]},
             "receiver_pair": {
@@ -403,17 +441,34 @@ def main() -> None:
             "skew": {"reviewer": "within 0.310-0.372 (n=1054) vs beyond "
                                  "0.220-0.288 (n=386), NON-OVERLAPPING",
                      "here": "within %.3f-%.3f (n=%d) vs beyond %.3f-%.3f "
-                             "(n=%d), OVERLAPPING"
+                             "(n=%d), %s"
                              % (skew_in["min"], skew_in["max"],
                                 skew_in["n_cells"], skew_out["min"],
-                                skew_out["max"], skew_out["n_cells"]),
-                     "verdict": "NOT REPRODUCED — the separation closes as the "
-                                "corpus grows; see f-strata-skew-vs-corpus.json"}},
+                                skew_out["max"], skew_out["n_cells"],
+                                "NON-OVERLAPPING" if skew_disjoint
+                                else "OVERLAPPING"),
+                     "disjoint": bool(skew_disjoint),
+                     "direction": skew_direction,
+                     "verdict": ("NOT REPRODUCED — the strata are disjoint here "
+                                 "too, but with the BEYOND-bound stratum higher, "
+                                 "the opposite of the reported ordering; see "
+                                 "f-strata-skew-vs-corpus.json"
+                                 if skew_disjoint
+                                 and skew_direction == "beyond-bound higher"
+                                 else "REPRODUCED" if skew_disjoint
+                                 else "NOT REPRODUCED — the separation closes as "
+                                      "the corpus grows; see "
+                                      "f-strata-skew-vs-corpus.json")}},
+        "axis_rank": {"order_flattest_first": ranked,
+                      "certified_axis_rank": rank,
+                      "certified_axis_is": ordinal},
     }
     JSON_OUT.write_text(json.dumps(out, indent=2) + "\n")
     print("wrote", JSON_OUT)
-    print("certified spread %.4f; axes flatter than it: %s"
-          % (certified, flatter or "none"))
+    print("certified spread %.4f (%s of five); axes flatter than it: %s"
+          % (certified, ordinal, flatter or "none"))
+    print("skew: %s, %s" % ("disjoint" if skew_disjoint else "overlapping",
+                            skew_direction))
     for name, item in excursion.items():
         print("  %-14s paired %.4f  unpaired %.4f  (%d detectors)"
               % (name, item["paired_median"], item["unpaired_range"],

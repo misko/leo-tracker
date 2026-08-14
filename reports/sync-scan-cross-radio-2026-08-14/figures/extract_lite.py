@@ -1,14 +1,26 @@
 """Compact mirror of the scored sync corpus.
 
 The real sidecars are ~1.6 MB each (adjudication blocks, per-frame score arrays,
-raw certificates).  This host has 4 GB of RAM and a live collector on it, so the
-full corpus cannot be held in memory at once.  This script streams every
-``sync-*/scores.json`` and writes back only the fields the cross-radio estimator
-in ``leo_tracker.radio.beacon.cross_radio`` actually reads, preserving the exact
+raw certificates) and there are 2,339 of them, 4.7 GB in all.  This host has
+4 GB of RAM and other services on it, so the full corpus cannot be held in
+memory at once.  This script streams every ``sync-*/scores.json`` and writes
+back only the fields the cross-radio estimator in
+``leo_tracker.radio.beacon.cross_radio`` actually reads, preserving the exact
 nested shape so the real module can be run against the mirror unmodified.
 
 Nothing is aggregated, filtered or rounded here.  Every score written is copied
 verbatim from the corpus.  ``manifest.json`` is copied byte for byte.
+
+CHANGED FOR THE FULL-CORPUS PASS (2026-08-14), plumbing only:
+  * the directory list comes from ``snapshot.py``'s frozen census instead of a
+    live glob, because ``leo-sync-import.timer`` is still draining and a glob
+    taken per-script would give each figure a different population;
+  * a worker pool, because one pass over 4.7 GB serially is ~4 minutes;
+  * the mirror is the frozen snapshot for EVERY downstream extractor, not only
+    for negative-control and method-correlation.  cfo-cliff/port-bias
+    (extract.py) and f-strata (extract_cells.py) read it too, so all six
+    figures are computed from one identical set of bytes.
+The ``compact`` projection itself is unchanged.
 """
 from __future__ import annotations
 
@@ -16,13 +28,14 @@ import json
 import os
 import shutil
 import sys
+from multiprocessing import Pool
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+WORK = Path(os.environ.get("REFRESH_WORK", HERE.parent / "work"))
 CORPUS = Path("/mnt/qnap01/mouse9911/leo/surveys/corpus")
-LITE = Path(os.environ.get(
-    "LITE_ROOT",
-    "/tmp/claude-1000/-home-satpi01-leo-tracker/"
-    "07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/lite"))
+LITE = Path(os.environ.get("LITE_ROOT", WORK / "lite"))
+SNAPSHOT = WORK / "snapshot.json"
 
 # Entry-level keys _entry() reads off the scores document.
 SCORE_KEYS = ("schema", "capture", "radio_id", "sample_rate_hz",
@@ -57,27 +70,33 @@ def compact(scores: dict) -> dict:
     return out
 
 
+def mirror_one(name: str) -> str:
+    source = CORPUS / name
+    try:
+        scores = json.loads((source / "scores.json").read_text())
+    except (OSError, ValueError):
+        return "unreadable"
+    target = LITE / name
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "scores.json").write_text(json.dumps(compact(scores)))
+    shutil.copyfile(source / "manifest.json", target / "manifest.json")
+    return "written"
+
+
 def main() -> int:
+    with open(SNAPSHOT) as handle:
+        frozen = json.load(handle)
+    names = frozen["scored"]
     LITE.mkdir(parents=True, exist_ok=True)
-    written = skipped = 0
-    for directory in sorted(CORPUS.glob("sync-*")):
-        scores_path = directory / "scores.json"
-        manifest_path = directory / "manifest.json"
-        if not scores_path.is_file() or not manifest_path.is_file():
-            skipped += 1
-            continue
-        try:
-            scores = json.loads(scores_path.read_text())
-        except (OSError, ValueError):
-            skipped += 1
-            continue
-        target = LITE / directory.name
-        target.mkdir(exist_ok=True)
-        (target / "scores.json").write_text(json.dumps(compact(scores)))
-        shutil.copyfile(manifest_path, target / "manifest.json")
-        del scores
-        written += 1
-    print(json.dumps({"written": written, "skipped_no_scores": skipped,
+    tally = {"written": 0, "unreadable": 0}
+    with Pool(3) as pool:
+        for index, status in enumerate(pool.imap_unordered(mirror_one, names,
+                                                           chunksize=8)):
+            tally[status] += 1
+            if (index + 1) % 400 == 0:
+                print(f"  {index + 1}/{len(names)}", file=sys.stderr, flush=True)
+    print(json.dumps({**tally, "requested": len(names),
+                      "snapshot_digest": frozen["scored_digest"],
                       "lite_root": str(LITE)}))
     return 0
 

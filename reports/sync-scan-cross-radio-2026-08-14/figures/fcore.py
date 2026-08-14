@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import random
 import sys
 from collections import defaultdict
@@ -25,7 +26,9 @@ from leo_tracker.radio.beacon.survey_comparison import (  # noqa: E402
     DEFAULT_FALSE_ALARM_RATE, threshold_from,
 )
 
-CACHE = Path(__file__).resolve().parent / "cells.json.gz"
+_HERE = Path(__file__).resolve().parent
+_WORK = Path(os.environ.get("REFRESH_WORK", _HERE.parent / "work"))
+CACHE = _WORK / "cells.json.gz"
 
 
 def load(cache: Path = CACHE) -> dict:

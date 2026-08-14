@@ -1,323 +1,329 @@
 {
   "figure": "f-strata",
-  "generated_utc": "2026-08-14T06:53:55+00:00",
-  "corpus_read_utc": "2026-08-14T06:26Z",
+  "generated_utc": "2026-08-14T15:24:59+00:00",
+  "corpus_read_utc": "2026-08-14T14:58Z",
   "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/",
   "estimator": "leo_tracker.radio.beacon.cross_radio.solve_coincidence; thresholds from the cross-edge null arm at false_alarm_rate 0.01; p = per-cell null firing rate; matched-arm cells only; lnb-a excluded as dead",
+  "snapshot": {
+    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_digest": "ec5505611f5f1fdf"
+  },
   "population": {
-    "scored_corpus_entries": 454,
-    "paired_sweeps_read": 227,
-    "matched_arm_sweeps": 199,
-    "matched_arm_cells": 3184,
+    "scored_corpus_entries": 2292,
+    "paired_sweeps_read": 1146,
+    "matched_arm_sweeps": 1035,
+    "matched_arm_cells": 16560,
     "census": {
-      "scanned": 1336,
-      "read": 458,
+      "scanned": 2339,
+      "read": 2339,
       "unreadable": 0,
       "other_schema": 0,
-      "not_synchronised": 878,
-      "unpaired_sweeps": 4,
-      "irregular_geometry": 0
+      "not_synchronised": 0,
+      "unpaired_sweeps": 47,
+      "irregular_geometry": 0,
+      "snapshot_scored_sidecars": 2339
     }
   },
   "empty_sky_rate_p": {
-    "anchor-8": 0.06397058823529411,
-    "differential-16": 0.06066176470588235,
-    "differential-32": 0.06397058823529411,
-    "full-frame-acquire": 0.06727941176470588,
-    "full-frame-full": 0.06691176470588235,
-    "full-frame-verify": 0.06691176470588235,
-    "glrt-32": 0.05625,
-    "glrt-64": 0.06323529411764706
+    "anchor-8": 0.06286337209302326,
+    "differential-16": 0.06315406976744187,
+    "differential-32": 0.0626453488372093,
+    "full-frame-acquire": 0.06751453488372093,
+    "full-frame-full": 0.06744186046511629,
+    "full-frame-verify": 0.06649709302325581,
+    "glrt-32": 0.05450581395348837,
+    "glrt-64": 0.06162790697674419
   },
   "reference_band_across_algorithms": {
-    "min": 0.253194149485488,
-    "max": 0.30870435613074143,
-    "spread": 0.05551020664525341,
+    "min": 0.3337553366843439,
+    "max": 0.3759733523114619,
+    "spread": 0.04221801562711802,
     "per_method": {
-      "anchor-8": 0.253194149485488,
-      "differential-16": 0.2947497218176511,
-      "differential-32": 0.29562068263147084,
-      "full-frame-acquire": 0.3081773837500553,
-      "full-frame-full": 0.30571094261614207,
-      "full-frame-verify": 0.30870435613074143,
-      "glrt-32": 0.25665212785578634,
-      "glrt-64": 0.2713269634953255
+      "anchor-8": 0.3337553366843439,
+      "differential-16": 0.36387240164523293,
+      "differential-32": 0.37039990809089596,
+      "full-frame-acquire": 0.3759733523114619,
+      "full-frame-full": 0.3748421985924056,
+      "full-frame-verify": 0.37107080052819685,
+      "glrt-32": 0.334543789780243,
+      "glrt-64": 0.3422431646399297
     }
   },
   "strata": [
     {
       "axis": "Algorithm",
       "label": "all matched cells",
-      "cells": 3184,
+      "cells": 16560,
       "methods_solved": 8,
-      "min": 0.253194149485488,
-      "max": 0.30870435613074143,
-      "spread": 0.05551020664525341,
-      "median": 0.29518520222456096,
+      "min": 0.3337553366843439,
+      "max": 0.3759733523114619,
+      "spread": 0.04221801562711802,
+      "median": 0.36713615486806445,
       "per_method": {
-        "anchor-8": 0.253194149485488,
-        "differential-16": 0.2947497218176511,
-        "differential-32": 0.29562068263147084,
-        "full-frame-acquire": 0.3081773837500553,
-        "full-frame-full": 0.30571094261614207,
-        "full-frame-verify": 0.30870435613074143,
-        "glrt-32": 0.25665212785578634,
-        "glrt-64": 0.2713269634953255
+        "anchor-8": 0.3337553366843439,
+        "differential-16": 0.36387240164523293,
+        "differential-32": 0.37039990809089596,
+        "full-frame-acquire": 0.3759733523114619,
+        "full-frame-full": 0.3748421985924056,
+        "full-frame-verify": 0.37107080052819685,
+        "glrt-32": 0.334543789780243,
+        "glrt-64": 0.3422431646399297
       },
       "unsolvable": {}
     },
     {
       "axis": "Receiver pair",
       "label": "lnb-c | lnb-b",
-      "cells": 1592,
+      "cells": 8280,
       "methods_solved": 8,
-      "min": 0.20390773535028253,
-      "max": 0.27852832273088934,
-      "spread": 0.07462058738060681,
-      "median": 0.26250543810407456,
+      "min": 0.2986475691664436,
+      "max": 0.3491958152378318,
+      "spread": 0.05054824607138819,
+      "median": 0.3373768881077286,
       "per_method": {
-        "anchor-8": 0.20390773535028253,
-        "differential-16": 0.2579713511946471,
-        "differential-32": 0.267039525013502,
-        "full-frame-acquire": 0.27852832273088934,
-        "full-frame-full": 0.26809041513940046,
-        "full-frame-verify": 0.27192419916189015,
-        "glrt-32": 0.22503927372840427,
-        "glrt-64": 0.23552623542121795
+        "anchor-8": 0.2986475691664436,
+        "differential-16": 0.33166705236429805,
+        "differential-32": 0.3430867238511591,
+        "full-frame-acquire": 0.3489923785590003,
+        "full-frame-full": 0.3491958152378318,
+        "full-frame-verify": 0.34728707498121025,
+        "glrt-32": 0.30385003135800914,
+        "glrt-64": 0.3115701987210062
       },
       "unsolvable": {}
     },
     {
       "axis": "Receiver pair",
       "label": "lnb-d | lnb-b",
-      "cells": 1592,
+      "cells": 8280,
       "methods_solved": 8,
-      "min": 0.2826315427319037,
-      "max": 0.3399199019887991,
-      "spread": 0.057288359256895405,
-      "median": 0.32152288416233343,
+      "min": 0.35986370863059125,
+      "max": 0.39832379839566934,
+      "spread": 0.03846008976507809,
+      "median": 0.3905536901835892,
       "per_method": {
-        "anchor-8": 0.2937257778478699,
-        "differential-16": 0.3245072365989237,
-        "differential-32": 0.3185385317257431,
-        "full-frame-acquire": 0.33216481690229666,
-        "full-frame-full": 0.33760711760584255,
-        "full-frame-verify": 0.3399199019887991,
-        "glrt-32": 0.2826315427319037,
-        "glrt-64": 0.30096147340120105
+        "anchor-8": 0.36302265151691615,
+        "differential-16": 0.39037177181374294,
+        "differential-32": 0.39283643526949347,
+        "full-frame-acquire": 0.39832379839566934,
+        "full-frame-full": 0.39607885967645484,
+        "full-frame-verify": 0.3907356085534355,
+        "glrt-32": 0.35986370863059125,
+        "glrt-64": 0.3676000884834591
       },
       "unsolvable": {}
     },
     {
       "axis": "Arm (160 ms)",
       "label": "1.25 MS/s",
-      "cells": 288,
-      "methods_solved": 2,
-      "min": 0.032086361053796225,
-      "max": 0.06737003568341252,
-      "spread": 0.03528367462961629,
-      "median": 0.04972819836860437,
+      "cells": 1376,
+      "methods_solved": 5,
+      "min": 0.09749416658212441,
+      "max": 0.201406210281524,
+      "spread": 0.10391204369939959,
+      "median": 0.14382527087445118,
       "per_method": {
-        "differential-16": 0.032086361053796225,
-        "full-frame-acquire": 0.06737003568341252
+        "differential-16": 0.12570828986945176,
+        "differential-32": 0.14497961319133118,
+        "full-frame-acquire": 0.201406210281524,
+        "full-frame-full": 0.14382527087445118,
+        "full-frame-verify": 0.09749416658212441
       },
       "unsolvable": {
-        "anchor-8": "a chain fires no more often than its own empty-sky rate, so it carries no detections to model",
-        "differential-32": "the counts imply a detection probability outside [0, 1] (dA 1.392, dB 0.511)",
-        "full-frame-full": "the counts imply a detection probability outside [0, 1] (dA 6.386, dB 0.360)",
-        "full-frame-verify": "the counts imply a detection probability outside [0, 1] (dA 1.445, dB 0.697)",
-        "glrt-32": "the counts imply a detection probability outside [0, 1] (dA 3.569, dB 0.592)",
-        "glrt-64": "a chain fires no more often than its own empty-sky rate, so it carries no detections to model"
+        "anchor-8": "the counts imply a detection probability outside [0, 1] (dA 1.085, dB 0.403)",
+        "glrt-32": "the counts imply a detection probability outside [0, 1] (dA 1.209, dB 0.447)",
+        "glrt-64": "the counts imply a detection probability outside [0, 1] (dA 1.321, dB 0.437)"
       }
     },
     {
       "axis": "Arm (160 ms)",
       "label": "2.50 MS/s",
-      "cells": 272,
+      "cells": 1376,
       "methods_solved": 8,
-      "min": 0.2607824481868125,
-      "max": 0.4411951628822379,
-      "spread": 0.1804127146954254,
-      "median": 0.3951372567194823,
+      "min": 0.44300503485831383,
+      "max": 0.5075894278134578,
+      "spread": 0.06458439295514401,
+      "median": 0.48801636177555774,
       "per_method": {
-        "anchor-8": 0.2607824481868125,
-        "differential-16": 0.4003252952407892,
-        "differential-32": 0.38994921819817546,
-        "full-frame-acquire": 0.4411951628822379,
-        "full-frame-full": 0.40266485562471294,
-        "full-frame-verify": 0.40266485562471294,
-        "glrt-32": 0.2938432956365201,
-        "glrt-64": 0.3198453543121384
+        "anchor-8": 0.44300503485831383,
+        "differential-16": 0.5044731941045029,
+        "differential-32": 0.4901095800080915,
+        "full-frame-acquire": 0.485923143543024,
+        "full-frame-full": 0.5006039899477381,
+        "full-frame-verify": 0.5075894278134578,
+        "glrt-32": 0.45356487923551153,
+        "glrt-64": 0.4662641942994199
       },
       "unsolvable": {}
     },
     {
       "axis": "Arm (160 ms)",
       "label": "5.00 MS/s",
-      "cells": 368,
-      "methods_solved": 7,
-      "min": 0.3387937013740004,
-      "max": 0.41684971013855365,
-      "spread": 0.07805600876455326,
-      "median": 0.3840562565981617,
+      "cells": 1600,
+      "methods_solved": 8,
+      "min": 0.4522550974459684,
+      "max": 0.5263349265364304,
+      "spread": 0.07407982909046201,
+      "median": 0.4945104331506368,
       "per_method": {
-        "differential-16": 0.3840562565981617,
-        "differential-32": 0.4105791841098683,
-        "full-frame-acquire": 0.35911710286538917,
-        "full-frame-full": 0.41684971013855365,
-        "full-frame-verify": 0.3955532284989224,
-        "glrt-32": 0.35672770001208537,
-        "glrt-64": 0.3387937013740004
+        "anchor-8": 0.4522550974459684,
+        "differential-16": 0.4995847929095555,
+        "differential-32": 0.5235225559325869,
+        "full-frame-acquire": 0.4894360733917181,
+        "full-frame-full": 0.5263349265364304,
+        "full-frame-verify": 0.5096235186899193,
+        "glrt-32": 0.4643715223517349,
+        "glrt-64": 0.4770253253100853
       },
-      "unsolvable": {
-        "anchor-8": "the counts imply a detection probability outside [0, 1] (dA 1.018, dB 0.850)"
-      }
+      "unsolvable": {}
     },
     {
       "axis": "Arm (160 ms)",
       "label": "10.00 MS/s",
-      "cells": 256,
+      "cells": 1360,
       "methods_solved": 8,
-      "min": 0.33415894877976376,
-      "max": 0.45481727694358126,
-      "spread": 0.1206583281638175,
-      "median": 0.3769354216036064,
+      "min": 0.42843696258358077,
+      "max": 0.4868541883893985,
+      "spread": 0.05841722580581771,
+      "median": 0.4563131298596035,
       "per_method": {
-        "anchor-8": 0.3696452764601032,
-        "differential-16": 0.4333016052309984,
-        "differential-32": 0.45481727694358126,
-        "full-frame-acquire": 0.4002246110847786,
-        "full-frame-full": 0.3839292637184409,
-        "full-frame-verify": 0.36386326081452086,
-        "glrt-32": 0.36994157948877193,
-        "glrt-64": 0.33415894877976376
+        "anchor-8": 0.43279838922885167,
+        "differential-16": 0.4587680181639476,
+        "differential-32": 0.4868541883893985,
+        "full-frame-acquire": 0.4634451846906106,
+        "full-frame-full": 0.4538582415552594,
+        "full-frame-verify": 0.45975358542905737,
+        "glrt-32": 0.4319137762998738,
+        "glrt-64": 0.42843696258358077
       },
       "unsolvable": {}
     },
     {
       "axis": "Channel",
       "label": "ch 1",
-      "cells": 796,
-      "methods_solved": 7,
-      "min": 0.1883188046747486,
-      "max": 0.25956700729507626,
-      "spread": 0.07124820262032766,
-      "median": 0.24120524317566117,
+      "cells": 4140,
+      "methods_solved": 8,
+      "min": 0.29748649099963975,
+      "max": 0.3475750140076325,
+      "spread": 0.05008852300799277,
+      "median": 0.3325363232977021,
       "per_method": {
-        "differential-16": 0.24452317906267612,
-        "differential-32": 0.22386798705358602,
-        "full-frame-acquire": 0.25956700729507626,
-        "full-frame-full": 0.24120524317566117,
-        "full-frame-verify": 0.25594760008762474,
-        "glrt-32": 0.1883188046747486,
-        "glrt-64": 0.21390894891506998
+        "anchor-8": 0.29748649099963975,
+        "differential-16": 0.33298946097392235,
+        "differential-32": 0.3320831856214818,
+        "full-frame-acquire": 0.3475750140076325,
+        "full-frame-full": 0.3455328767124109,
+        "full-frame-verify": 0.33935024877114583,
+        "glrt-32": 0.30913126474171276,
+        "glrt-64": 0.3159844702236445
       },
-      "unsolvable": {
-        "anchor-8": "the counts imply a detection probability outside [0, 1] (dA 1.010, dB 0.711)"
-      }
+      "unsolvable": {}
     },
     {
       "axis": "Channel",
       "label": "ch 2",
-      "cells": 796,
+      "cells": 4140,
       "methods_solved": 8,
-      "min": 0.23518863649127114,
-      "max": 0.2833933684386399,
-      "spread": 0.04820473194736874,
-      "median": 0.2667185036058394,
+      "min": 0.3501524148066552,
+      "max": 0.39216994168671393,
+      "spread": 0.04201752688005872,
+      "median": 0.3789854787829146,
       "per_method": {
-        "anchor-8": 0.23595921559047642,
-        "differential-16": 0.25923691001501237,
-        "differential-32": 0.2742000971966664,
-        "full-frame-acquire": 0.2833933684386399,
-        "full-frame-full": 0.2747463704769947,
-        "full-frame-verify": 0.2794630517783131,
-        "glrt-32": 0.23518863649127114,
-        "glrt-64": 0.23937411953462495
+        "anchor-8": 0.35383481476898226,
+        "differential-16": 0.3715403966246525,
+        "differential-32": 0.3867339749279783,
+        "full-frame-acquire": 0.39216994168671393,
+        "full-frame-full": 0.38928130588127347,
+        "full-frame-verify": 0.3864305609411767,
+        "glrt-32": 0.3501524148066552,
+        "glrt-64": 0.35178547066288635
       },
       "unsolvable": {}
     },
     {
       "axis": "Channel",
       "label": "ch 3",
-      "cells": 796,
+      "cells": 4140,
       "methods_solved": 8,
-      "min": 0.29969022493889086,
-      "max": 0.37198412941188924,
-      "spread": 0.07229390447299838,
-      "median": 0.33070859090648014,
+      "min": 0.35004373219158685,
+      "max": 0.4033085941640571,
+      "spread": 0.05326486197247027,
+      "median": 0.3826083985426413,
       "per_method": {
-        "anchor-8": 0.3202047230313576,
-        "differential-16": 0.3311888148099213,
-        "differential-32": 0.330228367003039,
-        "full-frame-acquire": 0.3672820935681118,
-        "full-frame-full": 0.3631543945268343,
-        "full-frame-verify": 0.37198412941188924,
-        "glrt-32": 0.29969022493889086,
-        "glrt-64": 0.3129338108360109
+        "anchor-8": 0.35004373219158685,
+        "differential-16": 0.3761056499195098,
+        "differential-32": 0.3891111471657727,
+        "full-frame-acquire": 0.4002492730644024,
+        "full-frame-full": 0.40080177983365234,
+        "full-frame-verify": 0.4033085941640571,
+        "glrt-32": 0.35198043724137645,
+        "glrt-64": 0.36393115989518077
       },
       "unsolvable": {}
     },
     {
       "axis": "Channel",
       "label": "ch 4",
-      "cells": 796,
+      "cells": 4140,
       "methods_solved": 8,
-      "min": 0.26953465192646153,
-      "max": 0.35489224932307856,
-      "spread": 0.08535759739661702,
-      "median": 0.3235519932101467,
+      "min": 0.32649869206303905,
+      "max": 0.37487656375596956,
+      "spread": 0.04837787169293051,
+      "median": 0.3589202528738149,
       "per_method": {
-        "anchor-8": 0.26953465192646153,
-        "differential-16": 0.347328562964491,
-        "differential-32": 0.35489224932307856,
-        "full-frame-acquire": 0.31915512434272864,
-        "full-frame-full": 0.33818909414632264,
-        "full-frame-verify": 0.3241652810684732,
-        "glrt-32": 0.3037744114661609,
-        "glrt-64": 0.3229387053518202
+        "anchor-8": 0.3334298549216323,
+        "differential-16": 0.37487656375596956,
+        "differential-32": 0.37371916721129633,
+        "full-frame-acquire": 0.36348165428001317,
+        "full-frame-full": 0.363188656246727,
+        "full-frame-verify": 0.3546518495009027,
+        "glrt-32": 0.32649869206303905,
+        "glrt-64": 0.33713677851278384
       },
       "unsolvable": {}
     },
     {
       "axis": "Skew",
       "label": "within 0.054 ms",
-      "cells": 2544,
+      "cells": 12080,
       "methods_solved": 8,
-      "min": 0.24840625228384405,
-      "max": 0.3199589941821613,
-      "spread": 0.07155274189831723,
-      "median": 0.29687479082264695,
+      "min": 0.31938624063807,
+      "max": 0.3657561984652965,
+      "spread": 0.04636995782722653,
+      "median": 0.35449592531317925,
       "per_method": {
-        "anchor-8": 0.24840625228384405,
-        "differential-16": 0.2985300149720475,
-        "differential-32": 0.2952195666732464,
-        "full-frame-acquire": 0.3199589941821613,
-        "full-frame-full": 0.3138121561619554,
-        "full-frame-verify": 0.31701858370954217,
-        "glrt-32": 0.2593109660951823,
-        "glrt-64": 0.2756770618083294
+        "anchor-8": 0.31938624063807,
+        "differential-16": 0.3523566906338495,
+        "differential-32": 0.356635159992509,
+        "full-frame-acquire": 0.3657561984652965,
+        "full-frame-full": 0.36247852002251846,
+        "full-frame-verify": 0.3596393425828163,
+        "glrt-32": 0.3203300922923268,
+        "glrt-64": 0.33114435919725477
       },
       "unsolvable": {}
     },
     {
       "axis": "Skew",
       "label": "beyond 0.054 ms",
-      "cells": 640,
+      "cells": 4480,
       "methods_solved": 8,
-      "min": 0.2461538461538461,
-      "max": 0.29754464772100864,
-      "spread": 0.051390801567162525,
-      "median": 0.2743260739628155,
+      "min": 0.37216534998760814,
+      "max": 0.40817775955150715,
+      "spread": 0.036012409563899006,
+      "median": 0.3983865485231271,
       "per_method": {
-        "anchor-8": 0.27463589659447807,
-        "differential-16": 0.2793008412947383,
-        "differential-32": 0.29754464772100864,
-        "full-frame-acquire": 0.2625770779163077,
-        "full-frame-full": 0.27401625133115287,
-        "full-frame-verify": 0.2759929817339948,
-        "glrt-32": 0.2461538461538461,
-        "glrt-64": 0.2540421986922984
+        "anchor-8": 0.37265183431607346,
+        "differential-16": 0.3948773169679232,
+        "differential-32": 0.407460884829244,
+        "full-frame-acquire": 0.40358573023875105,
+        "full-frame-full": 0.40817775955150715,
+        "full-frame-verify": 0.401895780078331,
+        "glrt-32": 0.3729062441472472,
+        "glrt-64": 0.37216534998760814
       },
       "unsolvable": {}
     }
@@ -325,79 +331,77 @@
   "axis_excursion": {
     "Algorithm": {
       "slices": 8,
-      "unpaired_range": 0.05551020664525341,
-      "paired_median": 0.05551020664525341,
-      "paired_min": 0.05551020664525341,
-      "paired_max": 0.05551020664525341,
+      "unpaired_range": 0.04221801562711802,
+      "paired_median": 0.04221801562711802,
+      "paired_min": 0.04221801562711802,
+      "paired_max": 0.04221801562711802,
       "paired_detectors": 8,
       "basis": "range over the eight detectors, cells held fixed"
     },
     "Receiver pair": {
       "slices": 2,
-      "unpaired_range": 0.05901744605825887,
-      "paired_median": 0.06598556169212987,
-      "paired_min": 0.05149900671224111,
-      "paired_max": 0.08981804249758737,
+      "unpaired_range": 0.05317680207586062,
+      "paired_median": 0.052881694345458224,
+      "paired_min": 0.04344853357222522,
+      "paired_max": 0.06437508235047257,
       "paired_detectors": 8,
       "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
     },
     "Arm (160 ms)": {
       "slices": 4,
-      "unpaired_range": 0.34540905835087793,
-      "paired_median": 0.38752018568801383,
-      "paired_min": 0.37382512719882544,
-      "paired_max": 0.4012152441772022,
-      "paired_detectors": 2,
+      "unpaired_range": 0.3506851622761856,
+      "paired_median": 0.3787649042350511,
+      "paired_min": 0.2880298631101941,
+      "paired_max": 0.4121293521077949,
+      "paired_detectors": 5,
       "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
     },
     "Channel": {
       "slices": 4,
-      "unpaired_range": 0.08950334773081897,
-      "paired_median": 0.11545560679141231,
-      "paired_min": 0.10280538390181487,
-      "paired_max": 0.13102426226949254,
-      "paired_detectors": 7,
+      "unpaired_range": 0.050072075244939174,
+      "paired_median": 0.053971581089005655,
+      "paired_min": 0.04284917249966369,
+      "paired_max": 0.06395834539291129,
+      "paired_detectors": 8,
       "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
     },
     "Skew": {
       "slices": 2,
-      "unpaired_range": 0.022548716859831452,
-      "paired_median": 0.02393225371333252,
-      "paired_min": 0.0023250810477622452,
-      "paired_max": 0.057381916265853594,
+      "unpaired_range": 0.043890623209947854,
+      "paired_median": 0.044109932931531204,
+      "paired_min": 0.03782953177345455,
+      "paired_max": 0.05326559367800349,
       "paired_detectors": 8,
       "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
     }
   },
-  "axes_flatter_than_the_certified_one": [
-    "Skew"
-  ],
+  "axes_flatter_than_the_certified_one": [],
   "receiver_pair_gap": {
     "definition": "f(lnb-d|lnb-b) - f(lnb-c|lnb-b), per detector",
     "per_method": {
-      "anchor-8": 0.08981804249758737,
-      "differential-16": 0.06653588540427663,
-      "differential-32": 0.05149900671224111,
-      "full-frame-acquire": 0.05363649417140731,
-      "full-frame-full": 0.06951670246644209,
-      "full-frame-verify": 0.06799570282690898,
-      "glrt-32": 0.05759226900349945,
-      "glrt-64": 0.0654352379799831
+      "anchor-8": 0.06437508235047257,
+      "differential-16": 0.058704719449444887,
+      "differential-32": 0.04974971141833434,
+      "full-frame-acquire": 0.049331419836669055,
+      "full-frame-full": 0.04688304443862307,
+      "full-frame-verify": 0.04344853357222522,
+      "glrt-32": 0.05601367727258211,
+      "glrt-64": 0.05602988976245288
     },
-    "mean": 0.06525366763279325,
+    "mean": 0.053067009762600516,
     "same_sign_positive": 8,
     "of": 8,
     "cluster_bootstrap_over_sweeps": {
       "draws": 300,
-      "sweeps": 199,
-      "p05": 0.04441166467837884,
-      "p50": 0.0641417150985628,
-      "p95": 0.08536414655295202,
+      "sweeps": 1035,
+      "p05": 0.04308809876921859,
+      "p50": 0.05311752773599362,
+      "p95": 0.06400450291394688,
       "le_zero": 0
     }
   },
   "reviewer_comparison": {
-    "note": "the reviewer's figures were taken when ~90-102 paired sweeps were scored; more of the corpus is scored now, so levels have moved. Structure reproduces on every axis except skew.",
+    "note": "the reviewer's figures were taken when ~90-102 paired sweeps were scored; the whole corpus is scored now (1146 paired sweeps, 16560 matched-arm cells), so levels have moved. Reproduces: the receiver-pair gap (same sign, 8/8), the channel ordering, and 1.25 MS/s being the weakest arm. Does NOT reproduce: the skew split, which is disjoint here and runs beyond-bound higher.",
     "algorithms": {
       "reviewer_min_max_spread": [
         0.307,
@@ -405,27 +409,40 @@
         0.05
       ],
       "here_min_max_spread": [
-        0.253194149485488,
-        0.30870435613074143,
-        0.05551020664525341
+        0.3337553366843439,
+        0.3759733523114619,
+        0.04221801562711802
       ]
     },
     "receiver_pair": {
       "reviewer": "f(c|b) 0.244-0.306 vs f(d|b) 0.333-0.387, mean gap +0.072, 8/8 same sign, bootstrap +0.042..+0.099, 0/300 <= 0",
-      "here": "f(c|b) 0.204-0.279 vs f(d|b) 0.283-0.340, mean gap +0.065, 8/8 same sign, bootstrap +0.044..+0.085, 0/300 <= 0"
+      "here": "f(c|b) 0.299-0.349 vs f(d|b) 0.360-0.398, mean gap +0.053, 8/8 same sign, bootstrap +0.043..+0.064, 0/300 <= 0"
     },
     "arm": {
       "reviewer": "1.25 MS/s 160 ms f 0.015; 5.0 MS/s 160 ms f 0.401-0.510",
-      "here": "1.25 MS/s 160 ms f 0.032-0.067 (2/8 solvable); 5.0 MS/s 160 ms f 0.339-0.417 (7/8)"
+      "here": "1.25 MS/s 160 ms f 0.097-0.201 (5/8 solvable); 5.0 MS/s 160 ms f 0.452-0.526 (8/8)"
     },
     "channel": {
       "reviewer": "ch1 0.211-0.291 vs ch3 0.381-0.436",
-      "here": "ch1 0.188-0.260 vs ch3 0.300-0.372"
+      "here": "ch1 0.297-0.348 vs ch3 0.350-0.403"
     },
     "skew": {
       "reviewer": "within 0.310-0.372 (n=1054) vs beyond 0.220-0.288 (n=386), NON-OVERLAPPING",
-      "here": "within 0.248-0.320 (n=2544) vs beyond 0.246-0.298 (n=640), OVERLAPPING",
-      "verdict": "NOT REPRODUCED \u2014 the separation closes as the corpus grows; see f-strata-skew-vs-corpus.json"
+      "here": "within 0.319-0.366 (n=12080) vs beyond 0.372-0.408 (n=4480), NON-OVERLAPPING",
+      "disjoint": true,
+      "direction": "beyond-bound higher",
+      "verdict": "NOT REPRODUCED \u2014 the strata are disjoint here too, but with the BEYOND-bound stratum higher, the opposite of the reported ordering; see f-strata-skew-vs-corpus.json"
     }
+  },
+  "axis_rank": {
+    "order_flattest_first": [
+      "Algorithm",
+      "Skew",
+      "Receiver pair",
+      "Channel",
+      "Arm (160 ms)"
+    ],
+    "certified_axis_rank": 1,
+    "certified_axis_is": "flattest"
   }
 }

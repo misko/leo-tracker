@@ -30,6 +30,7 @@ sidecars cannot all be held in memory at once, so ``extract_lite.py`` (beside
 this file) first streams the corpus into a compact mirror holding only the
 fields the estimator reads, with every score copied verbatim.  Run it first:
 
+    nice -n 15 python3 snapshot.py
     nice -n 15 python3 extract_lite.py
     nice -n 15 python3 negative-control.py
 """
@@ -51,7 +52,9 @@ sys.path.insert(0, "/home/satpi01/leo-tracker/src")
 from leo_tracker.radio.beacon import cross_radio as cr  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-LITE = Path(os.environ.get("LITE_ROOT", HERE.parent / "lite"))
+WORK = Path(os.environ.get("REFRESH_WORK", HERE.parent / "work"))
+LITE = Path(os.environ.get("LITE_ROOT", WORK / "lite"))
+SNAPSHOT = WORK / "snapshot.json"
 OUT_PNG = HERE / "negative-control.png"
 OUT_JSON = HERE / "negative-control.json"
 
@@ -63,10 +66,10 @@ SHIFT = 2
 #: Algorithm order, and the family each belongs to.  The order is the optimal
 #: adjacent-similarity seriation of the phi matrix, computed by exhaustive
 #: enumeration of all 8! orderings in ``method-correlation.py``; the colour
-#: groups here ARE the blocks that figure shows.
-ORDER = ["anchor-8", "glrt-32", "glrt-64", "full-frame-verify",
-         "full-frame-full", "full-frame-acquire",
-         "differential-16", "differential-32"]
+#: groups here ARE the blocks that figure shows.  Recomputed on the full corpus:
+#: the two differential variants swap places against the 320-sidecar snapshot,
+#: which is a tie being broken differently, not a change of structure.
+ORDER = ["anchor-8", "glrt-32", "glrt-64", "full-frame-verify", "full-frame-full", "full-frame-acquire", "differential-32", "differential-16"]
 
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d7d6d2"
 SURFACE = "#fcfcfb"
@@ -92,6 +95,20 @@ REPORTED = {
     "real":      {"f_min": 0.307, "f_max": 0.362, "spread": 0.050},
     "scrambled": {"f_min": 0.637, "f_max": 0.713, "spread": 0.075},
     "shifted":   {"f_min": 0.622, "f_max": 0.667, "spread": 0.045},
+}
+
+#: The other snapshot the same experiment was reported at -- 2,464 cells per
+#: join, the numbers the review brief carries.  Both are kept because f moved
+#: between them, and a reader comparing this run against only one of them would
+#: not see that the *level* has never held still while the *structure* has.
+REPORTED_AT_2464_CELLS = {
+    "real":      {"f_min": 0.255, "f_max": 0.302, "spread": 0.047,
+                  "spread_over_bootstrap_p50": 0.92},
+    "shifted":   {"f_min": 0.644, "f_max": 0.710, "spread": 0.066,
+                  "spread_over_bootstrap_p50": 0.68},
+    "scrambled": {"f_min": 0.795, "f_max": 0.894, "spread": 0.099,
+                  "spread_over_bootstrap_p50": 0.78},
+    "cells_per_join": 2464,
 }
 
 
@@ -182,6 +199,14 @@ def build_joins(pairs: list[dict]) -> tuple[dict, dict]:
 # compute
 # --------------------------------------------------------------------------
 
+def frozen_census() -> dict:
+    with open(SNAPSHOT) as handle:
+        snapshot = json.load(handle)
+    return {key: snapshot[key] for key in
+            ("measured_utc", "sweeps_on_share", "corpus_entries",
+             "scored_sidecars", "scored_digest")}
+
+
 def compute() -> dict:
     pairs, census = cr.load_pairs(LITE)
     if not pairs:
@@ -217,7 +242,7 @@ def compute() -> dict:
         }
 
     return {"corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*",
-            "mirror": str(LITE), "census": census,
+            "mirror": str(LITE), "snapshot": frozen_census(), "census": census,
             "pairs_loaded": len(pairs),
             "pairs_matched_arm": sum(1 for p in pairs if p["matched_arm"]),
             "entries": len(entries), "methods": methods,
@@ -249,7 +274,7 @@ def plot(data: dict) -> None:
         "xtick.color": MUTED, "ytick.color": MUTED,
     })
     fig, (left, right) = plt.subplots(
-        1, 2, figsize=(12.6, 7.1), dpi=150,
+        1, 2, figsize=(13.4, 9.4), dpi=150,
         gridspec_kw={"width_ratios": [1.5, 1]}, facecolor=SURFACE)
 
     # ---- left: f per algorithm -------------------------------------------
@@ -305,6 +330,11 @@ def plot(data: dict) -> None:
                     "connectionstyle": "arc3,rad=0.22"})
 
     # ---- right: the spread against its own sampling noise -----------------
+    # The axis is scaled to the data: at 2,464 cells per join the spreads sat
+    # near 0.10 and a fixed 0..0.30 axis was right; at 16,560 they sit near
+    # 0.04 and the same axis would crush all three marks onto the floor.
+    ceiling = max(max(item["spread"] for item in joins.values()),
+                  max(item["bootstrap_spread"]["p95"] for item in joins.values()))
     for column, (name, _) in enumerate(COLUMNS):
         item = joins[name]
         boot = item["bootstrap_spread"]
@@ -316,8 +346,13 @@ def plot(data: dict) -> None:
         right.plot([column], [item["spread"]], marker="o", markersize=13,
                    color=INK, markerfacecolor=SURFACE, markeredgewidth=2.6,
                    linestyle="none", zorder=3)
-        right.text(column - 0.29, item["spread"], f"{item['spread']:.3f}",
-                   ha="right", va="center", fontsize=11.5, color=INK)
+        right.text(column, item["spread"] + ceiling * 0.115,
+                   f"{item['spread']:.3f}", ha="center", va="bottom",
+                   fontsize=11.5, color=INK)
+        right.text(column, item["bootstrap_spread"]["p05"] - ceiling * 0.075,
+                   "%.2f\u00d7 its own\nsampling noise"
+                   % item["spread_over_bootstrap_p50"], ha="center", va="top",
+                   fontsize=9.5, color=MUTED, linespacing=1.35)
 
     right.plot([], [], marker="o", markersize=11, color=INK,
                markerfacecolor=SURFACE, markeredgewidth=2.4, linestyle="none",
@@ -331,7 +366,7 @@ def plot(data: dict) -> None:
     right.set_xticks(range(len(COLUMNS)))
     right.set_xticklabels(["real", "shifted", "scrambled"], fontsize=11.5)
     right.set_xlim(-0.62, len(COLUMNS) - 0.38)
-    right.set_ylim(0.0, 0.30)
+    right.set_ylim(0.0, ceiling * 2.7)
     right.set_ylabel("spread of $f$ across the 8 algorithms\n"
                      "(max \u2212 min, $f$ units)")
     right.set_title("the spread \u2014 the quantity used as evidence \u2014\n"
@@ -348,40 +383,66 @@ def plot(data: dict) -> None:
         "on sky the two radios never shared,\n"
         "the eight agree BETTER than sampling\n"
         "noise alone predicts \u2014 no failure mode",
-        xy=(1.80, joins["scrambled"]["spread"] - 0.006), xytext=(1.42, 0.056),
+        xy=(2.0, joins["scrambled"]["bootstrap_spread"]["p95"] + ceiling * 0.06),
+        xytext=(1.02, ceiling * 1.80),
         ha="center", va="top", fontsize=10.5, color=INK, linespacing=1.4,
         arrowprops={"arrowstyle": "->", "color": INK, "linewidth": 1.5,
-                    "connectionstyle": "arc3,rad=-0.28"})
+                    "connectionstyle": "arc3,rad=-0.25"})
 
     handles, labels = left.get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=4, frameon=True,
                framealpha=1.0, edgecolor=GRID, facecolor=SURFACE,
                fontsize=10.5, handletextpad=0.5, columnspacing=1.6,
-               bbox_to_anchor=(0.5, 0.088), borderpad=0.6)
+               bbox_to_anchor=(0.5, 0.205), borderpad=0.6)
 
     fig.suptitle("The consistency check cannot fail: eight algorithms agree on $f$ "
                  "on joins where the model is definitionally false",
                  fontsize=15, y=0.985, color=INK)
-    fig.text(0.5, 0.012,
-             f"{joins['real']['cells']:,} matched-arm cells in each of the three joins "
-             f"({data['pairs_matched_arm']} paired sweeps, {data['entries']} scored "
-             "sidecars).  Thresholds and the empty-sky rate p are drawn once from the "
-             "cross-edge null arms and held\nfixed across all three joins; only the join "
-             "changes.  Scrambled pairings are a median "
+    snap = data.get("snapshot") or {}
+    fig.text(0.5, 0.008,
+             f"{joins['real']['cells']:,} matched-arm cells in each of the three "
+             f"joins \u2014 {data['pairs_matched_arm']:,} matched-arm paired "
+             f"sweeps, {data['entries']:,} scored sidecars in a pair.\n"
+             "Thresholds and the empty-sky rate p are drawn once from the "
+             "cross-edge null arms and held fixed across all three joins;\n"
+             "only the join changes.  Scrambled pairings are a median "
              f"{data['scramble_separation']['median_s'] / 60:.0f} min apart "
-             f"(minimum {data['scramble_separation']['min_s'] / 60:.1f} min).  "
-             "Estimator: leo_tracker.radio.beacon.cross_radio, unmodified.",
-             ha="center", va="bottom", fontsize=9.5, color=MUTED, linespacing=1.5)
-    fig.tight_layout(rect=(0, 0.175, 1, 0.945))
+             f"(minimum {data['scramble_separation']['min_s'] / 60:.0f} min).\n"
+             "CENSUS frozen before any figure was computed and shared with all "
+             f"six (digest {snap.get('scored_digest', '?')}):\n"
+             f"{snap.get('sweeps_on_share', 0):,} sweeps  |  "
+             f"{snap.get('corpus_entries', 0):,} corpus entries  |  "
+             f"{snap.get('scored_sidecars', 0):,} scored sidecars.\n"
+             f"Previously reported at {REPORTED_AT_2464_CELLS['cells_per_join']:,}"
+             " cells per join: real "
+             f"{REPORTED_AT_2464_CELLS['real']['f_min']:.3f}\u2013"
+             f"{REPORTED_AT_2464_CELLS['real']['f_max']:.3f}, shifted "
+             f"{REPORTED_AT_2464_CELLS['shifted']['f_min']:.3f}\u2013"
+             f"{REPORTED_AT_2464_CELLS['shifted']['f_max']:.3f}, scrambled "
+             f"{REPORTED_AT_2464_CELLS['scrambled']['f_min']:.3f}\u2013"
+             f"{REPORTED_AT_2464_CELLS['scrambled']['f_max']:.3f}\n"
+             "\u2014 recomputed here at 6.7\u00d7 the cells, not replaced by it."
+             "  Estimator: leo_tracker.radio.beacon.cross_radio, unmodified.",
+             ha="center", va="bottom", fontsize=9.5, color=MUTED,
+             linespacing=1.5)
+
+    fig.tight_layout(rect=(0, 0.290, 1, 0.945))
     fig.savefig(OUT_PNG, dpi=150, facecolor=SURFACE)
     print(f"wrote {OUT_PNG}")
 
 
-def main() -> int:
+def main(argv: list[str]) -> int:
+    if "--replot" in argv and OUT_JSON.is_file():
+        # Every number plot() draws is already in the JSON this script wrote,
+        # so a layout change does not need a second pass over the corpus.  The
+        # data path is untouched: --replot cannot compute anything.
+        plot(json.loads(OUT_JSON.read_text()))
+        return 0
     data = compute()
     for name, item in data["joins"].items():
         got = REPORTED.get(name, {})
         item["reported_in_retraction_brief"] = got
+        item["reported_at_2464_cells"] = REPORTED_AT_2464_CELLS.get(name, {})
         item["agrees_with_brief"] = {
             key: (abs(item[key] - got[key]) <= 0.01) if key in got else None
             for key in ("f_min", "f_max", "spread")}
@@ -398,6 +459,19 @@ def main() -> int:
             shifted["spread_over_bootstrap_p50"] < real["spread_over_bootstrap_p50"]),
         "shifted_spread_tighter_than_real_relative_to_f": (
             shifted["spread_over_mean_f"] < real["spread_over_mean_f"]),
+        "controls_still_fail_to_separate_on_spread": all(
+            item["spread"] <= item["bootstrap_spread"]["p50"]
+            for item in data["joins"].values()),
+        "f_drift_across_snapshots": {
+            "real_f_mean_here": real["f_mean"],
+            "real_f_min_max_here": [real["f_min"], real["f_max"]],
+            "real_reported_at_2464_cells": [
+                REPORTED_AT_2464_CELLS["real"]["f_min"],
+                REPORTED_AT_2464_CELLS["real"]["f_max"]],
+            "real_reported_in_retraction_brief": [
+                REPORTED["real"]["f_min"], REPORTED["real"]["f_max"]],
+            "cells_here": real["cells"],
+            "cells_reported": REPORTED_AT_2464_CELLS["cells_per_join"]},
     }
     OUT_JSON.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n")
     print(f"wrote {OUT_JSON}")
@@ -406,4 +480,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

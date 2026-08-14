@@ -4,9 +4,17 @@
 Replicates ``cross_radio.load_pairs`` filtering exactly (schema, manifest,
 synchronised_scan.paired_sweep, exactly two radios per sweep, geometry not
 irregular) but keeps only the per-point columns the figures need, because the
-full sidecars are ~7 GB of JSON and this host has 4 GB of RAM.
+full sidecars are 4.7 GB of JSON and this host has 4 GB of RAM.
 
-Output: cfo-port-corpus.npz in the same directory.
+CHANGED FOR THE FULL-CORPUS PASS (2026-08-14), plumbing only: the source is the
+verbatim mirror ``extract_lite.py`` writes from ``snapshot.py``'s frozen
+directory list, not a live glob of the share.  ``leo-sync-import.timer`` is
+still draining, so a glob taken per-script would hand each figure a different
+population -- exactly the two-snapshot problem this pass exists to end.  Every
+score in the mirror is copied verbatim from the corpus and the manifests are
+byte-identical, so the filtering and the numbers are unchanged.
+
+Output: cfo-port-corpus.npz under the work directory.
 """
 from __future__ import annotations
 
@@ -19,9 +27,11 @@ from multiprocessing import Pool
 
 import numpy as np
 
-CORPUS = "/mnt/qnap01/mouse9911/leo/surveys/corpus"
 HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "cfo-port-corpus.npz")
+WORK = os.environ.get("REFRESH_WORK", os.path.join(os.path.dirname(HERE), "work"))
+CORPUS = os.environ.get("LITE_ROOT", os.path.join(WORK, "lite"))
+SNAPSHOT = os.path.join(WORK, "snapshot.json")
+CACHE = os.path.join(WORK, "cfo-port-corpus.npz")
 
 # --- constants lifted verbatim from the pipeline -------------------------
 SCORES_SCHEMA = "leo-tracker.survey-detector-comparison/v2"   # survey_scoring
@@ -111,13 +121,25 @@ def read_one(directory: str):
     })
 
 
+def frozen_dirs() -> list[str]:
+    """The snapshot's directory list, so every figure sees one population."""
+    with open(SNAPSHOT) as handle:
+        names = json.load(handle)["scored"]
+    return [os.path.join(CORPUS, name) for name in names]
+
+
+def snapshot_digest() -> str:
+    with open(SNAPSHOT) as handle:
+        return json.load(handle)["scored_digest"]
+
+
 def main() -> None:
-    dirs = sorted(glob.glob(os.path.join(CORPUS, "sync-*")))
+    dirs = frozen_dirs()
     census = defaultdict(int)
     census["scanned"] = len(dirs)
     grouped = defaultdict(list)
 
-    with Pool(2) as pool:
+    with Pool(3) as pool:
         for i, (status, entry) in enumerate(
                 pool.imap_unordered(read_one, dirs, chunksize=16)):
             census[status] += 1
@@ -162,6 +184,7 @@ def main() -> None:
         census_keys=np.array(sorted(census)),
         census_vals=np.array([census[k] for k in sorted(census)], np.int64),
         entries=np.array(len(kept)),
+        snapshot_digest=np.array(snapshot_digest()),
     )
     print(json.dumps(dict(sorted(census.items())), indent=2))
     print(f"entries kept: {len(kept)}   points: {len(cfo)}   -> {CACHE}")

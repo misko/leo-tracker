@@ -4,17 +4,27 @@
 # WHERE THE DATA IS. The collector writes sync-<UTC>/ directories to the capture
 # host's NVMe at /mnt/leo-nvme/leo-tracker/sync-scans, roughly 63 GB/h. This
 # script runs on the analysis host, which reads the QNAP share and cannot see
-# that NVMe, so the sweeps have to be copied first:
+# that NVMe. Nobody copies them by hand: leo-sync-drain.service runs
+# syncdrain.sh on the capture host, which moves finished sweeps to the share in
+# verified batches and deletes the local copy only once every file has matched
+# its source byte for byte. Its destination is
 #
-#   # on the capture Pi, and it is 180 GB and growing, so expect hours:
-#   rsync -a --info=progress2 --exclude 'collector.log' \
-#         /mnt/leo-nvme/leo-tracker/sync-scans/ \
-#         /mnt/qnap01/mouse9911/leo/sync-scans/
+#   /mnt/qnap01/mouse9911/leo-scans
 #
-# rsync only whole sweeps: the collector writes the IQ before sweep.json, so a
+# and that is the one and only place the sweeps land.
+#
+# THAT PATH IS NOT UNDER THE SHARED ROOT. leo-scans is its own top-level dataset
+# on the share, a *sibling* of the shared root (/mnt/qnap01/mouse9911/leo) and
+# not a directory inside it, exactly like leo-cropped. So --sweep-root does not
+# default to something derived from SHARED_ROOT: the drain decides where the
+# sweeps are, this script only reads them, and a default computed here would be
+# a second opinion about the same path that drifts the moment either moves. Set
+# LEO_SYNC_SWEEP_ROOT to override it without touching the shared root.
+#
+# Only whole sweeps count: the collector writes the IQ before sweep.json, so a
 # directory without sweep.json is one still being written. This script skips
-# those and counts them rather than reporting them as broken, so an rsync that
-# raced the collector costs nothing but a second pass.
+# those and counts them rather than reporting them as broken, so reading the
+# share while the drain is mid-batch costs nothing but a second pass.
 #
 # The script does NOT require the share. --sweep-root takes any directory of
 # sweeps and --corpus-root any destination, so it runs equally well on the
@@ -50,11 +60,17 @@ Import the interim synchronised sweeps into a survey corpus and score every
 preserved probe with every candidate detector. Safe to re-run: imported sweeps
 and scored entries are skipped, so an interrupted run resumes.
 
-  --sweep-root DIR      sweep directories (default: SHARED_ROOT/sync-scans).
-                        The collector writes them to the capture host's NVMe;
-                        get them here with rsync, e.g.
+  --sweep-root DIR      sweep directories, or $LEO_SYNC_SWEEP_ROOT. Default:
+                          /mnt/qnap01/mouse9911/leo-scans
+                        That is where the drain -- leo-sync-drain.service on
+                        the capture host -- moves finished sweeps, in verified
+                        batches, all by itself. It is a sibling of SHARED_ROOT
+                        and not a directory in it, so it is not derived from
+                        SHARED_ROOT.
+                        Nothing to copy by hand; if you ever must, rsync to
+                        that same directory and nowhere else:
                           rsync -a /mnt/leo-nvme/leo-tracker/sync-scans/ \
-                                   /mnt/qnap01/mouse9911/leo/sync-scans/
+                                   /mnt/qnap01/mouse9911/leo-scans/
                         Or point this at any directory of sweeps, including the
                         NVMe itself on the capture host.
   --corpus-root DIR     corpus to import into and score
@@ -105,7 +121,12 @@ done
 if (( $# > 1 )); then usage >&2; exit 2; fi
 
 shared_root="${1:-${LEO_OFFLOAD_ROOT:-/mnt/qnap01/mouse9911/leo}}"
-sweep_root="${sweep_root:-${shared_root}/sync-scans}"
+# Deliberately NOT ${shared_root}/sync-scans, and deliberately not derived from
+# ${shared_root} at all: the sweeps are wherever syncdrain.sh's DST puts them,
+# which is a top-level dataset beside the shared root rather than inside it.
+# The corpus below is this script's own output and does belong to the shared
+# root, so that one is still derived.
+sweep_root="${sweep_root:-${LEO_SYNC_SWEEP_ROOT:-/mnt/qnap01/mouse9911/leo-scans}}"
 corpus_root="${corpus_root:-${shared_root}/surveys/sync-corpus}"
 repo_dir="${LEO_TRACKER_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 uv_bin="${UV_BIN:-$(command -v uv || true)}"
@@ -125,8 +146,9 @@ fi
 # sweeps had all been analysed.
 if (( do_import )) && [[ ! -d "${sweep_root}" ]]; then
   echo "no sweeps at ${sweep_root}" >&2
-  echo "the collector writes them to the capture host's NVMe; rsync them here" >&2
-  echo "  rsync -a /mnt/leo-nvme/leo-tracker/sync-scans/ ${sweep_root}/" >&2
+  echo "that directory is where leo-sync-drain.service moves finished sweeps;" >&2
+  echo "if it is missing, check the drain and the share mount before copying" >&2
+  echo "anything by hand:  systemctl status leo-sync-drain" >&2
   exit 2
 fi
 
@@ -160,6 +182,22 @@ echo "cores:          ${cores}"
 echo "import workers: ${import_workers} (I/O bound: a read, a SHA-256, a rename)"
 echo "score workers:  ${score_workers} (each is 3 OpenMP threads, so not one per core)"
 if (( plan )); then
+  # Count the sweeps rather than only naming the directory. A plan that prints
+  # a path proves the path was spelled, not that anything is there -- which is
+  # exactly how a default pointing at an empty directory survived. It is one
+  # readdir plus a stat per sweep, seconds on the share, and reads nothing.
+  if (( do_import )); then
+    finished=0
+    unfinished=0
+    for sweep in "${sweep_root}"/sync-*/; do
+      if [[ -f "${sweep}sweep.json" ]]; then
+        finished=$(( finished + 1 ))
+      elif [[ -d "${sweep}" ]]; then
+        unfinished=$(( unfinished + 1 ))
+      fi
+    done
+    echo "finished sweeps: ${finished} (${unfinished} still being written)"
+  fi
   echo "--plan: nothing was imported and nothing was scored"
   exit 0
 fi
@@ -192,28 +230,90 @@ if (( do_import )); then
   # names are UTC stamps and the arm is drawn per sweep, so a contiguous split
   # would hand one worker an hour of whichever arm was running then.
   mkdir -p "${corpus_root}"
+  # What the corpus already holds, read in one pass. The test has to be the
+  # importer's own entry_complete(), not "manifest.json exists": the manifest
+  # also names the size it wrote, and an entry whose IQ was truncated or whose
+  # schema is stale is NOT finished. Testing only for the file would skip such
+  # an entry here as done and it would never be repaired, turning silent
+  # corruption into a green report. Reading each manifest costs more than
+  # globbing for one, but it is still a single pass, so the deal stays linear
+  # in the corpus rather than quadratic. Called rather than reimplemented in
+  # bash, because a second copy of the rule is how it drifted in the first
+  # place.
+  declare -A committed=()
+  if (( ! rebuild )); then
+    while IFS= read -r entry; do
+      [[ -n "${entry}" ]] && committed["${entry}"]=1
+    done < <(nice -n "${niceness}" "${repo_env[@]}" "${uv_bin}" run --active \
+               --no-sync python - "${corpus_root}" <<'PY'
+import sys
+from pathlib import Path
+
+from leo_tracker.radio.beacon.sync_import import entry_complete
+
+root = Path(sys.argv[1])
+if root.is_dir():
+    for entry in sorted(root.iterdir()):
+        if entry.is_dir() and entry_complete(entry):
+            print(entry.name)
+PY
+    )
+  fi
+  # A sweep is done when every radio it captured has a committed entry. The
+  # radios are counted from the sweep's own IQ files, which is what the entries
+  # are named after, so this stays a stat and never a JSON parse.
+  sweep_committed() {
+    local sweep="$1" sweep_id iq radio wanted=0 held=0
+    sweep_id="${sweep%/}"; sweep_id="${sweep_id##*/}"
+    for iq in "${sweep}"*.ci16; do
+      [[ -f "${iq}" ]] || continue
+      radio="${iq##*/}"; radio="${radio%.ci16}"
+      wanted=$(( wanted + 1 ))
+      if [[ -n "${committed["${sweep_id}-${radio}"]:-}" ]]; then
+        held=$(( held + 1 ))
+      fi
+    done
+    (( wanted > 0 && held == wanted ))
+  }
   dealt=0
+  done_already=0
   for sweep in "${sweep_root}"/sync-*/; do
     [[ -f "${sweep}sweep.json" ]] || continue
+    # Skip what is already imported BEFORE the limit is spent on it. --limit N
+    # is documented as "bound this pass, then run it again": counting sweeps
+    # that are already in the corpus deals every pass the same first N, they
+    # all come back "already imported", and the corpus stops growing after
+    # pass one however many times the operator re-runs it.
+    if (( ! rebuild )) && sweep_committed "${sweep}"; then
+      done_already=$(( done_already + 1 ))
+      continue
+    fi
     printf '%s\n' "${sweep%/}" >> "${shard_root}/import-$(( dealt % import_workers )).list"
     dealt=$(( dealt + 1 ))
     if [[ -n "${limit}" ]] && (( dealt >= limit )); then break; fi
   done
   if (( dealt == 0 )); then
+    # An empty share and a finished corpus must not print the same line either:
+    # now that already-imported sweeps are skipped before the deal, "nothing to
+    # deal" is the ordinary end state of a completed import and has to say so.
+    if (( done_already )); then
+      echo "all ${done_already} finished sweeps are already in ${corpus_root}"
     # A sweep is a directory. Observed on the share while this was written: a
     # drain was copying every sweep's three files into one flat directory, so
     # the path existed, held 102 MB of IQ, and contained not one sweep. Saying
     # "no finished sweeps" there sends the operator to look for a transfer that
     # has already run and destroyed what it moved.
-    if compgen -G "${sweep_root}/*.ci16" > /dev/null; then
+    elif compgen -G "${sweep_root}/*.ci16" > /dev/null; then
       echo "${sweep_root} holds loose .ci16 files and no sync-<UTC>/ directories" >&2
       echo "a sweep is a directory of pluto-*.ci16 plus sweep.json; whatever" >&2
       echo "wrote these flattened them, and one sweep's files overwrite the next" >&2
       exit 2
+    else
+      echo "no finished sweeps at ${sweep_root}"
     fi
-    echo "no finished sweeps at ${sweep_root}"
   else
-    echo "dealing ${dealt} sweeps into ${import_workers} import workers"
+    echo "dealing ${dealt} sweeps into ${import_workers} import workers" \
+         "(${done_already} already imported)"
     extra=()
     (( rebuild )) && extra+=(--rebuild)
     (( copy )) && extra+=(--copy)

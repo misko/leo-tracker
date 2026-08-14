@@ -21,20 +21,33 @@ here rather than trusted:
 * confirmation leaves the scored method out.  A cell only method M fires on is
   M's claim; counting it as evidence for M is the circularity the whole
   cross-radio construction exists to escape.
+* **the f-agreement check is printed with its negative controls or not at
+  all.**  The check passed on the corpus, and it also passed on a join of two
+  radios from different sweeps and on a join with one radio shifted two
+  instants — data the coincidence model cannot fit by construction.  A check
+  that cannot fail certifies nothing, so the controls are rebuilt every run and
+  :data:`CONSISTENT_VERDICT` is unreachable unless they separate.  Two tests
+  below hold both ends of that: one that the pass token is absent when the
+  controls do not separate, one that it appears when they do, so neither can be
+  satisfied by a formatter that simply never prints it.
 
 Synthetic sidecars throughout, with the arithmetic small enough to check by
 hand: a real probe cannot show whether the join transposed.
 """
+import copy
 import json
 import math
 
 import pytest
 
 from leo_tracker.radio.beacon.cross_radio import (
-    CROSS_RADIO_SCHEMA, DEAD_RECEIVERS, OFFSET_BINS_HZ, cell_false_alarm,
-    channel_instant_verdicts, format_review, guard_band_curve, join_cells,
-    join_null_cells, load_pairs, method_roc, null_thresholds, review,
-    solve_coincidence)
+    AXIS_MIN_CELLS, AXIS_MIN_METHODS, CONSISTENT_VERDICT, CONTROL_SHIFT,
+    CROSS_RADIO_SCHEMA, DEAD_RECEIVERS, OFFSET_BINS_HZ, UNTESTED_VERDICT,
+    VACUOUS_VERDICT,
+    axis_movement, cell_false_alarm, channel_instant_verdicts,
+    consistency_verdict, format_review, guard_band_curve, join_cells,
+    join_null_cells, load_pairs, method_roc, negative_controls, null_thresholds,
+    review, scrambled_cells, shifted_cells, solve_coincidence)
 from leo_tracker.radio.beacon.survey_scoring import SCORES_SCHEMA
 
 #: A point score that clears any threshold these fixtures calibrate, and one
@@ -758,3 +771,437 @@ def test_a_corpus_with_no_pairs_says_so_instead_of_printing_zeroes(tmp_path):
     assert report["pairs"]["joined"] == 0
     assert report["occupancy"]["f_spread"]["methods"] == 0
     assert "no paired sweep" in text.lower()
+    # An empty corpus has no control either, so it certifies nothing.
+    assert CONSISTENT_VERDICT not in text
+
+
+# --------------------------------------------------------------------------
+# the negative controls, which are the only thing that makes the f check mean
+# anything at all
+# --------------------------------------------------------------------------
+
+#: A sky where the two receiver pairs genuinely disagree about f.
+#:
+#: lnb-c coincides with lnb-b on 2 of its 8 instants and lnb-d on 3 of its 8,
+#: which the model resolves to f 0.600 against 0.529 — a gap of 0.071, close to
+#: the +0.072 the reviewers measured between f(c|b) and f(d|b) on the corpus.
+#: Every algorithm scores identical samples here, so the algorithm axis spread
+#: is exactly zero while the receiver-pair axis is not: the two axes are the
+#: point of the comparison and this fixture separates them by construction.
+_PAIRED_SKY = {"lnb-c": (0, 1, 6), "lnb-d": (0, 1, 2, 7), "lnb-b": (0, 1, 2, 3)}
+
+
+def _pair_split(instant, label):
+    return [_point(METHODS if instant in _PAIRED_SKY.get(label, ()) else ())]
+
+
+def _corpus(root, sweeps, **kwargs):
+    """``sweeps`` synchronised sweeps that differ only in their timestamp."""
+    for index in range(sweeps):
+        _sweep(root, f"20260814T0100{index:02d}Z", **kwargs)
+
+
+def test_the_review_builds_both_negative_controls_every_run(tmp_path):
+    """The controls are not a flag, and the report is not correct without them.
+
+    The f-agreement check passed on the corpus and also passed on a join of two
+    radios taken from *different sweeps* and on a join with one radio moved two
+    instants — two joins where the coincidence model is false by construction,
+    since neither pairs two chains that ever looked at one instant together.  A
+    check that passes on those is not testing anything, so both are rebuilt on
+    every run, through the same thresholds and the same per-cell p, and printed
+    in the same table as the real estimate.
+    """
+    _corpus(tmp_path, 4, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    text = format_review(report)
+
+    controls = {control["name"]: control
+                for control in report["occupancy"]["controls"]}
+    assert sorted(controls) == ["scrambled", f"shifted +{CONTROL_SHIFT}"]
+    for control in controls.values():
+        assert control["cell_count"] > 0, (
+            "a control with no cells cannot say whether the check can fail")
+        assert control["f_spread"]["methods"] == 8
+    assert "NEGATIVE CONTROL" in text
+    for name in controls:
+        assert name in text
+    # The real estimate and both controls are in one table, in the same units,
+    # because the whole failure this section exists to prevent was one number
+    # being read on its own.
+    block = text.split("NEGATIVE CONTROLS")[1].split("WHERE f")[0]
+    assert "real" in block and "scrambled" in block
+
+
+def test_the_controls_go_through_the_same_pipeline_as_the_real_estimate(tmp_path):
+    """A control computed some other way is a control for that other way.
+
+    Both joins go through the same cell construction, the same thresholds and
+    the same per-cell empty-sky rate the real estimate uses, so that a
+    difference between them can only be the broken pairing.  Starve them of the
+    corpus's ``p`` and every one of them goes unsolvable, which is what shows
+    the rate really flows in from outside rather than being invented inside the
+    control.  The resample seed is fixed for the same reason it is fixed for the
+    real join: a review that moves when nothing moved cannot be compared against
+    yesterday's.
+    """
+    _corpus(tmp_path, 4, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+    pairs, _census = load_pairs(tmp_path)
+    entries = [entry for pair in pairs for entry in pair["radios"]]
+    thresholds = null_thresholds(entries,
+                                 false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    rates = cell_false_alarm(entries, thresholds)
+
+    built = negative_controls(pairs, thresholds, rates, list(METHODS))
+    again = negative_controls(pairs, thresholds, rates, list(METHODS))
+    starved = negative_controls(pairs, thresholds, {}, list(METHODS))
+
+    assert [control["name"] for control in built] == [
+        "scrambled", f"shifted +{CONTROL_SHIFT}"]
+    assert built == again, "the controls have to be reproducible run to run"
+    assert all(control["f_spread"]["methods"] == 0 for control in starved), (
+        "the controls must take the corpus's own p, never one of their own")
+
+
+def test_the_scrambled_control_joins_radios_from_different_sweeps(tmp_path):
+    """A control that quietly re-ran the real join would prove nothing.
+
+    So this pins the thing that makes it a control: every cell's A side and B
+    side come from *different* sweeps, while the arm and the geometry are held
+    matched so a wider spread cannot be blamed on the sample rate instead of on
+    the broken pairing.
+    """
+    _corpus(tmp_path, 4, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    pairs, _census = load_pairs(tmp_path)
+    cells, census = scrambled_cells(pairs)
+
+    assert cells
+    assert census["sweeps_joined"] == 4
+    for cell in cells:
+        assert cell["a_sweep"] != cell["b_sweep"], (
+            "the A and B sides of a scrambled cell must come from two sweeps")
+        assert cell["a"]["radio_id"] != cell["b"]["radio_id"]
+        assert cell["a"]["sample_rate_hz"] == cell["b"]["sample_rate_hz"]
+        assert cell["a"]["instant"] == cell["b"]["instant"]
+
+
+def test_the_shifted_control_moves_the_second_radio_off_the_instant(tmp_path):
+    """One sweep, one pair of radios, one arm — and the wrong moment.
+
+    It is the harsher control precisely because so little changes: whatever the
+    real join measures that survives a two-instant shift is not simultaneity.
+    A shift of one would only swap the edge on a two-edges-per-channel order,
+    which is a geometry the real join already contains.
+    """
+    _corpus(tmp_path, 2, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    pairs, _census = load_pairs(tmp_path)
+    cells, census = shifted_cells(pairs)
+
+    assert cells
+    assert census["shift"] == CONTROL_SHIFT
+    for cell in cells:
+        assert cell["a_sweep"] == cell["b_sweep"]
+        assert cell["peer_instant"] == cell["instant"] + CONTROL_SHIFT
+        assert cell["a"]["instant"] != cell["b"]["instant"]
+
+
+def test_a_check_the_controls_also_pass_is_printed_vacuous_never_certified(tmp_path):
+    """The whole point. Two reviews measured this on the real corpus:
+
+    ``f`` spread 0.050 on the real pairing, 0.075 on the scrambled join and
+    **0.045** on the shifted one — the shifted control, which cannot contain any
+    simultaneous sky at all, agreed *more* closely than the truth.  The eight
+    algorithms correlate with each other at phi 0.82 to 0.94 over the 2160
+    target observations, so they are near-duplicates and their f values agree
+    whatever they are fed.
+
+    Here every algorithm fires on identical samples, so all three joins return a
+    spread of zero and neither control separates.  The report must say the check
+    is vacuous in its own headline and must not print the pass token anywhere.
+    """
+    _corpus(tmp_path, 4, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    text = format_review(report)
+    consistency = report["occupancy"]["consistency"]
+
+    assert consistency["vacuous"] is True
+    assert consistency["certified"] is False
+    assert consistency["verdict"] == VACUOUS_VERDICT
+    assert sorted(consistency["controls_that_failed"]) == [
+        "scrambled", f"shifted +{CONTROL_SHIFT}"]
+    # The pass token is a module constant so that its absence can be asserted.
+    # Nothing in the text may certify the model while the controls sit level
+    # with the real join.
+    assert CONSISTENT_VERDICT not in text
+    assert VACUOUS_VERDICT in text
+    # And it leads: a reader who stops after the first screen has already been
+    # told the check does not discriminate.
+    assert text.index("HEADLINE") < text.index("OCCUPANCY f")
+    assert "CANNOT be read as evidence" in text
+    assert "NOTHING BELOW IS VALIDATED" in text
+
+
+def test_the_pass_token_does_print_once_the_controls_come_apart(tmp_path):
+    """The other end of the red-green pair, so the assertion above has teeth.
+
+    A formatter that simply never printed a pass would satisfy the test above
+    and would be just as useless as one that always printed it: the operator
+    could no longer tell a check that discriminates from one that does not.  So
+    the same report, with the controls' spreads replaced by ones that clear the
+    real join's resampled interval, has to reach the pass token.
+    """
+    _corpus(tmp_path, 4, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+
+    assert CONSISTENT_VERDICT not in format_review(report)
+
+    separated = copy.deepcopy(report)
+    for control in separated["occupancy"]["controls"]:
+        control["f_spread"].update(
+            methods=8, min=0.20, max=0.62, spread=0.42, ratio=3.1,
+            sampling={"draws": 200, "observed": 0.42, "p05": 0.31, "p50": 0.42,
+                      "p95": 0.55, "basis": "constructed for this test"})
+    separated["occupancy"]["consistency"] = consistency_verdict(
+        separated["occupancy"]["f_spread"], separated["occupancy"]["controls"])
+    text = format_review(separated)
+
+    assert separated["occupancy"]["consistency"]["certified"] is True
+    assert CONSISTENT_VERDICT in text
+    # Even a pass is only a necessary condition: there is still no injection.
+    assert "not sufficient" in text
+
+
+def test_the_banner_names_the_control_that_failed_rather_than_summarising(tmp_path):
+    """One control separating and the other not is its own state.
+
+    A fixed sentence reading "neither control separates" would print over the
+    top of it and tell the operator something that did not happen — which is
+    the same class of mistake as the verdict this whole section replaced.  So
+    the banner names the joins that actually failed.
+    """
+    _corpus(tmp_path, 4, target_a=_planted_a, target_b=_planted_b,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+
+    partial = copy.deepcopy(report)
+    scrambled = partial["occupancy"]["controls"][0]
+    assert scrambled["name"] == "scrambled"
+    scrambled["f_spread"].update(
+        methods=8, min=0.20, max=0.62, spread=0.42, ratio=3.1,
+        sampling={"draws": 200, "observed": 0.42, "p05": 0.31, "p50": 0.42,
+                  "p95": 0.55, "basis": "constructed for this test"})
+    partial["occupancy"]["consistency"] = consistency_verdict(
+        partial["occupancy"]["f_spread"], partial["occupancy"]["controls"])
+    text = format_review(partial)
+
+    assert partial["occupancy"]["consistency"]["controls_that_failed"] == [
+        f"shifted +{CONTROL_SHIFT}"]
+    assert CONSISTENT_VERDICT not in text
+    assert VACUOUS_VERDICT in text
+    banner = text.split(">>> VERDICT:")[1].split("WHERE f")[0]
+    assert f"shifted +{CONTROL_SHIFT} destroys" in banner
+    assert "scrambled destroys" not in banner
+
+
+def test_one_control_that_fails_to_separate_is_enough_to_void_the_check():
+    """Averaging the controls would let the harsher one hide behind the other.
+
+    These are the numbers the reviewers measured: the scrambled join comes apart
+    a little, the shifted join does not come apart at all and is in fact tighter
+    than the real pairing.  One definitionally-false join that the check passes
+    is a demonstration that the check passes on anything, so the verdict is
+    vacuous even though the other control behaved.
+    """
+    real = {"methods": 8, "spread": 0.050, "ratio": 1.18,
+            "sampling": {"draws": 300, "p05": 0.031, "p95": 0.078}}
+    scrambled = {"name": "scrambled", "cell_count": 2144, "f_spread": {
+        "methods": 8, "spread": 0.075, "ratio": 1.12,
+        "sampling": {"draws": 300, "p05": 0.091, "p95": 0.140}}}
+    shifted = {"name": "shifted +2", "cell_count": 1890, "f_spread": {
+        "methods": 8, "spread": 0.045, "ratio": 1.07,
+        "sampling": {"draws": 300, "p05": 0.028, "p95": 0.071}}}
+
+    both = consistency_verdict(real, [scrambled, shifted])
+    alone = consistency_verdict(real, [scrambled])
+    none_at_all = consistency_verdict(real, [])
+
+    assert both["verdict"] == VACUOUS_VERDICT
+    assert both["controls_that_failed"] == ["shifted +2"]
+    assert both["controls_tighter_than_real"] == ["shifted +2"]
+    assert alone["verdict"] == CONSISTENT_VERDICT
+    assert alone["certified"] is True
+    # No control at all is not a pass either. Absence of a failing test is not
+    # a passing test, and this is the state a thin corpus produces.
+    assert none_at_all["verdict"] == UNTESTED_VERDICT
+    assert none_at_all["certified"] is False
+
+
+def test_a_corpus_too_thin_for_a_control_is_not_certified(tmp_path):
+    """One sweep of one channel can form neither control, so it certifies nothing.
+
+    There is no second sweep to donate a B side and only two instants, which a
+    two-instant shift walks straight off the end of.  ``f`` is still estimable
+    and still perfectly consistent across the eight algorithms — which is
+    exactly the state in which the old report would have certified the model.
+    It has to say the check was not tested instead.
+    """
+    _sweep(tmp_path, "20260814T010900Z", channels=(1,), target_a=_planted_a,
+           target_b=_planted_b, nulls_a=_quiet, nulls_b=_quiet)
+
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    text = format_review(report)
+
+    assert all(control["cell_count"] == 0
+               for control in report["occupancy"]["controls"])
+    assert report["occupancy"]["f_spread"]["methods"] == 8
+    assert report["occupancy"]["f_spread"]["spread"] == pytest.approx(0.0)
+    assert report["occupancy"]["consistency"]["verdict"] == UNTESTED_VERDICT
+    assert CONSISTENT_VERDICT not in text
+    assert "certifies nothing" in text
+
+
+# --------------------------------------------------------------------------
+# the axes the check was NOT run on
+# --------------------------------------------------------------------------
+
+def test_f_moves_further_across_receiver_pairs_than_across_algorithms(tmp_path):
+    """The check was run on the axis with the least variance available.
+
+    ``f`` is a property of the sky, so it must be constant across receiver
+    pairs, arms, channels and either side of the skew bound exactly as much as
+    across algorithms.  The reviewers measured f(c|b) against f(d|b) at a mean
+    gap of +0.072 with the same sign in 8 of 8 algorithms, against an
+    across-algorithm spread of 0.050 that the report was calling agreement.
+
+    Planted here: lnb-c coincides with lnb-b on 2 of its 8 instants and lnb-d on
+    3 of its 8, which the model resolves to 0.600 against 0.529.  Every
+    algorithm sees identical samples, so the algorithm axis is flat at zero and
+    the receiver-pair axis is not.
+    """
+    _corpus(tmp_path, 4, target_a=_pair_split, target_b=_pair_split,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    text = format_review(report)
+    axes = report["occupancy"]["axes"]
+    receivers = axes["axes"]["receiver pair"]
+
+    assert report["occupancy"]["f_spread"]["spread"] == pytest.approx(0.0)
+    assert receivers["levels"]["lnb-c|lnb-b"]["f"] == pytest.approx(0.600)
+    assert receivers["levels"]["lnb-d|lnb-b"]["f"] == pytest.approx(0.5294, abs=1e-3)
+    assert receivers["gap"] == pytest.approx(0.0706, abs=1e-3)
+    # The reviewers' sign test: a gap every algorithm orders the same way is not
+    # the noise those same algorithms' disagreement was dismissed as.
+    assert receivers["concordant"] == 8 and receivers["compared"] == 8
+    assert receivers["unanimous"] is True
+    assert receivers["wider_than_algorithm"] is True
+    assert "receiver pair" in axes["wider_than_algorithm"]
+    assert "receiver pair" in axes["moves"]
+    assert axes["unresolved"] is True
+    assert "WHERE f ACTUALLY MOVES" in text
+    assert "UNRESOLVED" in text
+    assert "lnb-d|lnb-b" in text
+
+
+def test_a_gap_smaller_than_the_algorithm_spread_still_counts_when_unanimous(tmp_path):
+    """The receiver-pair gap on the corpus is the case this exists for.
+
+    It measured +0.072 against an across-algorithm spread of the same order,
+    with the same sign in 8 of 8 algorithms and 0 of 300 cluster-bootstrap
+    draws at or below zero.  Sized against the algorithm spread alone it reads
+    as a tie and vanishes from the report; ordered the same way by every
+    algorithm it is a systematic movement of a parameter that belongs to the
+    sky.  So an axis every algorithm orders the same way is reported as movement
+    whether or not its gap is the larger number — otherwise the one finding the
+    reviewers pinned hardest would be the one the report dropped.
+    """
+    _corpus(tmp_path, 4, target_a=_pair_split, target_b=_pair_split,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+    pairs, _census = load_pairs(tmp_path)
+    entries = [entry for pair in pairs for entry in pair["radios"]]
+    thresholds = null_thresholds(entries,
+                                 false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    cells = [cell for pair in pairs for cell in join_cells(pair)]
+
+    # An across-algorithm spread far wider than the 0.071 receiver-pair gap, so
+    # the size test alone would drop the axis entirely.
+    dwarfed = axis_movement(cells, thresholds,
+                            cell_false_alarm(entries, thresholds),
+                            list(METHODS), algorithm_spread=0.5)
+    receivers = dwarfed["axes"]["receiver pair"]
+
+    assert receivers["wider_than_algorithm"] is False
+    assert receivers["unanimous"] is True
+    assert dwarfed["wider_than_algorithm"] == []
+    assert "receiver pair" in dwarfed["moves"]
+    assert dwarfed["unresolved"] is True
+
+
+def test_an_axis_level_too_thin_to_carry_an_f_is_listed_but_not_counted(tmp_path):
+    """A four-cell level swings by tenths on one extra coincidence.
+
+    The axis table exists to compare gaps between levels, so a gap set by a
+    level that small would be sampling noise wearing the axis's name.  The same
+    goes for a level only one algorithm can solve: the comparison being drawn is
+    against the *across-algorithm* spread, and a level with one algorithm on it
+    carries no across-algorithm reading at all.  Both kinds are still listed — a
+    level that exists and cannot be read is a fact about the corpus — but
+    neither may form the gap.
+    """
+    _corpus(tmp_path, 1, target_a=_pair_split, target_b=_pair_split,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    pairs, _census = load_pairs(tmp_path)
+    entries = [entry for pair in pairs for entry in pair["radios"]]
+    thresholds = null_thresholds(entries,
+                                 false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    cells = [cell for pair in pairs for cell in join_cells(pair)]
+    moved = axis_movement(cells, thresholds,
+                          cell_false_alarm(entries, thresholds),
+                          list(METHODS), algorithm_spread=0.0)
+    channels = moved["axes"]["channel"]
+
+    assert channels["levels"]["ch1"]["cells"] == 4 < AXIS_MIN_CELLS
+    assert channels["levels"]["ch1"]["counted"] is False
+    assert channels["gap"] is None, (
+        "no two levels clear the cut, so this axis has no gap to report")
+
+    # The algorithm cut is the other half, and it is separately wired: with
+    # every level far above the cell floor and no level able to reach nine
+    # solving algorithms, no gap may be formed either.
+    thin = axis_movement(cells, thresholds, cell_false_alarm(entries, thresholds),
+                         list(METHODS), algorithm_spread=0.0, minimum_cells=1,
+                         minimum_methods=len(METHODS) + 1)
+    assert thin["minimum_methods"] == len(METHODS) + 1
+    assert thin["axes"]["receiver pair"]["gap"] is None
+    assert thin["unresolved"] is False
+    assert AXIS_MIN_METHODS == 2
+
+
+def test_the_controls_and_the_axes_travel_in_the_json_report(tmp_path):
+    """``--json`` is what gets pasted into a discussion, so it carries them too.
+
+    A text report that qualifies the verdict and a JSON report that does not
+    would let the unqualified claim back out through the other door.
+    """
+    _corpus(tmp_path, 4, target_a=_pair_split, target_b=_pair_split,
+            nulls_a=_planted_null, nulls_b=_planted_null)
+
+    report = review(tmp_path, false_alarm_rate=FIXTURE_FALSE_ALARM_RATE)
+    encoded = json.loads(json.dumps(report, allow_nan=False, default=str))
+
+    occupancy_report = encoded["occupancy"]
+    assert [control["name"] for control in occupancy_report["controls"]] == [
+        "scrambled", f"shifted +{CONTROL_SHIFT}"]
+    assert occupancy_report["consistency"]["certified"] is False
+    assert occupancy_report["axes"]["axes"]["receiver pair"]["gap"] > 0

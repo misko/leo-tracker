@@ -27,11 +27,62 @@ share an ADC clock, a USB bus and a power rail, so their firings are correlated
 through the hardware and the estimator reads that correlation as sky.
 
 Two radios share nothing but the sky: separate LNBs, separate Plutos, separate
-USB controllers on separate buses.  **Whether ``f`` now agrees across all eight
-algorithms is the internal check on this whole construction**, and
-:func:`format_review` prints it as its headline whether it passes or fails,
-because a spread that stays wide means the numbers below it are not
-trustworthy and hiding that would be the worst possible outcome.
+USB controllers on separate buses.  Whether ``f`` now agrees across all eight
+algorithms was for a while treated as the internal check on this whole
+construction, and :func:`format_review` printed that agreement as its headline.
+
+The agreement check is worthless without its negative controls
+---------------------------------------------------------------
+
+It is worthless because it was never shown to be able to fail.  Two independent
+adversarial reviews rebuilt the same estimate on joins where the coincidence
+model is **definitionally false** and got this:
+
+============================================  ==============  ==========
+join                                          f               spread
+============================================  ==============  ==========
+real pairing                                  0.307 - 0.362   0.050
+radio A of one sweep + radio B of ANOTHER     0.637 - 0.713   0.075
+same sweep, radio B shifted 2 instants        0.622 - 0.667   0.045
+============================================  ==============  ==========
+
+The shifted join — two chains that were never looking at the same instant —
+produced a *tighter* agreement than the real one.  The reason is measurable: the
+eight algorithms correlate with each other at phi 0.82 to 0.94 over the 2160
+target observations in this corpus.  They are near-duplicates of one another,
+not eight independent witnesses, so their ``f`` values have to agree whatever
+they are fed.  A check that passes on data the model cannot possibly fit is not
+evidence that the model fits.
+
+So both of those joins are now **built in**.  :func:`negative_controls` rebuilds
+them every run, on the same sweeps, through the same thresholds and the same
+empty-sky rate ``p``, and :func:`format_review` prints them in the same table as
+the real estimate.  The verdict is a statement about *separation*, never about
+tightness on its own: unless every control's resampled spread sits clear above
+the real join's, the report says the check is vacuous and refuses to certify
+anything.  :data:`CONSISTENT_VERDICT` is the only token that may be read as a
+pass, and nothing prints it unless the controls separate.
+
+f moves further along four other axes than it does across algorithms
+---------------------------------------------------------------------
+
+``f`` belongs to the sky, so it must be constant along *every* axis, and the
+algorithm axis is the one with the least variance available.  Measured on these
+same cells:
+
+* receiver pair — f(c|b) against f(d|b) is a mean gap of +0.072 with the same
+  sign in 8 of 8 algorithms; a cluster bootstrap over 94 sweeps puts p05..p95
+  at +0.042..+0.099 with 0 of 300 draws at or below zero.
+* arm — 1.25 MS/s at 160 ms gives f 0.015 against 0.401..0.510 at 5.0 MS/s.
+* channel — ch1 gives 0.211..0.291 against ch3's 0.381..0.436.
+* skew — inside the 0.054 ms design bound f is 0.310..0.372 (n=1054); beyond it
+  0.220..0.288 (n=386), and the two intervals do not overlap.
+
+:func:`axis_movement` recomputes those gaps on whatever the corpus currently
+holds and prints them beside the algorithm spread.  **None of them is resolved
+here.**  The report labels them unresolved in its own headline rather than
+leaving a reader to infer that the one axis that was checked is the only one
+that matters.
 
 Two geometries, two different questions
 ---------------------------------------
@@ -78,6 +129,7 @@ from collections import defaultdict
 import json
 from pathlib import Path
 import random
+import textwrap
 
 from .survey_comparison import (DEFAULT_FALSE_ALARM_RATE, MINIMUM_EXCEEDANCES,
                                 _at, describe, threshold_from)
@@ -142,14 +194,64 @@ ALL_SKY_DOPPLER_P999_HZ = 279_000.0
 #: at the guard cannot be smeared across it by the binning.
 OFFSET_BINS_HZ = (0.0, 100e3, 200e3, 312.5e3, 500e3, float("inf"))
 
+#: How far the shifted negative control moves the second radio, in instants.
+#:
+#: Two is the smallest shift that lands on a different tuning in both scan
+#: geometries — on a two-edges-per-channel order a shift of one only swaps the
+#: edge, which is a geometry the real join already contains and so would not be
+#: a control at all.  At two instants the two chains are looking at different
+#: sky at different times through the same hardware, which is precisely the
+#: situation the coincidence model cannot fit.
+CONTROL_SHIFT = 2
+
+#: Smallest population an axis level needs before its f enters the axis table.
+#:
+#: A level with a handful of cells produces an f that swings by tenths on one
+#: extra coincidence, and the axis table exists to compare gaps between levels;
+#: a gap dominated by a four-cell level would be noise wearing the axis's name.
+AXIS_MIN_CELLS = 24
+
+#: Algorithms that must solve on a level before its f may set an axis gap.
+#:
+#: The comparison being drawn is against the *across-algorithm* spread, so a
+#: level whose f rests on a single algorithm is not a like-for-like extreme: it
+#: carries no information about whether the algorithms agree there, and the sign
+#: test degenerates to 1 of 1.  Such levels stay in the table — a level where
+#: seven of eight algorithms cannot solve is a finding of its own — but they do
+#: not form the gap.
+AXIS_MIN_METHODS = 2
+
+#: The axes f is checked along besides the algorithm axis, in reporting order.
+#:
+#: f is a property of the sky and must be constant along all of them.  The
+#: algorithm axis is the one with the least variance available — eight
+#: near-duplicate scorers on identical samples — so checking only that one is
+#: choosing the easiest test in the building.
+AXES = ("receiver pair", "arm", "channel", "skew vs design bound", "geometry")
+
+#: The **only** verdict token that may be read as the agreement check passing.
+#:
+#: It is a module constant so that a test can assert it is absent, and so that
+#: a future edit that wants to print a pass has to come through here and meet
+#: the separation requirement in :func:`consistency_verdict`.
+CONSISTENT_VERDICT = "CONSISTENT — AND EVERY NEGATIVE CONTROL SEPARATES"
+
+#: The verdicts that are not a pass.  Each names why, because "the check did not
+#: pass" and "the check cannot pass on this corpus" are different findings.
+VACUOUS_VERDICT = "VACUOUS — THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY"
+DISAGREE_VERDICT = "ALGORITHMS DISAGREE"
+UNTESTED_VERDICT = "NOT VALIDATED — NO USABLE NEGATIVE CONTROL"
+UNESTIMATED_VERDICT = "NOT VALIDATED — f NOT ESTIMATED"
+
 #: The header every printed report opens with.  It travels with the numbers
 #: because the misreading it prevents would invert them.
 PREAMBLE = (
     "Two radios, one sky, one instant. There is still no injection here: d is "
-    "inferred from a\ncoincidence model, not measured against a known input, "
-    "and the model's own consistency\ncheck is the spread of f across the eight "
-    "algorithms — f belongs to the sky, so a wide\nspread means the model is "
-    "wrong and the d values below it are not trustworthy.")
+    "inferred from a\ncoincidence model, not measured against a known input. "
+    "The model's own consistency check\nis the spread of f across the eight "
+    "algorithms — but a check is only worth something if it\nCAN fail, so every "
+    "run rebuilds two joins where the model is definitionally false and prints\n"
+    "their spread beside the real one. Read the controls before the estimate.")
 
 
 # --------------------------------------------------------------------------
@@ -338,6 +440,46 @@ def _by_instant(entry: dict, *, target: bool) -> dict:
     return ordered
 
 
+def arm_label(side: dict) -> str:
+    """The (rate, probe length) pair a cell was taken under, as one string."""
+    return (f"{float(side['sample_rate_hz']) / 1e6:g} MS/s "
+            f"{float(side['probe_ms']):g} ms")
+
+
+def _cells_between(left: dict, right: dict, meta: dict, *, target: bool,
+                   shift: int = 0, skew=None) -> list[dict]:
+    """Join two scored radios on the instant index, optionally offset.
+
+    One function for the real join and for both negative controls, so that a
+    control cannot drift away from the thing it is a control for: the cell
+    construction, the dead-receiver exclusion and the per-side threshold key are
+    literally the same code.  ``shift`` is what makes the shifted control a
+    control — radio A's instant ``t`` against radio B's instant ``t + shift``,
+    which is two chains that were never released together.
+    """
+    ahead, behind = _by_instant(left, target=target), _by_instant(right, target=target)
+    cells = []
+    for instant in sorted(ahead, key=lambda value: (value is None, value)):
+        peer = instant
+        if shift:
+            if not isinstance(instant, int):
+                continue
+            peer = instant + shift
+        if peer not in behind:
+            continue
+        at_instant = skew(instant) if skew is not None else None
+        for side_a in ahead[instant]:
+            for side_b in behind[peer]:
+                cells.append({**meta, "instant": instant, "peer_instant": peer,
+                              "skew_ms": at_instant,
+                              "receiver_pair": f"{side_a['receiver_label']}|"
+                                               f"{side_b['receiver_label']}",
+                              "radio_pair": f"{side_a['radio_id']}|"
+                                            f"{side_b['radio_id']}",
+                              "a": side_a, "b": side_b})
+    return cells
+
+
 def _join(pair: dict, *, target: bool) -> list[dict]:
     """Cross-radio cells, keyed on the instant both radios were released into.
 
@@ -347,25 +489,19 @@ def _join(pair: dict, *, target: bool) -> list[dict]:
     experiment while leaving every count looking reasonable.
     """
     left, right = pair["radios"]
-    ahead, behind = _by_instant(left, target=target), _by_instant(right, target=target)
-    skew = (pair.get("skew_ms") or {}).get("per_tuning") or []
-    cells = []
-    for instant in sorted(set(ahead) & set(behind), key=lambda value: (value is None, value)):
-        at_instant = (skew[instant]
-                      if isinstance(instant, int) and 0 <= instant < len(skew)
-                      else (pair.get("skew_ms") or {}).get("median"))
-        for side_a in ahead[instant]:
-            for side_b in behind[instant]:
-                cells.append({"paired_sweep": pair["paired_sweep"],
-                              "geometry": pair["geometry"],
-                              "matched_arm": pair["matched_arm"],
-                              "instant": instant, "skew_ms": at_instant,
-                              "receiver_pair": f"{side_a['receiver_label']}|"
-                                               f"{side_b['receiver_label']}",
-                              "radio_pair": f"{side_a['radio_id']}|"
-                                            f"{side_b['radio_id']}",
-                              "a": side_a, "b": side_b})
-    return cells
+    per_tuning = (pair.get("skew_ms") or {}).get("per_tuning") or []
+    median = (pair.get("skew_ms") or {}).get("median")
+
+    def skew_at(instant):
+        return (per_tuning[instant]
+                if isinstance(instant, int) and 0 <= instant < len(per_tuning)
+                else median)
+
+    return _cells_between(left, right, {
+        "join": "real", "paired_sweep": pair["paired_sweep"],
+        "a_sweep": pair["paired_sweep"], "b_sweep": pair["paired_sweep"],
+        "geometry": pair["geometry"], "matched_arm": pair["matched_arm"]},
+        target=target, skew=skew_at)
 
 
 def join_cells(pair: dict) -> list[dict]:
@@ -380,6 +516,87 @@ def join_null_cells(pair: dict) -> list[dict]:
     false-alarm rate it produces belongs to a different experiment.
     """
     return _join(pair, target=False)
+
+
+# --------------------------------------------------------------------------
+# the negative controls: the same join, made definitionally false
+# --------------------------------------------------------------------------
+
+def scrambled_cells(pairs: list[dict], *,
+                    matched_arm_only: bool = True) -> tuple[list[dict], dict]:
+    """Radio A of one sweep against radio B of a **different** sweep.
+
+    The donor is chosen from the same (A arm, B arm, geometry) group and the
+    A side keeps its own radio, so the two chains still differ only in the way
+    they always did — separate LNBs, separate Plutos — and every count is drawn
+    through the same thresholds.  The single thing destroyed is simultaneity:
+    these two observations were taken minutes or hours apart, so no occupancy of
+    the sky at "the" instant exists for the model to recover.
+
+    Matching the donor on arm and geometry matters.  A donor at another sample
+    rate would make the control differ from the real join in two ways at once,
+    and a wider spread could then be read as the arm rather than as the broken
+    pairing — which is the same conflation the whole module exists to avoid.
+    """
+    usable = [pair for pair in pairs
+              if pair["matched_arm"] or not matched_arm_only]
+    groups: dict = defaultdict(list)
+    for pair in usable:
+        left, right = pair["radios"]
+        groups[(threshold_key(left), threshold_key(right),
+                pair["geometry"])].append(pair)
+    census = {"donor_groups": 0, "sweeps_joined": 0, "sweeps_without_a_donor": 0,
+              "shift": None}
+    cells: list[dict] = []
+    for key in sorted(groups, key=str):
+        group = groups[key]
+        if len(group) < 2:
+            census["sweeps_without_a_donor"] += len(group)
+            continue
+        census["donor_groups"] += 1
+        for index, pair in enumerate(group):
+            donor = group[(index + 1) % len(group)]
+            census["sweeps_joined"] += 1
+            cells.extend(_cells_between(
+                pair["radios"][0], donor["radios"][1], {
+                    "join": "scrambled",
+                    "paired_sweep": pair["paired_sweep"],
+                    "a_sweep": pair["paired_sweep"],
+                    "b_sweep": donor["paired_sweep"],
+                    "geometry": pair["geometry"],
+                    "matched_arm": pair["matched_arm"] and donor["matched_arm"]},
+                target=True))
+    return cells, census
+
+
+def shifted_cells(pairs: list[dict], *, shift: int = CONTROL_SHIFT,
+                  matched_arm_only: bool = True) -> tuple[list[dict], dict]:
+    """One sweep, both its own radios, radio B moved ``shift`` instants along.
+
+    Everything the real join has — one sweep, one pair of radios, one arm, one
+    calibration — except that the two chains are no longer looking at the same
+    moment.  It is the harsher of the two controls precisely because so little
+    changes: whatever the real join measures that survives here is not
+    simultaneity.
+    """
+    census = {"donor_groups": None, "sweeps_joined": 0,
+              "sweeps_without_a_donor": 0, "shift": shift}
+    cells: list[dict] = []
+    for pair in pairs:
+        if matched_arm_only and not pair["matched_arm"]:
+            continue
+        left, right = pair["radios"]
+        joined = _cells_between(left, right, {
+            "join": f"shifted+{shift}", "paired_sweep": pair["paired_sweep"],
+            "a_sweep": pair["paired_sweep"], "b_sweep": pair["paired_sweep"],
+            "geometry": pair["geometry"], "matched_arm": pair["matched_arm"]},
+            target=True, shift=shift)
+        if joined:
+            census["sweeps_joined"] += 1
+        else:
+            census["sweeps_without_a_donor"] += 1
+        cells.extend(joined)
+    return cells, census
 
 
 # --------------------------------------------------------------------------
@@ -622,10 +839,8 @@ def occupancy(cells: list[dict], thresholds: dict, false_alarm: dict, *,
         pairs = {name: _estimate(_rates(group, method, thresholds), p)
                  for name, group in sorted(by_pair.items())}
         report["methods"][method] = {"pooled": pooled, "pairs": pairs}
-    report["f_spread"] = f_spread(report["methods"])
-    report["f_spread"]["sampling"] = bootstrap_f_spread(
-        cells, thresholds, false_alarm, chosen,
-        observed=report["f_spread"].get("spread"))
+    report["f_spread"] = _spread_with_scale(report["methods"], cells,
+                                            thresholds, false_alarm, chosen)
     report["by_geometry"] = {}
     for geometry in sorted({cell["geometry"] for cell in cells}):
         subset = [cell for cell in cells if cell["geometry"] == geometry]
@@ -714,12 +929,17 @@ def bootstrap_f_spread(cells: list[dict], thresholds: dict, false_alarm: dict,
 def f_spread(per_method: dict) -> dict:
     """How far apart the eight algorithms put one sky parameter.
 
-    This is the headline.  ``f`` is a property of the sky: eight algorithms
-    scoring the same cells must return the same value, and inside one radio
-    they returned 0.226 to 0.422 — a factor of 1.9 — which is how that
-    construction was shown to be measuring its own shared hardware.  The same
-    number computed across radios is the check on this one, and it is reported
-    whether it passes or fails.
+    ``f`` is a property of the sky: eight algorithms scoring the same cells must
+    return the same value, and inside one radio they returned 0.226 to 0.422 — a
+    factor of 1.9 — which is how that construction was shown to be measuring its
+    own shared hardware.
+
+    On its own this number certifies nothing, and it is not the headline any
+    more.  The eight algorithms correlate with each other at phi 0.82 to 0.94 on
+    these cells, so a small spread is their default output on any input; the
+    negative controls in :func:`negative_controls` are what say whether this
+    particular small spread carries information.  Read
+    :func:`consistency_verdict`, not this.
     """
     values = {method: item["pooled"]["f"] for method, item in per_method.items()
               if item["pooled"].get("solvable")}
@@ -733,6 +953,276 @@ def f_spread(per_method: dict) -> dict:
     return {"methods": len(values), "min": low, "max": high,
             "spread": high - low, "ratio": (high / low) if low else None,
             "values": values, "unsolvable": unsolvable}
+
+
+def _spread_with_scale(per_method: dict, cells: list[dict], thresholds: dict,
+                       false_alarm: dict, methods: list[str], *,
+                       draws: int = BOOTSTRAP_DRAWS,
+                       seed: int = BOOTSTRAP_SEED) -> dict:
+    """A spread and the resampled scale it has to be read against, together.
+
+    One function so the real join and both negative controls carry the same
+    statistic computed the same way.  A control measured by a second
+    implementation would only be a control for that implementation.
+    """
+    spread = f_spread(per_method)
+    spread["sampling"] = bootstrap_f_spread(
+        cells, thresholds, false_alarm, methods,
+        observed=spread.get("spread"), draws=draws, seed=seed)
+    return spread
+
+
+def spread_of(cells: list[dict], thresholds: dict, false_alarm: dict,
+              methods: list[str], *, draws: int = BOOTSTRAP_DRAWS,
+              seed: int = BOOTSTRAP_SEED) -> dict:
+    """The f spread across algorithms on one join, with its resampled scale."""
+    per_method = {
+        method: {"pooled": _estimate(_rates(cells, method, thresholds),
+                                     (false_alarm.get(method) or {}).get("rate"))}
+        for method in methods}
+    return _spread_with_scale(per_method, cells, thresholds, false_alarm,
+                              methods, draws=draws, seed=seed)
+
+
+def negative_controls(pairs: list[dict], thresholds: dict, false_alarm: dict,
+                      methods: list[str], *, shift: int = CONTROL_SHIFT,
+                      draws: int = BOOTSTRAP_DRAWS,
+                      seed: int = BOOTSTRAP_SEED) -> list[dict]:
+    """The same estimate, on two joins where the coincidence model is false.
+
+    This exists because the agreement check was never shown to be capable of
+    failing.  Both reviews that attacked it rebuilt exactly these two joins and
+    found the eight algorithms agreeing as closely as on the real pairing —
+    0.075 on the scrambled join and 0.045 on the shifted one against 0.050 on
+    the real one, the shifted control agreeing *more* closely than the truth.
+
+    A control has to be run through the identical pipeline or it proves nothing
+    about that pipeline, so both use :func:`_cells_between`, the thresholds the
+    real estimate uses and the same per-method empty-sky rate ``p``.  Only the
+    pairing is broken, and it is broken in a way the model cannot absorb: no
+    occupancy of the sky "at the instant" exists when the two chains were never
+    at one instant together.
+    """
+    scrambled, scrambled_census = scrambled_cells(pairs)
+    shifted, shifted_census = shifted_cells(pairs, shift=shift)
+    built = [
+        {"name": "scrambled",
+         "join": "radio A of one sweep + radio B of a DIFFERENT sweep",
+         "matched_on": "arm and geometry; only the pairing is broken",
+         "broken": "the two chains never observed the same sky at the same "
+                   "moment, so there is no occupancy at 'the' instant to find",
+         "cells": scrambled, "census": scrambled_census},
+        {"name": f"shifted +{shift}",
+         "join": f"same sweep, same two radios, radio B moved {shift} instants",
+         "matched_on": "sweep, radios, arm, calibration; only the instant is "
+                       "wrong",
+         "broken": f"radio A's instant t is joined to radio B's instant "
+                   f"t+{shift}: same hardware, different moment",
+         "cells": shifted, "census": shifted_census}]
+    controls = []
+    for item in built:
+        cells = item.pop("cells")
+        controls.append({**item, "cell_count": len(cells),
+                         "f_spread": spread_of(cells, thresholds, false_alarm,
+                                               methods, draws=draws, seed=seed)})
+    return controls
+
+
+def consistency_verdict(real: dict, controls: list[dict]) -> dict:
+    """Whether the f-agreement check discriminates at all on this corpus.
+
+    **The verdict is about separation, never about tightness.**  A tight spread
+    on the real join is evidence only if the same eight algorithms come apart on
+    a join the model cannot fit; if they stay tight there too, the tightness is
+    a property of the algorithms — they correlate at phi 0.82 to 0.94 here — and
+    says nothing about the sky or about independence.
+
+    A control counts as separating when the whole middle 90% of its resampled
+    spread sits above the whole middle 90% of the real join's.  Comparing two
+    point estimates would call a 0.075 against 0.050 a separation when both
+    intervals span 0.03 to 0.11; comparing the intervals is the weakest claim
+    the numbers actually support.  Where a resample could not be formed the
+    fallback is the bare comparison, and ``basis`` says which was used so a
+    reader is never guessing.
+
+    **Every** control has to separate.  One definitionally-false join that the
+    check passes is a demonstration that the check passes on anything, and an
+    average over controls would let the other one hide it.
+    """
+    spread = real.get("spread")
+    real_high = (real.get("sampling") or {}).get("p95")
+    assessed = []
+    for control in controls:
+        measured = control["f_spread"]
+        control_spread = measured.get("spread")
+        control_low = (measured.get("sampling") or {}).get("p05")
+        if control_spread is None or spread is None:
+            separates, basis = None, ("no f could be estimated on this join, "
+                                      "so it cannot act as a control")
+        elif control_low is None or real_high is None:
+            separates = control_spread > spread
+            basis = "point spreads only: no resampled interval on both sides"
+        else:
+            separates = control_low > real_high
+            basis = (f"resampled p05 {control_low:.3f} against the real join's "
+                     f"p95 {real_high:.3f}")
+        assessed.append({
+            "name": control["name"], "spread": control_spread,
+            "cells": control["cell_count"], "separates": separates,
+            "basis": basis,
+            "tighter_than_real": (control_spread is not None and spread is not None
+                                  and control_spread <= spread)})
+    usable = [item for item in assessed if item["separates"] is not None]
+    failed = [item["name"] for item in usable if not item["separates"]]
+    # A control that could not be estimated is not a control that passed, and it
+    # is not a control that failed either: it leaves the check untested, which
+    # is its own answer and must not collapse into either of the other two.
+    if not real.get("methods"):
+        verdict, vacuous = UNESTIMATED_VERDICT, False
+    elif (real.get("ratio") or 1.0) >= 1.5:
+        verdict, vacuous = DISAGREE_VERDICT, False
+    elif failed:
+        verdict, vacuous = VACUOUS_VERDICT, True
+    elif not usable or len(usable) != len(assessed):
+        verdict, vacuous = UNTESTED_VERDICT, False
+    else:
+        verdict, vacuous = CONSISTENT_VERDICT, False
+    tighter = [item["name"] for item in assessed if item["tighter_than_real"]]
+    return {"verdict": verdict, "vacuous": vacuous,
+            "certified": verdict == CONSISTENT_VERDICT,
+            "controls": assessed, "controls_that_failed": failed,
+            "controls_tighter_than_real": tighter,
+            "real_spread": spread,
+            "rule": "every negative control's resampled f spread must sit "
+                    "clear above the real join's before a tight real spread "
+                    "may be read as evidence of anything"}
+
+
+# --------------------------------------------------------------------------
+# the axes f is not allowed to move along either
+# --------------------------------------------------------------------------
+
+def cell_axes(cell: dict) -> dict:
+    """Every axis one cell can be filed under, for the movement table.
+
+    ``None`` where a cell cannot be placed — an unmeasured skew, a missing
+    channel — so that absence drops out of the axis rather than becoming a level
+    called "None" that then gets compared against real ones.
+    """
+    skew = cell.get("skew_ms")
+    channel = cell["a"].get("channel")
+    return {
+        "receiver pair": cell.get("receiver_pair"),
+        "arm": arm_label(cell["a"]),
+        "channel": None if channel is None else f"ch{channel}",
+        "skew vs design bound": (
+            None if skew is None else
+            f"within {DESIGN_MAX_SKEW_MS:g} ms" if skew <= DESIGN_MAX_SKEW_MS
+            else f"beyond {DESIGN_MAX_SKEW_MS:g} ms"),
+        "geometry": cell.get("geometry")}
+
+
+def axis_movement(cells: list[dict], thresholds: dict, false_alarm: dict,
+                  methods: list[str], *, algorithm_spread: float | None = None,
+                  minimum_cells: int = AXIS_MIN_CELLS,
+                  minimum_methods: int = AXIS_MIN_METHODS) -> dict:
+    """How far f moves along every other axis, measured on the same cells.
+
+    ``f`` is a property of the sky.  It must be identical for every algorithm —
+    the check the report used to lead with — but equally for every receiver
+    pair, every arm, every channel and either side of the skew bound.  The
+    algorithm axis is eight near-duplicate scorers reading identical samples,
+    which is the least variance available anywhere in this corpus, so passing
+    there and stopping is choosing the easiest test in the building.
+
+    Each level's f is the median over the algorithms that solve on it, and the
+    axis's ``gap`` is the distance between the extreme levels' medians.
+    ``concordant`` is the reviewers' sign test: of the algorithms that solve on
+    both extremes, how many order them the same way.  A gap that 8 of 8
+    algorithms agree on cannot be dismissed as the noise the same 8 algorithms'
+    disagreement was dismissed as.
+    """
+    report: dict = {"algorithm_spread": algorithm_spread,
+                    "minimum_cells": minimum_cells,
+                    "minimum_methods": minimum_methods, "axes": {}}
+    # Placed once rather than once per axis: five axes over a corpus-sized cell
+    # list is five passes of dict-building for one pass of information.
+    placed = [(cell, cell_axes(cell)) for cell in cells]
+    for axis in AXES:
+        grouped: dict = defaultdict(list)
+        for cell, levels_of in placed:
+            level = levels_of.get(axis)
+            if level is not None:
+                grouped[level].append(cell)
+        levels = {}
+        for name in sorted(grouped, key=str):
+            group = grouped[name]
+            values = {}
+            for method in methods:
+                estimate = _estimate(
+                    _rates(group, method, thresholds),
+                    (false_alarm.get(method) or {}).get("rate"))
+                if estimate.get("solvable"):
+                    values[method] = estimate["f"]
+            ordered = sorted(values.values())
+            levels[str(name)] = {
+                "cells": len(group), "methods": len(values), "values": values,
+                "min": ordered[0] if ordered else None,
+                "max": ordered[-1] if ordered else None,
+                "f": _at(ordered, 0.50) if ordered else None,
+                "counted": (len(values) >= minimum_methods
+                            and len(group) >= minimum_cells)}
+        counted = {name: item for name, item in levels.items()
+                   if item["counted"]}
+        entry = {"levels": levels, "counted": len(counted), "gap": None,
+                 "low": None, "high": None, "concordant": None,
+                 "compared": None, "ratio_to_algorithm": None,
+                 "wider_than_algorithm": False, "unanimous": False}
+        if len(counted) >= 2:
+            # Ordered on (f, name) so the two extremes are always two *different*
+            # levels: with every level on the same f, ``min`` and ``max`` both
+            # return the first key and the table would compare a level with
+            # itself while printing a gap of zero as though it meant something.
+            ranked = sorted(counted, key=lambda name: (counted[name]["f"], name))
+            bottom, top = counted[ranked[0]], counted[ranked[-1]]
+            gap = top["f"] - bottom["f"]
+            shared = [method for method in bottom["values"]
+                      if method in top["values"]]
+            concordant = sum(1 for method in shared
+                             if top["values"][method] > bottom["values"][method])
+            entry.update(
+                gap=gap, low=ranked[0], high=ranked[-1], compared=len(shared),
+                concordant=concordant,
+                ratio_to_algorithm=(gap / algorithm_spread)
+                                   if algorithm_spread else None,
+                wider_than_algorithm=(algorithm_spread is not None
+                                      and gap > algorithm_spread),
+                # A gap smaller than the algorithm spread is not thereby noise.
+                # Every algorithm ordering the two extremes the same way is the
+                # reviewers' sign test, and it is what separates a systematic
+                # movement from a wobble: they measured 8 of 8 on the receiver
+                # pair with 0 of 300 cluster-bootstrap draws at or below zero,
+                # on a gap of the same size as the across-algorithm spread that
+                # was being called agreement.
+                unanimous=(len(shared) >= minimum_methods
+                           and concordant == len(shared) and gap > 0))
+        report["axes"][axis] = entry
+    def _by_gap(name):
+        return -(report["axes"][name]["gap"] or 0.0)
+    wider = sorted((name for name, item in report["axes"].items()
+                    if item["wider_than_algorithm"]), key=_by_gap)
+    unanimous = sorted((name for name, item in report["axes"].items()
+                        if item["unanimous"]), key=_by_gap)
+    report["wider_than_algorithm"] = wider
+    report["unanimous"] = unanimous
+    report["moves"] = sorted(set(wider) | set(unanimous), key=_by_gap)
+    report["unresolved"] = bool(report["moves"])
+    report["why"] = ("f belongs to the sky and must not move along ANY of these "
+                     "axes. Movement along them is measured here — by size "
+                     "against the across-algorithm spread, and by whether every "
+                     "algorithm orders the extremes the same way — and is NOT "
+                     "resolved by anything in this report")
+    return report
 
 
 # --------------------------------------------------------------------------
@@ -1134,6 +1624,16 @@ def review(corpus_root, *, limit: int | None = None,
         "why": "the model carries one p, so the two chains have to have been "
                "running the same arm; unmatched-arm sweeps are joined and "
                "counted but left out of the estimate"}
+    # The controls are not optional and are not a flag.  The agreement check
+    # above passes on data the model cannot fit, so it is only ever reported
+    # alongside two joins that prove whether it can fail at all.
+    spread = report["occupancy"]["f_spread"]
+    controls = negative_controls(pairs, thresholds, false_alarm, methods)
+    report["occupancy"]["controls"] = controls
+    report["occupancy"]["consistency"] = consistency_verdict(spread, controls)
+    report["occupancy"]["axes"] = axis_movement(
+        matched, thresholds, false_alarm, methods,
+        algorithm_spread=spread.get("spread"))
     return report
 
 
@@ -1143,9 +1643,284 @@ def _cell(value, spec: str = "8.3f", missing: str = "       -") -> str:
     return format(value, spec)
 
 
+def _range_of(spread: dict) -> str:
+    """One algorithm-spread as ``low..high``, or why there is none."""
+    if not spread.get("methods"):
+        return "not estimable"
+    return f"{spread['min']:.3f}..{spread['max']:.3f}"
+
+
+def _interval_of(spread: dict) -> str:
+    sampling = spread.get("sampling") or {}
+    if not sampling.get("draws"):
+        return "no resample"
+    return f"{sampling['p05']:.3f}..{sampling['p95']:.3f}"
+
+
+def _paragraph(text: str, *, indent: str = "  ", hanging: str | None = None,
+               width: int = 94) -> list[str]:
+    """Wrap one sentence-run to the report's column, keeping the indent.
+
+    ``hanging`` indents every line after the first, which is what keeps a
+    ``<--`` marker pointing at the row above it while its sentences line up
+    under each other rather than under the arrow.
+    """
+    return textwrap.wrap(" ".join(text.split()), width=width,
+                         initial_indent=indent,
+                         subsequent_indent=hanging or indent) or []
+
+
+def headline(report: dict) -> list[str]:
+    """The one thing a reader must not be able to miss.
+
+    It is the *verdict on the check*, not the check's own number.  The spread of
+    f across algorithms used to lead this report and was read as validation; it
+    is a number the negative controls reproduce on data the model cannot fit, so
+    leading with it is how a reader was misled in the first place.
+    """
+    consistency = (report.get("occupancy") or {}).get("consistency") or {}
+    axes = (report.get("occupancy") or {}).get("axes") or {}
+    verdict = consistency.get("verdict")
+    if not verdict:
+        return []
+    lines = [f"HEADLINE — f-AGREEMENT CHECK: {verdict}"]
+    failed = consistency.get("controls_that_failed") or []
+    tighter = consistency.get("controls_tighter_than_real") or []
+    if consistency.get("vacuous"):
+        lines += _paragraph(
+            "The check passes on joins where the coincidence model is "
+            f"definitionally false ({', '.join(failed)}), so it is not testing "
+            "the model. It CANNOT be read as evidence that the independence "
+            "assumption holds.")
+        if tighter:
+            lines += _paragraph(
+                f"{', '.join(tighter)} "
+                + ("agrees" if len(tighter) == 1 else "agree")
+                + " MORE closely than the real pairing does.")
+    elif verdict == CONSISTENT_VERDICT:
+        lines += _paragraph(
+            "Every definitionally-false join came apart and the real one did "
+            "not, so the check can fail and did not. Necessary, not sufficient: "
+            "d below is still a model output with no injection behind it.")
+    elif verdict == DISAGREE_VERDICT:
+        lines += _paragraph(
+            "The eight algorithms do not agree on one sky parameter, so the "
+            "model's independence assumption is not met and every d below is a "
+            "model output, not a measurement.")
+    else:
+        lines += _paragraph(
+            "Nothing here shows the check is capable of failing, so the spread "
+            "of f certifies nothing.")
+    if axes.get("unresolved"):
+        moves = axes.get("moves") or []
+        wider = axes.get("wider_than_algorithm") or []
+        # Only the axes the size test missed are worth naming twice: an axis
+        # already called wider does not become a second finding by also being
+        # unanimous, and repeating it reads as two axes where there is one.
+        only_unanimous = [name for name in (axes.get("unanimous") or [])
+                          if name not in wider]
+        lines += _paragraph(
+            "UNRESOLVED, and separately: f moves along "
+            + (f"{len(moves)} other axis" if len(moves) == 1
+               else f"{len(moves)} other axes")
+            + f" ({', '.join(moves)}) — "
+            + (f"further than across algorithms on {', '.join(wider)}"
+               if wider else "none of them further than across algorithms")
+            + (f"; ordered the same way by every algorithm on "
+               f"{', '.join(only_unanimous)}" if only_unanimous else "")
+            + ". f belongs to the sky and must not move along any of them. "
+              "Nothing in this report resolves that.", hanging="      ")
+    return lines
+
+
+def _control_block(report: dict) -> list[str]:
+    """The real estimate and both negative controls, in one table.
+
+    Side by side and in the same units, because the whole failure this section
+    exists to prevent was a number being read on its own.
+    """
+    occupancy_report = report.get("occupancy") or {}
+    controls = occupancy_report.get("controls") or []
+    consistency = occupancy_report.get("consistency") or {}
+    spread = occupancy_report.get("f_spread") or {}
+    estimated = (occupancy_report.get("population") or {}).get("cells", 0)
+    lines = ["",
+             "  NEGATIVE CONTROLS — the same sweeps, the same thresholds, the "
+             "same p, joined so that the",
+             "  coincidence model is DEFINITIONALLY FALSE. A tight f spread on "
+             "the real join is evidence only if",
+             "  these come apart from it. Rebuilt every run; there is no flag "
+             "that turns them off.",
+             f"    {'join':<14} {'cells':>7} {'f range':>15} {'spread':>8}"
+             f" {'resample p05..p95':>18}   separates?"]
+    lines.append(
+        f"    {'real':<14} {estimated:>7}"
+        f" {_range_of(spread):>15}"
+        f" {_cell(spread.get('spread'), '8.3f', '       -')}"
+        f" {_interval_of(spread):>18}   --")
+    assessed = {item["name"]: item for item in consistency.get("controls") or []}
+    for control in controls:
+        measured = control["f_spread"]
+        judged = assessed.get(control["name"]) or {}
+        separates = judged.get("separates")
+        note = ("--" if separates is None else "yes" if separates else "NO")
+        if judged.get("tighter_than_real"):
+            note += "  (TIGHTER than the real join)"
+        lines.append(
+            f"    {control['name']:<14} {control['cell_count']:>7}"
+            f" {_range_of(measured):>15}"
+            f" {_cell(measured.get('spread'), '8.3f', '       -')}"
+            f" {_interval_of(measured):>18}   {note}")
+    for control in controls:
+        census = control.get("census") or {}
+        orphaned = census.get("sweeps_without_a_donor") or 0
+        lines += _paragraph(
+            f"{control['name']}: {control['join']} — matched on "
+            f"{control['matched_on']}. {census.get('sweeps_joined', 0)} sweep(s) "
+            "joined"
+            + (f", {orphaned} left out for want of a donor" if orphaned else "")
+            + ".", indent="      ")
+    for item in consistency.get("controls") or []:
+        lines.append(f"      {item['name']} separation basis: {item['basis']}")
+    lines.append(f"  >>> VERDICT: {consistency.get('verdict', UNTESTED_VERDICT)}")
+    failed = consistency.get("controls_that_failed") or []
+    scorers = spread.get("methods") or len(spread.get("values") or {})
+    if consistency.get("vacuous"):
+        # Named rather than summarised as "neither": one control separating and
+        # the other not is a different, and much more interesting, state than
+        # both failing, and a fixed sentence would print the wrong one of them.
+        lines += _paragraph(
+            f"{', '.join(failed)} destroy{'s' if len(failed) == 1 else ''} the "
+            "simultaneity the model is built on, and the "
+            f"{scorers} algorithms agree on f just as closely there as here. "
+            "The agreement above is therefore a property of the algorithms, not "
+            "of the sky: they correlate with one another at phi 0.82-0.94 over "
+            "these observations, so they are near-duplicates rather than "
+            f"{scorers} independent witnesses and their f values have to agree "
+            "whatever they are fed.", indent="      ")
+        lines += _paragraph(
+            "NOTHING BELOW IS VALIDATED BY THE SPREAD ABOVE. d stays what it "
+            "was: a model output, with no injection behind it and now no "
+            "working check either.", indent="      ")
+    elif consistency.get("certified"):
+        lines += _paragraph(
+            "Every definitionally-false join produced a wider f spread than the "
+            "real pairing, with resampled intervals clear of it. The check can "
+            "fail and did not fail. That is necessary and not sufficient: d is "
+            "still inferred from the model, not measured against a known input.",
+            indent="      ")
+    elif consistency.get("verdict") == UNTESTED_VERDICT:
+        lines += _paragraph(
+            "Not every definitionally-false join could be formed and estimated "
+            "from this corpus, so there is no evidence the check is able to "
+            "fail. The spread above certifies nothing until every control "
+            "separates.", indent="      ")
+    lines += _paragraph(f"rule: {consistency.get('rule', '')}", indent="      ")
+    return lines
+
+
+def _axis_block(report: dict) -> list[str]:
+    """Where f moves, next to the one axis the check was run on."""
+    axes = (report.get("occupancy") or {}).get("axes") or {}
+    if not axes.get("axes"):
+        return []
+    spread = (report.get("occupancy") or {}).get("f_spread") or {}
+    lines = ["",
+             "  WHERE f ACTUALLY MOVES — f is a property of the sky, so it must "
+             "be constant along EVERY axis.",
+             "  The algorithm axis checked above is the one with the LEAST "
+             "variance available: eight scorers",
+             "  reading identical samples, correlated with each other at phi "
+             "0.82-0.94.",
+             f"    {'axis':<22} {'levels':>7} {'cells':>7} {'f low..high':>15}"
+             f" {'gap':>7} {'vs algos':>9} {'same sign':>10}"]
+    solved = spread.get("methods", 0)
+    scored = solved + len(spread.get("unsolvable") or {})
+    estimated = ((report.get("occupancy") or {}).get("population") or {}).get(
+        "cells", 0)
+    lines.append(
+        f"    {'algorithm':<22} {f'{solved}/{scored}':>7} {estimated:>7}"
+        f" {_range_of(spread):>15}"
+        f" {_cell(spread.get('spread'), '7.3f', '      -')}"
+        f" {'checked':>9} {'--':>10}")
+    ordered = sorted(axes["axes"].items(),
+                     key=lambda item: -(item[1]["gap"] or -1.0))
+    for axis, item in ordered:
+        levels = item["levels"]
+        counted = {name: level for name, level in levels.items()
+                   if level["counted"]}
+        cells = sum(level["cells"] for level in counted.values())
+        span = ("too few levels" if item["gap"] is None else
+                f"{counted[item['low']]['f']:.3f}..{counted[item['high']]['f']:.3f}")
+        ratio = ("-" if item["ratio_to_algorithm"] is None
+                 else f"{item['ratio_to_algorithm']:.1f}x")
+        sign = ("-" if item["compared"] in (None, 0)
+                else f"{item['concordant']}/{item['compared']}")
+        flags = []
+        if item["wider_than_algorithm"]:
+            flags.append("WIDER THAN THE ALGORITHM AXIS")
+        if item["unanimous"]:
+            flags.append("EVERY ALGORITHM ORDERS IT THE SAME WAY")
+        lines.append(
+            f"    {axis:<22} {f'{len(counted)}/{len(levels)}':>7} {cells:>7}"
+            f" {span:>15} {_cell(item['gap'], '7.3f', '      -')} {ratio:>9}"
+            f" {sign:>10}"
+            + ("   " + ", ".join(flags) if flags else ""))
+        if item["gap"] is None:
+            continue
+        for role, name in (("lowest ", item["low"]), ("highest", item["high"])):
+            level = counted[name]
+            lines.append(
+                f"        {role} {name:<24} n={level['cells']:<6} f "
+                f"{level['f']:.3f}   algorithms "
+                f"{level['min']:.3f}..{level['max']:.3f} over "
+                f"{level['methods']}")
+    moves = axes.get("moves") or []
+    if moves:
+        lines += _paragraph(
+            "<-- UNRESOLVED: f moves along "
+            + (f"{len(moves)} of these axes" if len(moves) > 1
+               else "one of these axes")
+            + f" ({', '.join(moves)}). The consistency check was run on the "
+              "axis with the least variance available.", hanging="      ")
+        lines += _paragraph(
+            "'same sign' counts the algorithms that order the two extreme "
+            "levels the same way. A gap SMALLER than the across-algorithm "
+            "spread is not thereby noise: one that every algorithm orders the "
+            "same way is systematic, and it is exactly the pattern the "
+            "reviewers pinned on the receiver pair — mean +0.072, 8 of 8 "
+            "algorithms, 0 of 300 cluster-bootstrap draws at or below zero.",
+            indent="      ")
+        lines += _paragraph(
+            "NOTHING IN THIS REPORT RESOLVES ANY OF THIS MOVEMENT.",
+            indent="      ")
+    else:
+        lines.append("  no other axis moves f on the cells now in the corpus: "
+                     "none is wider than the algorithm axis and none is ordered "
+                     "unanimously.")
+    lines += _paragraph(
+        f"levels shows counted/found: a level under {axes.get('minimum_cells')} "
+        "cells, or one that fewer than "
+        f"{axes.get('minimum_methods')} algorithms can solve, is found and "
+        "listed but left out of the gap — the first swings by tenths on one "
+        "extra coincidence and the second has no across-algorithm reading to "
+        "compare against the axis above. A gap is only formed where two levels "
+        "survive both cuts.", indent="      ")
+    if not spread.get("spread"):
+        lines += _paragraph(
+            "the algorithm spread is zero on these cells, so 'vs algos' has no "
+            "denominator and every other axis is wider than it by construction; "
+            "the gaps themselves are still the numbers to read.",
+            indent="      ")
+    return lines
+
+
 def format_review(report: dict) -> str:
     """The cross-radio result as text, with every caveat beside its number."""
     lines = [PREAMBLE, ""]
+    lines.extend(headline(report))
+    if len(lines) > 2:
+        lines.append("")
     pairs, cells = report["pairs"], report["cells"]
     if not pairs["joined"]:
         census = report["census"]
@@ -1218,51 +1993,46 @@ def format_review(report: dict) -> str:
     lines.append("  the channel were live at once. Per-geometry values are "
                  "below; they are what to read if the two")
     lines.append("  disagree.")
+    consistency = report["occupancy"].get("consistency") or {}
     if spread["methods"]:
         sampling = spread.get("sampling") or {}
-        noise = sampling.get("p95")
-        # The verdict is read against the resampled scale rather than against a
-        # bare threshold: the spread was watched move 0.099 -> 0.047 as the
-        # corpus grew, so a fixed cut on it changes answer with N alone.
-        verdict = ("DISAGREE" if (spread["ratio"] or 1) >= 1.5 else
-                   "WITHIN SAMPLING NOISE" if noise is not None
-                   and (spread["spread"] or 0) <= noise else "PARTIAL")
         lines.append(
             f"  f spans {spread['min']:.3f} to {spread['max']:.3f} across "
             f"{spread['methods']} algorithms: spread {spread['spread']:.3f}, "
-            f"ratio {spread['ratio']:.2f}x  <-- {verdict}")
+            f"ratio {spread['ratio']:.2f}x")
         if sampling.get("draws"):
             lines.append(
                 f"  resampling the same cells {sampling['draws']}x puts the "
                 f"spread at {sampling['p05']:.3f}..{sampling['p95']:.3f} "
-                f"(median {sampling['p50']:.3f}) from sampling alone —")
+                f"(median {sampling['p50']:.3f}) from sampling alone. The eight")
             lines.append(
-                "  the eight algorithms are resampled together, so the scale "
-                "keeps the correlation of scoring one")
+                "  are resampled together, so the scale keeps the correlation "
+                "of scoring one set of cells. It is")
             lines.append(
-                "  set of cells. It is optimistic about disagreement: max-minus-"
-                "min cannot go below zero and its")
+                "  optimistic about disagreement: max-minus-min cannot go below "
+                "zero and its two extremes were")
             lines.append(
-                "  two extremes were picked out of the same cells. A scale to "
-                "read the spread against, not a test.")
+                "  picked out of the same cells. A scale to read the spread "
+                "against, not a test.")
         else:
             lines.append("  no resampled scale for the spread: "
                          + str(sampling.get("basis", "not computed")))
-        if verdict not in ("AGREE", "WITHIN SAMPLING NOISE"):
-            lines.append(
-                "      f belongs to the SKY. Algorithms disagreeing about it "
-                "means the model's independence")
-            lines.append(
-                "      assumption is still not fully met, so every d below is a "
-                "model output, not a measurement.")
-            lines.append(
-                "      For scale: the two receivers inside one radio spanned "
-                "0.226 to 0.422, a ratio of 1.87x.")
     else:
         lines.append("  f could not be estimated for any algorithm; the reasons "
                      "are per method below")
     for method, reason in sorted((spread.get("unsolvable") or {}).items()):
         lines.append(f"      {method}: unsolvable — {reason}")
+    lines.extend(_control_block(report))
+    lines.extend(_axis_block(report))
+    if consistency.get("verdict") == DISAGREE_VERDICT:
+        lines.append(
+            "  f belongs to the SKY. Algorithms disagreeing about it means the "
+            "model's independence assumption")
+        lines.append(
+            "  is not met, so every d below is a model output, not a "
+            "measurement. For scale: the two receivers")
+        lines.append(
+            "  inside one radio spanned 0.226 to 0.422, a ratio of 1.87x.")
     lines.append("")
     lines.append(f"{'method':>19} {'cells':>6} {'P(A)':>7} {'P(B)':>7}"
                  f" {'P(AB)':>7} {'p':>7} {'P(AB)-p^2':>10} {'f':>7}"

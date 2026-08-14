@@ -1,40 +1,94 @@
 {
-  "schema": "leo-tracker.hardware-epochs/v1",
-  "note": "Receiver labels are reused across hardware changes: reports and corpus entries before and after a swap both say 'lnb-c'. These boundaries are the only way to separate them. Split on capture start time, not on label.",
-  "epochs": [
-    {
-      "id": "pluto-19f2.lnb-cd.gen1",
-      "radio_id": "pluto-19f2",
-      "receiver_labels": ["lnb-c", "lnb-d"],
-      "until_utc": "2026-08-13T04:38:23Z",
-      "uncertain_until_utc": "2026-08-13T04:46:20Z",
-      "measured": {
-        "lnb-c": {"absolute_offset_hz": 430700, "source": "lo_sweep corrected, 240 probes, n=13, SE 12600"},
-        "lnb-d": {"absolute_offset_hz": 20000, "source": "lo_sweep corrected, 240 probes, n=61, SE 5800"},
-        "mismatch_hz": 434408.4,
-        "mismatch_source": "lnb-calibration.json 2026-08-12T19:01:53Z, sample_count 230",
-        "survey_active_fraction": {"lnb-c": 0.065, "lnb-d": 0.212},
-        "survey_active_basis": "351 probes / 2808 tunings per receiver over 23.5 h before the swap"
-      },
-      "fault": "lnb-c detected 3.3x less often than lnb-d. Its +430 kHz LO offset costs only ~10% of survey score (the survey spans +/-700 kHz centred on zero and does not use receiver_centers), so the offset does not explain the deficit. The unit had a separate hardware fault."
+ "schema": "leo-tracker.hardware-epochs/v1",
+ "note": "Receiver labels are reused across hardware changes: reports and corpus entries before and after a swap both say 'lnb-c'. These boundaries are the only way to separate them. Split on capture start time, not on label. A boundary can move a receiver on a radio nobody touched: pluto-5d4d.lnb-a jumped +566 kHz across the pluto-19f2 swap window, which was recorded here as leaving 5d4d valid. Split on capture start time for every radio, not only the one that was worked on.",
+ "epochs": [
+  {
+   "id": "pluto-19f2.lnb-cd.gen1",
+   "radio_id": "pluto-19f2",
+   "receiver_labels": [
+    "lnb-c",
+    "lnb-d"
+   ],
+   "until_utc": "2026-08-13T04:38:23Z",
+   "uncertain_until_utc": "2026-08-13T04:46:20Z",
+   "measured": {
+    "lnb-c": {
+     "absolute_offset_hz": 430700,
+     "source": "lo_sweep corrected, 240 probes, n=13, SE 12600"
     },
-    {
-      "id": "pluto-19f2.lnb-cd.gen2",
-      "radio_id": "pluto-19f2",
-      "receiver_labels": ["lnb-c", "lnb-d"],
-      "from_utc": "2026-08-13T04:46:20Z",
-      "hardware_note": "Both units replaced at once and are identical to each other. Identical model does not imply identical LO: free-running crystals, no shared 10 MHz reference in the chain, so the two offsets are independent draws.",
-      "measured": null,
-      "pending": "absolute offsets unknown; measure with lo_sweep once ~40 post-swap corpus probes exist, then write measured_centers_hz"
-    }
-  ],
-  "unchanged": {
-    "radio_id": "pluto-5d4d",
-    "receiver_labels": ["lnb-a", "lnb-b"],
-    "note": "not touched by this swap; calibration entry remains valid"
+    "lnb-d": {
+     "absolute_offset_hz": 20000,
+     "source": "lo_sweep corrected, 240 probes, n=61, SE 5800"
+    },
+    "mismatch_hz": 434408.4,
+    "mismatch_source": "lnb-calibration.json 2026-08-12T19:01:53Z, sample_count 230",
+    "survey_active_fraction": {
+     "lnb-c": 0.065,
+     "lnb-d": 0.212
+    },
+    "survey_active_basis": "351 probes / 2808 tunings per receiver over 23.5 h before the swap"
+   },
+   "fault": "lnb-c detected 3.3x less often than lnb-d. Its +430 kHz LO offset costs only ~10% of survey score (the survey spans +/-700 kHz centred on zero and does not use receiver_centers), so the offset does not explain the deficit. The unit had a separate hardware fault."
   },
-  "backups": [
-    "/mnt/qnap01/mouse9911/leo/reports/lnb-calibration.json.pre-swap-20260812T2144",
-    "hardware/lnb-calibration.pre-swap-20260812.json"
-  ]
+  {
+   "id": "pluto-19f2.lnb-cd.gen2",
+   "radio_id": "pluto-19f2",
+   "receiver_labels": [
+    "lnb-c",
+    "lnb-d"
+   ],
+   "from_utc": "2026-08-13T04:46:20Z",
+   "hardware_note": "Both units replaced at once and are identical to each other. Identical model does not imply identical LO: free-running crystals, no shared 10 MHz reference in the chain, so the two offsets are independent draws.",
+   "measured": null,
+   "pending": "absolute offsets unknown; measure with lo_sweep once ~40 post-swap corpus probes exist, then write measured_centers_hz"
+  },
+  {
+   "id": "pluto-5d4d.lnb-a.gen1",
+   "radio_id": "pluto-5d4d",
+   "receiver_labels": [
+    "lnb-a",
+    "lnb-b"
+   ],
+   "until_utc": "2026-08-13T04:38:23Z",
+   "uncertain_until_utc": "2026-08-13T04:46:20Z",
+   "measured": {
+    "rx0_minus_rx1_hz": 5154,
+    "ci_95": [
+     4711,
+     5532
+    ],
+    "n_pairs": 9736,
+    "reports": 1162,
+    "source": "lnb_calibration estimator, narrow reports, sweep-clustered bootstrap"
+   },
+   "note": "lnb-a sat near zero and fired at a median -130.5 kHz, indistinguishable from lnb-b. The recorded receiver_centers_hz of +1,170 Hz was CORRECT for this epoch."
+  },
+  {
+   "id": "pluto-5d4d.lnb-a.gen2",
+   "radio_id": "pluto-5d4d",
+   "receiver_labels": [
+    "lnb-a",
+    "lnb-b"
+   ],
+   "from_utc": "2026-08-13T04:46:20Z",
+   "measured": {
+    "rx0_minus_rx1_hz": 567402,
+    "uncertainty_hz": 4000,
+    "ci_95_precision_only": [
+     567338,
+     567552
+    ],
+    "n_points": 2585,
+    "n_sweeps": 931,
+    "source": "survey path, coarse bank E (+/-700 kHz about raw zero), refined points where both ports fired"
+   },
+   "fault": "lnb-a's LO moved about +566 kHz across the same window that brackets pluto-19f2's LNB swap, even though 5d4d was believed untouched. Its fire rate stepped 8.26% -> 0.24% while lnb-b was unchanged at 6.49% -> 6.87%, and its surviving detections pinned at +349.8 kHz, the search-grid edge. This single event produced BOTH the 'flat ~1.19 peak-to-median, dead port' exclusion in cross_radio.DEAD_RECEIVERS AND the stale receiver_centers_hz. They are one fault, not two: the port was never dead, it moved out of the search.",
+   "why_it_cannot_self_heal": "acquisition.py builds frequency_offsets = arange(-350_000, 350_001, 25_000) + centre, where centre is the ALREADY APPLIED receiver_centers value. A port anchored near zero is blind past about +/-356 kHz and can never discover that it has moved. pluto-19f2's replacement LNB was findable only because its stale +434 kHz calibration had already displaced its grid into range. The daily timer will keep returning ~0 Hz for this port forever; the value must be written as measured_centers_hz from the survey path.",
+   "action": "set measured_centers_hz: [567402.0, 0.0] for pluto-5d4d; receiver_centers() already prefers that field. Verified: with it applied, lnb-a's signed live window moves from +250..+550 kHz to -300..0 kHz, centroid -158.4 kHz against lnb-b -151.8, lnb-c -155.0, lnb-d -144.1, and the paired per-instant residual is 0.000 kHz, CI [-61, +153] Hz."
+  }
+ ],
+ "backups": [
+  "/mnt/qnap01/mouse9911/leo/reports/lnb-calibration.json.pre-swap-20260812T2144",
+  "hardware/lnb-calibration.pre-swap-20260812.json"
+ ]
 }

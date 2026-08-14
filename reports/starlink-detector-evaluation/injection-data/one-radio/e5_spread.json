@@ -1,0 +1,37 @@
+{
+ "experiment": "E5-spread",
+ "note": "CABLED LOOPBACK (TX2 -> tee -> 2x30 dB -> RX1,RX2): this tests the detectors and the digital pipeline, NOT the LNBs, the antenna, or real sky.",
+ "f_true": 0.2775,
+ "cells": 400,
+ "tx2_gain_db": -71.0,
+ "f_by_method": {
+  "anchor-8": 0.3106172117771299,
+  "differential-16": 0.3309367153177166,
+  "differential-32": 0.3256810873069581,
+  "glrt-32": 0.28821802799745,
+  "glrt-64": 0.30189735874289536,
+  "full-frame-full": 0.3006629918503384,
+  "full-frame-acquire": 0.3203388379028339,
+  "full-frame-verify": 0.28314137239019926
+ },
+ "observed_spread": 0.04779534292751736,
+ "spread_ci": [
+  0.03334775466543908,
+  0.15963239647533695
+ ],
+ "spread_median": 0.06915683511576592,
+ "mean_bias": 0.03018670041069016,
+ "mean_bias_ci": [
+  -0.02958667033350894,
+  0.11388346047830374
+ ],
+ "share_of_draws_all_eight_high": 0.8177257525083612,
+ "report_sky_spread": 0.04,
+ "report_sky_range": [
+  0.3388,
+  0.3788
+ ],
+ "spread_exceeds_sky_share": 0.9230769230769231,
+ "bootstrap_draws": 598,
+ "reads": "the eight-algorithm f-spread the report treats as the model's failed consistency check is reproduced here, at a comparable size, on data where f is identical for all eight by construction"
+}

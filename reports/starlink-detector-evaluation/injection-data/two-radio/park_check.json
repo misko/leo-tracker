@@ -1,0 +1,62 @@
+{
+  "r183": {
+    "uri": "ip:192.168.1.183",
+    "serial": "104000bac4950008230026001b440a003a",
+    "before": {
+      "tx1_db": -89.75,
+      "tx2_db": -89.75
+    },
+    "after": {
+      "tx1_db": -89.75,
+      "tx2_db": -89.75
+    },
+    "dds": {
+      "altvoltage0.raw": "0",
+      "altvoltage0.scale": "0.000000",
+      "altvoltage1.raw": "0",
+      "altvoltage1.scale": "0.000000",
+      "altvoltage2.raw": "0",
+      "altvoltage2.scale": "0.000000",
+      "altvoltage3.raw": "0",
+      "altvoltage3.scale": "0.000000",
+      "altvoltage4.raw": "0",
+      "altvoltage4.scale": "0.000000",
+      "altvoltage5.raw": "0",
+      "altvoltage5.scale": "0.000000",
+      "altvoltage6.raw": "0",
+      "altvoltage6.scale": "0.000000",
+      "altvoltage7.raw": "0",
+      "altvoltage7.scale": "0.000000"
+    }
+  },
+  "r165": {
+    "uri": "ip:192.168.1.165",
+    "serial": "1040007c4a94000211000b009186843ef2",
+    "before": {
+      "tx1_db": -89.75,
+      "tx2_db": -89.75
+    },
+    "after": {
+      "tx1_db": -89.75,
+      "tx2_db": -89.75
+    },
+    "dds": {
+      "altvoltage0.raw": "0",
+      "altvoltage0.scale": "0.000000",
+      "altvoltage1.raw": "0",
+      "altvoltage1.scale": "0.000000",
+      "altvoltage2.raw": "0",
+      "altvoltage2.scale": "0.000000",
+      "altvoltage3.raw": "0",
+      "altvoltage3.scale": "0.000000",
+      "altvoltage4.raw": "0",
+      "altvoltage4.scale": "0.000000",
+      "altvoltage5.raw": "0",
+      "altvoltage5.scale": "0.000000",
+      "altvoltage6.raw": "0",
+      "altvoltage6.scale": "0.000000",
+      "altvoltage7.raw": "0",
+      "altvoltage7.scale": "0.000000"
+    }
+  }
+}

@@ -1055,10 +1055,11 @@ quantity it measures was never diagnostic: **a spread of that size is what a
 correct model produces.** The machinery is sound; the instrument used to police
 it reads nothing.
 
-One systematic bias worth carrying: the solver reads `d` **low** against direct
-measurement in 15 of 16 cases, by up to 0.10. The `d` values in
-[section 5](#5-ground-truth-by-coincidence-the-model) are better read as floors
-than as estimates.
+One systematic bias appeared here — the solver reading `d` **low** against
+direct measurement in 15 of 16 cases — but it does **not** survive independent
+radios and is withdrawn in
+[section 13c](#13c-one-earlier-finding-does-not-survive-independence). It was a
+property of this rig's shared oscillator, not of the estimator.
 
 ![Recovered f against the f that was set](figures/injection/coincidence-recovery.png)
 
@@ -1225,6 +1226,108 @@ error, or a shared LO family error across both LNB models — cannot be separate
 by a differential calibration, and distinguishing them needs hardware. And what
 sets the ~±175 kHz half-width remains open, given that injection shows the
 detectors themselves flat out to ±700 kHz.
+
+
+## 13. The same experiment, on two radios, with the answer known
+
+[Section 11](#11-ground-truth-at-last-measured-detection-probability) used one
+radio, where `RX1` and `RX2` share an oscillator and carry 7.4% common-mode
+noise — the *dependent* configuration this report argues elsewhere is unusable.
+This section removes that objection. Two separate radios, each with its own
+loopback, own oscillator, own clock and no RF path to the other, are driven from
+one process on a shared occupancy schedule. They have in common exactly one
+thing: whether a pilot frame was transmitted at instant *k*. That is what `f`
+means, and here it is set rather than inferred.
+
+Every structural property of the sky configuration is reproduced. The one
+unknown becomes a dial.
+
+### 13a. The estimator recovers a known occupancy
+
+500 cells per level, at an SNR where detection is partial so coincidence carries
+information:
+
+| `f` set | `f` realised | Recovered across the eight | Covers truth? |
+|---:|---:|---|:--:|
+| 0.15 | 0.132 | 0.089 – 0.146 | **yes** |
+| 0.30 | 0.318 | 0.291 – 0.341 | **yes** |
+| 0.50 | 0.478 | 0.460 – 0.506 | **yes** |
+
+The coincidence machinery works. On two radios that share nothing but a
+schedule, it returns the occupancy it was given at every level tried.
+
+![Recovered f against the f that was set, three levels](figures/injection/fig_d1_recovered_f.png)
+
+### 13b. And its consistency check never says "consistent"
+
+The same runs, scored by the check the model uses to validate itself — on data
+where the model is **true by construction**:
+
+| `f` set | Verdict |
+|---:|---|
+| 0.15 | `ALGORITHMS DISAGREE` |
+| 0.30 | `VACUOUS — THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY` |
+| 0.50 | `NOT VALIDATED — NO USABLE NEGATIVE CONTROL` |
+
+Three occupancy levels, three different non-consistent verdicts, and not once
+does it return the passing token. The check does not merely fail to detect a
+broken model — **it declines to certify a correct one.**
+
+The reason is in the spread it measures:
+
+| `f` set | Across-algorithm spread | On sky, for comparison |
+|---:|---:|---:|
+| 0.15 | 0.0569 | 0.040 |
+| 0.30 | 0.0509 | 0.040 |
+| 0.50 | 0.0460 | 0.040 |
+
+**Every spread measured where `f` is one number by construction is wider than
+the spread observed on sky.** The sky figure this report opens by treating as a
+symptom is, if anything, unusually *tight*. A spread of 0.05 is what a correct
+model produces with eight near-duplicate detectors and finite samples, and the
+single-radio run reached the same conclusion independently at 0.048.
+
+This is the strongest available statement of
+[section 6](#6-did-it-work-the-negative-controls)'s result, and it is stronger
+than the one that section makes. The negative controls showed the check cannot
+fail. This shows the quantity behind it was never diagnostic at all.
+
+![The check's verdict and spread at three known occupancies](figures/injection/fig_d4_controls.png)
+
+### 13c. One earlier finding does not survive independence
+
+The single-radio run found the solver reading `d` **low** against direct
+measurement in 15 of 16 cases, and this report carried that as a caveat: that
+the published `d` values are floors rather than estimates. On two independent
+radios it reads low in **20 of 48** — indistinguishable from chance.
+
+That bias was a property of the shared-oscillator configuration, not of the
+estimator. The floors caveat is withdrawn. Median bias here is 0.005, though the
+worst case is 0.17, so `d` remains imprecise per algorithm even without a
+systematic direction.
+
+![Recovered d against directly measured d](figures/injection/fig_d2_d_bias.png)
+
+### 13d. The joint null
+
+The model assumes false alarms are independent across chains and uses `p²` for
+joint null firing, which has never been checked against a measured joint null.
+With both radios silent, the odds ratio between the two chains' firing is
+**1.03** and **0.84** at the two better-sampled rates — consistent with
+independence. The lowest-rate point falls to 0.50 but rests on very few
+coincidences and should not be read as a violation.
+
+![Measured joint null against the p-squared assumption](figures/injection/fig_d5_joint_null.png)
+
+### What this section still does not reach
+
+Both rigs are cabled loopbacks: no LNB, no antenna, no sky, and no genuine
+carrier offset, since each radio's transmit and receive share one reference. It
+tests the estimator and the detectors, which is what was in question — but the
+−150 kHz common-mode tuning error in
+[section 12](#12-what-the-cliff-actually-is), the water on the `lnb-c` and
+`lnb-d` bias tees, and the LNB chain generally are all outside what a cable can
+say anything about.
 
 
 ## Figures and provenance

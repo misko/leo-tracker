@@ -1,0 +1,165 @@
+{
+ "title": "D4: the negative controls destroy f exactly as they should - and the agreement check still cannot see it",
+ "levels": [
+  {
+   "f_true": 0.15,
+   "f_realised": 0.132,
+   "cells": 500,
+   "joins": {
+    "real": {
+     "f_min": 0.08914656771799628,
+     "f_max": 0.1460775473399459,
+     "f_median": 0.12427366447985003,
+     "solvable": 8,
+     "spread": 0.05693097962194962,
+     "spread_p05": 0.04139943595210491,
+     "spread_p95": 0.10606942396126968,
+     "reasons": {}
+    },
+    "scrambled": {
+     "f_min": 0.29298780487804876,
+     "f_max": 0.6747663551401869,
+     "f_median": 0.566283387767885,
+     "solvable": 8,
+     "spread": 0.38177855026213814,
+     "spread_p05": 0.21450624846851252,
+     "spread_p95": 0.6924465872565702,
+     "reasons": {}
+    },
+    "shifted": {
+     "f_min": 0.5251147863208488,
+     "f_max": 0.9790556616735364,
+     "f_median": 0.7520852239971927,
+     "solvable": 2,
+     "spread": 0.45394087535268757,
+     "spread_p05": 0.06195982145192136,
+     "spread_p95": 0.6030701754385965,
+     "reasons": {
+      "anchor-8": "fewer coincidences than independent firing predicts (covariance -0.0048): no occupancy in (0, 1] fits these counts",
+      "differential-32": "fewer coincidences than independent firing predicts (covariance -0.0003): no occupancy in (0, 1] fits these counts",
+      "full-frame-acquire": "fewer coincidences than independent firing predicts (covariance -0.0014): no occupancy in (0, 1] fits these counts",
+      "full-frame-full": "fewer coincidences than independent firing predicts (covariance -0.0025): no occupancy in (0, 1] fits these counts",
+      "full-frame-verify": "fewer coincidences than independent firing predicts (covariance -0.0049): no occupancy in (0, 1] fits these counts",
+      "glrt-64": "fewer coincidences than independent firing predicts (covariance -0.0025): no occupancy in (0, 1] fits these counts"
+     }
+    }
+   },
+   "verdict": "ALGORITHMS DISAGREE",
+   "verdict_short": "algorithms disagree"
+  },
+  {
+   "f_true": 0.3,
+   "f_realised": 0.318,
+   "cells": 500,
+   "joins": {
+    "real": {
+     "f_min": 0.2905982905982906,
+     "f_max": 0.3414936247723133,
+     "f_median": 0.3302258581647947,
+     "solvable": 8,
+     "spread": 0.0508953341740227,
+     "spread_p05": 0.041015844202992535,
+     "spread_p95": 0.09508389286572011,
+     "reasons": {}
+    },
+    "scrambled": {
+     "f_min": 0.991957671957672,
+     "f_max": 0.991957671957672,
+     "f_median": 0.991957671957672,
+     "solvable": 1,
+     "spread": 0.0,
+     "spread_p05": 0.010763681559981975,
+     "spread_p95": 0.26398239449922534,
+     "reasons": {
+      "anchor-8": "fewer coincidences than independent firing predicts (covariance -0.0103): no occupancy in (0, 1] fits these counts",
+      "differential-16": "fewer coincidences than independent firing predicts (covariance -0.0124): no occupancy in (0, 1] fits these counts",
+      "full-frame-acquire": "fewer coincidences than independent firing predicts (covariance -0.0114): no occupancy in (0, 1] fits these counts",
+      "full-frame-full": "fewer coincidences than independent firing predicts (covariance -0.0067): no occupancy in (0, 1] fits these counts",
+      "full-frame-verify": "fewer coincidences than independent firing predicts (covariance -0.0111): no occupancy in (0, 1] fits these counts",
+      "glrt-32": "fewer coincidences than independent firing predicts (covariance -0.0073): no occupancy in (0, 1] fits these counts",
+      "glrt-64": "fewer coincidences than independent firing predicts (covariance -0.0102): no occupancy in (0, 1] fits these counts"
+     }
+    },
+    "shifted": {
+     "f_min": 0.622565653896219,
+     "f_max": 0.7793548699100493,
+     "f_median": 0.7523018800509013,
+     "solvable": 8,
+     "spread": 0.15678921601383033,
+     "spread_p05": 0.11700472636952552,
+     "spread_p95": 0.32059952110446566,
+     "reasons": {}
+    }
+   },
+   "verdict": "VACUOUS \u2014 THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY",
+   "verdict_short": "vacuous"
+  },
+  {
+   "f_true": 0.5,
+   "f_realised": 0.478,
+   "cells": 500,
+   "joins": {
+    "real": {
+     "f_min": 0.46046488605889835,
+     "f_max": 0.5064959254947613,
+     "f_median": 0.4813808833356007,
+     "solvable": 8,
+     "spread": 0.04603103943586295,
+     "spread_p05": 0.03564236285590722,
+     "spread_p95": 0.08294351430982555,
+     "reasons": {}
+    },
+    "scrambled": {
+     "f_min": null,
+     "f_max": null,
+     "f_median": null,
+     "solvable": 0,
+     "spread": null,
+     "spread_p05": 0.010538436140855811,
+     "spread_p95": 0.12326779758277995,
+     "reasons": {
+      "anchor-8": "fewer coincidences than independent firing predicts (covariance -0.0132): no occupancy in (0, 1] fits these counts",
+      "differential-16": "fewer coincidences than independent firing predicts (covariance -0.0112): no occupancy in (0, 1] fits these counts",
+      "differential-32": "fewer coincidences than independent firing predicts (covariance -0.0105): no occupancy in (0, 1] fits these counts",
+      "full-frame-acquire": "fewer coincidences than independent firing predicts (covariance -0.0173): no occupancy in (0, 1] fits these counts",
+      "full-frame-full": "fewer coincidences than independent firing predicts (covariance -0.0081): no occupancy in (0, 1] fits these counts",
+      "full-frame-verify": "fewer coincidences than independent firing predicts (covariance -0.0172): no occupancy in (0, 1] fits these counts",
+      "glrt-32": "fewer coincidences than independent firing predicts (covariance -0.0098): no occupancy in (0, 1] fits these counts",
+      "glrt-64": "fewer coincidences than independent firing predicts (covariance -0.0118): no occupancy in (0, 1] fits these counts"
+     }
+    },
+    "shifted": {
+     "f_min": null,
+     "f_max": null,
+     "f_median": null,
+     "solvable": 0,
+     "spread": null,
+     "spread_p05": 0.0039023537913311923,
+     "spread_p95": 0.13976181482481165,
+     "reasons": {
+      "anchor-8": "fewer coincidences than independent firing predicts (covariance -0.0149): no occupancy in (0, 1] fits these counts",
+      "differential-16": "fewer coincidences than independent firing predicts (covariance -0.0149): no occupancy in (0, 1] fits these counts",
+      "differential-32": "fewer coincidences than independent firing predicts (covariance -0.0177): no occupancy in (0, 1] fits these counts",
+      "full-frame-acquire": "fewer coincidences than independent firing predicts (covariance -0.0089): no occupancy in (0, 1] fits these counts",
+      "full-frame-full": "fewer coincidences than independent firing predicts (covariance -0.0199): no occupancy in (0, 1] fits these counts",
+      "full-frame-verify": "fewer coincidences than independent firing predicts (covariance -0.0164): no occupancy in (0, 1] fits these counts",
+      "glrt-32": "fewer coincidences than independent firing predicts (covariance -0.0027): no occupancy in (0, 1] fits these counts",
+      "glrt-64": "fewer coincidences than independent firing predicts (covariance -0.0176): no occupancy in (0, 1] fits these counts"
+     }
+    }
+   },
+   "verdict": "NOT VALIDATED \u2014 NO USABLE NEGATIVE CONTROL",
+   "verdict_short": "not validated"
+  }
+ ],
+ "joins": [
+  "real",
+  "scrambled",
+  "shifted"
+ ],
+ "join_labels": {
+  "real": "real pairing",
+  "scrambled": "scrambled (radio B from another sweep)",
+  "shifted": "shifted +2 instants"
+ }
+}

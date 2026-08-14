@@ -207,7 +207,7 @@ raw spreads, which grow from 0.047 to 0.099. Population: 154 paired sweeps, 352
 scored sidecars; scrambled partners are a median 1,446.5 s apart, minimum
 235 s.
 Estimator `leo_tracker.radio.beacon.cross_radio`, unmodified; every plotted
-value is in* [`figures/negative-control.json`](figures/negative-control.json).
+value is in [`figures/negative-control.json`](figures/negative-control.json).*
 
 The root cause is that the eight detectors are not eight independent opinions.
 Over 2,160 observations they correlate with each other at φ 0.82–0.94. They
@@ -224,16 +224,16 @@ reading noise.
 ***Figure 2 — why the check cannot fail.*** *φ between every pair of the eight
 confirmers, on the same 4,224 live target observations (176 paired sweeps, 352
 scored sidecars, `lnb-a` excluded, no missing verdicts). No pair anywhere in the
-matrix falls below φ = 0.809 —* `anchor-8` *against* `differential-32` *— the
-tightest is 0.927 (*`full-frame-full` *against* `full-frame-acquire`*), and the
-mean over the 28 pairs is 0.858. Eight independent opinions would sit near 0.
+matrix falls below φ = 0.809 — `anchor-8` against `differential-32` — and the
+tightest is 0.927, `full-frame-full` against `full-frame-acquire`; the mean over
+the 28 pairs is 0.858. Eight independent opinions would sit near 0.
 Near-duplicates are obliged to return near-identical f whatever they are fed,
 which is exactly what the controls above show. Row order maximises adjacent φ
 over all 8! = 40,320 orderings, which is why the outlined same-family blocks
-land on the diagonal. Values in*
-[`figures/method-correlation.json`](figures/method-correlation.json). *The text
-above quotes φ 0.82–0.94 over 2,160 observations, measured on an earlier, smaller
-snapshot; the conclusion is the same either way.*
+land on the diagonal. Values in
+[`figures/method-correlation.json`](figures/method-correlation.json). The text
+above quotes φ 0.82–0.94 over 2,160 observations, measured on an earlier,
+smaller snapshot; the conclusion is the same either way.*
 
 ## Retraction 2 — the differentials were never shown to be miscalibrated
 
@@ -310,8 +310,8 @@ pilot band.
 ![Detection rate against bias-corrected offset for three sample rates, with
 each rate's pilot guard marked](figures/cfo-cliff.png)
 
-***Figure 3 — the cliff does not move with the guard.*** `differential-32`,
-*fired against its own (sample rate, probe length) cross-edge-null 1% threshold
+***Figure 3 — the cliff does not move with the guard.*** *`differential-32`,
+fired against its own (sample rate, probe length) cross-edge-null 1% threshold
 and binned on the pipeline's bias-corrected offset, over 176 paired sweeps. In
 the 350–400 kHz bin the rate collapses at every live rate: 21.6% → 2.5% at
 2.5 MS/s (n 287 → 120), 11.9% → 1.2% at 5.0 MS/s (n 943 → 404), 12.7% → 1.2% at
@@ -323,7 +323,7 @@ rate. Crosses are the nine values quoted per rate in the table above, plotted
 against the recomputed lines rather than instead of them; they track within 10.8
 points everywhere and put the cliff in the same bin. Lower panel is n per bin,
 with a dotted line at n = 150 below which a bin is too thin to lean on. Values
-in* [`figures/cfo-cliff.json`](figures/cfo-cliff.json).
+in [`figures/cfo-cliff.json`](figures/cfo-cliff.json).*
 
 The withdrawn report reached a partly correct destination by an
 argument the data does not support, which is worse than being wrong, because it
@@ -345,25 +345,25 @@ argue them:
 
 ![Detection against raw and bias-corrected offset for the three live ports](figures/port-bias.png)
 
-***Figure 4 — `lnb-c` is shifted, not deaf.*** *5 MS/s,* `differential-32`, *176
-paired sweeps. On the raw axis* `lnb-c` *reads 1.2% (n = 402) in the
-100–200 kHz bin where the other two ports peak, because its whole response has
-moved to 400–500 kHz (54.9%, n = 541) — its +604.2 kHz LO bias. Bias-corrected
-it is the strongest port in that bin: 60.6% (n = 487) against* `lnb-b` *36.5%
-(n = 705) and* `lnb-d` *40.7% (n = 762), a real 1.5× port difference that
-survives the correction rather than being created by it.* `lnb-b` *and* `lnb-d`
-*carry zero bias, so their two panels are identical by construction and only*
-`lnb-c` *moves. Values in* [`figures/port-bias.json`](figures/port-bias.json).
+***Figure 4 — `lnb-c` is shifted, not deaf.*** *5 MS/s, `differential-32`, 176
+paired sweeps. On the raw axis `lnb-c` reads 1.2% (n = 402) in the 100–200 kHz
+bin where the other two ports peak, because its whole response has moved to
+400–500 kHz (54.9%, n = 541) — its +604.2 kHz LO bias. Bias-corrected it is the
+strongest port in that bin: 60.6% (n = 487) against `lnb-b` 36.5% (n = 705) and
+`lnb-d` 40.7% (n = 762), a real 1.5× port difference that survives the
+correction rather than being created by it. `lnb-b` and `lnb-d` carry zero bias,
+so their two panels are identical by construction and only `lnb-c` moves. Values
+in [`figures/port-bias.json`](figures/port-bias.json).*
 
 ***Audit note carried by the figure, recorded here and not resolved.***
-`lnb-a` *is excluded because* `cross_radio.DEAD_RECEIVERS` *records it as flat
-≈1.19 at every tuning. Scored on* `differential-32`*, this corpus does not
-reproduce that:* `lnb-a` *fires on 12.47% of its 9,276 target points against*
-`lnb-b`*'s 14.50% of 9,250, and its cross-edge null is not silence — median
-0.0182 and p99 0.0799, against* `lnb-b`*'s 0.0198 and 0.0831. The exclusion is
+*`lnb-a` is excluded because `cross_radio.DEAD_RECEIVERS` records it as flat
+≈1.19 at every tuning. Scored on `differential-32`, this corpus does not
+reproduce that: `lnb-a` fires on 12.47% of its 9,276 target points against
+`lnb-b`'s 14.50% of 9,250, and its cross-edge null is not silence — median
+0.0182 and p99 0.0799, against `lnb-b`'s 0.0198 and 0.0831. The exclusion is
 applied throughout this report regardless, and the section below is left as
-written; the disagreement belongs in the record*
-([`figures/lnb-a-check.py`](figures/lnb-a-check.py)).
+written; the disagreement belongs in the record
+([`figures/lnb-a-check.py`](figures/lnb-a-check.py)).*
 
 The scored records apply `receiver_centers_hz` at scoring time. Two distinct
 values appear across the census, one per radio:
@@ -431,13 +431,13 @@ a plausible common cause and should be checked against the bench log before
 ***Figure 5 — one dropout, 1:43:26 without a single pair.*** *Committed sweeps
 on the share at the 2026-08-14T06:51Z read: 3,069, of which 2,176 paired and 893
 single-radio. The 893 are one contiguous run from 20260814T032415Z to
-20260814T050741Z. The genuine event is one USB loss at the start of it — the*
-`OSError: [Errno 5] Input/output error` *behind the* `found 0` *reopen quoted
-below; the other 892 reopen failures are the* `KeyError` *the bug turned that
+20260814T050741Z. The genuine event is one USB loss at the start of it — the
+`OSError: [Errno 5] Input/output error` behind the `found 0` reopen quoted
+below; the other 892 reopen failures are the `KeyError` the bug turned that
 single dropout into. Paired capture resumes at 20260814T050756Z and all 840
 sweeps after it are paired, none single. The collector was live during the read,
-so both totals are floors. Values in*
-[`figures/outage-timeline.json`](figures/outage-timeline.json).
+so both totals are floors. Values in
+[`figures/outage-timeline.json`](figures/outage-timeline.json).*
 
 A USB dropout wedged the collector's reopen path. The reopen block deleted the
 context with `del ctx[name]`, which raised before the retry below it could ever
@@ -527,15 +527,15 @@ four axes nobody checked are wider: receiver pair 0.066 (mean gap +0.065, same
 sign in 8 of 8 detectors, cluster bootstrap over sweeps +0.044…+0.085, 0 of 300
 draws ≤ 0), channel 0.115, arm 0.388. The 1.25 MS/s arm sits entirely off the
 certified band at f 0.032–0.067, with only 2 of 8 detectors solvable on it.
-Values in* [`figures/f-strata.json`](figures/f-strata.json).
+Values in [`figures/f-strata.json`](figures/f-strata.json).*
 
 *Skew is the one axis flatter than the certified one, at 0.024, and on this
 snapshot its two strata overlap: f 0.248–0.320 within the 0.054 ms bound (2,544
 cells) against 0.246–0.298 beyond it (640 cells). The non-overlapping split
 reported in the simultaneity section above was measured on an earlier, smaller
-snapshot and is not reproduced here.*
+snapshot and is not reproduced here.
 [`figures/f-strata-skew-vs-corpus.json`](figures/f-strata-skew-vs-corpus.json)
-*walks the corpus up in steps: the two strata are disjoint through about 90
+walks the corpus up in steps: the two strata are disjoint through about 90
 paired sweeps and overlapping at every size beyond, which is what a sampling
 artefact looks like.*
 

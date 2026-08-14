@@ -1,0 +1,174 @@
+{
+ "figure": "smoke-test",
+ "note": "CABLED LOOPBACK (TX2 -> tee -> 2x30 dB -> RX1,RX2): this tests the detectors and the digital pipeline, NOT the LNBs, the antenna, or real sky.",
+ "reference_from_bench_notes": {
+  "rms": 83.6,
+  "peak_to_median": 60.3,
+  "tx2_gain_db": -20.0
+ },
+ "config": {
+  "serial": "104000bac4950008230026001b440a003a",
+  "tx1_gain_db": -89.75,
+  "tx2_gain_db": -89.75,
+  "rx1_gain_db": 40.0,
+  "rx2_gain_db": 40.0,
+  "rx_gain_mode": "manual",
+  "sample_rate_hz": 5000000.0,
+  "rf_bandwidth_hz": 5000000.0,
+  "tx_lo_hz": 1190312500.0,
+  "rx_lo_hz": 1190312500.0
+ },
+ "tx_waveform": {
+  "samples": 20000,
+  "frames": 3,
+  "digital_peak": 9987.3816,
+  "digital_rms": 3875.5160469762336,
+  "source": "leo_tracker.radio.beacon.pilots.edge_pilot_frame(5e6,'lower')"
+ },
+ "tx_off": {
+  "rx1_rms": 1.3980164527893066,
+  "rx1_peak_to_median": 4.4151482582092285
+ },
+ "ladder": [
+  {
+   "tx2_gain_db": -85.0,
+   "rx1_rms": 1.4017239809036255,
+   "rx2_rms": 1.511793613433838,
+   "rx1_peak": 5.0,
+   "rx2_peak": 5.099019527435303,
+   "rx1_peak_to_median": 4.501550674438477,
+   "rx2_peak_to_median": 4.079524517059326
+  },
+  {
+   "tx2_gain_db": -80.0,
+   "rx1_rms": 1.4038162231445312,
+   "rx2_rms": 1.512332558631897,
+   "rx1_peak": 5.099019527435303,
+   "rx2_peak": 5.099019527435303,
+   "rx1_peak_to_median": 6.882183074951172,
+   "rx2_peak_to_median": 6.198260307312012
+  },
+  {
+   "tx2_gain_db": -75.0,
+   "rx1_rms": 1.4010138511657715,
+   "rx2_rms": 1.521574854850769,
+   "rx1_peak": 5.0,
+   "rx2_peak": 5.099019527435303,
+   "rx1_peak_to_median": 10.489888191223145,
+   "rx2_peak_to_median": 9.148374557495117
+  },
+  {
+   "tx2_gain_db": -70.0,
+   "rx1_rms": 1.4182701110839844,
+   "rx2_rms": 1.532755732536316,
+   "rx1_peak": 4.4721360206604,
+   "rx2_peak": 5.0,
+   "rx1_peak_to_median": 15.838333129882812,
+   "rx2_peak_to_median": 14.973770141601562
+  },
+  {
+   "tx2_gain_db": -65.0,
+   "rx1_rms": 1.4615540504455566,
+   "rx2_rms": 1.5755412578582764,
+   "rx1_peak": 5.099019527435303,
+   "rx2_peak": 5.099019527435303,
+   "rx1_peak_to_median": 26.70686149597168,
+   "rx2_peak_to_median": 25.44242286682129
+  },
+  {
+   "tx2_gain_db": -60.0,
+   "rx1_rms": 1.5880208015441895,
+   "rx2_rms": 1.703522801399231,
+   "rx1_peak": 5.385164737701416,
+   "rx2_peak": 5.830951690673828,
+   "rx1_peak_to_median": 39.6345329284668,
+   "rx2_peak_to_median": 37.86662673950195
+  },
+  {
+   "tx2_gain_db": -55.0,
+   "rx1_rms": 1.9509357213974,
+   "rx2_rms": 2.0624547004699707,
+   "rx1_peak": 6.4031243324279785,
+   "rx2_peak": 7.071067810058594,
+   "rx1_peak_to_median": 51.173221588134766,
+   "rx2_peak_to_median": 51.31899642944336
+  },
+  {
+   "tx2_gain_db": -50.0,
+   "rx1_rms": 2.7869105339050293,
+   "rx2_rms": 2.911903142929077,
+   "rx1_peak": 8.602325439453125,
+   "rx2_peak": 9.433980941772461,
+   "rx1_peak_to_median": 58.12636184692383,
+   "rx2_peak_to_median": 57.973968505859375
+  },
+  {
+   "tx2_gain_db": -45.0,
+   "rx1_rms": 4.548012733459473,
+   "rx2_rms": 4.682356357574463,
+   "rx1_peak": 13.453624725341797,
+   "rx2_peak": 14.03566837310791,
+   "rx1_peak_to_median": 60.520957946777344,
+   "rx2_peak_to_median": 60.72395324707031
+  },
+  {
+   "tx2_gain_db": -40.0,
+   "rx1_rms": 8.154131889343262,
+   "rx2_rms": 8.2249116897583,
+   "rx1_peak": 21.63330841064453,
+   "rx2_peak": 23.021728515625,
+   "rx1_peak_to_median": 61.58159255981445,
+   "rx2_peak_to_median": 61.60609817504883
+  },
+  {
+   "tx2_gain_db": -35.0,
+   "rx1_rms": 14.565486907958984,
+   "rx2_rms": 14.354069709777832,
+   "rx1_peak": 38.832977294921875,
+   "rx2_peak": 38.63935852050781,
+   "rx1_peak_to_median": 62.08412170410156,
+   "rx2_peak_to_median": 61.94542694091797
+  },
+  {
+   "tx2_gain_db": -30.0,
+   "rx1_rms": 26.000165939331055,
+   "rx2_rms": 25.377866744995117,
+   "rx1_peak": 68.0,
+   "rx2_peak": 66.37017059326172,
+   "rx1_peak_to_median": 62.1118278503418,
+   "rx2_peak_to_median": 62.10765075683594
+  },
+  {
+   "tx2_gain_db": -25.0,
+   "rx1_rms": 46.0443229675293,
+   "rx2_rms": 45.0113525390625,
+   "rx1_peak": 119.00419616699219,
+   "rx2_peak": 117.068359375,
+   "rx1_peak_to_median": 62.17937469482422,
+   "rx2_peak_to_median": 62.1436882019043
+  },
+  {
+   "tx2_gain_db": -20.0,
+   "rx1_rms": 82.6113052368164,
+   "rx2_rms": 80.66205596923828,
+   "rx1_peak": 212.00234985351562,
+   "rx2_peak": 206.1552734375,
+   "rx1_peak_to_median": 62.08879470825195,
+   "rx2_peak_to_median": 62.103912353515625
+  }
+ ],
+ "verdict": {
+  "reference": {
+   "rms": 83.6,
+   "peak": 461.0,
+   "peak_to_median": 60.3
+  },
+  "measured_rx1": {
+   "rms": 82.6113052368164,
+   "peak": 212.00234985351562,
+   "peak_to_median": 62.08879470825195
+  },
+  "passed": true
+ },
+ "rx_peak_ceiling_counts": 1500.0
+}

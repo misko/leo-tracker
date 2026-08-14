@@ -1,8 +1,10 @@
 # Evaluating Starlink edge-pilot detectors with two radios
 
 Date: 2026-08-14 UTC
-Status: **the apparatus works; the method proposed for deciding which detector
-is better does not, and the test that shows it is the main result**
+Status: **the apparatus works; the coincidence estimator is sound but the check
+used to validate it is uninformative; and a cabled injection rig now measures
+what the model could only infer — giving a detector ranking that matches neither
+of the rankings this report previously offered**
 
 ## Executive summary
 
@@ -51,7 +53,19 @@ worth acting on: a scoring-pipeline detection cliff near 350–400 kHz of correc
 offset, and a +604.2 kHz configured centre correction on one port without which a
 working receiver reads as deaf ([section 9](#9-what-survives-the-instrument)).
 
-Every `d` in this report is a **model output**, never a measurement. It is
+**Since this report was first written, ground truth arrived.** A cabled
+loopback on two bench radios injects the repository's own pilot waveform at a
+known amplitude, occupancy and carrier offset, which converts the central
+questions from inference into measurement.
+[Section 11](#11-ground-truth-at-last-measured-detection-probability) reports
+it: the measured detector ranking is uncorrelated with both the model's ranking
+(rho −0.048) and the fire-count ranking (+0.048); the coincidence estimator
+recovers a known `f` without bias, so the machinery is sound and only its
+diagnostic fails; the 350–400 kHz cliff does not exist against a *known* offset,
+falling instead at the 700 kHz bank edge; and the thresholds are calibrated on
+truly empty input.
+
+Every `d` in the sections below is a **model output**, never a measurement. It is
 inferred from a model whose own consistency check is the one shown above to be
 incapable of failing. That caveat is repeated wherever a `d` appears, because it
 is load-bearing every time.
@@ -843,7 +857,9 @@ Binned on that axis, `differential-32`'s detection rate collapses in the
 
 The pilot guard bands at those three rates are +312.5, +1,562.5 and
 +4,062.5 kHz — a **13x range** — and the cliff does not move. That rules the
-guard band out. What is left is a rate-independent ~350 kHz offset tolerance
+guard band out. What is left is a detection cliff near 350–400 kHz of corrected offset — **since shown by
+injection not to be a detector tolerance at all, see
+[section 11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)**
 whose mechanism is open: the survey scorer's own bank spans ±700 kHz, and the
 ±350 kHz constant elsewhere in the codebase belongs to the acquisition path,
 which this scoring path does not use.
@@ -972,6 +988,154 @@ detectors — by fire count, by excess over the measured null, or by model outpu
 `d` — should be reported as a result.
 
 ---
+
+## 11. Ground truth at last: measured detection probability
+
+Every number before this section is inferred. This one is measured.
+
+Two bench radios carry a closed loopback — `TX2` into a splitter and 30 dB of
+attenuation, into `RX1` and `RX2`, with no antenna. Transmitting the
+repository's own `pilots.edge_pilot_frame` puts the exact signal the eight
+detectors hunt onto a channel whose occupancy, amplitude and carrier offset are
+set rather than guessed. That converts every question in this report from a
+model output into a measurement — for the detectors and the digital pipeline,
+though **not** for the LNBs, the antenna or the sky, none of which the cable
+contains.
+
+### 11a. The measured ranking matches neither of the rankings in this report
+
+SNR at 50% detection, 20 ms probes at 5 MS/s, thresholds set to 1% per point on
+a genuinely empty channel, 160 cells per rung across 18 rungs:
+
+| Rank | Detector | SNR at Pd = 0.5 | | Rank | Detector | SNR at Pd = 0.5 |
+|---:|---|---:|---|---:|---|---:|
+| 1 | `glrt-32` | **−18.69 dB** | | 5 | `glrt-64` | −18.22 dB |
+| 2 | `full-frame-verify` | −18.57 dB | | 6 | `anchor-8` | −17.61 dB |
+| 3 | `full-frame-acquire` | −18.50 dB | | 7 | `differential-32` | −17.50 dB |
+| 4 | `full-frame-full` | −18.29 dB | | 8 | `differential-16` | −17.04 dB |
+
+Against the model's `d` ranking, Spearman rho = **−0.048**. Against the raw
+fire-count ranking, **+0.048**. Both are indistinguishable from zero: **neither
+ranking in this report carries information about which detector is more
+sensitive.**
+
+The measured order is nonetheless real. The spread is only 1.65 dB, but **21 of
+28 pairs resolve at 95%** under a paired bootstrap. The model's second most
+confident claim — `full-frame-acquire` worst of eight — is exactly inverted: it
+measures third, and its gap from `glrt-32` is not resolvable. The differentials
+the model placed mid-field measure worst, and `differential-16` is significantly
+worse than all seven others.
+
+![Detection probability against measured SNR, one curve per detector](figures/injection/detection-vs-snr.png)
+
+*Pd against measured SNR on the cabled loopback. SNR is estimated empirically at
+each rung from signal-present against TX-off power in the same configuration,
+not assumed from the gain setting.*
+
+![The three rankings side by side](figures/injection/detector-ranking.png)
+
+*The measured ranking against the model's and the fire count's. Spearman −0.048
+and +0.048 respectively.*
+
+### 11b. The coincidence estimator works. Its consistency check never could.
+
+With occupancy set by hand to `f_true` = 0.2775 at an SNR where Pd ~ 0.6:
+
+- The estimator recovers **0.283–0.331**, and every 95% interval covers the
+  truth. It is not biased.
+- Conditional independence — the assumption everything rests on — **holds**:
+  on known-empty cells, P(AB) − P(A)P(B) <= 0.007.
+- And the eight algorithms disagree about `f` by **0.048 on data where `f` is
+  one number by construction** — *larger* than the 0.040 spread this report
+  observes on sky, and larger in 92.3% of bootstrap resamples.
+
+That last line reframes [section 6](#6-did-it-work-the-negative-controls). The
+negative controls showed the agreement check cannot fail. This shows the
+quantity it measures was never diagnostic: **a spread of that size is what a
+correct model produces.** The machinery is sound; the instrument used to police
+it reads nothing.
+
+One systematic bias worth carrying: the solver reads `d` **low** against direct
+measurement in 15 of 16 cases, by up to 0.10. The `d` values in
+[section 5](#5-ground-truth-by-coincidence-the-model) are better read as floors
+than as estimates.
+
+![Recovered f against the f that was set](figures/injection/coincidence-recovery.png)
+
+*Recovered occupancy against known truth, with the across-algorithm spread on
+the same axis.*
+
+### 11c. The 350–400 kHz cliff is not in the detectors, the banks or the search
+
+Injecting at a **known** imposed offset removes the circularity of plotting
+against an offset the pipeline itself estimates. At +4.7 dB SNR all eight hold
+Pd = 1.00 out to 750 kHz. Repeated at the detection knee, so tolerance cannot
+simply be bought with signal:
+
+| Imposed offset | Pd, all eight |
+|---|---|
+| 0 – 700 kHz | flat, including straight through 350–400 kHz (0.80–0.83) |
+| 700 – 800 kHz | hard fall, 50% crossing at **743–746 kHz**, all eight together |
+
+743–746 kHz is the coarse-E bank's own ±700 kHz span. Received power is flat to
++0.08 dB across the transition, so it is not the analogue filter. The second
+radio reproduces this independently: per-cell detection 100% at every offset out
+to 800 kHz, with one exception in 320 combinations.
+
+**So the on-sky cliff is not a detector tolerance and not a search limit.** It
+lives in something the cable does not contain: the sky, the LNBs, or the offset
+*estimation and bias correction*, which here was never estimated. The
+`~350 kHz tolerance` framing in
+[section 9](#9-what-survives-the-instrument) is withdrawn.
+
+![Detection against imposed offset](figures/injection/offset-cliff.png)
+
+*Detection against a known imposed carrier offset. The fall is at the bank
+edge, not at 350–400 kHz.*
+
+### 11d. The thresholds are calibrated — and one null in the repository is not
+
+Measured on truly empty input, independently on both radios:
+
+| | radio `.183` | radio `.165` | nominal |
+|---|---|---|---|
+| per point | 0.59–1.14% | 0.57–1.42% | 1% |
+| per cell | 4.0–7.7% | 3.9–9.7% | 6.6–6.8% predicted by 1 − 0.99^k |
+
+Both bracket the on-sky 5.47–6.74%. **The sky null rate is fully explained by
+candidate multiplicity; no residual sky energy is required to account for it.**
+This is the measurement behind the correction in
+[section 2](#2-the-hard-part-nothing-was-injected).
+
+One caveat the two radios do not fully agree on: `.165` finds the sky null
+hotter than a cable null in the **tail only** — medians 1.131 against 1.139, but
+p99 1.258 against 1.181 — while `.183` finds the empty-channel band brackets sky
+outright. The tail is what a threshold is made of, so this is worth resolving.
+
+**A defect that should be fixed.** The repository contains two cross-edge nulls
+and only one is sound:
+
+| | What it does | On empty input |
+|---|---|---|
+| `cross_radio.null_thresholds` | runs the opposite edge as its own target, with its own bank and points | thresholds 0.92–1.34× truth — **valid**, and this is what the published `f` and `d` rest on |
+| `survey_comparison.conditioned_comparison` | scores the opposite template at points the *target-edge* detectors selected | thresholds to **0.52×** truth; fires on **25–53% of cells** for five of eight |
+
+The second compares an unselected draw against a maximised one. Its docstring
+claims no screening on the statistic being calibrated; the screening is in the
+point selection rather than the template. The bias is concentrated in the GLRT
+and full-frame families, with `differential-*` and `anchor-8` near-unbiased.
+
+### What this section does not establish
+
+The loopback shares one oscillator between transmit and receive, so the injected
+signal arrives at ~0.07 Hz offset and the detectors never had to search
+frequency — which is why 11c had to impose offset explicitly, and why nothing
+here speaks to LO drift or to the water on the `lnb-c`/`lnb-d` bias tees. `RX1`
+and `RX2` share an LO and carry 7.4% common-mode noise power; it produced no
+correlated false alarms, but two radios on sky are not quite this pair. One
+probe length, one sample rate, and a single occupancy and SNR for 11b. And no
+LNB, antenna or sky anywhere in the path.
+
 
 ## Figures and provenance
 

@@ -1,0 +1,535 @@
+{
+ "experiment": "E3-true-false-alarm",
+ "note": "CABLED LOOPBACK (TX2 -> tee -> 2x30 dB -> RX1,RX2): this tests the detectors and the digital pipeline, NOT the LNBs, the antenna, or real sky.",
+ "population": {
+  "tx_off_observations": 600,
+  "calibration_observations": 300,
+  "evaluation_observations": 300,
+  "dark_observations": 120,
+  "points_per_cell_mean": 6.735,
+  "probe_ms": 20.0,
+  "sample_rate_hz": 5000000.0
+ },
+ "false_alarm_rate_requested": 0.01,
+ "off_versus_dark": {
+  "anchor-8": {
+   "off_p50": 0.15318301785872562,
+   "dark_p50": 0.15071029843084352,
+   "off_p99": 0.27735256253506696,
+   "dark_p99": 0.2658542502934881,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "differential-16": {
+   "off_p50": 0.07583610922407663,
+   "dark_p50": 0.0745362638551151,
+   "off_p99": 0.2424503340580791,
+   "dark_p99": 0.2533296604066866,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "differential-32": {
+   "off_p50": 0.054086155117346726,
+   "dark_p50": 0.05480370084360277,
+   "off_p99": 0.1646566989210492,
+   "dark_p99": 0.1609593044385508,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "glrt-32": {
+   "off_p50": 0.04486562664085588,
+   "dark_p50": 0.04415344582041535,
+   "off_p99": 0.0868270623913853,
+   "dark_p99": 0.08858485910124081,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "glrt-64": {
+   "off_p50": 0.02320770051830988,
+   "dark_p50": 0.0228373388367837,
+   "off_p99": 0.04803299012337658,
+   "dark_p99": 0.05227708444110696,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "full-frame-full": {
+   "off_p50": 0.012119147346721404,
+   "dark_p50": 0.012146501031598431,
+   "off_p99": 0.03176163608839348,
+   "dark_p99": 0.0419536310727805,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "full-frame-acquire": {
+   "off_p50": 0.016904330737516075,
+   "dark_p50": 0.01684102980306294,
+   "off_p99": 0.038896965482579746,
+   "dark_p99": 0.033742763290394766,
+   "off_n": 4041,
+   "dark_n": 817
+  },
+  "full-frame-verify": {
+   "off_p50": 0.01677560443416502,
+   "dark_p50": 0.016803189957268296,
+   "off_p99": 0.03552223337698011,
+   "dark_p99": 0.03733350613100874,
+   "off_n": 4041,
+   "dark_n": 817
+  }
+ },
+ "off_versus_dark_verdict": {
+  "p50_ratio_range": [
+   0.9828598093670546,
+   1.0132667172347385
+  ],
+  "p99_ratio_range": [
+   0.8674908922010042,
+   1.3208901127140436
+  ],
+  "p99_caveat": "the dark arm's p99 rests on ~8 draws; it is reported but not used for the verdict",
+  "reads": "-89.75 dB with the cyclic buffer running is indistinguishable from no waveform at all"
+ },
+ "thresholds": {
+  "anchor-8": {
+   "empty_channel": {
+    "threshold": 0.2757987619173665,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.2814548958715438,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.2695724310990174,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "differential-16": {
+   "empty_channel": {
+    "threshold": 0.24589536167138354,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.27227788179513013,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.2462442669301087,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "differential-32": {
+   "empty_channel": {
+    "threshold": 0.1690601804918028,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.18132074996957706,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.175569061058931,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "glrt-32": {
+   "empty_channel": {
+    "threshold": 0.0867862195483363,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.07310676715019669,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.07008342664182952,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "glrt-64": {
+   "empty_channel": {
+    "threshold": 0.04791508060801688,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.03716520705338331,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.034968197561777714,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "full-frame-full": {
+   "empty_channel": {
+    "threshold": 0.031845029315572114,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.016546751197421012,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.016405700038452705,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "full-frame-acquire": {
+   "empty_channel": {
+    "threshold": 0.04163718232871282,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.02272171665286343,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.023251277488790266,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  },
+  "full-frame-verify": {
+   "empty_channel": {
+    "threshold": 0.03565721170526924,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "cross_edge_on_empty": {
+    "threshold": 0.022652851354040302,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   },
+   "wrong_code_on_empty": {
+    "threshold": 0.022653722367086782,
+    "samples": 2023,
+    "finest_rate": 0.0014829461196243204,
+    "effective_rate": 0.009886307464162136,
+    "false_alarm_rate": 0.01,
+    "supported": true
+   }
+  }
+ },
+ "measured": {
+  "anchor-8": {
+   "threshold": 0.2757987619173665,
+   "per_point": {
+    "fired": 23,
+    "points": 2018,
+    "rate": 0.011397423191278493,
+    "lo": 0.007606605705426992,
+    "hi": 0.017044979265423345
+   },
+   "per_cell": {
+    "fired": 23,
+    "cells": 300,
+    "rate": 0.07666666666666666,
+    "lo": 0.05162723750301175,
+    "hi": 0.11241086656173778
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 20,
+    "cells": 300,
+    "rate": 0.06666666666666667,
+    "lo": 0.04356717679698387,
+    "hi": 0.10072379586772039
+   },
+   "sky_null_per_cell": 0.063
+  },
+  "differential-16": {
+   "threshold": 0.24589536167138354,
+   "per_point": {
+    "fired": 18,
+    "points": 2018,
+    "rate": 0.008919722497522299,
+    "lo": 0.005649541262754099,
+    "hi": 0.014056057830666472
+   },
+   "per_cell": {
+    "fired": 16,
+    "cells": 300,
+    "rate": 0.05333333333333334,
+    "lo": 0.03309162538404202,
+    "hi": 0.08486983874726851
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 6,
+    "cells": 300,
+    "rate": 0.02,
+    "lo": 0.009197506067771085,
+    "hi": 0.042940186730055147
+   },
+   "sky_null_per_cell": 0.0635
+  },
+  "differential-32": {
+   "threshold": 0.1690601804918028,
+   "per_point": {
+    "fired": 13,
+    "points": 2018,
+    "rate": 0.006442021803766105,
+    "lo": 0.0037686084621116416,
+    "hi": 0.010991004753879164
+   },
+   "per_cell": {
+    "fired": 13,
+    "cells": 300,
+    "rate": 0.043333333333333335,
+    "lo": 0.025496203603204263,
+    "hi": 0.07271812912806098
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 10,
+    "cells": 300,
+    "rate": 0.03333333333333333,
+    "lo": 0.018204749873650852,
+    "hi": 0.0602624514575691
+   },
+   "sky_null_per_cell": 0.063
+  },
+  "glrt-32": {
+   "threshold": 0.0867862195483363,
+   "per_point": {
+    "fired": 21,
+    "points": 2018,
+    "rate": 0.010406342913776016,
+    "lo": 0.006816398352044781,
+    "hi": 0.015856792267833653
+   },
+   "per_cell": {
+    "fired": 20,
+    "cells": 300,
+    "rate": 0.06666666666666667,
+    "lo": 0.04356717679698387,
+    "hi": 0.10072379586772039
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 76,
+    "cells": 300,
+    "rate": 0.25333333333333335,
+    "lo": 0.2074489707089529,
+    "hi": 0.3054551214232634
+   },
+   "sky_null_per_cell": 0.0547
+  },
+  "glrt-64": {
+   "threshold": 0.04791508060801688,
+   "per_point": {
+    "fired": 21,
+    "points": 2018,
+    "rate": 0.010406342913776016,
+    "lo": 0.006816398352044781,
+    "hi": 0.015856792267833653
+   },
+   "per_cell": {
+    "fired": 21,
+    "cells": 300,
+    "rate": 0.07,
+    "lo": 0.04623659396060609,
+    "hi": 0.10463675583744661
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 105,
+    "cells": 300,
+    "rate": 0.35,
+    "lo": 0.2982310964752725,
+    "hi": 0.4055619325240481
+   },
+   "sky_null_per_cell": 0.061
+  },
+  "full-frame-full": {
+   "threshold": 0.031845029315572114,
+   "per_point": {
+    "fired": 20,
+    "points": 2018,
+    "rate": 0.009910802775024777,
+    "lo": 0.006424813026040345,
+    "hi": 0.015259180418352135
+   },
+   "per_cell": {
+    "fired": 20,
+    "cells": 300,
+    "rate": 0.06666666666666667,
+    "lo": 0.04356717679698387,
+    "hi": 0.10072379586772039
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 160,
+    "cells": 300,
+    "rate": 0.5333333333333333,
+    "lo": 0.47681387445407486,
+    "hi": 0.5890098968794095
+   },
+   "sky_null_per_cell": 0.0674
+  },
+  "full-frame-acquire": {
+   "threshold": 0.04163718232871282,
+   "per_point": {
+    "fired": 12,
+    "points": 2018,
+    "rate": 0.005946481665014866,
+    "lo": 0.003404887305220826,
+    "hi": 0.010365528735284027
+   },
+   "per_cell": {
+    "fired": 12,
+    "cells": 300,
+    "rate": 0.04,
+    "lo": 0.02302709213793877,
+    "hi": 0.06860486345997804
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 115,
+    "cells": 300,
+    "rate": 0.38333333333333336,
+    "lo": 0.33011889302772734,
+    "hi": 0.43949790730507765
+   },
+   "sky_null_per_cell": 0.0673
+  },
+  "full-frame-verify": {
+   "threshold": 0.03565721170526924,
+   "per_point": {
+    "fired": 20,
+    "points": 2018,
+    "rate": 0.009910802775024777,
+    "lo": 0.006424813026040345,
+    "hi": 0.015259180418352135
+   },
+   "per_cell": {
+    "fired": 20,
+    "cells": 300,
+    "rate": 0.06666666666666667,
+    "lo": 0.04356717679698387,
+    "hi": 0.10072379586772039
+   },
+   "per_cell_cross_edge_threshold": {
+    "fired": 122,
+    "cells": 300,
+    "rate": 0.4066666666666667,
+    "lo": 0.3526007999029206,
+    "hi": 0.4630926403633234
+   },
+   "sky_null_per_cell": 0.0669
+  }
+ },
+ "summary": {
+  "per_point_range": [
+   0.005946481665014866,
+   0.011397423191278493
+  ],
+  "per_cell_range": [
+   0.04,
+   0.07666666666666666
+  ],
+  "sky_per_cell_range": [
+   0.0547,
+   0.0674
+  ],
+  "nominal_per_point": 0.01
+ },
+ "cross_edge_null_validity": {
+  "threshold_ratio_cross_edge_over_empty": {
+   "anchor-8": 1.0205081919688674,
+   "differential-16": 1.1072916542403284,
+   "differential-32": 1.072521923507403,
+   "glrt-32": 0.8423775978567574,
+   "glrt-64": 0.7756473866218445,
+   "full-frame-full": 0.5196023226560418,
+   "full-frame-acquire": 0.5457073553508598,
+   "full-frame-verify": 0.6352950853611692
+  },
+  "range": [
+   0.5196023226560418,
+   1.1072916542403284
+  ]
+ }
+}

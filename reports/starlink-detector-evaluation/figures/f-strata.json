@@ -1,0 +1,562 @@
+{
+  "figure": "f-strata",
+  "generated_utc": "2026-08-14T19:44:16+00:00",
+  "corpus_read_utc": "2026-08-14T14:58Z",
+  "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/",
+  "estimator": "leo_tracker.radio.beacon.cross_radio.solve_coincidence; thresholds from the cross-edge null arm at false_alarm_rate 0.01; p = per-cell null firing rate; matched-arm cells only; lnb-a excluded as dead",
+  "snapshot": {
+    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "sweeps_on_share": 7054,
+    "corpus_entries": 13215,
+    "scored_sidecars": 2339,
+    "scored_digest": "ec5505611f5f1fdf"
+  },
+  "population": {
+    "scored_corpus_entries": 2292,
+    "paired_sweeps_read": 1146,
+    "matched_arm_sweeps": 1035,
+    "matched_arm_cells": 16560,
+    "census": {
+      "scanned": 2339,
+      "read": 2339,
+      "unreadable": 0,
+      "other_schema": 0,
+      "not_synchronised": 0,
+      "unpaired_sweeps": 47,
+      "irregular_geometry": 0,
+      "snapshot_scored_sidecars": 2339
+    }
+  },
+  "cross_edge_target_code_null_rate_p": {
+    "anchor-8": 0.06286337209302326,
+    "differential-16": 0.06315406976744187,
+    "differential-32": 0.0626453488372093,
+    "full-frame-acquire": 0.06751453488372093,
+    "full-frame-full": 0.06744186046511629,
+    "full-frame-verify": 0.06649709302325581,
+    "glrt-32": 0.05450581395348837,
+    "glrt-64": 0.06162790697674419
+  },
+  "empty_sky_rate_p": {
+    "anchor-8": 0.06286337209302326,
+    "differential-16": 0.06315406976744187,
+    "differential-32": 0.0626453488372093,
+    "full-frame-acquire": 0.06751453488372093,
+    "full-frame-full": 0.06744186046511629,
+    "full-frame-verify": 0.06649709302325581,
+    "glrt-32": 0.05450581395348837,
+    "glrt-64": 0.06162790697674419
+  },
+  "reference_band_across_algorithms": {
+    "min": 0.3337553366843439,
+    "max": 0.3759733523114619,
+    "spread": 0.04221801562711802,
+    "per_method": {
+      "anchor-8": 0.3337553366843439,
+      "differential-16": 0.36387240164523293,
+      "differential-32": 0.37039990809089596,
+      "full-frame-acquire": 0.3759733523114619,
+      "full-frame-full": 0.3748421985924056,
+      "full-frame-verify": 0.37107080052819685,
+      "glrt-32": 0.334543789780243,
+      "glrt-64": 0.3422431646399297
+    }
+  },
+  "strata": [
+    {
+      "axis": "Algorithm",
+      "label": "all matched cells",
+      "status": "checked",
+      "cells": 16560,
+      "methods_solved": 8,
+      "min": 0.3337553366843439,
+      "max": 0.3759733523114619,
+      "spread": 0.04221801562711802,
+      "median": 0.36713615486806445,
+      "per_method": {
+        "anchor-8": 0.3337553366843439,
+        "differential-16": 0.36387240164523293,
+        "differential-32": 0.37039990809089596,
+        "full-frame-acquire": 0.3759733523114619,
+        "full-frame-full": 0.3748421985924056,
+        "full-frame-verify": 0.37107080052819685,
+        "glrt-32": 0.334543789780243,
+        "glrt-64": 0.3422431646399297
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Receiver pair",
+      "label": "lnb-c | lnb-b",
+      "status": "not checked",
+      "cells": 8280,
+      "methods_solved": 8,
+      "min": 0.2986475691664436,
+      "max": 0.3491958152378318,
+      "spread": 0.05054824607138819,
+      "median": 0.3373768881077286,
+      "per_method": {
+        "anchor-8": 0.2986475691664436,
+        "differential-16": 0.33166705236429805,
+        "differential-32": 0.3430867238511591,
+        "full-frame-acquire": 0.3489923785590003,
+        "full-frame-full": 0.3491958152378318,
+        "full-frame-verify": 0.34728707498121025,
+        "glrt-32": 0.30385003135800914,
+        "glrt-64": 0.3115701987210062
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Receiver pair",
+      "label": "lnb-d | lnb-b",
+      "status": "not checked",
+      "cells": 8280,
+      "methods_solved": 8,
+      "min": 0.35986370863059125,
+      "max": 0.39832379839566934,
+      "spread": 0.03846008976507809,
+      "median": 0.3905536901835892,
+      "per_method": {
+        "anchor-8": 0.36302265151691615,
+        "differential-16": 0.39037177181374294,
+        "differential-32": 0.39283643526949347,
+        "full-frame-acquire": 0.39832379839566934,
+        "full-frame-full": 0.39607885967645484,
+        "full-frame-verify": 0.3907356085534355,
+        "glrt-32": 0.35986370863059125,
+        "glrt-64": 0.3676000884834591
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Arm (160 ms)",
+      "label": "1.25 MS/s",
+      "status": "not checked",
+      "cells": 1376,
+      "methods_solved": 5,
+      "min": 0.09749416658212441,
+      "max": 0.201406210281524,
+      "spread": 0.10391204369939959,
+      "median": 0.14382527087445118,
+      "per_method": {
+        "differential-16": 0.12570828986945176,
+        "differential-32": 0.14497961319133118,
+        "full-frame-acquire": 0.201406210281524,
+        "full-frame-full": 0.14382527087445118,
+        "full-frame-verify": 0.09749416658212441
+      },
+      "unsolvable": {
+        "anchor-8": "the counts imply a detection probability outside [0, 1] (dA 1.085, dB 0.403)",
+        "glrt-32": "the counts imply a detection probability outside [0, 1] (dA 1.209, dB 0.447)",
+        "glrt-64": "the counts imply a detection probability outside [0, 1] (dA 1.321, dB 0.437)"
+      }
+    },
+    {
+      "axis": "Arm (160 ms)",
+      "label": "2.50 MS/s",
+      "status": "not checked",
+      "cells": 1376,
+      "methods_solved": 8,
+      "min": 0.44300503485831383,
+      "max": 0.5075894278134578,
+      "spread": 0.06458439295514401,
+      "median": 0.48801636177555774,
+      "per_method": {
+        "anchor-8": 0.44300503485831383,
+        "differential-16": 0.5044731941045029,
+        "differential-32": 0.4901095800080915,
+        "full-frame-acquire": 0.485923143543024,
+        "full-frame-full": 0.5006039899477381,
+        "full-frame-verify": 0.5075894278134578,
+        "glrt-32": 0.45356487923551153,
+        "glrt-64": 0.4662641942994199
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Arm (160 ms)",
+      "label": "5.00 MS/s",
+      "status": "not checked",
+      "cells": 1600,
+      "methods_solved": 8,
+      "min": 0.4522550974459684,
+      "max": 0.5263349265364304,
+      "spread": 0.07407982909046201,
+      "median": 0.4945104331506368,
+      "per_method": {
+        "anchor-8": 0.4522550974459684,
+        "differential-16": 0.4995847929095555,
+        "differential-32": 0.5235225559325869,
+        "full-frame-acquire": 0.4894360733917181,
+        "full-frame-full": 0.5263349265364304,
+        "full-frame-verify": 0.5096235186899193,
+        "glrt-32": 0.4643715223517349,
+        "glrt-64": 0.4770253253100853
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Arm (160 ms)",
+      "label": "10.00 MS/s",
+      "status": "not checked",
+      "cells": 1360,
+      "methods_solved": 8,
+      "min": 0.42843696258358077,
+      "max": 0.4868541883893985,
+      "spread": 0.05841722580581771,
+      "median": 0.4563131298596035,
+      "per_method": {
+        "anchor-8": 0.43279838922885167,
+        "differential-16": 0.4587680181639476,
+        "differential-32": 0.4868541883893985,
+        "full-frame-acquire": 0.4634451846906106,
+        "full-frame-full": 0.4538582415552594,
+        "full-frame-verify": 0.45975358542905737,
+        "glrt-32": 0.4319137762998738,
+        "glrt-64": 0.42843696258358077
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Channel",
+      "label": "ch 1",
+      "status": "not checked",
+      "cells": 4140,
+      "methods_solved": 8,
+      "min": 0.29748649099963975,
+      "max": 0.3475750140076325,
+      "spread": 0.05008852300799277,
+      "median": 0.3325363232977021,
+      "per_method": {
+        "anchor-8": 0.29748649099963975,
+        "differential-16": 0.33298946097392235,
+        "differential-32": 0.3320831856214818,
+        "full-frame-acquire": 0.3475750140076325,
+        "full-frame-full": 0.3455328767124109,
+        "full-frame-verify": 0.33935024877114583,
+        "glrt-32": 0.30913126474171276,
+        "glrt-64": 0.3159844702236445
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Channel",
+      "label": "ch 2",
+      "status": "not checked",
+      "cells": 4140,
+      "methods_solved": 8,
+      "min": 0.3501524148066552,
+      "max": 0.39216994168671393,
+      "spread": 0.04201752688005872,
+      "median": 0.3789854787829146,
+      "per_method": {
+        "anchor-8": 0.35383481476898226,
+        "differential-16": 0.3715403966246525,
+        "differential-32": 0.3867339749279783,
+        "full-frame-acquire": 0.39216994168671393,
+        "full-frame-full": 0.38928130588127347,
+        "full-frame-verify": 0.3864305609411767,
+        "glrt-32": 0.3501524148066552,
+        "glrt-64": 0.35178547066288635
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Channel",
+      "label": "ch 3",
+      "status": "not checked",
+      "cells": 4140,
+      "methods_solved": 8,
+      "min": 0.35004373219158685,
+      "max": 0.4033085941640571,
+      "spread": 0.05326486197247027,
+      "median": 0.3826083985426413,
+      "per_method": {
+        "anchor-8": 0.35004373219158685,
+        "differential-16": 0.3761056499195098,
+        "differential-32": 0.3891111471657727,
+        "full-frame-acquire": 0.4002492730644024,
+        "full-frame-full": 0.40080177983365234,
+        "full-frame-verify": 0.4033085941640571,
+        "glrt-32": 0.35198043724137645,
+        "glrt-64": 0.36393115989518077
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Channel",
+      "label": "ch 4",
+      "status": "not checked",
+      "cells": 4140,
+      "methods_solved": 8,
+      "min": 0.32649869206303905,
+      "max": 0.37487656375596956,
+      "spread": 0.04837787169293051,
+      "median": 0.3589202528738149,
+      "per_method": {
+        "anchor-8": 0.3334298549216323,
+        "differential-16": 0.37487656375596956,
+        "differential-32": 0.37371916721129633,
+        "full-frame-acquire": 0.36348165428001317,
+        "full-frame-full": 0.363188656246727,
+        "full-frame-verify": 0.3546518495009027,
+        "glrt-32": 0.32649869206303905,
+        "glrt-64": 0.33713677851278384
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Skew",
+      "label": "within 0.054 ms",
+      "status": "withdrawn",
+      "cells": 12080,
+      "methods_solved": 8,
+      "min": 0.31938624063807,
+      "max": 0.3657561984652965,
+      "spread": 0.04636995782722653,
+      "median": 0.35449592531317925,
+      "per_method": {
+        "anchor-8": 0.31938624063807,
+        "differential-16": 0.3523566906338495,
+        "differential-32": 0.356635159992509,
+        "full-frame-acquire": 0.3657561984652965,
+        "full-frame-full": 0.36247852002251846,
+        "full-frame-verify": 0.3596393425828163,
+        "glrt-32": 0.3203300922923268,
+        "glrt-64": 0.33114435919725477
+      },
+      "unsolvable": {}
+    },
+    {
+      "axis": "Skew",
+      "label": "beyond 0.054 ms",
+      "status": "withdrawn",
+      "cells": 4480,
+      "methods_solved": 8,
+      "min": 0.37216534998760814,
+      "max": 0.40817775955150715,
+      "spread": 0.036012409563899006,
+      "median": 0.3983865485231271,
+      "per_method": {
+        "anchor-8": 0.37265183431607346,
+        "differential-16": 0.3948773169679232,
+        "differential-32": 0.407460884829244,
+        "full-frame-acquire": 0.40358573023875105,
+        "full-frame-full": 0.40817775955150715,
+        "full-frame-verify": 0.401895780078331,
+        "glrt-32": 0.3729062441472472,
+        "glrt-64": 0.37216534998760814
+      },
+      "unsolvable": {}
+    }
+  ],
+  "axis_excursion": {
+    "Algorithm": {
+      "slices": 8,
+      "unpaired_range": 0.04221801562711802,
+      "paired_median": 0.04221801562711802,
+      "paired_min": 0.04221801562711802,
+      "paired_max": 0.04221801562711802,
+      "paired_detectors": 8,
+      "basis": "range over the eight detectors, cells held fixed"
+    },
+    "Receiver pair": {
+      "slices": 2,
+      "unpaired_range": 0.05317680207586062,
+      "paired_median": 0.052881694345458224,
+      "paired_min": 0.04344853357222522,
+      "paired_max": 0.06437508235047257,
+      "paired_detectors": 8,
+      "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
+    },
+    "Arm (160 ms)": {
+      "slices": 4,
+      "unpaired_range": 0.3506851622761856,
+      "paired_median": 0.3787649042350511,
+      "paired_min": 0.2880298631101941,
+      "paired_max": 0.4121293521077949,
+      "paired_detectors": 5,
+      "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
+    },
+    "Channel": {
+      "slices": 4,
+      "unpaired_range": 0.050072075244939174,
+      "paired_median": 0.053971581089005655,
+      "paired_min": 0.04284917249966369,
+      "paired_max": 0.06395834539291129,
+      "paired_detectors": 8,
+      "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
+    },
+    "Skew": {
+      "slices": 2,
+      "unpaired_range": 0.043890623209947854,
+      "paired_median": 0.044109932931531204,
+      "paired_min": 0.03782953177345455,
+      "paired_max": 0.05326559367800349,
+      "paired_detectors": 8,
+      "basis": "per-detector range over the strata, median over the detectors solvable on every stratum"
+    }
+  },
+  "usable_axes": [
+    "Algorithm",
+    "Receiver pair",
+    "Channel",
+    "Arm (160 ms)"
+  ],
+  "withdrawn_axis": {
+    "axis": "Skew",
+    "verdict": "NOT A USABLE STRATIFYING VARIABLE",
+    "what_the_corpus_says": {
+      "sweeps_read": 2339,
+      "skew_basis": {
+        "measured at barrier release, a LOWER BOUND on the true sample-start offset; see leo-scans/README.md": 2339
+      },
+      "mirror": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/refresh/work/lite"
+    },
+    "what_the_module_measured": {
+      "source": "leo_tracker.radio.beacon.synchronised_scan, 256 paired tunings on the real radios, barrier before the retune",
+      "reported_at_barrier_release_ms": {
+        "same order": 0.023,
+        "opposite order": 0.029
+      },
+      "true_sample_start_median_ms": {
+        "same order": 0.086,
+        "opposite order": 0.274
+      },
+      "true_sample_start_max_ms": {
+        "same order": 3.36,
+        "opposite order": 18.96
+      },
+      "true_over_reported_median": {
+        "same order": 3.7391304347826084,
+        "opposite order": 9.448275862068966
+      },
+      "true_offset_opposite_over_same": {
+        "median": 3.1860465116279073,
+        "max": 5.642857142857143
+      },
+      "note": "the error was deterministic in the edge order, not noise: tunings 2 and 4 of every opposite-order sweep sat at ~16.9 ms, always the same way round"
+    },
+    "what_these_cells_say": {
+      "stamped_skew_by_geometry": {
+        "opposite-edge": {
+          "cells": 8704,
+          "median_ms": 0.0435,
+          "mean_ms": 0.12219802389705882,
+          "max_ms": 8.3409
+        },
+        "same-edge": {
+          "cells": 7856,
+          "median_ms": 0.0422,
+          "mean_ms": 0.1098623981670061,
+          "max_ms": 5.3604
+        }
+      },
+      "opposite_over_same_median": 1.0308056872037914,
+      "design_bound_ms": 0.054,
+      "reading": "the stamp separates the two geometries by a factor of 1.03. The offset it stands in for separates them by 3.2x on the module's medians and 5.6x on its maxima, and it is the geometry that this axis exists to bound."
+    },
+    "consequence": "a stratification on skew_ms splits the corpus on a number that is a lower bound on the true offset AND is blind to the geometry the offset depends on, so neither half of the split means what the axis needs it to mean. The row is struck through rather than dropped: its removal is itself a finding."
+  },
+  "arm_axis_is_the_largest_confound": {
+    "available": true,
+    "source": "/tmp/claude-1000/-home-satpi01-leo-tracker/07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/revise/analysis-A.json",
+    "basis": "cross-channel mean phi, section 8a, with the receiver held fixed in every rung; both combiners (any-of-eight and the predeclared glrt-32)",
+    "per_combiner": {
+      "any-of-eight": {
+        "raw_cross_channel_mean_phi": 0.11820529022203978,
+        "removed_by_the_arm": 0.4251628453664511,
+        "removed_by_the_time_trend": 0.06314186891592069,
+        "removed_by_both": 0.43988676313188996
+      },
+      "glrt-32": {
+        "raw_cross_channel_mean_phi": 0.1769764455686741,
+        "removed_by_the_arm": 0.4612537521116321,
+        "removed_by_the_time_trend": 0.048088950098519406,
+        "removed_by_both": 0.4869567212088819
+      }
+    },
+    "arm_share_range": [
+      0.4251628453664511,
+      0.4612537521116321
+    ],
+    "time_trend_share_range": [
+      0.048088950098519406,
+      0.06314186891592069
+    ],
+    "reading": "the arm \u2014 sample rate x probe length \u2014 accounts for 43-46% of the cross-channel correlation; the chronological trend that was the flagged confound accounts for 5-6%."
+  },
+  "axes_flatter_than_the_certified_one": [],
+  "receiver_pair_gap": {
+    "definition": "f(lnb-d|lnb-b) - f(lnb-c|lnb-b), per detector",
+    "per_method": {
+      "anchor-8": 0.06437508235047257,
+      "differential-16": 0.058704719449444887,
+      "differential-32": 0.04974971141833434,
+      "full-frame-acquire": 0.049331419836669055,
+      "full-frame-full": 0.04688304443862307,
+      "full-frame-verify": 0.04344853357222522,
+      "glrt-32": 0.05601367727258211,
+      "glrt-64": 0.05602988976245288
+    },
+    "mean": 0.053067009762600516,
+    "same_sign_positive": 8,
+    "of": 8,
+    "cluster_bootstrap_over_sweeps": {
+      "draws": 300,
+      "sweeps": 1035,
+      "p05": 0.04308809876921859,
+      "p50": 0.05311752773599362,
+      "p95": 0.06400450291394688,
+      "le_zero": 0
+    }
+  },
+  "reviewer_comparison": {
+    "note": "the reviewer's figures were taken when ~90-102 paired sweeps were scored; the whole corpus is scored now (1146 paired sweeps, 16560 matched-arm cells), so levels have moved. Reproduces: the receiver-pair gap (same sign, 8/8), the channel ordering, and 1.25 MS/s being the weakest arm. Does NOT reproduce: the skew split, which is disjoint here and runs beyond-bound higher.",
+    "algorithms": {
+      "reviewer_min_max_spread": [
+        0.307,
+        0.362,
+        0.05
+      ],
+      "here_min_max_spread": [
+        0.3337553366843439,
+        0.3759733523114619,
+        0.04221801562711802
+      ]
+    },
+    "receiver_pair": {
+      "reviewer": "f(c|b) 0.244-0.306 vs f(d|b) 0.333-0.387, mean gap +0.072, 8/8 same sign, bootstrap +0.042..+0.099, 0/300 <= 0",
+      "here": "f(c|b) 0.299-0.349 vs f(d|b) 0.360-0.398, mean gap +0.053, 8/8 same sign, bootstrap +0.043..+0.064, 0/300 <= 0"
+    },
+    "arm": {
+      "reviewer": "1.25 MS/s 160 ms f 0.015; 5.0 MS/s 160 ms f 0.401-0.510",
+      "here": "1.25 MS/s 160 ms f 0.097-0.201 (5/8 solvable); 5.0 MS/s 160 ms f 0.452-0.526 (8/8)"
+    },
+    "channel": {
+      "reviewer": "ch1 0.211-0.291 vs ch3 0.381-0.436",
+      "here": "ch1 0.297-0.348 vs ch3 0.350-0.403"
+    },
+    "skew": {
+      "reviewer": "within 0.310-0.372 (n=1054) vs beyond 0.220-0.288 (n=386), NON-OVERLAPPING",
+      "here": "within 0.319-0.366 (n=12080) vs beyond 0.372-0.408 (n=4480), NON-OVERLAPPING",
+      "disjoint": true,
+      "direction": "beyond-bound higher",
+      "verdict": "SUPERSEDED \u2014 this comparison is withdrawn with the axis. The strata are disjoint here too and run the opposite way round (beyond-bound higher), but neither reading is usable: skew_ms does not measure the offset it is being used to stratify on. See withdrawn_axis."
+    }
+  },
+  "axis_rank": {
+    "order_flattest_first": [
+      "Algorithm",
+      "Receiver pair",
+      "Channel",
+      "Arm (160 ms)"
+    ],
+    "counted_over": "the axes whose stratifying variable measures what it stratifies on; Skew is withdrawn",
+    "certified_axis_rank": 1,
+    "certified_axis_is": "flattest",
+    "widest_axis": "Arm (160 ms)",
+    "widest_over_certified": 8.971641575492665
+  }
+}

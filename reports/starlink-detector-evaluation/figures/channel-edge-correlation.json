@@ -1,6 +1,6 @@
 {
   "figure": "channel-edge-correlation",
-  "question": "does one channel's firing predict another channel's, and is a channel's own upper/lower pair tighter than two different channels are?",
+  "question": "does one channel's firing predict another channel's once the apparatus is held fixed, and is a channel's own upper/lower pair tighter than two different channels are?",
   "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*",
   "census": {
     "frozen_at_start": {
@@ -28,17 +28,25 @@
       "irregular_geometry": 0,
       "beyond_limit": 0
     },
-    "excluded_receivers": {
-      "lnb-a": 15104
-    },
-    "threshold_keys": 96
+    "excluded_receivers": {},
+    "threshold_keys": 96,
+    "receivers_live": [
+      "lnb-a",
+      "lnb-b",
+      "lnb-c",
+      "lnb-d"
+    ],
+    "lnb_a": "INCLUDED. The exclusion recorded in cross_radio.DEAD_RECEIVERS cites a flat ~1.19 peak-to-median at every tuning since 2026-08-13 04:44 UTC. That instant falls inside pluto-5d4d's 03:24:04Z-05:07:56Z outage, when the radio produced no data at all, and this scored corpus stops at 2026-08-14T03:21:55Z regardless.",
+    "threshold_null_population": "lnb-b, lnb-c, lnb-d -- the published figure's own null population, held fixed so that the receiver set and the permutation null are the only things that changed"
   },
+  "lnb_a": "INCLUDED",
   "unit_of_observation": "one receiver chain's pass over one sweep; it visits all eight tunings once",
-  "units_seen": 3774,
-  "units_complete": 3774,
-  "n_per_cell": 3774,
+  "units_seen": 5032,
+  "units_complete": 5032,
+  "n_per_cell": 5032,
   "n_is_identical_in_every_cell": true,
   "decision_rule": "cross_radio._any_method_fires (any of the eight scored methods), each against its own (sample rate, probe length) cross-edge-null threshold",
+  "phi_matches_module_phi_to": 1.5987211554602254e-14,
   "axis_order": [
     "ch1 lower",
     "ch1 upper",
@@ -51,287 +59,847 @@
   ],
   "axis_order_basis": "declared in advance: a channel's own two edges are adjacent, so channel structure would appear as four 2x2 diagonal blocks",
   "fire_rate_per_tuning": {
-    "ch1 lower": 0.40169581346051936,
-    "ch1 upper": 0.36036036036036034,
-    "ch2 lower": 0.4446210916799152,
-    "ch2 upper": 0.3985161632220456,
-    "ch3 lower": 0.42792792792792794,
-    "ch3 upper": 0.404610492845787,
-    "ch4 lower": 0.40540540540540543,
-    "ch4 upper": 0.3958664546899841
+    "ch1 lower": 0.382154213036566,
+    "ch1 upper": 0.34439586645469,
+    "ch2 lower": 0.43223370429252783,
+    "ch2 upper": 0.3789745627980922,
+    "ch3 lower": 0.41156597774244835,
+    "ch3 upper": 0.3827503974562798,
+    "ch4 lower": 0.40798887122416533,
+    "ch4 upper": 0.3793720190779014
   },
-  "phi": {
+  "statistic": {
+    "primary": "phi between tuning columns CENTRED ON THEIR OWN STRATUM MEANS, stratum = time8 x arm x receiver. This is the partial correlation controlling for stratum: the between-stratum structure the apparatus produces is removed and only within-stratum co-movement is left.",
+    "raw": "phi on the uncentred columns -- the published statistic, kept for the comparison",
+    "stratum": "time8 x arm x receiver",
+    "time_blocks": "equal-COUNT blocks of units ordered by capture time; collection was not uniform, so equal-width blocks would not hold observation count fixed"
+  },
+  "phi_residualised": {
     "ch1 lower": {
       "ch1 lower": 1.0,
-      "ch1 upper": 0.4477142770039879,
-      "ch2 lower": 0.07173690696177817,
-      "ch2 upper": 0.10802196550238591,
-      "ch3 lower": 0.131372207064869,
-      "ch3 upper": 0.1273111743587346,
-      "ch4 lower": 0.14465931861696202,
-      "ch4 upper": 0.16121410316309356
+      "ch1 upper": 0.38542670273053053,
+      "ch2 lower": 0.01538617254715692,
+      "ch2 upper": 0.036631953492375434,
+      "ch3 lower": 0.06465605570442336,
+      "ch3 upper": 0.0717608835059856,
+      "ch4 lower": 0.09389326647426888,
+      "ch4 upper": 0.09585941238076373
     },
     "ch1 upper": {
-      "ch1 lower": 0.4477142770039879,
+      "ch1 lower": 0.38542670273053053,
       "ch1 upper": 1.0,
-      "ch2 lower": 0.09031180904434376,
-      "ch2 upper": 0.10147438049623939,
-      "ch3 lower": 0.13610534808302394,
-      "ch3 upper": 0.11776405103458266,
-      "ch4 lower": 0.12213242943267658,
-      "ch4 upper": 0.1349990685605292
+      "ch2 lower": 0.01978646769761567,
+      "ch2 upper": 0.034160330335821366,
+      "ch3 lower": 0.07941287723316301,
+      "ch3 upper": 0.06812721486250377,
+      "ch4 lower": 0.08045944910552882,
+      "ch4 upper": 0.0829762587183812
     },
     "ch2 lower": {
-      "ch1 lower": 0.07173690696177817,
-      "ch1 upper": 0.09031180904434376,
+      "ch1 lower": 0.01538617254715692,
+      "ch1 upper": 0.01978646769761567,
       "ch2 lower": 1.0,
-      "ch2 upper": 0.4664566000419317,
-      "ch3 lower": 0.10554659102101034,
-      "ch3 upper": 0.09024017663912152,
-      "ch4 lower": 0.1354637575320852,
-      "ch4 upper": 0.13055473415411475
+      "ch2 upper": 0.4149491177516391,
+      "ch3 lower": 0.0458386245830112,
+      "ch3 upper": 0.045316404163716,
+      "ch4 lower": 0.08477946962132805,
+      "ch4 upper": 0.061333452032757585
     },
     "ch2 upper": {
-      "ch1 lower": 0.10802196550238591,
-      "ch1 upper": 0.10147438049623939,
-      "ch2 lower": 0.4664566000419317,
+      "ch1 lower": 0.036631953492375434,
+      "ch1 upper": 0.034160330335821366,
+      "ch2 lower": 0.4149491177516391,
       "ch2 upper": 1.0,
-      "ch3 lower": 0.08137750386078517,
-      "ch3 upper": 0.08431626060128836,
-      "ch4 lower": 0.13478103268524283,
-      "ch4 upper": 0.12463089410971429
+      "ch3 lower": 0.02670592143590032,
+      "ch3 upper": 0.04474079068209705,
+      "ch4 lower": 0.08342043436824052,
+      "ch4 upper": 0.06325748273437809
     },
     "ch3 lower": {
-      "ch1 lower": 0.131372207064869,
-      "ch1 upper": 0.13610534808302394,
-      "ch2 lower": 0.10554659102101034,
-      "ch2 upper": 0.08137750386078517,
+      "ch1 lower": 0.06465605570442336,
+      "ch1 upper": 0.07941287723316301,
+      "ch2 lower": 0.0458386245830112,
+      "ch2 upper": 0.02670592143590032,
       "ch3 lower": 1.0,
-      "ch3 upper": 0.45887043860044235,
-      "ch4 lower": 0.125733058794985,
-      "ch4 upper": 0.14857597269296166
+      "ch3 upper": 0.419044240335918,
+      "ch4 lower": 0.07716724034321833,
+      "ch4 upper": 0.080849217556934
     },
     "ch3 upper": {
-      "ch1 lower": 0.1273111743587346,
-      "ch1 upper": 0.11776405103458266,
-      "ch2 lower": 0.09024017663912152,
-      "ch2 upper": 0.08431626060128836,
-      "ch3 lower": 0.45887043860044235,
+      "ch1 lower": 0.0717608835059856,
+      "ch1 upper": 0.06812721486250377,
+      "ch2 lower": 0.045316404163716,
+      "ch2 upper": 0.04474079068209705,
+      "ch3 lower": 0.419044240335918,
       "ch3 upper": 1.0,
-      "ch4 lower": 0.10439991020217239,
-      "ch4 upper": 0.12420431071625453
+      "ch4 lower": 0.07931014262762154,
+      "ch4 upper": 0.07457360583109923
     },
     "ch4 lower": {
-      "ch1 lower": 0.14465931861696202,
-      "ch1 upper": 0.12213242943267658,
-      "ch2 lower": 0.1354637575320852,
-      "ch2 upper": 0.13478103268524283,
-      "ch3 lower": 0.125733058794985,
-      "ch3 upper": 0.10439991020217239,
+      "ch1 lower": 0.09389326647426888,
+      "ch1 upper": 0.08045944910552882,
+      "ch2 lower": 0.08477946962132805,
+      "ch2 upper": 0.08342043436824052,
+      "ch3 lower": 0.07716724034321833,
+      "ch3 upper": 0.07931014262762154,
       "ch4 lower": 1.0,
-      "ch4 upper": 0.44068452216400267
+      "ch4 upper": 0.42347620977280875
     },
     "ch4 upper": {
-      "ch1 lower": 0.16121410316309356,
-      "ch1 upper": 0.1349990685605292,
-      "ch2 lower": 0.13055473415411475,
-      "ch2 upper": 0.12463089410971429,
-      "ch3 lower": 0.14857597269296166,
-      "ch3 upper": 0.12420431071625453,
-      "ch4 lower": 0.44068452216400267,
+      "ch1 lower": 0.09585941238076373,
+      "ch1 upper": 0.0829762587183812,
+      "ch2 lower": 0.061333452032757585,
+      "ch2 upper": 0.06325748273437809,
+      "ch3 lower": 0.080849217556934,
+      "ch3 upper": 0.07457360583109923,
+      "ch4 lower": 0.42347620977280875,
       "ch4 upper": 1.0
     }
   },
-  "same_channel_edge_pairs": {
-    "ch1": 0.4477142770039879,
-    "ch2": 0.4664566000419317,
-    "ch3": 0.45887043860044235,
-    "ch4": 0.44068452216400267
+  "phi_raw": {
+    "ch1 lower": {
+      "ch1 lower": 1.0,
+      "ch1 upper": 0.430113215424411,
+      "ch2 lower": 0.0791020081142034,
+      "ch2 upper": 0.10135846830526753,
+      "ch3 lower": 0.12429190353281051,
+      "ch3 upper": 0.1236640225303994,
+      "ch4 lower": 0.142664683166237,
+      "ch4 upper": 0.1563218702065045
+    },
+    "ch1 upper": {
+      "ch1 lower": 0.430113215424411,
+      "ch1 upper": 1.0,
+      "ch2 lower": 0.07761848704414899,
+      "ch2 upper": 0.0915853421387806,
+      "ch3 lower": 0.12981942293242343,
+      "ch3 upper": 0.10987283365814263,
+      "ch4 lower": 0.12165240139744009,
+      "ch4 upper": 0.13493032540026786
+    },
+    "ch2 lower": {
+      "ch1 lower": 0.0791020081142034,
+      "ch1 upper": 0.07761848704414899,
+      "ch2 lower": 1.0,
+      "ch2 upper": 0.4578822763354048,
+      "ch3 lower": 0.1025838837300462,
+      "ch3 upper": 0.08956293920460733,
+      "ch4 lower": 0.13355916800740056,
+      "ch4 upper": 0.12141931364846495
+    },
+    "ch2 upper": {
+      "ch1 lower": 0.10135846830526753,
+      "ch1 upper": 0.0915853421387806,
+      "ch2 lower": 0.4578822763354048,
+      "ch2 upper": 1.0,
+      "ch3 lower": 0.08419179612680855,
+      "ch3 upper": 0.091099707364109,
+      "ch4 lower": 0.13083200258317706,
+      "ch4 upper": 0.12455292024717773
+    },
+    "ch3 lower": {
+      "ch1 lower": 0.12429190353281051,
+      "ch1 upper": 0.12981942293242343,
+      "ch2 lower": 0.1025838837300462,
+      "ch2 upper": 0.08419179612680855,
+      "ch3 lower": 1.0,
+      "ch3 upper": 0.45638464916540195,
+      "ch4 lower": 0.11261511589330722,
+      "ch4 upper": 0.13758442098350912
+    },
+    "ch3 upper": {
+      "ch1 lower": 0.1236640225303994,
+      "ch1 upper": 0.10987283365814263,
+      "ch2 lower": 0.08956293920460733,
+      "ch2 upper": 0.091099707364109,
+      "ch3 lower": 0.45638464916540195,
+      "ch3 upper": 1.0,
+      "ch4 lower": 0.09917614824215173,
+      "ch4 upper": 0.1173993954137606
+    },
+    "ch4 lower": {
+      "ch1 lower": 0.142664683166237,
+      "ch1 upper": 0.12165240139744009,
+      "ch2 lower": 0.13355916800740056,
+      "ch2 upper": 0.13083200258317706,
+      "ch3 lower": 0.11261511589330722,
+      "ch3 upper": 0.09917614824215173,
+      "ch4 lower": 1.0,
+      "ch4 upper": 0.44012760948714597
+    },
+    "ch4 upper": {
+      "ch1 lower": 0.1563218702065045,
+      "ch1 upper": 0.13493032540026786,
+      "ch2 lower": 0.12141931364846495,
+      "ch2 upper": 0.12455292024717773,
+      "ch3 lower": 0.13758442098350912,
+      "ch3 upper": 0.1173993954137606,
+      "ch4 lower": 0.44012760948714597,
+      "ch4 upper": 1.0
+    }
   },
-  "same_channel_mean": 0.45343145945259117,
-  "cross_channel_mean": 0.11820529022203978,
-  "cross_channel_min": 0.07173690696177817,
-  "cross_channel_max": 0.16121410316309356,
-  "ratio_same_over_cross": 3.8359658742925475,
-  "channel_separation": {
+  "same_channel_edge_pairs_residualised": {
+    "ch1": 0.38542670273053053,
+    "ch2": 0.4149491177516391,
+    "ch3": 0.419044240335918,
+    "ch4": 0.42347620977280875
+  },
+  "terms_raw": {
+    "same_channel_mean": 0.44612693760309097,
+    "cross_channel_mean": 0.11406077416129774,
+    "cross_channel_min": 0.07761848704414899,
+    "cross_channel_max": 0.1563218702065045
+  },
+  "terms_residualised": {
+    "same_channel_mean": 0.41072406764772407,
+    "cross_channel_mean": 0.06293346366826207,
+    "cross_channel_min": 0.01538617254715692,
+    "cross_channel_max": 0.09585941238076373
+  },
+  "ratio_same_over_cross_raw": 3.9113090445292404,
+  "ratio_same_over_cross_residualised": 6.526322304660566,
+  "cross_channel_mean_ladder": {
+    "any-of-eight": {
+      "raw (no strata)": {
+        "same_channel_mean": 0.44612693760309097,
+        "cross_channel_mean": 0.11406077416129774,
+        "cross_channel_min": 0.07761848704414899,
+        "cross_channel_max": 0.1563218702065045,
+        "strata": 1
+      },
+      "receiver": {
+        "same_channel_mean": 0.44360770476009653,
+        "cross_channel_mean": 0.107540532757335,
+        "cross_channel_min": 0.0707568696449915,
+        "cross_channel_max": 0.1474844658431715,
+        "strata": 4
+      },
+      "time8 x receiver": {
+        "same_channel_mean": 0.4380559035221896,
+        "cross_channel_mean": 0.1054342680215649,
+        "cross_channel_min": 0.06768513029950354,
+        "cross_channel_max": 0.14526065289044723,
+        "strata": 32
+      },
+      "arm x receiver": {
+        "same_channel_mean": 0.4172039500995866,
+        "cross_channel_mean": 0.06450000693070317,
+        "cross_channel_min": 0.0169692483245742,
+        "cross_channel_max": 0.10030587695302737,
+        "strata": 48
+      },
+      "time4 x arm x receiver": {
+        "same_channel_mean": 0.4119383394045797,
+        "cross_channel_mean": 0.061788992395134044,
+        "cross_channel_min": 0.007467009521832836,
+        "cross_channel_max": 0.10034131523107818,
+        "strata": 192
+      },
+      "time8 x arm x receiver": {
+        "same_channel_mean": 0.41072406764772407,
+        "cross_channel_mean": 0.06293346366826207,
+        "cross_channel_min": 0.01538617254715692,
+        "cross_channel_max": 0.09585941238076373,
+        "strata": 384
+      },
+      "time16 x arm x receiver": {
+        "same_channel_mean": 0.4059000962632737,
+        "cross_channel_mean": 0.061984220989267334,
+        "cross_channel_min": 0.011456971008301238,
+        "cross_channel_max": 0.09178410779520091,
+        "strata": 768
+      }
+    },
+    "glrt-32": {
+      "raw (no strata)": {
+        "same_channel_mean": 0.649793932890354,
+        "cross_channel_mean": 0.17014885138451954,
+        "cross_channel_min": 0.11848831740872388,
+        "cross_channel_max": 0.23333284046319483,
+        "strata": 1
+      },
+      "receiver": {
+        "same_channel_mean": 0.6492609946244712,
+        "cross_channel_mean": 0.1632753684393529,
+        "cross_channel_min": 0.110935164093738,
+        "cross_channel_max": 0.22338772583301317,
+        "strata": 4
+      },
+      "time8 x receiver": {
+        "same_channel_mean": 0.6448070236265451,
+        "cross_channel_mean": 0.1604666615991683,
+        "cross_channel_min": 0.11002197472490226,
+        "cross_channel_max": 0.22033775332813374,
+        "strata": 32
+      },
+      "arm x receiver": {
+        "same_channel_mean": 0.6196802048113834,
+        "cross_channel_mean": 0.09138675569537262,
+        "cross_channel_min": 0.023213754185988384,
+        "cross_channel_max": 0.15021413588242852,
+        "strata": 48
+      },
+      "time4 x arm x receiver": {
+        "same_channel_mean": 0.6165414893494487,
+        "cross_channel_mean": 0.08825485271835247,
+        "cross_channel_min": 0.01093463090212575,
+        "cross_channel_max": 0.14826107817439282,
+        "strata": 192
+      },
+      "time8 x arm x receiver": {
+        "same_channel_mean": 0.6151899777765519,
+        "cross_channel_mean": 0.0884430520948033,
+        "cross_channel_min": 0.016518493872504026,
+        "cross_channel_max": 0.14168912453279836,
+        "strata": 384
+      },
+      "time16 x arm x receiver": {
+        "same_channel_mean": 0.6107670416811191,
+        "cross_channel_mean": 0.08969816269301878,
+        "cross_channel_min": 0.015353848606833306,
+        "cross_channel_max": 0.13614603195754768,
+        "strata": 768
+      }
+    }
+  },
+  "fraction_of_the_raw_cross_channel_term_that_survives": {
+    "any-of-eight": {
+      "time_only": 0.9243692127888439,
+      "arm_and_receiver": 0.5654880690139032,
+      "time_and_arm": 0.5517537832880691
+    },
+    "glrt-32": {
+      "time_only": 0.9430957675789979,
+      "arm_and_receiver": 0.5370988693238229,
+      "time_and_arm": 0.5197981142695507
+    }
+  },
+  "channel_separation_raw": {
     "0": {
       "tuning_pairs": 4,
-      "mean_phi": 0.4534314594525911,
-      "min_phi": 0.44068452216400267,
-      "max_phi": 0.4664566000419317,
+      "mean_phi": 0.44612693760309097,
+      "min_phi": 0.430113215424411,
+      "max_phi": 0.4578822763354048,
       "values": [
-        0.4477142770039879,
-        0.4664566000419317,
-        0.45887043860044235,
-        0.44068452216400267
+        0.430113215424411,
+        0.4578822763354048,
+        0.45638464916540195,
+        0.44012760948714597
       ]
     },
     "1": {
       "tuning_pairs": 12,
-      "mean_phi": 0.10299490387777717,
-      "min_phi": 0.07173690696177817,
-      "max_phi": 0.14857597269296166,
+      "mean_phi": 0.09865647604672502,
+      "min_phi": 0.07761848704414899,
+      "max_phi": 0.13758442098350912,
       "values": [
-        0.07173690696177817,
-        0.10802196550238591,
-        0.09031180904434376,
-        0.10147438049623939,
-        0.10554659102101034,
-        0.09024017663912152,
-        0.08137750386078517,
-        0.08431626060128836,
-        0.125733058794985,
-        0.14857597269296166,
-        0.10439991020217239,
-        0.12420431071625453
+        0.0791020081142034,
+        0.10135846830526753,
+        0.07761848704414899,
+        0.0915853421387806,
+        0.1025838837300462,
+        0.08956293920460733,
+        0.08419179612680855,
+        0.091099707364109,
+        0.11261511589330722,
+        0.13758442098350912,
+        0.09917614824215173,
+        0.1173993954137606
       ]
     },
     "2": {
       "tuning_pairs": 8,
-      "mean_phi": 0.12974789987779592,
-      "min_phi": 0.11776405103458266,
-      "max_phi": 0.13610534808302394,
+      "mean_phi": 0.12475144839249953,
+      "min_phi": 0.10987283365814263,
+      "max_phi": 0.13355916800740056,
       "values": [
-        0.131372207064869,
-        0.1273111743587346,
-        0.13610534808302394,
-        0.11776405103458266,
-        0.1354637575320852,
-        0.13055473415411475,
-        0.13478103268524283,
-        0.12463089410971429
+        0.12429190353281051,
+        0.1236640225303994,
+        0.12981942293242343,
+        0.10987283365814263,
+        0.13355916800740056,
+        0.12141931364846495,
+        0.13083200258317706,
+        0.12455292024717773
       ]
     },
     "3": {
       "tuning_pairs": 4,
-      "mean_phi": 0.14075122994331535,
-      "min_phi": 0.12213242943267658,
-      "max_phi": 0.16121410316309356,
+      "mean_phi": 0.13889232004261237,
+      "min_phi": 0.12165240139744009,
+      "max_phi": 0.1563218702065045,
       "values": [
-        0.14465931861696202,
-        0.16121410316309356,
-        0.12213242943267658,
-        0.1349990685605292
+        0.142664683166237,
+        0.1563218702065045,
+        0.12165240139744009,
+        0.13493032540026786
       ]
     }
   },
-  "permutation_null": {
-    "draws": 200,
+  "channel_separation_residualised": {
+    "0": {
+      "tuning_pairs": 4,
+      "mean_phi": 0.41072406764772407,
+      "min_phi": 0.38542670273053053,
+      "max_phi": 0.42347620977280875,
+      "values": [
+        0.38542670273053053,
+        0.4149491177516391,
+        0.419044240335918,
+        0.42347620977280875
+      ]
+    },
+    "1": {
+      "tuning_pairs": 12,
+      "mean_phi": 0.04837223927471392,
+      "min_phi": 0.01538617254715692,
+      "max_phi": 0.080849217556934,
+      "values": [
+        0.01538617254715692,
+        0.036631953492375434,
+        0.01978646769761567,
+        0.034160330335821366,
+        0.0458386245830112,
+        0.045316404163716,
+        0.02670592143590032,
+        0.04474079068209705,
+        0.07716724034321833,
+        0.080849217556934,
+        0.07931014262762154,
+        0.07457360583109923
+      ]
+    },
+    "2": {
+      "tuning_pairs": 8,
+      "mean_phi": 0.07209348375784749,
+      "min_phi": 0.061333452032757585,
+      "max_phi": 0.08477946962132805,
+      "values": [
+        0.06465605570442336,
+        0.0717608835059856,
+        0.07941287723316301,
+        0.06812721486250377,
+        0.08477946962132805,
+        0.061333452032757585,
+        0.08342043436824052,
+        0.06325748273437809
+      ]
+    },
+    "3": {
+      "tuning_pairs": 4,
+      "mean_phi": 0.08829709666973566,
+      "min_phi": 0.08045944910552882,
+      "max_phi": 0.09585941238076373,
+      "values": [
+        0.09389326647426888,
+        0.09585941238076373,
+        0.08045944910552882,
+        0.0829762587183812
+      ]
+    }
+  },
+  "channel_separation_residualised_glrt_32": {
+    "0": {
+      "tuning_pairs": 4,
+      "mean_phi": 0.6151899777765519,
+      "min_phi": 0.6021863531579114,
+      "max_phi": 0.6242488941734844,
+      "values": [
+        0.6021863531579114,
+        0.6214864916770391,
+        0.6242488941734844,
+        0.6128381720977727
+      ]
+    },
+    "1": {
+      "tuning_pairs": 12,
+      "mean_phi": 0.06520129133141794,
+      "min_phi": 0.016518493872504026,
+      "max_phi": 0.1111501101457697,
+      "values": [
+        0.016518493872504026,
+        0.037674845633592635,
+        0.04429195151523673,
+        0.05835278553163671,
+        0.05090954866165856,
+        0.046475485560496715,
+        0.04539404466545321,
+        0.054469242739443605,
+        0.108694929511957,
+        0.10069811866621033,
+        0.1111501101457697,
+        0.10778593947305601
+      ]
+    },
+    "2": {
+      "tuning_pairs": 8,
+      "mean_phi": 0.10147419651837611,
+      "min_phi": 0.08766948829621517,
+      "max_phi": 0.12098857528828594,
+      "values": [
+        0.08957983573577004,
+        0.09910065416805533,
+        0.12098857528828594,
+        0.1114250341453639,
+        0.10865452854533539,
+        0.08836962341481795,
+        0.10600583255316513,
+        0.08766948829621517
+      ]
+    },
+    "3": {
+      "tuning_pairs": 4,
+      "mean_phi": 0.1321060455378138,
+      "min_phi": 0.11822076705378477,
+      "max_phi": 0.14168912453279836,
+      "values": [
+        0.14135568655639336,
+        0.14168912453279836,
+        0.11822076705378477,
+        0.12715860400827866
+      ]
+    }
+  },
+  "stratified_permutation_null": {
+    "draws": 400,
     "seed": 20260814,
-    "what": "each tuning column shuffled independently across units, destroying every between-tuning association while keeping each tuning's own fire rate",
-    "mean_abs_phi": 0.01303961102466845,
-    "p99_of_max_abs_phi": 0.062385322546039575,
-    "max_observed_across_draws": 0.06467616806426033,
-    "theory_sd_1_over_sqrt_n": 0.016277925334825298
+    "strata": 384,
+    "strata_with_more_than_one_unit": 384,
+    "cross_channel_mean": {
+      "null_mean": 4.489322439698253e-05,
+      "null_p99": 0.007261039787712082,
+      "null_max": 0.008286911320056427
+    },
+    "family_wise_bar_p99_of_max_abs_phi": 0.050449744540584575
+  },
+  "per_cell": {
+    "family_wise_bar": 0.050449744540584575,
+    "cross_channel_cells": 48,
+    "cross_channel_cells_clearing_the_bar": 32,
+    "same_channel_cells": 8,
+    "same_channel_cells_clearing_the_bar": 8,
+    "weakest_cross_channel_cell": 0.01538617254715692,
+    "cells_failing_their_own_per_cell_null_at_p_0_05": [
+      {
+        "pair": [
+          "ch1 lower",
+          "ch2 lower"
+        ],
+        "phi": 0.01538617254715692,
+        "p": 0.345
+      },
+      {
+        "pair": [
+          "ch1 upper",
+          "ch2 lower"
+        ],
+        "phi": 0.01978646769761567,
+        "p": 0.1425
+      },
+      {
+        "pair": [
+          "ch2 upper",
+          "ch3 lower"
+        ],
+        "phi": 0.02670592143590032,
+        "p": 0.06
+      }
+    ]
+  },
+  "glrt_32": {
+    "terms_raw": {
+      "same_channel_mean": 0.649793932890354,
+      "cross_channel_mean": 0.17014885138451954,
+      "cross_channel_min": 0.11848831740872388,
+      "cross_channel_max": 0.23333284046319483
+    },
+    "terms_residualised": {
+      "same_channel_mean": 0.6151899777765519,
+      "cross_channel_mean": 0.0884430520948033,
+      "cross_channel_min": 0.016518493872504026,
+      "cross_channel_max": 0.14168912453279836
+    },
+    "stratified_permutation_null": {
+      "draws": 400,
+      "seed": 20260815,
+      "strata": 384,
+      "strata_with_more_than_one_unit": 384,
+      "cross_channel_mean": {
+        "null_mean": -7.095957735288073e-06,
+        "null_p99": 0.006254103766644435,
+        "null_max": 0.007257831663940288
+      },
+      "family_wise_bar_p99_of_max_abs_phi": 0.05459511817703666
+    },
+    "per_cell": {
+      "family_wise_bar": 0.05459511817703666,
+      "cross_channel_cells": 48,
+      "cross_channel_cells_clearing_the_bar": 34,
+      "same_channel_cells": 8,
+      "same_channel_cells_clearing_the_bar": 8,
+      "weakest_cross_channel_cell": 0.016518493872504026,
+      "cells_failing_their_own_per_cell_null_at_p_0_05": [
+        {
+          "pair": [
+            "ch1 lower",
+            "ch2 lower"
+          ],
+          "phi": 0.016518493872504026,
+          "p": 0.28
+        }
+      ]
+    }
   },
   "per_receiver": {
+    "lnb-a": {
+      "units": 1258,
+      "raw": {
+        "same_channel_mean": 0.4172454257561439,
+        "cross_channel_mean": 0.09070243739499691,
+        "cross_channel_min": 0.027194533883855232,
+        "cross_channel_max": 0.14064415447659243
+      },
+      "residualised": {
+        "same_channel_mean": 0.39157864182003044,
+        "cross_channel_mean": 0.05223470393997585,
+        "cross_channel_min": -0.01968519176214808,
+        "cross_channel_max": 0.10558925826211729
+      }
+    },
     "lnb-b": {
       "units": 1258,
-      "same_channel_mean": 0.4605339498885111,
-      "cross_channel_mean": 0.11490310442780634
+      "raw": {
+        "same_channel_mean": 0.46053394988851126,
+        "cross_channel_mean": 0.11490310442780625,
+        "cross_channel_min": 0.034960020766323895,
+        "cross_channel_max": 0.1737704057660461
+      },
+      "residualised": {
+        "same_channel_mean": 0.42625224850365206,
+        "cross_channel_mean": 0.06501514844241241,
+        "cross_channel_min": -0.0391678473002334,
+        "cross_channel_max": 0.11843563280266979
+      }
     },
     "lnb-c": {
       "units": 1258,
-      "same_channel_mean": 0.4253084755654686,
-      "cross_channel_mean": 0.10194511908292503
+      "raw": {
+        "same_channel_mean": 0.42530847556547136,
+        "cross_channel_mean": 0.10194511908292563,
+        "cross_channel_min": 0.045218008871937096,
+        "cross_channel_max": 0.1581312654766039
+      },
+      "residualised": {
+        "same_channel_mean": 0.39935834867730946,
+        "cross_channel_mean": 0.070259375172689,
+        "cross_channel_min": 0.016901830554313227,
+        "cross_channel_max": 0.12303764369451807
+      }
     },
     "lnb-d": {
       "units": 1258,
-      "same_channel_mean": 0.46813763907828165,
-      "cross_channel_mean": 0.12113757363604848
+      "raw": {
+        "same_channel_mean": 0.46813763907828054,
+        "cross_channel_mean": 0.1211375736360481,
+        "cross_channel_min": 0.07574176005105356,
+        "cross_channel_max": 0.1884482030734176
+      },
+      "residualised": {
+        "same_channel_mean": 0.4245823308989075,
+        "cross_channel_mean": 0.06380122428660415,
+        "cross_channel_min": 0.017661603383424956,
+        "cross_channel_max": 0.11129412364527286
+      }
     }
   },
   "per_method": {
     "anchor-8": {
-      "same_channel_mean": 0.6241687893868586,
-      "cross_channel_mean": 0.17160725177456124,
-      "same_channel_pairs": [
-        0.6365821362718547,
-        0.638029156136549,
-        0.6351456685792755,
-        0.5869181965597552
-      ]
+      "raw": {
+        "same_channel_mean": 0.6199767692515907,
+        "cross_channel_mean": 0.1654292783669765,
+        "cross_channel_min": 0.11648592029128632,
+        "cross_channel_max": 0.22676556457361083
+      },
+      "residualised": {
+        "same_channel_mean": 0.5829316154476779,
+        "cross_channel_mean": 0.08785497943088542,
+        "cross_channel_min": 0.02653546442201439,
+        "cross_channel_max": 0.14295697519232783
+      }
     },
     "differential-16": {
-      "same_channel_mean": 0.6091561050461495,
-      "cross_channel_mean": 0.1719656472366797,
-      "same_channel_pairs": [
-        0.6077065519569882,
-        0.626053785208039,
-        0.6141401762509071,
-        0.5887239067686637
-      ]
+      "raw": {
+        "same_channel_mean": 0.5994104212829363,
+        "cross_channel_mean": 0.1625757136666465,
+        "cross_channel_min": 0.1102676405394624,
+        "cross_channel_max": 0.22488760453498252
+      },
+      "residualised": {
+        "same_channel_mean": 0.5594025517019929,
+        "cross_channel_mean": 0.07987918721861459,
+        "cross_channel_min": 0.004225520107331676,
+        "cross_channel_max": 0.13565645838637946
+      }
     },
     "differential-32": {
-      "same_channel_mean": 0.592550792273818,
-      "cross_channel_mean": 0.17135440414196101,
-      "same_channel_pairs": [
-        0.6074913693975286,
-        0.5919555431497685,
-        0.6011475459121313,
-        0.5696087106358437
-      ]
+      "raw": {
+        "same_channel_mean": 0.5875456169169311,
+        "cross_channel_mean": 0.1626601732752998,
+        "cross_channel_min": 0.11758964301117122,
+        "cross_channel_max": 0.2206981874134376
+      },
+      "residualised": {
+        "same_channel_mean": 0.5444120630549119,
+        "cross_channel_mean": 0.07831953374457502,
+        "cross_channel_min": 0.007228078733056894,
+        "cross_channel_max": 0.12691086533499157
+      }
     },
     "full-frame-acquire": {
-      "same_channel_mean": 0.5737822397139103,
-      "cross_channel_mean": 0.16090265746441837,
-      "same_channel_pairs": [
-        0.5806316546403583,
-        0.5883233662964317,
-        0.5691343243859032,
-        0.557039613532948
-      ]
+      "raw": {
+        "same_channel_mean": 0.5687545145153163,
+        "cross_channel_mean": 0.15537359489298916,
+        "cross_channel_min": 0.1058294046895219,
+        "cross_channel_max": 0.22323316785973124
+      },
+      "residualised": {
+        "same_channel_mean": 0.5288758608068509,
+        "cross_channel_mean": 0.07878560017716975,
+        "cross_channel_min": 0.02216907357146741,
+        "cross_channel_max": 0.1352170496279647
+      }
     },
     "full-frame-full": {
-      "same_channel_mean": 0.5745210006210028,
-      "cross_channel_mean": 0.16661464172171545,
-      "same_channel_pairs": [
-        0.5841263978572827,
-        0.5812904141941935,
-        0.5820704782070323,
-        0.5505967122255025
-      ]
+      "raw": {
+        "same_channel_mean": 0.5709252337255575,
+        "cross_channel_mean": 0.159134891406341,
+        "cross_channel_min": 0.11288993381608053,
+        "cross_channel_max": 0.22421810397644348
+      },
+      "residualised": {
+        "same_channel_mean": 0.5271456890586598,
+        "cross_channel_mean": 0.07941286849922391,
+        "cross_channel_min": 0.018002604772123426,
+        "cross_channel_max": 0.1326710235265793
+      }
     },
     "full-frame-verify": {
-      "same_channel_mean": 0.5783476507789538,
-      "cross_channel_mean": 0.1665340925562094,
-      "same_channel_pairs": [
-        0.5835627855121892,
-        0.5972039834038598,
-        0.5749544260616849,
-        0.557669408138081
-      ]
+      "raw": {
+        "same_channel_mean": 0.5742669157970741,
+        "cross_channel_mean": 0.15912372127190644,
+        "cross_channel_min": 0.11210078405082496,
+        "cross_channel_max": 0.2207070345782896
+      },
+      "residualised": {
+        "same_channel_mean": 0.5316199032580623,
+        "cross_channel_mean": 0.08047102084709572,
+        "cross_channel_min": 0.020194318973853417,
+        "cross_channel_max": 0.13355493746093844
+      }
     },
     "glrt-32": {
-      "same_channel_mean": 0.6581881276948336,
-      "cross_channel_mean": 0.1769764455686741,
-      "same_channel_pairs": [
-        0.6597434523139338,
-        0.6685853307216301,
-        0.6716524953081996,
-        0.6327712324355709
-      ]
+      "raw": {
+        "same_channel_mean": 0.649793932890354,
+        "cross_channel_mean": 0.17014885138451954,
+        "cross_channel_min": 0.11848831740872388,
+        "cross_channel_max": 0.23333284046319483
+      },
+      "residualised": {
+        "same_channel_mean": 0.6151899777765519,
+        "cross_channel_mean": 0.0884430520948033,
+        "cross_channel_min": 0.016518493872504026,
+        "cross_channel_max": 0.14168912453279836
+      }
     },
     "glrt-64": {
-      "same_channel_mean": 0.6310138966285119,
-      "cross_channel_mean": 0.17028777584362934,
-      "same_channel_pairs": [
-        0.6326716686166902,
-        0.65136181903966,
-        0.6348966994266192,
-        0.6051253994310783
-      ]
+      "raw": {
+        "same_channel_mean": 0.6244040955062877,
+        "cross_channel_mean": 0.1654377080242114,
+        "cross_channel_min": 0.1119232883360748,
+        "cross_channel_max": 0.22982487570339022
+      },
+      "residualised": {
+        "same_channel_mean": 0.5880229371251908,
+        "cross_channel_mean": 0.0852630282161142,
+        "cross_channel_min": 0.009711746293270849,
+        "cross_channel_max": 0.14109832821804819
+      }
     }
   },
-  "headline_checks": {
-    "same_channel_edge_pair_mean": 0.45343145945259117,
+  "published_with_lnb_a_excluded_and_the_unstratified_null": {
+    "units_complete": 3774,
+    "lnb_a": "EXCLUDED",
+    "same_channel_mean": 0.45343145945259117,
     "cross_channel_mean": 0.11820529022203978,
-    "ratio": 3.8359658742925475,
-    "weakest_cross_channel_cell": 0.07173690696177817,
-    "shuffled_null_p99_of_max_abs_phi": 0.062385322546039575,
-    "every_cross_channel_cell_beats_the_null": true,
-    "cross_channel_fades_with_separation": false,
-    "verdict": "channel-correlated, but the only strong structure is a channel's own upper/lower pair. Two different channels correlate at phi 0.118 \u2014 above noise (shuffled null p99 |phi| 0.062) but 3.8x weaker, and FLAT in channel separation, which is a sweep-wide common mode rather than one satellite lighting neighbouring channels"
+    "cross_channel_min": 0.07173690696177817,
+    "cross_channel_max": 0.16121410316309356,
+    "ratio_same_over_cross": 3.8359658742925475,
+    "null": {
+      "what": "each tuning column shuffled independently across ALL units, which destroys the time trend, the arm composition and the receiver state along with the association being tested",
+      "mean_abs_phi": 0.01303961102466845,
+      "p99_of_max_abs_phi": 0.062385322546039575
+    },
+    "claim_now_withdrawn": "Every cross-channel cell clears the null, but the weakest clears it by 0.010."
+  },
+  "robustness_thresholds_redrawn": {
+    "what": "the same statistics with lnb-a's cross-edge null arm folded into the population null_thresholds draws from",
+    "units_complete": 5032,
+    "terms_raw": {
+      "same_channel_mean": 0.4395424829842355,
+      "cross_channel_mean": 0.10980620210494585,
+      "cross_channel_min": 0.07736305747610692,
+      "cross_channel_max": 0.14822135063759057
+    },
+    "terms_residualised": {
+      "same_channel_mean": 0.40441381986108904,
+      "cross_channel_mean": 0.06056597514179126,
+      "cross_channel_min": 0.01767607906845452,
+      "cross_channel_max": 0.0917335221034481
+    }
+  },
+  "time_block_sensitivity": {
+    "time4 x arm x receiver": 0.061788992395134044,
+    "time8 x arm x receiver": 0.06293346366826207,
+    "time16 x arm x receiver": 0.061984220989267334
+  },
+  "headline_checks": {
+    "lnb_a": "INCLUDED",
+    "units_complete": 5032,
+    "cross_channel_raw": 0.11406077416129774,
+    "cross_channel_residualised": 0.06293346366826207,
+    "cross_channel_residualised_glrt_32": 0.0884430520948033,
+    "same_channel_raw": 0.44612693760309097,
+    "same_channel_residualised": 0.41072406764772407,
+    "fraction_surviving": {
+      "any-of-eight": {
+        "time_only": 0.9243692127888439,
+        "arm_and_receiver": 0.5654880690139032,
+        "time_and_arm": 0.5517537832880691
+      },
+      "glrt-32": {
+        "time_only": 0.9430957675789979,
+        "arm_and_receiver": 0.5370988693238229,
+        "time_and_arm": 0.5197981142695507
+      }
+    },
+    "term_rises_with_separation": true,
+    "separation_any_of_eight": [
+      0.04837223927471392,
+      0.07209348375784749,
+      0.08829709666973566
+    ],
+    "separation_glrt_32": [
+      0.06520129133141794,
+      0.10147419651837611,
+      0.1321060455378138
+    ],
+    "cross_channel_cells_clearing_family_wise": [
+      32,
+      34,
+      48
+    ],
+    "flat_common_mode_still_supportable": false,
+    "verdict": "The cross-channel term survives a null that holds the apparatus fixed, but at about half its published size: 0.1141 -> 0.0629 (any-of-eight) and 0.1701 -> 0.0884 (glrt-32). The time trend is not what costs it: removing time blocks alone leaves 92% standing, while removing the arm (sample rate x probe length) removes about 43%. The same-channel term is barely affected (0.4461 -> 0.4107). The phrase 'flat sweep-wide common mode' is NOT supportable: the surviving term rises monotonically with channel separation, 0.0484/0.0721/0.0883 (any-of-eight) and 0.0652/0.1015/0.1321 (glrt-32), which a common additive mode under every tuning could not do. Under family-wise correction only 32/48 and 34/48 cross-channel cells clear their null, against 48/48 under the published one"
   },
   "census_drift_at_end": {
     "frozen_at_start": {
@@ -342,19 +910,19 @@
       "scored_digest": "3e0d0ecdf2915ee1"
     },
     "measured_at_end": {
-      "measured_utc": "2026-08-14T16:31:59+00:00",
+      "measured_utc": "2026-08-14T19:21:15+00:00",
       "sweeps_on_share": 7054,
       "corpus_entries": 13215,
-      "scored_sidecars": 2693,
-      "scored_digest": "902ab6b4e11cca89"
+      "scored_sidecars": 3394,
+      "scored_digest": "e917cb05f34115c5"
     },
     "delta": {
       "sweeps_on_share": 0,
       "sweeps_committed": 0,
       "corpus_entries": 0,
-      "scored_sidecars": 146
+      "scored_sidecars": 847
     },
-    "scored_added": 146,
+    "scored_added": 847,
     "scored_removed": 0,
     "sweeps_added": 0,
     "identical": false,

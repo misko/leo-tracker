@@ -28,14 +28,28 @@
       "irregular_geometry": 0,
       "beyond_limit": 0
     },
-    "excluded_receivers": {
-      "lnb-a": 15104
-    },
-    "threshold_keys": 96
+    "excluded_receivers": {},
+    "threshold_keys": 96,
+    "lnb_a": "INCLUDED. The exclusion recorded in cross_radio.DEAD_RECEIVERS cites a flat ~1.19 peak-to-median at every tuning since 2026-08-13 04:44 UTC. That instant falls inside pluto-5d4d's 03:24:04Z-05:07:56Z outage, when the radio produced no data at all, and this scored corpus stops at 2026-08-14T03:21:55Z regardless. Re-measured on this freeze with the repository's own fire logic, lnb-a's coarse peak-to-median runs median 1.104, max 2.007, sd 0.078 -- not flat.",
+    "receivers_live": [
+      "lnb-a",
+      "lnb-b",
+      "lnb-c",
+      "lnb-d"
+    ],
+    "threshold_null_population": "lnb-b, lnb-c, lnb-d -- the published figure's own null population, held fixed so that the receiver set is the only thing that changed"
   },
-  "population": "every live target observation in the paired corpus (lnb-a excluded: dead port), all eight verdicts present",
-  "observations": 30192,
-  "n_per_cell": 30192,
+  "lnb_a": "INCLUDED",
+  "population": "every live target observation in the paired corpus, all four receivers (lnb-a, lnb-b, lnb-c, lnb-d), all eight verdicts present",
+  "receivers": [
+    "lnb-a",
+    "lnb-b",
+    "lnb-c",
+    "lnb-d"
+  ],
+  "observations": 40256,
+  "observations_added_by_restoring_lnb_a": 10064,
+  "n_per_cell": 40256,
   "n_is_identical_in_every_cell": true,
   "observations_with_a_missing_verdict": 0,
   "methods_alphabetical": [
@@ -52,110 +66,152 @@
     "anchor-8",
     "glrt-32",
     "glrt-64",
-    "full-frame-verify",
-    "full-frame-full",
     "full-frame-acquire",
+    "full-frame-full",
+    "full-frame-verify",
     "differential-32",
     "differential-16"
   ],
-  "order_basis": "maximises adjacent phi, exhaustive over 8! = 40320 orderings; total adjacent phi 6.4027",
+  "order_basis": "maximises adjacent phi, exhaustive over 8! = 40320 orderings; total adjacent phi 6.3923",
+  "order_unchanged_by_restoring_lnb_a": false,
+  "family_blocks_contiguous": true,
   "fire_rate": {
-    "anchor-8": 0.3118706942236354,
-    "differential-16": 0.32694091149973503,
-    "differential-32": 0.33081611022787494,
-    "full-frame-acquire": 0.3328696343402226,
-    "full-frame-full": 0.33300211976682564,
-    "full-frame-verify": 0.3320084790673026,
-    "glrt-32": 0.3087572866984632,
-    "glrt-64": 0.3174019607843137
+    "anchor-8": 0.2964775437201908,
+    "differential-16": 0.3130465023847377,
+    "differential-32": 0.31612678855325915,
+    "full-frame-acquire": 0.3179153418124006,
+    "full-frame-full": 0.3176172496025437,
+    "full-frame-verify": 0.3165987678855326,
+    "glrt-32": 0.29344693958664547,
+    "glrt-64": 0.30231518282988873
   },
   "phi": {
     "anchor-8": {
       "anchor-8": 1.0,
-      "glrt-32": 0.879931810116022,
-      "glrt-64": 0.8700576707521096,
-      "full-frame-verify": 0.8554701873021564,
-      "full-frame-full": 0.8582641295076414,
-      "full-frame-acquire": 0.855656253623329,
-      "differential-32": 0.8498990018453454,
-      "differential-16": 0.8470439640483043
+      "glrt-32": 0.8766315266388183,
+      "glrt-64": 0.8654970511134623,
+      "full-frame-acquire": 0.851117134343036,
+      "full-frame-full": 0.8543164363773479,
+      "full-frame-verify": 0.8516787155870112,
+      "differential-32": 0.8447243360550594,
+      "differential-16": 0.8411897320156327
     },
     "glrt-32": {
-      "anchor-8": 0.879931810116022,
+      "anchor-8": 0.8766315266388183,
       "glrt-32": 1.0,
-      "glrt-64": 0.9363577965230402,
-      "full-frame-verify": 0.8940986075455851,
-      "full-frame-full": 0.8968872955241088,
-      "full-frame-acquire": 0.89305681627243,
-      "differential-32": 0.8853279555223993,
-      "differential-16": 0.8756313169946688
+      "glrt-64": 0.9351883405655814,
+      "full-frame-acquire": 0.8911283200004075,
+      "full-frame-full": 0.8959828909612716,
+      "full-frame-verify": 0.8933563595791566,
+      "differential-32": 0.8821661712299971,
+      "differential-16": 0.8714931920428522
     },
     "glrt-64": {
-      "anchor-8": 0.8700576707521096,
-      "glrt-32": 0.9363577965230402,
+      "anchor-8": 0.8654970511134623,
+      "glrt-32": 0.9351883405655814,
       "glrt-64": 1.0,
-      "full-frame-verify": 0.9028695552048551,
-      "full-frame-full": 0.9093612541826601,
-      "full-frame-acquire": 0.898620561851106,
-      "differential-32": 0.8815218525468576,
-      "differential-16": 0.8734249373503381
-    },
-    "full-frame-verify": {
-      "anchor-8": 0.8554701873021564,
-      "glrt-32": 0.8940986075455851,
-      "glrt-64": 0.9028695552048551,
-      "full-frame-verify": 1.0,
-      "full-frame-full": 0.9453835469439522,
-      "full-frame-acquire": 0.9094089530776011,
-      "differential-32": 0.8814662795591122,
-      "differential-16": 0.877648412783688
-    },
-    "full-frame-full": {
-      "anchor-8": 0.8582641295076414,
-      "glrt-32": 0.8968872955241088,
-      "glrt-64": 0.9093612541826601,
-      "full-frame-verify": 0.9453835469439522,
-      "full-frame-full": 1.0,
-      "full-frame-acquire": 0.9427321558418973,
-      "differential-32": 0.886492791839,
-      "differential-16": 0.8849595723041918
+      "full-frame-acquire": 0.8981007475774244,
+      "full-frame-full": 0.9085067025400633,
+      "full-frame-verify": 0.9024737273255187,
+      "differential-32": 0.8780274170229699,
+      "differential-16": 0.8706153810940614
     },
     "full-frame-acquire": {
-      "anchor-8": 0.855656253623329,
-      "glrt-32": 0.89305681627243,
-      "glrt-64": 0.898620561851106,
-      "full-frame-verify": 0.9094089530776011,
-      "full-frame-full": 0.9427321558418973,
+      "anchor-8": 0.851117134343036,
+      "glrt-32": 0.8911283200004075,
+      "glrt-64": 0.8981007475774244,
       "full-frame-acquire": 1.0,
-      "differential-32": 0.8779652518821205,
-      "differential-16": 0.8740063204865006
+      "full-frame-full": 0.9424784779491854,
+      "full-frame-verify": 0.9093470881715299,
+      "differential-32": 0.8747236414428646,
+      "differential-16": 0.8719156135792406
+    },
+    "full-frame-full": {
+      "anchor-8": 0.8543164363773479,
+      "glrt-32": 0.8959828909612716,
+      "glrt-64": 0.9085067025400633,
+      "full-frame-acquire": 0.9424784779491854,
+      "full-frame-full": 1.0,
+      "full-frame-verify": 0.9460305230096742,
+      "differential-32": 0.8843293551890301,
+      "differential-16": 0.8822316434346215
+    },
+    "full-frame-verify": {
+      "anchor-8": 0.8516787155870112,
+      "glrt-32": 0.8933563595791566,
+      "glrt-64": 0.9024737273255187,
+      "full-frame-acquire": 0.9093470881715299,
+      "full-frame-full": 0.9460305230096742,
+      "full-frame-verify": 1.0,
+      "differential-32": 0.879228188002435,
+      "differential-16": 0.8756014742925634
     },
     "differential-32": {
-      "anchor-8": 0.8498990018453454,
-      "glrt-32": 0.8853279555223993,
-      "glrt-64": 0.8815218525468576,
-      "full-frame-verify": 0.8814662795591122,
-      "full-frame-full": 0.886492791839,
-      "full-frame-acquire": 0.8779652518821205,
+      "anchor-8": 0.8447243360550594,
+      "glrt-32": 0.8821661712299971,
+      "glrt-64": 0.8780274170229699,
+      "full-frame-acquire": 0.8747236414428646,
+      "full-frame-full": 0.8843293551890301,
+      "full-frame-verify": 0.879228188002435,
       "differential-32": 1.0,
-      "differential-16": 0.917427482559027
+      "differential-16": 0.9146563428638961
     },
     "differential-16": {
-      "anchor-8": 0.8470439640483043,
-      "glrt-32": 0.8756313169946688,
-      "glrt-64": 0.8734249373503381,
-      "full-frame-verify": 0.877648412783688,
-      "full-frame-full": 0.8849595723041918,
-      "full-frame-acquire": 0.8740063204865006,
-      "differential-32": 0.917427482559027,
+      "anchor-8": 0.8411897320156327,
+      "glrt-32": 0.8714931920428522,
+      "glrt-64": 0.8706153810940614,
+      "full-frame-acquire": 0.8719156135792406,
+      "full-frame-full": 0.8822316434346215,
+      "full-frame-verify": 0.8756014742925634,
+      "differential-32": 0.9146563428638961,
       "differential-16": 1.0
     }
   },
   "phi_off_diagonal": {
-    "min": 0.8470439640483043,
-    "max": 0.9453835469439522,
-    "mean": 0.8878918476425017,
+    "min": 0.8411897320156327,
+    "max": 0.9460305230096742,
+    "mean": 0.8854548760715968,
     "pairs": 28,
+    "lowest_pair": [
+      "anchor-8",
+      "differential-16"
+    ],
+    "highest_pair": [
+      "full-frame-full",
+      "full-frame-verify"
+    ]
+  },
+  "per_receiver": {
+    "lnb-a": {
+      "observations": 10064,
+      "phi_min": 0.8193980506625851,
+      "phi_max": 0.9474342717685832,
+      "phi_mean": 0.8756472611400827
+    },
+    "lnb-b": {
+      "observations": 10064,
+      "phi_min": 0.8452024089476478,
+      "phi_max": 0.9481558154888673,
+      "phi_mean": 0.8877704918012854
+    },
+    "lnb-c": {
+      "observations": 10064,
+      "phi_min": 0.8349347637613181,
+      "phi_max": 0.9396180665422699,
+      "phi_mean": 0.8791730747439852
+    },
+    "lnb-d": {
+      "observations": 10064,
+      "phi_min": 0.8560449055968481,
+      "phi_max": 0.9483491033678866,
+      "phi_mean": 0.8935409767177698
+    }
+  },
+  "published_with_lnb_a_excluded": {
+    "phi_min": 0.8470439640483043,
+    "phi_max": 0.9453835469439522,
+    "phi_mean": 0.8878918476425017,
+    "observations": 30192,
     "lowest_pair": [
       "anchor-8",
       "differential-16"
@@ -163,7 +219,37 @@
     "highest_pair": [
       "full-frame-verify",
       "full-frame-full"
+    ],
+    "order": [
+      "anchor-8",
+      "glrt-32",
+      "glrt-64",
+      "full-frame-verify",
+      "full-frame-full",
+      "full-frame-acquire",
+      "differential-32",
+      "differential-16"
     ]
+  },
+  "movement_from_restoring_lnb_a": {
+    "phi_min": -0.005854232032671547,
+    "phi_max": 0.0006469760657219492,
+    "phi_mean": -0.0024369715709049444
+  },
+  "robustness_thresholds_redrawn": {
+    "what": "the same matrix with lnb-a's cross-edge null arm folded into the population null_thresholds draws from, instead of the published three-port null",
+    "phi_min": 0.8384050258966995,
+    "phi_max": 0.9441545720266242,
+    "phi_mean": 0.882168938261248,
+    "lowest_pair": [
+      "anchor-8",
+      "differential-16"
+    ],
+    "highest_pair": [
+      "full-frame-full",
+      "full-frame-verify"
+    ],
+    "observations": 40256
   },
   "reported_in_retraction_report": {
     "phi_min": 0.82,
@@ -171,18 +257,36 @@
     "observations": 2160
   },
   "headline_checks": {
+    "lnb_a": "INCLUDED",
     "expected_band_0_82_to_0_94": [
       0.82,
       0.94
     ],
     "observed_band": [
+      0.8411897320156327,
+      0.9460305230096742
+    ],
+    "band_with_lnb_a_excluded": [
       0.8470439640483043,
       0.9453835469439522
+    ],
+    "band_movement": [
+      -0.005854232032671547,
+      0.0006469760657219492
     ],
     "every_pair_above_0_8": true,
     "observed_floor_above_reported_floor": true,
     "observed_ceiling_above_reported_ceiling": true,
-    "verdict": "VERIFIED and tighter: at 14.0x the observations every pair sits at phi 0.847-0.945, above the reported 0.82-0.94 floor"
+    "band_moves_by_less_than_0_01": true,
+    "row_order_identical": false,
+    "family_blocks_still_contiguous": true,
+    "loosest_pair_unchanged": true,
+    "tightest_pair_unchanged": true,
+    "lnb_a_own_band": [
+      0.8193980506625851,
+      0.9474342717685832
+    ],
+    "verdict": "CONCLUSION UNCHANGED. The band was phi 0.847-0.945 on 30,192 observations and is phi 0.841-0.946 on 40,256: floor -0.0059, ceiling +0.0006, mean -0.0024. The loosest pair (anchor-8 vs differential-16) and the tightest pair (full-frame-full vs full-frame-verify) are the same pairs, and the four detector families still seriate into contiguous blocks; the only order change is full-frame-acquire and full-frame-verify swapping places INSIDE the full-frame block, which the block outline absorbs. lnb-a's own 10,064 observations give phi 0.819-0.947, inside the range the other three ports span. Eight detectors remain one opinion counted eight times"
   },
   "census_drift_at_end": {
     "frozen_at_start": {
@@ -193,19 +297,19 @@
       "scored_digest": "3e0d0ecdf2915ee1"
     },
     "measured_at_end": {
-      "measured_utc": "2026-08-14T16:31:59+00:00",
+      "measured_utc": "2026-08-14T19:21:15+00:00",
       "sweeps_on_share": 7054,
       "corpus_entries": 13215,
-      "scored_sidecars": 2693,
-      "scored_digest": "902ab6b4e11cca89"
+      "scored_sidecars": 3394,
+      "scored_digest": "e917cb05f34115c5"
     },
     "delta": {
       "sweeps_on_share": 0,
       "sweeps_committed": 0,
       "corpus_entries": 0,
-      "scored_sidecars": 146
+      "scored_sidecars": 847
     },
-    "scored_added": 146,
+    "scored_added": 847,
     "scored_removed": 0,
     "sweeps_added": 0,
     "identical": false,

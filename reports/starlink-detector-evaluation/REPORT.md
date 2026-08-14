@@ -1344,6 +1344,78 @@ tests the estimator and the detectors, which is what was in question — but the
 say anything about.
 
 
+## 14. The dead port and the stale calibration are one fault
+
+Two problems with `lnb-a` appear separately in this report: it was excluded as a
+dead port on a failure that postdates every observation
+([the corpus](#the-corpus)), and its recorded centre is stale by 567 kHz
+([section 12](#12-what-the-cliff-actually-is)). They are the same event.
+
+**Its local oscillator moved.** Measured from the corpus at instants where both
+ports of `pluto-5d4d` fired:
+
+| Epoch | `rx0 − rx1` | n | `lnb-a` fire rate | Its median offset |
+|---|---:|---:|---:|---:|
+| before 2026-08-13T04:38:23Z | **+5,154 Hz** | 9,736 pairs | 8.26% | −130.5 kHz |
+| after 2026-08-13T04:46:20Z | **+567,402 Hz** ±4 kHz | 2,585 points / 931 sweeps | **0.24%** | pinned at +349.8 kHz |
+
+`lnb-b`, on the same radio, is unchanged across that boundary (6.49% → 6.87%).
+A step in one port and not its sibling, at one instant, localises the change to
+`lnb-a`. And the recorded `+1,170 Hz` was **correct for the earlier epoch** —
+before the boundary `lnb-a` sat near zero and fired indistinguishably from
+`lnb-b`.
+
+So the port was never dead. Its LO moved out of the search grid, its detections
+collapsed to those pinned at the grid edge, and the dwell path read that as a
+flat peak-to-median. One fault, seen twice.
+
+**The boundary is the window `hardware/epochs.json` brackets for `pluto-19f2`'s
+LNB swap** — where that file recorded `pluto-5d4d` as *"not touched by this
+swap; calibration entry remains valid"*. It was touched. That entry is now
+corrected, with `pluto-5d4d.lnb-a` gen1 and gen2 epochs recorded.
+
+### Why the calibration could never notice
+
+`acquisition.py` builds its search as
+`arange(-350_000, 350_001, 25_000) + centre`, where `centre` is the **already
+applied** `receiver_centers` value. A port anchored near zero is therefore blind
+beyond about ±356 kHz and **cannot discover that it has moved**. Observed reach
+in the data: `5d4d` rx0 spans −355.8 to +368.2 kHz; `19f2` rx0 spans −355.7 to
+**+958.5** kHz — the replacement LNB there was findable only because its stale
++434 kHz calibration had already displaced the grid into range.
+
+This is a self-sealing failure. The daily calibration returned −906.6 Hz on
+2026-08-14 and will keep returning near zero forever, because the offset it must
+measure lies outside the window it searches. The value has to come from the
+survey path, whose coarse bank spans ±700 kHz about raw zero.
+
+### The fix, and its verification
+
+Applying `measured_centers_hz: [567402.0, 0.0]` to `pluto-5d4d`:
+
+| Port | Signed live-window centroid |
+|---|---:|
+| `lnb-a`, corrected | **−158.4 kHz** |
+| `lnb-b` | −151.8 kHz |
+| `lnb-c` | −155.0 kHz |
+| `lnb-d` | −144.1 kHz |
+
+Its window moves from +250…+550 kHz onto −300…0 kHz, and the paired
+per-instant residual after correction is **0.000 kHz, CI [−61, +153] Hz**. The
+`lnb-a`↔`lnb-b` landing is partly definitional, but the non-circular part is
+that it also lands on `lnb-c` and `lnb-d` — on the other radio, corrected by an
+independently recorded centre.
+
+`lnb-a` can now enter offset-binned figures. The ±4 kHz uncertainty is a twelfth
+of a 50 kHz bin.
+
+![All four ports before and after correction](figures/injection/lnba-centre.png)
+
+**And all four still sit at −144 to −158 kHz, not zero.** That residual is the
+common-mode offset of [section 12](#12-what-the-cliff-actually-is), shared by
+both radios, invisible to every differential measurement, and still unexplained.
+
+
 ## Figures and provenance
 
 Every figure is computed from the read-only corpus at

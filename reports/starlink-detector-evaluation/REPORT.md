@@ -70,6 +70,33 @@ section can therefore differ from a neighbouring section by a percent or two.
 Nothing here turns on that, no figure mixes lists, and the range is 2,339–2,554
 throughout.
 
+**One limitation that does matter, and it constrains how every absolute number
+here should be read.** Scoring runs in corpus order, so the scored set is a
+*chronological prefix* of the campaign, not a sample of it. The share spans
+00:03:15Z to 14:49:22Z; scoring has reached 03:54:56Z. Of the 2,948 entries at
+or before that instant, 2,840 are scored; of the 10,267 after it, **none are**.
+Every figure in this report therefore describes the first quarter of the
+observing window.
+
+That window is not stationary. Split into equal quartiles, the fire rate climbs
+steadily through it:
+
+| Window (UTC) | n | `anchor-8` | `full-frame-full` | `glrt-32` | any method |
+|---|---:|---:|---:|---:|---:|
+| 00:03–01:07 | 8,016 | 0.2586 | 0.2823 | 0.2516 | 0.3519 |
+| 01:07–02:00 | 8,016 | 0.3326 | 0.3500 | 0.3280 | 0.4228 |
+| 02:00–02:44 | 8,016 | 0.3230 | 0.3462 | 0.3225 | 0.4178 |
+| 02:44–03:24 | 8,016 | 0.3527 | 0.3721 | 0.3542 | 0.4452 |
+
+The swing across 3.3 hours is 0.094 — roughly **four times the 0.024 spread
+between the eight detectors** that section 2 is about. So: every *absolute* rate
+in this report is a property of 00:03–03:55 UTC and should not be read as a
+property of the sky in general. Every *comparison* — between algorithms, between
+geometries, between joins — is paired inside that window and is unaffected,
+which is why the results in sections 6, 7 and 8 stand regardless. It also
+explains why the census numbers above drift monotonically rather than randomly:
+each later batch is later sky, and later sky was busier.
+
 ## The corpus
 
 | Quantity | Measured | Moves? |
@@ -118,12 +145,14 @@ about 16 dB below what a spectrum could show. And the next shoulder out sits at
 −0.12 dB, so +0.0588 dB is inside this receiver's own passband curvature, not
 above it.
 
-There is also no comb to resolve, at any signal-to-noise ratio. A 4.4 us OFDM
-symbol spreads each pilot to a ~227 kHz main lobe against 234.375 kHz subcarrier
-spacing, so adjacent pilots merge. Even with the noise removed entirely, the
-on-pilot minus between-pilot contrast in 117.2 kHz windows is **+0.39 dB**; on
-the real capture it is −0.05 dB. The eight edge pilots are a 1.875 MHz **block**,
-not a comb.
+There is also almost nothing to resolve even in principle. A 4.4 us OFDM symbol
+spreads each pilot to a ~227 kHz main lobe against 234.375 kHz subcarrier
+spacing, so adjacent pilots merge. With the noise removed entirely the on-pilot
+minus between-pilot contrast in 117.2 kHz windows is **+0.39 dB** — a comb
+exists, but a 0.39 dB one; on the real capture it is −0.05 dB. Treat the eight
+edge pilots as a 1.875 MHz **block** rather than a resolvable comb: the comb is
+real and is simply far too shallow to find a signal by, which is a statement
+about this geometry and not about noise.
 
 | Quantity | Value | Source |
 |---|---:|---|
@@ -168,8 +197,11 @@ measurement shows why.
 
 Across the eight detectors, how often a detector fires on sky tracks how often
 it fires on a **measured** empty-sky null: least squares over the eight points
-gives slope 1.99, r = 0.84, **r-squared = 0.70**. Seventy per cent of the
-between-detector spread in fire rate is just the null rate. `full-frame-full`
+gives slope 1.99, r = 0.84, **r-squared = 0.70**. Roughly two-thirds of the
+between-detector spread in fire rate is just the null rate. That fit is eight
+points and it moves with the corpus: recomputed independently at three census
+sizes spanning one hour of scoring it ranges r-squared 0.64–0.70, so read it as
+"about two-thirds", not as 70.0%. `full-frame-full`
 fires most on sky (33.30%) and also most on the null (6.74%); `glrt-32` fires
 least on both (30.89% and 5.47%). Firing 8% more often may mean 8% more
 sensitive or 8% looser, and the count cannot say which.

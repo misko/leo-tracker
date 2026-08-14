@@ -10,6 +10,7 @@ what was *measured* and not on what was asked for.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -271,8 +272,8 @@ def test_the_headline_skew_is_when_sampling_began_not_when_the_barrier_released(
     reports the barrier release as the skew therefore reports a number that is
     optimistic by a factor of ten to a hundred and is biased by exactly the
     variable the sweep exists to study.  Measured on the radios: the barrier
-    released a median 0.038 ms apart while sampling began about 4 ms apart on
-    the opposite-order sweeps.
+    released a median 0.029 ms apart while sampling began 0.274 ms apart, and
+    18.96 ms apart at worst, on the opposite-order sweeps.
 
     So the headline is stamped where sampling begins.  The barrier release is
     kept -- it is how long the rendezvous itself cost -- but it is kept
@@ -610,6 +611,185 @@ def test_two_radios_that_both_sampled_but_never_met_are_not_simultaneous():
     assert record["skew"]["simultaneous_tuning_count"] == 0
 
 
+def test_a_sweep_four_seconds_apart_is_not_recorded_as_simultaneous():
+    """The verdict has to consult the number, or it is not a verdict.
+
+    Both radios turn up at every tuning, the barrier holds them both, and both
+    go on to sample -- so every clause that counts who was there is satisfied.
+    One of them begins observing four seconds after the other.  Four seconds of
+    sky is several degrees of a LEO pass, which is not one observation of one
+    sky by any reading, and a row that called it simultaneous would be believed
+    by everything downstream.
+
+    The measured offset is the only thing that can tell this sweep from a real
+    one, so both verdicts -- the per-tuning one and the sweep's own mode -- are
+    made to consult it.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, collect=_fake_collect({}),
+        clock=_scripted_clock({"pluto-19f2": 0, "pluto-5d4d": 0},
+                              {"pluto-19f2": 0, "pluto-5d4d": 4_000_000_000}))
+
+    assert [item["skew_ms"] for item in record["tunings"]] == [4000.0] * 8
+    for item in record["tunings"]:
+        # Everything that counts attendance still says both radios were here.
+        assert item["radios_arrived"] == 2 and item["radios_sampled"] == 2
+        assert all(entry["synchronised"] for entry in item["arrivals"].values())
+        # And the measurement says they were not observing the same sky.
+        assert item["within_simultaneity_bound"] is False
+        assert item["simultaneous"] is False
+    assert record["sweep_mode"] == "solo"
+    assert record["paired_tuning_count"] == 0
+    assert record["skew"]["simultaneous_tuning_count"] == 0
+
+
+def test_two_radios_inside_the_bound_that_never_met_are_still_not_simultaneous():
+    """The offset is a new clause, not a replacement for the old ones.
+
+    Gating the verdict on the measured offset must not quietly become the only
+    thing gating it.  Here the barrier timed out at every tuning -- each radio
+    proceeded alone, nothing held them together -- and the two then happened to
+    begin sampling 5 ms apart, well inside the stated bound.  Two radios that
+    were never held together are not a rendezvous however close this tuning's
+    stamps landed, because nothing was making the next one close.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, barrier_timeout_s=0.05,
+        collect=_fake_collect({}, tune_delays={"pluto-19f2": 0.0,
+                                               "pluto-5d4d": 0.250}),
+        clock=_scripted_clock({"pluto-19f2": 0, "pluto-5d4d": 0},
+                              {"pluto-19f2": 0, "pluto-5d4d": 5_000_000}))
+
+    for item in record["tunings"]:
+        assert item["skew_ms"] == 5.0
+        assert item["within_simultaneity_bound"] is True
+        assert not all(entry["synchronised"]
+                       for entry in item["arrivals"].values())
+        assert item["simultaneous"] is False
+    assert record["sweep_mode"] == "solo"
+
+
+def test_every_simultaneity_verdict_carries_the_bound_it_was_judged_against():
+    """A stored verdict a later reader cannot re-judge is an opinion.
+
+    ``survey_threshold`` returns its number with the basis for it attached, so
+    a probe scored against a bar measured somewhere else can be recognised as
+    such years later.  The same applies here: the bound travels beside every
+    verdict it decided, in the record and in every capture manifest, so a
+    reader who wants a tighter one can apply it to the stored offsets instead
+    of trusting this sweep's word.
+    """
+    record, _ = _run()
+
+    assert sync.SIMULTANEITY_BOUND_MS == min(sync.REQUESTED_SKEW_TOLERANCE_MS)
+    assert record["simultaneity"]["bound_ms"] == sync.SIMULTANEITY_BOUND_MS
+    assert record["simultaneity"]["event"] == "sample_start"
+    assert record["simultaneity"]["operator_requested_tolerance_ms"] == [200.0,
+                                                                        500.0]
+    assert "0.0155" in record["simultaneity"]["basis"]
+    assert record["skew"]["simultaneity_bound_ms"] == sync.SIMULTANEITY_BOUND_MS
+    for item in record["tunings"]:
+        assert item["simultaneity_bound_ms"] == sync.SIMULTANEITY_BOUND_MS
+        assert item["within_simultaneity_bound"] is True
+        assert item["simultaneous"] is True
+    assert record["sweep_mode"] == "paired"
+
+
+def test_a_tuning_only_one_radio_sampled_is_inside_no_bound_at_all():
+    """No offset was measured, so no bound was met -- and that is not False.
+
+    ``skew_ms`` is null for a tuning one radio sampled alone, because "the
+    other radio was not there" and "the two started together" are opposite
+    facts.  The bound verdict inherits that: null rather than False, so a
+    reader counting failures does not count a tuning that was never a pair.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, barrier_timeout_s=1.0,
+        collect=_fake_collect({"pluto-19f2": 0.002, "pluto-5d4d": 0.002},
+                              fail_at={"pluto-5d4d": 3}))
+
+    assert [item["skew_ms"] for item in record["tunings"]][3:] == [None] * 5
+    for item in record["tunings"][3:]:
+        assert item["within_simultaneity_bound"] is None
+        assert item["simultaneous"] is False
+    for item in record["tunings"][:3]:
+        assert item["within_simultaneity_bound"] is True
+
+
+def test_the_record_is_built_from_the_snapshot_and_never_the_live_arrivals(
+        monkeypatch):
+    """An abandoned radio is still running, and still arriving.
+
+    ``sweep_pair`` gives up on a hung radio and builds the record while that
+    radio's thread is alive, holding a reference to the rendezvous and still
+    calling ``arrive`` on it.  Iterating the live dictionary there is a
+    ``RuntimeError: dictionary changed size during iteration`` waiting for the
+    moment the abandoned radio reaches one more tuning -- and a record built
+    half from a snapshot and half from a dictionary that moved underneath it
+    describes neither the state before nor the state after.  ``snapshot()``
+    exists precisely for this and is taken already; the counts underneath it
+    then went back to the live dictionary anyway.
+
+    Stated as a mechanism rather than hoped for: this rendezvous refuses to be
+    iterated except by the copy ``snapshot`` takes under the lock.  Every other
+    iteration is the bug, whether or not this run happens to lose the race.
+    """
+    class _GuardedArrivals(dict):
+        copying = False
+
+        def _refuse(self):
+            if not self.copying:
+                raise RuntimeError(
+                    "the live arrivals dict was iterated outside the lock; an "
+                    "abandoned radio still arriving resizes it mid-loop")
+
+        def __iter__(self):
+            self._refuse()
+            return super().__iter__()
+
+        def keys(self):
+            self._refuse()
+            return super().keys()
+
+        def items(self):
+            self._refuse()
+            return super().items()
+
+        def values(self):
+            self._refuse()
+            return super().values()
+
+    class _WatchfulRendezvous(sync.TuningRendezvous):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.arrivals = _GuardedArrivals()
+
+        def snapshot(self):
+            self.arrivals.copying = True
+            try:
+                return super().snapshot()
+            finally:
+                self.arrivals.copying = False
+
+    monkeypatch.setattr(sync, "TuningRendezvous", _WatchfulRendezvous)
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(_RADIOS, plan, open_context=_open_fake,
+                                collect=_fake_collect({}))
+
+    # And the numbers that used to come off the live dictionary are still right.
+    for entry in record["radios"]:
+        assert entry["arrived_tuning_count"] == 8
+        assert entry["barrier_wait_ms"] >= 0.0
+    assert len(record["tunings"]) == 8
+
+
 def test_a_sweep_where_both_radios_return_records_no_abandonment():
     record, _ = _run()
 
@@ -877,13 +1057,250 @@ def test_collect_radio_takes_a_rendezvous_hook_before_and_after_each_tuning():
     assert collected["samples"].shape[0] == 3
 
 
+def test_the_tuning_label_states_the_oscillator_the_radio_landed_on():
+    """The outcome of the tune, read back off the radio, not the request.
+
+    A fractional-N synthesiser does not land exactly where it is sent, and a
+    driver that clamps or wraps lands somewhere else entirely.  The request is
+    what the reader wanted; the read-back is what the sky it sampled actually
+    was, and only one of those two is a measurement.  ``deployed_shape``
+    recorded the belief rather than the event and made a heterogeneous corpus
+    look uniform for days.
+
+    The stand-in lands 137 Hz above every request, which is what a real synth
+    does.  The label has to follow the radio.
+    """
+    from leo_tracker.radio.beacon.channels import starlink_edge_pilot_if_hz
+    from leo_tracker.radio.beacon.fast_scan import collect_radio, survey_profile
+
+    tunings = [(1, "lower"), (2, "upper")]
+    context = _fake_context(lands=lambda hz: hz + 137)
+
+    collected = collect_radio(context, tunings,
+                              profile=survey_profile(0.002, 250_000.0),
+                              sample_rate_hz=250_000.0)
+
+    for entry, (channel, edge) in zip(collected["plan"], tunings, strict=True):
+        asked = int(starlink_edge_pilot_if_hz(channel, edge, 9_750_000_000.0))
+        assert entry["requested_if_center_hz"] == asked
+        # The measurement, and it is not the request.
+        assert entry["if_center_hz"] == asked + 137
+        assert entry["rf_center_hz"] == asked + 137 + 9_750_000_000.0
+        assert entry["tuning_offset_hz"] == 137
+        # The label still resolves to the tuning it landed on, because 137 Hz
+        # is nowhere near the 19.375 MHz that separates two edge tunings.
+        assert (entry["channel"], entry["edge"]) == (channel, edge)
+
+
+def test_a_radio_that_lands_on_a_different_tuning_refuses_to_publish_the_probe():
+    """A probe nobody can label is better than a probe labelled wrong.
+
+    ``tuning_plan`` raises ``ProbeUnusable`` rather than guess which IQ block
+    belongs to which tuning, for exactly this reason: a wrong answer here is
+    attributed to the wrong sky and believed.  The reader is the last place
+    that still knows where the oscillator went, so it is the place that has to
+    refuse.
+
+    The stand-in is sent to CH1-lower and lands on CH2-lower, 250 MHz away --
+    a driver that clamped, a channel table off by one, a write that did not
+    take.  Every timing number the sweep produces is perfect either way.
+    """
+    from leo_tracker.radio.beacon.channels import starlink_edge_pilot_if_hz
+    from leo_tracker.radio.beacon.fast_scan import (TuningMisfiled, collect_radio,
+                                                    survey_profile)
+
+    elsewhere = int(starlink_edge_pilot_if_hz(2, "lower", 9_750_000_000.0))
+    context = _fake_context(lands=lambda hz: elsewhere)
+
+    with pytest.raises(TuningMisfiled) as raised:
+        collect_radio(context, [(1, "lower"), (2, "upper")],
+                      profile=survey_profile(0.002, 250_000.0),
+                      sample_rate_hz=250_000.0)
+
+    message = str(raised.value)
+    assert "959687500" in message and str(elsewhere) in message
+    assert "(1, 'lower')" in message
+
+
+def test_every_probe_names_the_iq_block_it_was_written_into():
+    """The mapping is stored, never implied by position.
+
+    ``sample_order`` is how the analysis host decides which IQ block belongs to
+    which sky, and it agreed with the retained array only because the loop that
+    filled one appended to the other.  An off-by-one between those two files
+    every probe under its neighbour's label with nothing out of place: the
+    count is right, the timing is right, the skew is perfect.  So the block
+    index each probe went into is written down, and the set of them is checked
+    to be exactly the blocks that exist.
+    """
+    from leo_tracker.radio.beacon.fast_scan import collect_radio, survey_profile
+
+    tunings = [(channel, edge) for channel in (1, 2, 3, 4)
+               for edge in ("lower", "upper")]
+
+    collected = collect_radio(_fake_context(), tunings,
+                              profile=survey_profile(0.002, 250_000.0),
+                              sample_rate_hz=250_000.0)
+
+    assert [item["iq_index"] for item in collected["plan"]] == list(range(8))
+    assert collected["samples"].shape[0] == 8
+    # And ``sample_order`` is keyed by that index rather than by list position.
+    for item in collected["plan"]:
+        assert collected["sample_order"][item["iq_index"]] == (
+            item["channel"], item["region"])
+
+
+def test_the_block_mapping_and_the_read_back_reach_the_analysis_host():
+    """The manifest is the only thing that survives the copy to the share.
+
+    The reader knows which block holds which tuning and where the oscillator
+    actually went.  Neither fact is any use if it stops at the capture host:
+    the analysis host reads the manifest and nothing else, and it is the one
+    deciding what sky a detection belongs to.  So both travel -- per tuning, in
+    the sweep record the manifest embeds whole.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws(edge_orders=(0, 1)))
+    record, collected = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, collect=_fake_collect({}))
+
+    with _storage() as root:
+        written = sync.write_sweep(record, collected, storage_root=root,
+                                   sweep_id="20260813T101500Z", enqueue=False)
+        manifest = json.loads(
+            (Path(written["captures"][0]["path"]) / "manifest.json").read_text())
+
+    for entry in manifest["sweep"]["radios"]:
+        assert [item["iq_index"] for item in entry["per_tuning"]] == list(range(8))
+        for item in entry["per_tuning"]:
+            assert item["requested_if_center_hz"] is not None
+            assert item["tuning_offset_hz"] == 0.0
+    # And the block-to-tuning mapping the analysis host indexes the IQ by.
+    assert len(manifest["sample_order"]) == manifest["tuning_count"]
+
+
+def test_every_iq_block_holds_the_tuning_its_own_label_names():
+    """The label is a claim about the bytes; here it is checked against them.
+
+    This is the assertion an off-by-one between the tuning loop and the
+    retained array cannot survive, and the only one that cannot: every count,
+    every stamp and every skew is identical whether the probes are filed under
+    their own labels or under their neighbours'.  A probe of ch2-upper filed as
+    ch1-lower is worse than a missing probe, because it will be believed.
+
+    The stand-in stamps each block with the oscillator it was parked on when
+    the block was read -- a real radio's blocks differ from tuning to tuning,
+    and a stand-in of zeros could not tell the two filings apart.
+    """
+    from leo_tracker.radio.beacon.channels import starlink_edge_pilot_if_hz
+    from leo_tracker.radio.beacon.fast_scan import collect_radio, survey_profile
+
+    tunings = [(channel, edge) for channel in (1, 2, 3, 4)
+               for edge in ("lower", "upper")]
+
+    collected = collect_radio(_fake_context(stamp_lo=True), tunings,
+                              profile=survey_profile(0.002, 250_000.0),
+                              sample_rate_hz=250_000.0)
+
+    for index, (channel, region) in enumerate(collected["sample_order"]):
+        assert _stamped_lo_hz(collected["samples"][index]) == int(
+            starlink_edge_pilot_if_hz(channel, region.split("-")[0],
+                                      9_750_000_000.0)), (
+            f"IQ block {index} is labelled ({channel}, {region}) and holds "
+            "another tuning's samples")
+
+
+def _stamped_lo_hz(block):
+    """The oscillator the stand-in radio was parked on when this block was read."""
+    import numpy as np
+
+    return int(np.frombuffer(np.ascontiguousarray(block[0], "<i2").tobytes(),
+                             "<i8")[0])
+
+
+def test_the_sample_start_stamp_sits_between_the_rendezvous_and_the_first_sample():
+    """Where the stamp is taken is the whole correction, so it is pinned here.
+
+    The sweep's headline number is the difference of the two radios' sample-start
+    stamps, and it only means "when the radios began observing" if the stamp is
+    taken after the rendezvous has released and before the first block is read.
+    Moved one statement earlier it becomes the barrier release again, which is
+    the number the branch exists to stop reporting -- 0.274 ms median and
+    18.96 ms worst against 0.0155 ms, biased by the edge order.
+
+    Both sides are asserted by injecting time at each of them.  The rendezvous
+    holds the reader 50 ms; a block costs it 100 ms.  A stamp in the right
+    place lands after the first and before the second, and no other placement
+    in the reader satisfies both bounds.
+    """
+    from leo_tracker.radio.beacon.fast_scan import collect_radio, survey_profile
+
+    released = {}
+
+    def rendezvous(index):
+        released[index] = time.time_ns()
+        time.sleep(0.050)
+
+    collected = collect_radio(_fake_context(refill_s=0.100),
+                              [(1, "lower"), (2, "upper")],
+                              profile=survey_profile(0.002, 250_000.0),
+                              sample_rate_hz=250_000.0,
+                              before_listen=rendezvous)
+
+    for entry in collected["plan"]:
+        after_release_ms = (entry["sample_start_utc_ns"] -
+                            released[entry["tuning_index"]]) / 1e6
+        assert after_release_ms >= 50.0, (
+            "the sample start was stamped before the rendezvous released, so "
+            "it is the barrier release wearing the name of the sample start")
+        assert after_release_ms < 150.0, (
+            "the sample start was stamped after the first block was read, so "
+            "it is not when this radio began observing")
+
+
+def test_a_delay_between_the_rendezvous_and_the_first_sample_moves_the_skew():
+    """The same placement, measured through the sweep that reports it.
+
+    One radio is held 60 ms between the barrier releasing it and its first
+    sample -- the real reader, the real rendezvous, one wrapper that sleeps
+    where the local oscillator write used to sit.  If the stamp is taken where
+    it is supposed to be, the sweep's measured skew moves by that 60 ms; if it
+    is taken at the barrier release, the delay is invisible and the sweep
+    reports two radios starting together when one of them started 60 ms late.
+    """
+    from leo_tracker.radio.beacon.fast_scan import collect_radio
+
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    def collect(context, tunings, *, before_listen=None, **kwargs):
+        def held(index):
+            if before_listen is not None:
+                before_listen(index)               # the rendezvous itself
+            if context.radio_id == "pluto-5d4d":   # ...then 60 ms of nothing
+                time.sleep(0.060)
+        return collect_radio(context, tunings, before_listen=held, **kwargs)
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, collect=collect,
+        open_context=lambda spec: _fake_context(radio_id=spec.radio_id))
+
+    skews = [item["skew_ms"] for item in record["tunings"]]
+    assert len(skews) == 8
+    assert all(item == pytest.approx(60.0, abs=25.0) for item in skews), (
+        f"a 60 ms hold between the rendezvous and the first sample left the "
+        f"measured skew at {skews}")
+    # And the barrier release, which is what the number used to be, does not
+    # see it at all -- which is exactly why it stopped being the headline.
+    assert all(item["barrier_release_skew_ms"] < 25.0
+               for item in record["tunings"])
+
+
 def test_the_reader_never_holds_two_copies_of_the_sweep_it_is_collecting():
     """A 4 GB host, two radios, and the dearest arm is 410 MB of probes each.
 
     ``np.stack`` at the end of a sweep builds a second copy of every probe in
     it while the first is still held by the list it was appended to, so the
     reader transiently needs twice what it returns.  Both radios do that at
-    once, and peak RSS on the dearest matched arm reached 1.4-1.5 GB of the
+    once, and peak RSS on the dearest matched arm reached 1,862 MB of the
     host's 4 GB while two other capture services were running.
 
     Measured here rather than argued: the reader fills one array it allocated
@@ -964,6 +1381,115 @@ def test_the_reader_no_longer_claims_radio_time_ignores_sample_rate():
     assert "cost follows probe *duration* only" not in presurvey.__doc__
 
 
+def test_the_sweep_schema_is_bumped_because_its_skew_changed_meaning():
+    """One spelling, two definitions, is what a version number is for.
+
+    ``skew.median_ms`` meant how far apart the two threads left the barrier and
+    now means how far apart the two radios began sampling.  Those are different
+    events -- 0.029 ms against 0.274 ms median on opposite-order sweeps, 18.96 ms
+    at worst -- and about 3.2 GB of recordings already on disk carry the old
+    meaning under the old spelling.  Left at v1 a mixed corpus would hold both
+    definitions in one column and any comparison would average them silently.
+
+    ``SCORES_SCHEMA`` was bumped to v2 this morning for the identical reason:
+    ``deployed_shape`` kept its name and changed its meaning.
+    """
+    record, _ = _run()
+
+    assert sync.SWEEP_SCHEMA == "leo-tracker.synchronised-scan-sweep/v2"
+    assert record["schema"] == sync.SWEEP_SCHEMA
+    assert "leo-tracker.synchronised-scan-sweep/v1" in \
+        sync.SUPERSEDED_SWEEP_SCHEMAS
+    # And the manifest that travels to the analysis host carries it.
+    with _storage() as root:
+        written = sync.write_sweep(record, _collected_for(record),
+                                   storage_root=root, sweep_id="20260813T101500Z",
+                                   enqueue=False)
+        manifest = json.loads(
+            (Path(written["captures"][0]["path"]) / "manifest.json").read_text())
+    assert manifest["sweep"]["schema"] == sync.SWEEP_SCHEMA
+
+
+def test_a_reader_can_tell_an_old_sweep_record_from_a_new_one():
+    """The rule for reading a mixed corpus, executable rather than described.
+
+    Every v1 record on the share stays v1 forever -- nothing can restamp bytes
+    already written -- so "which event is this number" has to be answerable
+    from a stored record alone.  v2 always names the event beside the numbers
+    and always carries the barrier release separately; v1 has neither key, and
+    that absence is the discriminator.
+    """
+    record, _ = _run()
+
+    assert record["skew"]["event"] == "sample_start"
+    assert sync.sweep_skew_event(record) == "sample_start"
+    # What 3.2 GB of already-written recordings look like: a median that means
+    # the barrier release, with nothing on the record saying so.
+    old = {"schema": "leo-tracker.synchronised-scan-sweep/v1",
+           "skew": {"measured": True, "median_ms": 0.029, "count": 8}}
+    assert sync.sweep_skew_event(old) == "barrier_release"
+    assert "event" not in old["skew"] and "barrier_release" not in old["skew"]
+    # And a record from neither version is refused rather than guessed at.
+    with pytest.raises(ValueError, match="synchronised-scan-sweep"):
+        sync.sweep_skew_event({"schema": "leo-tracker.something-else/v1",
+                               "skew": {"median_ms": 1.0}})
+
+
+def _collected_for(record):
+    """One radio's worth of collected IQ, shaped as the reader hands it back."""
+    import numpy as np
+
+    return {entry["radio_id"]: {
+        "samples": np.zeros((8, 4, 2, 2), "<i2"),
+        "sample_order": entry["tunings"],
+    } for entry in record["radios"]}
+
+
+def test_every_basis_string_states_a_number_that_was_actually_measured():
+    """``deployed_shape`` again: a record asserting a belief as a measurement.
+
+    These strings ship inside every capture manifest, which is the only thing
+    that survives the copy to shared storage, so a wrong number here is what a
+    later analysis will have to reason from.  Three of them stated figures
+    contradicted by the run that produced this branch:
+
+      - the barrier released 0.023 ms (same order) and 0.029 ms (opposite)
+        apart, not a median 0.038 ms;
+      - sampling began 0.086 ms and 0.274 ms apart, 18.96 ms at worst -- not
+        "0.2-0.8 ms" and "about 4 ms";
+      - peak RSS was 1,862 MB stacking against 1,080 MB preallocated, not
+        1,452 against 1,014.
+
+    The precedent is ``test_the_reader_no_longer_claims_radio_time_ignores_sample_rate``:
+    a claim wrong in the record is worse than a claim wrong in a comment,
+    because the record is what gets believed.
+    """
+    record, _ = _run()
+
+    skew = record["skew"]["basis"]
+    assert "0.038 ms" not in skew
+    assert "0.2-0.8 ms" not in skew
+    assert "about 4 ms" not in skew
+    assert "0.023" in skew and "0.029" in skew
+    assert "0.086" in skew and "0.274" in skew and "18.96" in skew
+
+    memory = record["memory"]["basis"]
+    assert "1,452" not in memory and "1,014" not in memory
+    assert "1,862" in memory and "1,080" in memory
+
+    barrier = record["barrier"]["basis"]
+    # The write costs about 6 ms; what it cost the *offset* was 16.9 ms, every
+    # sweep, at the same two tunings.  Those are different numbers and only the
+    # first of them is 6.
+    assert "a different 6 ms on each radio" not in barrier
+    assert "16.9" in barrier
+
+    # And the same false numbers are not left standing in the module that
+    # explains the record either.
+    assert "0.038 ms" not in sync._tuning_records.__doc__
+    assert "about 4 ms" not in sync._tuning_records.__doc__
+
+
 def test_the_offload_queue_recognises_a_sync_scan_recording():
     """The exporter reconciles by walking every preserved recording.
 
@@ -985,21 +1511,58 @@ def test_the_offload_queue_recognises_a_sync_scan_recording():
     assert offload.observation_mode("ch4-lower-edge-narrow-x", {}) == "narrow"
 
 
-def _fake_context():
-    """The smallest libiio stand-in the reader will accept."""
+def _fake_context(*, stamp_lo=False, lands=None, refill_s=0.001, radio_id=None):
+    """The smallest libiio stand-in the reader will accept.
+
+    ``refill_s`` is what one block costs the radio.  It is a parameter because
+    the sample-start stamp has to sit *before* the first block is read, and the
+    only way to see that from outside is to make reading a block expensive and
+    watch where the stamp lands relative to it.
+
+    ``lands`` is where the synthesiser actually goes when it is sent to a
+    frequency, defaulting to exactly where it was sent.  A real fractional-N
+    part lands a few Hz away; a driver that clamps or a channel table off by
+    one lands somewhere else entirely, and the reader has no other way to find
+    out which of those happened.
+
+    ``stamp_lo`` writes the oscillator the radio is parked on into the first
+    four int16 of every block it hands back.  A real radio's blocks differ from
+    tuning to tuning, so the bytes can be asked which tuning they came from; a
+    stand-in whose every block is zeros cannot tell a probe filed under its own
+    label from one filed under its neighbour's, which is the single failure
+    that must not be invisible here.
+    """
     import sys
     import types
 
     import numpy as np
 
+    landing = lands or (lambda requested: requested)
+    built = []
+
     class _Attr:
         def __init__(self, value=""):
             self.value = value
 
+    class _OscillatorAttr:
+        """Written by the reader, and read back by it -- as on the radio."""
+
+        def __init__(self):
+            self._value = "0"
+
+        @property
+        def value(self):
+            return self._value
+
+        @value.setter
+        def value(self, requested):
+            self._value = str(int(landing(int(requested))))
+
     class _Channel:
         def __init__(self, identifier, output=False):
             self.id, self.output, self.enabled = identifier, output, False
-            self.attrs = {"frequency": _Attr("0"), "sampling_frequency": _Attr("0"),
+            self.attrs = {"frequency": _OscillatorAttr(),
+                          "sampling_frequency": _Attr("0"),
                           "rf_bandwidth": _Attr("0"), "hardwaregain": _Attr("0"),
                           "gain_control_mode": _Attr("manual")}
 
@@ -1015,10 +1578,14 @@ def _fake_context():
             self._size = size
 
         def refill(self):
-            time.sleep(0.001)
+            time.sleep(refill_s)
 
         def read(self):
-            return np.zeros(self._size * 4, np.int16).tobytes()
+            raw = np.zeros(self._size * 4, np.int16)
+            if stamp_lo:
+                raw[:4] = np.frombuffer(
+                    np.array(built[0].tuned_hz, "<i8").tobytes(), "<i2")
+            return raw.tobytes()
 
     class _Context:
         def __init__(self):
@@ -1034,10 +1601,18 @@ def _fake_context():
             return {"ad9361-phy": self._phy,
                     "cf-ad9361-lpc": self._stream}[name]
 
-    module = types.ModuleType("iio")
+    module = sys.modules.get("iio")
+    if module is None:
+        module = types.ModuleType("iio")
+        sys.modules["iio"] = module
+    # Rebound on every call rather than left at the first caller's class, so a
+    # context asked to stamp its blocks actually stamps them.
     module.Buffer = _Buffer
-    sys.modules.setdefault("iio", module)
-    return _Context()
+    built.append(_Context())
+    # Named so a paired sweep driving the real reader can tell its two
+    # stand-ins apart, the way ``_open_fake`` does for the collect stand-in.
+    built[0].radio_id = radio_id
+    return built[0]
 
 
 def test_the_unit_an_operator_starts_binds_both_radios_and_neither_dwell():
@@ -1188,7 +1763,14 @@ def _fake_collect(delays, *, tune_delays=None, fail_at=None, hang=None,
             landed = reported[index] if reported is not None else (channel, edge)
             entry = {"channel": landed[0], "region": f"{landed[1]}-edge",
                      "edge": landed[1],
+                     # The reader's own entry shape: where the oscillator went,
+                     # where it was sent, and which IQ block this probe is in.
+                     # A stand-in missing these would let the sweep pass a test
+                     # the real reader's record could not.
                      "if_center_hz": 1.7e9, "rf_center_hz": 1.15e10,
+                     "requested_if_center_hz": 1.7e9,
+                     "tuning_offset_hz": 0.0,
+                     "iq_index": index,
                      "tuning_index": index,
                      "sample_start_utc_ns": started,
                      "sample_end_utc_ns": int(stamp(index, "sample_end")),

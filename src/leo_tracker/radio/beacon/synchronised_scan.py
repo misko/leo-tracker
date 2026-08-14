@@ -69,7 +69,32 @@ from .fast_scan import (PILOT_BANDWIDTH_HZ, collect_radio, pilot_guard_hz,
                         survey_profile)
 
 #: What the sweep record calls itself.
-SWEEP_SCHEMA = "leo-tracker.synchronised-scan-sweep/v1"
+#:
+#: v2 because the numbers in the ``skew`` block changed meaning while keeping
+#: their spelling.  In v1 ``skew.median_ms`` was how far apart the two threads
+#: left :meth:`threading.Barrier.wait`; in v2 it is how far apart the two radios
+#: began sampling.  Those are different events and the gap between them is not
+#: small -- measured over 256 paired tunings the release was 0.023 ms (same
+#: order) and 0.029 ms (opposite) while sampling began 0.086 ms and 0.274 ms
+#: apart, 18.96 ms at worst -- and the error was deterministic in the edge
+#: order, which is the variable under study.  About 3.2 GB of recordings
+#: already carry the v1 meaning.
+#:
+#: This is exactly the case a version exists for, and this project bumped
+#: :data:`survey_scoring.SCORES_SCHEMA` to v2 for the identical reason: two
+#: definitions under one spelling in a mixed corpus get averaged without a
+#: word.  Re-recording is not the price here and could not be paid anyway; the
+#: price is that a reader has to be able to tell the two apart.
+#:
+#: **How a reader tells an old record from a new one.**  For anything written
+#: from here on, the schema string.  For the v1 records already on disk, which
+#: nothing can restamp, the discriminator is ``skew.event``: v2 always names
+#: the event its numbers were taken at and always carries ``skew.barrier_release``
+#: beside them, and v1 has neither key.  :func:`sweep_skew_event` is that rule
+#: written down once so no reader has to rediscover it.
+SWEEP_SCHEMA = "leo-tracker.synchronised-scan-sweep/v2"
+#: Spellings this record used to answer to, and what they meant.
+SUPERSEDED_SWEEP_SCHEMAS = ("leo-tracker.synchronised-scan-sweep/v1",)
 #: What the plan the sweep was drawn from calls itself.
 PLAN_SCHEMA = "leo-tracker.synchronised-scan-plan/v1"
 #: What one radio's stored probes call themselves.
@@ -83,6 +108,32 @@ SCAN_IQ_SCHEMA = "leo-tracker.synchronised-scan-iq/v1"
 #: reused: a sync-scan recording is not a narrow dwell and must not be analysed
 #: as one.
 SCAN_OBSERVATION_MODE = "sync-scan"
+
+
+def sweep_skew_event(record: dict) -> str:
+    """Which event a stored sweep's skew numbers were taken at.
+
+    The one thing a reader of a mixed corpus has to get right, and the one
+    thing that cannot be recovered from the numbers themselves: 0.03 ms is a
+    plausible reading of either event.  A v2 record says so on its face; a v1
+    record predates the question and always meant the barrier release.
+
+    Raises :class:`ValueError` rather than assuming for a record that is
+    neither, because guessing which event an unknown record's skew was taken at
+    is how two incomparable populations end up in one column.
+    """
+    skew = record.get("skew") or {}
+    event = skew.get("event")
+    if event:
+        return str(event)
+    schema = record.get("schema")
+    if schema in SUPERSEDED_SWEEP_SCHEMAS:
+        # v1 reported the barrier release and did not say which event it was.
+        return "barrier_release"
+    raise ValueError(
+        f"cannot tell which event the skew in a {schema!r} record was taken "
+        f"at: it names no skew.event and is not one of "
+        f"{[SWEEP_SCHEMA, *SUPERSEDED_SWEEP_SCHEMAS]}")
 
 #: What the randomisation calls itself.  Named rather than implied so a later
 #: analysis can select exactly the sweeps that belong to this experiment, and
@@ -425,8 +476,9 @@ MEMORY_BASIS = (
     "doubled by np.stack building a second copy beside the list that still "
     "holds the first. Both radios sample at once by construction, so the "
     "floor is the two arrays -- 819 MB on the dearest matched arm, 640 ms at "
-    "10 MS/s -- plus one driver block each. Measured peak RSS for that arm on "
-    "this 4 GB host: 1,452 MB stacking against 1,014 MB preallocated. Each "
+    "10 MS/s, which is arithmetic and not an observation -- plus one driver "
+    "block each. Measured peak RSS for that arm on this 4 GB host: 1,862 MB "
+    "stacking against 1,080 MB preallocated. Each "
     "radio's array is also released as soon as its bytes are on disk, so the "
     "second write does not hold the first radio's sweep as well")
 
@@ -449,18 +501,53 @@ JOIN_BASIS = (
 #: against, in a field named for the request rather than for the outcome.
 REQUESTED_SKEW_TOLERANCE_MS = (200.0, 500.0)
 
+#: How far apart the two radios may begin sampling and still be one observation.
+#:
+#: Derived from the request above rather than written beside it, so raising one
+#: cannot leave the other behind, and taken at its tighter end because that is
+#: the requirement the design was judged against.
+#:
+#: Every verdict this sweep publishes -- ``simultaneous`` per tuning and
+#: ``sweep_mode`` for the sweep -- is decided against it, and it travels in the
+#: record beside each of them.  Both were computed without reference to the
+#: measured offset at all: a sweep whose two radios began sampling four seconds
+#: apart satisfied every clause and was filed as ``paired``.  A bound that is
+#: not stated cannot be checked, and a verdict nobody can re-judge is an
+#: opinion; ``survey_threshold`` carries its own basis for exactly this reason.
+SIMULTANEITY_BOUND_MS = min(REQUESTED_SKEW_TOLERANCE_MS)
+
+SIMULTANEITY_BASIS = (
+    f"a tuning counts as one observation when both radios arrived, the barrier "
+    f"held them, both went on to sample, AND the measured offset between the "
+    f"two sample starts is at most {SIMULTANEITY_BOUND_MS:g} ms. The bound is "
+    f"the tighter end of the {REQUESTED_SKEW_TOLERANCE_MS[0]:g}-"
+    f"{REQUESTED_SKEW_TOLERANCE_MS[1]:g} ms the operator asked for, NOT what "
+    "the sweep achieves: measured over 128 paired tunings on the real radios "
+    "the offset is 0.0155 ms median, 0.0313 ms p95 and 0.0543 ms worst, so the "
+    "bound clears the worst tuning ever seen by about 3,700x. It is there to "
+    "catch a sweep that has gone wrong rather than to grade one that has not. "
+    "It is stored beside every verdict it decided so a later reader can apply "
+    "a tighter bound to the recorded offsets instead of trusting this one. A "
+    "tuning only one radio sampled has no offset, so it meets no bound: that "
+    "verdict is null rather than false, because 'not measured' and 'measured "
+    "and too far apart' are different facts")
+
 SKEW_BASIS = (
     "measured, not requested, and measured at the event that matters: each "
     "radio reads host UTC in its own thread the instant it begins sampling "
     "that tuning, and the skew is the difference between those two stamps. It "
     "is NOT the difference between the two threads leaving the barrier. Those "
-    "are different events and the gap between them is not small: the barrier "
-    "released a median 0.038 ms apart while sampling began 0.2-0.8 ms apart on "
-    "same-order sweeps and about 4 ms apart on opposite-order ones, where the "
-    "two radios are writing their local oscillators to different frequencies. "
-    "That bias was deterministic in the edge order, which is the variable "
-    "under study, so reporting the barrier release correlated the error with "
-    "the experiment. A tuning only one radio SAMPLED has no skew at all and is "
+    "are different events and the gap between them is not small. Measured over "
+    "256 paired tunings with the barrier sitting before the retune, the "
+    "barrier released a median 0.023 ms apart on same-order sweeps and "
+    "0.029 ms on opposite-order ones, while sampling began 0.086 ms apart "
+    "(3.36 ms worst) and 0.274 ms apart (18.96 ms worst) -- an order of "
+    "magnitude and more, in the direction that flatters the sweep, because "
+    "each thread still had a local oscillator to write and on an "
+    "opposite-order sweep the two are writing different frequencies. That "
+    "error was deterministic in the edge order, which is the variable under "
+    "study, so reporting the barrier release correlated it with the "
+    "experiment. A tuning only one radio SAMPLED has no skew at all and is "
     "recorded with skew_ms null rather than zero, because 'the other radio was "
     "not there' and 'the two started together' are opposite facts and must not "
     "share a column")
@@ -641,8 +728,16 @@ def _sweep_one_radio(spec: RadioSpec, entry: dict, rendezvous: TuningRendezvous,
     tunings = [tuple(item) for item in entry["tunings"]]
     per_tuning: list[dict] = outcome["per_tuning"]
 
+    # This thread's own arrivals, kept here as ``arrive`` hands them back.  The
+    # shared dictionary is the other radio's too, and it is written by the other
+    # radio's thread; reading it from here to recover a stamp this thread was
+    # already given is a cross-thread read for nothing.
+    mine: dict[int, dict] = {}
+
     def before(index: int) -> dict:
-        return rendezvous.arrive(spec.radio_id, index)
+        arrival = rendezvous.arrive(spec.radio_id, index)
+        mine[int(index)] = arrival
+        return arrival
 
     def stamp(index: int, event: str) -> int:
         return clock(spec.radio_id, index, event)
@@ -654,12 +749,23 @@ def _sweep_one_radio(spec: RadioSpec, entry: dict, rendezvous: TuningRendezvous,
         # request rather than the outcome and made a heterogeneous corpus look
         # uniform for days; a radio that landed on another tuning has to be a
         # visibly different row rather than a correctly labelled one.
-        arrival = rendezvous.arrivals.get(index, {}).get(spec.radio_id, {})
+        arrival = mine.get(int(index), {})
         per_tuning.append({
             "tuning_index": int(index),
             "channel": plan_entry["channel"], "region": plan_entry["region"],
+            # Which block of this radio's retained IQ holds this tuning's
+            # probe, carried through to the manifest so the analysis host reads
+            # a stated mapping rather than inferring one from row order.
+            "iq_index": plan_entry.get("iq_index"),
+            # Where the oscillator went and where it was sent.  Equal to within
+            # a couple of Hz on every healthy tuning -- measured -2 to 0 Hz over
+            # 256 tunings on the two radios -- which is exactly why the two have
+            # to be separate columns: a reader cannot otherwise tell a sweep
+            # that checked from one that assumed.
             "if_center_hz": plan_entry.get("if_center_hz"),
             "rf_center_hz": plan_entry.get("rf_center_hz"),
+            "requested_if_center_hz": plan_entry.get("requested_if_center_hz"),
+            "tuning_offset_hz": plan_entry.get("tuning_offset_hz"),
             # When this radio actually began observing.  The headline offset is
             # the difference of these, never of the barrier releases below.
             "sample_start_utc_ns": plan_entry.get("sample_start_utc_ns"),
@@ -728,10 +834,12 @@ def _tuning_records(arrivals_by_index: dict, outcomes: dict,
     of the two barrier releases.  The barrier releasing is not the radios
     observing: each thread still writes its local oscillator and settles
     afterwards, and on an opposite-order sweep the two are moving to different
-    frequencies, so that work costs different amounts.  Measured on the radios,
-    the barrier released 0.038 ms apart while sampling began about 4 ms apart,
-    and the error was deterministic in the edge order rather than random --
-    correlated, that is, with the exact variable the sweep is built to study.
+    frequencies, so that work costs different amounts.  Measured on the radios
+    with the barrier before the retune, it released 0.023 ms (same order) and
+    0.029 ms (opposite) apart while sampling began 0.086 ms and 0.274 ms apart,
+    18.96 ms at worst; and the error was deterministic in the edge order rather
+    than random -- correlated, that is, with the exact variable the sweep is
+    built to study.
     """
     where = {radio_id: {int(item["tuning_index"]): item
                         for item in outcomes[radio_id]["per_tuning"]}
@@ -744,18 +852,37 @@ def _tuning_records(arrivals_by_index: dict, outcomes: dict,
             "sample_start_utc_ns") for radio_id in present}
         sampled = [radio_id for radio_id in present
                    if started[radio_id] is not None]
+        if len(sampled) == len(order) == 2:
+            first, second = (started[radio_id] for radio_id in sampled)
+            skew_ms = abs(first - second) / 1e6
+        else:
+            # Not zero.  A tuning one radio sampled alone has no offset at all,
+            # and a zero here would read as a perfectly simultaneous pair.
+            skew_ms = None
+        # Null rather than False when nothing was measured: "the other radio
+        # was not there" is not "they were too far apart".
+        within = (None if skew_ms is None
+                  else bool(skew_ms <= SIMULTANEITY_BOUND_MS))
         row = {"tuning_index": int(index),
                "radios_arrived": len(present),
                "radios_sampled": len(sampled),
-               # Three conditions, and each one of them can fail on its own:
+               "skew_ms": skew_ms,
+               # The bound this row's verdict was decided against, stored with
+               # it so the verdict can be overturned from the record alone.
+               "simultaneity_bound_ms": SIMULTANEITY_BOUND_MS,
+               "within_simultaneity_bound": within,
+               # Four conditions, and each one of them can fail on its own:
                # both radios had to be here, the barrier had to actually hold
-               # them (rather than break and let each proceed alone), and both
-               # had to go on to sample.  Dropping the middle clause is the one
-               # change that lets a sweep which was not simultaneous be
-               # recorded as simultaneous, so it is asserted directly.
+               # them (rather than break and let each proceed alone), both had
+               # to go on to sample, and the offset between the two sample
+               # starts had to be inside the stated bound.  The last clause is
+               # the only one that consults what was measured rather than who
+               # turned up: without it a sweep whose radios began four seconds
+               # apart satisfies the other three and is filed as simultaneous.
                "simultaneous": bool(len(present) == len(order) and all(
                    arrivals[radio_id]["synchronised"]
-                   for radio_id in present) and len(sampled) == len(order)),
+                   for radio_id in present) and len(sampled) == len(order)
+                   and within is True),
                "arrivals": {}}
         for radio_id in present:
             completed = where[radio_id].get(int(index), {})
@@ -768,13 +895,6 @@ def _tuning_records(arrivals_by_index: dict, outcomes: dict,
                 "channel": completed.get("channel"),
                 "region": completed.get("region"),
                 "completed": bool(completed)}
-        if len(sampled) == len(order) == 2:
-            first, second = (started[radio_id] for radio_id in sampled)
-            row["skew_ms"] = abs(first - second) / 1e6
-        else:
-            # Not zero.  A tuning one radio sampled alone has no offset at all,
-            # and a zero here would read as a perfectly simultaneous pair.
-            row["skew_ms"] = None
         if len(present) == 2:
             first, second = (arrivals[radio_id]["utc_ns"]
                              for radio_id in present)
@@ -892,19 +1012,23 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
     for radio_id in order:
         outcome = outcomes[radio_id]
         outcome["completed_tuning_count"] = len(outcome["per_tuning"])
+        # From the snapshot, like every other number in this record, and never
+        # from ``rendezvous.arrivals``.  An abandoned radio is still running and
+        # still arriving, so iterating the live dictionary here is a
+        # "dictionary changed size during iteration" waiting for the moment it
+        # reaches one more tuning -- and a record built half from a snapshot
+        # and half from a dictionary that moved underneath it describes neither
+        # the state before nor the state after.
         outcome["arrived_tuning_count"] = sum(
-            1 for index in rendezvous.arrivals
-            if radio_id in rendezvous.arrivals[index])
+            1 for radios in arrivals_by_index.values() if radio_id in radios)
         outcome["solo_tuning_count"] = sum(
             1 for item in outcome["per_tuning"] if not item["synchronised"])
         # What this radio spent waiting for the other one. On a matched sweep
         # it is milliseconds; on a mismatched one it is the difference between
         # the two arms, and it is what shows the sweep cost the slower arm.
         outcome["barrier_wait_ms"] = sum(
-            float(item["waited_ms"])
-            for index in rendezvous.arrivals
-            for item in [rendezvous.arrivals[index].get(radio_id)]
-            if item is not None)
+            float(radios[radio_id]["waited_ms"])
+            for radios in arrivals_by_index.values() if radio_id in radios)
         outcome["solo"] = bool(outcome["solo_tuning_count"] or
                                outcome["state"] != "complete")
         # Where the pairing was lost, so "ran alone from the start" and "lost
@@ -917,12 +1041,22 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
     released = [item["barrier_release_skew_ms"] for item in tunings
                 if item["barrier_release_skew_ms"] is not None]
     simultaneous = [item for item in tunings if item["simultaneous"]]
+    # The sweep's own reading of the measured offsets, computed here rather
+    # than inherited, so the mode states a fact about the numbers and not only
+    # a count of rows that already agreed with it.
+    within_bound = [item for item in tunings
+                    if item["within_simultaneity_bound"] is True]
     clipped = [radio_id for radio_id in order
                if outcomes[radio_id]["pilot_band_clipped"]]
     # Three outcomes, not two.  "Never had a partner" and "lost its partner on
     # tuning five" are different observations of the sky and pooling them into
     # one degraded bucket is how a heterogeneous corpus comes to look uniform.
-    if bool(tunings) and len(simultaneous) == len(tunings) and all(
+    #
+    # ``paired`` is the row every later analysis trusts, so it consults the
+    # measured offset directly: every tuning must have been measured inside
+    # SIMULTANEITY_BOUND_MS, not merely have had both radios present.
+    if bool(tunings) and len(simultaneous) == len(tunings) and len(
+            within_bound) == len(tunings) and all(
             outcomes[radio_id]["state"] == "complete" for radio_id in order):
         sweep_mode = "paired"
     elif simultaneous:
@@ -949,10 +1083,15 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
                       "cross-process problem that does not exist here. The "
                       "wait is placed after the local oscillator write and the "
                       "settle, so both radios are already on frequency when it "
-                      "releases and the write -- about 6 ms, and a different "
-                      "6 ms on each radio whenever the two are moving to "
-                      "different frequencies -- is outside the offset "
-                      "entirely rather than merely reported inside it"),
+                      "releases and the write is outside the offset entirely "
+                      "rather than merely reported inside it. The write itself "
+                      "measures about 6 ms writing a new frequency; what it "
+                      "cost the OFFSET is a separate and larger number, "
+                      "because the two radios pay different amounts of it "
+                      "whenever they are moving to different frequencies -- "
+                      "with the barrier before the write, tunings 2 and 4 of "
+                      "every opposite-order sweep sat at about 16.9 ms apart, "
+                      "always the same way round"),
         },
         "join": {
             "bounded": True,
@@ -973,6 +1112,9 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
             "per_tuning_ms": [item["skew_ms"] for item in tunings],
             "simultaneous_tuning_count": len(simultaneous),
             "operator_requested_tolerance_ms": list(REQUESTED_SKEW_TOLERANCE_MS),
+            # The bar these offsets were judged against, beside the offsets.
+            "simultaneity_bound_ms": SIMULTANEITY_BOUND_MS,
+            "within_simultaneity_bound_tuning_count": len(within_bound),
             # Kept, and kept subordinate.  It is what the rendezvous cost, not
             # when the radios began observing, and it was the headline until it
             # was measured against the sample starts and found 10-130x
@@ -1004,6 +1146,16 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
             "basis": MEMORY_BASIS,
         },
         "sweep_mode": sweep_mode,
+        # Beside the verdict it decided, not buried in the skew block, because
+        # ``sweep_mode`` is the field a later analysis groups by.
+        "simultaneity": {
+            "bound_ms": SIMULTANEITY_BOUND_MS,
+            "event": "sample_start",
+            "operator_requested_tolerance_ms": list(REQUESTED_SKEW_TOLERANCE_MS),
+            "within_bound_tuning_count": len(within_bound),
+            "measured_tuning_count": len(skews),
+            "basis": SIMULTANEITY_BASIS,
+        },
         "paired_tuning_count": len(simultaneous),
         "solo": any(outcomes[radio_id]["solo"] for radio_id in order),
         "dwell": {

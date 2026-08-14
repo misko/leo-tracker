@@ -108,16 +108,42 @@ The eight scoring methods present on every observation are `anchor-8`,
 The withdrawn claim was that six of eight methods agreeing on f = 0.2278 ±
 0.007 validated the cross-radio coincidence model. Two controls kill it.
 
-| Join | f range | spread |
-|---|---|---:|
-| Real join: radio A and radio B of the same sweep | — | 0.050 |
-| Radio A of one sweep to radio B of a *different* sweep, minutes apart | 0.637–0.713 | 0.075 |
-| Radio B shifted by two instants within one sweep | — | 0.045 |
+Recomputed on 2,464 matched-arm cells in each join (154 paired sweeps, 352
+scored sidecars). Thresholds and the empty-sky rate `p` are drawn **once** from
+the cross-edge null arms and held fixed across all three, so the join is the
+only thing that changes:
 
-The second row is a join for which the coincidence model is *definitionally
-false* — the two radios are looking at sky minutes apart — and the check
-passes on it. The third row is *tighter* than the real join. A test that
-cannot fail is not a test.
+| Join | Model can hold? | f range | spread | vs its own noise median |
+|---|---|---|---:|---:|
+| Real: radio A and radio B of one sweep, same instant | yes | 0.255–0.302 | 0.047 | 0.92× |
+| Radio B shifted by two instants within one sweep | **no** | 0.644–0.710 | 0.066 | 0.68× |
+| Radio A to radio B of a *different* sweep, median 24 min apart | **no** | 0.795–0.894 | 0.099 | 0.78× |
+
+The last column is the argument. Each join's spread is compared against the
+sampling noise *for that join*, resampled 200×, and all three land **at or
+below their own noise median** — the scrambled join, where the two radios never
+shared sky at all, further below it than the real one. By the verdict's own
+standard, "within sampling noise" fires on every join, including the two the
+model forbids. A test that cannot fail is not a test.
+
+Note what the raw spreads do *not* show: the scrambled join has the widest
+spread of the three, not the narrowest. An earlier draft of this section
+claimed the shifted control came out numerically tighter than the real join.
+It does not, and that framing is withdrawn. The refutation does not need it —
+it rests on every join clearing its own noise floor.
+
+Meanwhile f itself moves 3× across the joins, from 0.27 to 0.79. The joins
+really are different data; the estimator is not simply returning the same
+answer three times.
+
+![Sky-occupancy f across three joins, and each join's spread against its own
+sampling noise](figures/negative-control.png)
+
+*The check cannot fail. Left: f moves 3× between joins, so these are genuinely
+different data — yet all eight algorithms cluster just as tightly in the two
+joins the model forbids. Right: observed spread against the p05–p95 band from
+200 joint resamples; the scrambled join sits furthest below its median.
+Estimator is `leo_tracker.radio.beacon.cross_radio`, unmodified.*
 
 The root cause is that the eight detectors are not eight independent opinions.
 Over 2,160 observations they correlate with each other at φ 0.82–0.94. They
@@ -128,6 +154,13 @@ The corollary is uncomfortable and is stated rather than buried: **"which
 detector is best" may be the wrong question at this corpus size.** At φ
 0.82–0.94 the eight are not distinguishable, and any ranking among them is
 reading noise.
+
+![Pairwise phi between the eight algorithms on the same observations](figures/method-correlation.png)
+
+*Why the check cannot fail. The eight detectors agree with each other at phi
+0.82-0.94 on identical observations, so they are near-duplicates rather than
+independent witnesses. Near-duplicates are obliged to return near-identical f
+whatever they are fed, which is exactly what the controls above show.*
 
 ## Retraction 2 — the differentials were never shown to be miscalibrated
 
@@ -179,13 +212,31 @@ The pilot guard bands at those rates, read from the scored records, are:
 
 The guard spans a 13× range across the three live rates and the cliff does not
 move. A rate-independent ≈350 kHz tolerance is the CFO search span, not the
-pilot band. The withdrawn report reached a partly correct destination by an
+pilot band.
+
+![Detection rate against bias-corrected offset for three sample rates, with
+each rate's pilot guard marked](figures/cfo-cliff.png)
+
+*The cliff does not move with the guard. All three rates collapse in the same
+350–400 kHz bin while their guards span 13×, and the 5 and 10 MS/s rates fall
+off at a quarter and a tenth of their own guard respectively — so the guard
+cannot be what causes it. Only the 2.5 MS/s guard sits near the cliff, and it
+lands there by coincidence. Lower panel is n per bin; the dotted line at 150
+marks where a bin is too thin to lean on. Crosses are the values quoted in the
+withdrawn analysis, plotted against the recomputed lines rather than instead of
+them.* The withdrawn report reached a partly correct destination by an
 argument the data does not support, which is worse than being wrong, because it
 would have survived review unexamined.
 
 ## What survives and is actionable
 
 ### `lnb-c` carries a large LO bias and is the best port on site
+
+![Detection against raw and bias-corrected offset for the three live ports](figures/port-bias.png)
+
+*lnb-c is shifted, not deaf. On the raw axis its +604.2 kHz LO bias drags it
+off the others; correcting for the bias collapses all three live ports onto one
+curve, and lnb-c becomes the strongest of them. lnb-a is excluded as dead.*
 
 The scored records apply `receiver_centers_hz` at scoring time. Two distinct
 values appear across the census, one per radio:
@@ -247,6 +298,12 @@ a plausible common cause and should be checked against the bench log before
 `lnb-a` is written off as a component failure.
 
 ### The collector bug cost 893 sweeps, not ~400
+
+![Paired and single-radio sweeps over wall-clock through the outage](figures/outage-timeline.png)
+
+*One USB dropout, 893 lost sweeps, one contiguous block. The single-radio run
+begins at 03:24:15Z and ends at 05:07:41Z when the collector was restarted with
+the fix; every sweep after it is paired again.*
 
 A USB dropout wedged the collector's reopen path. The reopen block deleted the
 context with `del ctx[name]`, which raised before the retry below it could ever
@@ -320,6 +377,13 @@ that the recorded skew is a lower bound blind to the dominant term — this is
 the next experiment, not a finding.
 
 ### f is not behaving like a sky parameter
+
+![f estimated across algorithms compared with f across receiver pair, arm, channel and skew](figures/f-strata.png)
+
+*The consistency check was run on the axis with the least variance. The
+across-algorithm spread that was certified as agreement is the smallest band on
+the chart; f moves further along receiver pair, arm, channel and skew — every
+axis that was not checked.*
 
 If f were sky occupancy it should be roughly invariant across the instrument
 and vary with the sky. It does the opposite. It moves more across instrumental

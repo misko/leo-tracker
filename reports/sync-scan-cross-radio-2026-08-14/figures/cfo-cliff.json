@@ -1,0 +1,617 @@
+{
+  "figure": "cfo-cliff",
+  "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/",
+  "method": "differential-32",
+  "false_alarm_rate": 0.01,
+  "excluded_receivers": [
+    "lnb-a"
+  ],
+  "x_axis": "abs(cfo_hz - receiver_centers_hz[receiver]) -- the pipeline's bias-corrected offset (cross_radio.median_corrected_hz), binned by that quantity rather than by raw offset",
+  "min_bin_n_plotted": 20,
+  "bin_edges_khz": [
+    0.0,
+    50.0,
+    100.0,
+    150.0,
+    200.0,
+    250.0,
+    300.0,
+    350.0,
+    400.0,
+    500.0,
+    600.0,
+    700.0,
+    850.0,
+    1000.0,
+    1450.0
+  ],
+  "reviewer_bin_count": 9,
+  "thresholds": {
+    "1250000Hz/80.0ms": 0.10289398923429055,
+    "1250000Hz/160.0ms": 0.08309668800791374,
+    "1250000Hz/640.0ms": 0.052472438122913356,
+    "2500000Hz/80.0ms": 0.09012295959489161,
+    "2500000Hz/160.0ms": 0.06004019725244807,
+    "2500000Hz/640.0ms": 0.0547942578245998,
+    "5000000Hz/80.0ms": 0.10764221278994872,
+    "5000000Hz/160.0ms": 0.07070099725167285,
+    "5000000Hz/640.0ms": 0.050006296482612796,
+    "10000000Hz/80.0ms": 0.09476192722769738,
+    "10000000Hz/160.0ms": 0.07210150081067734,
+    "10000000Hz/640.0ms": 0.04413636642321172
+  },
+  "guard_khz": {
+    "2.5 MS/s": 312.5,
+    "5 MS/s": 1562.5,
+    "10 MS/s": 4062.5
+  },
+  "guard_spread": 13.0,
+  "max_corrected_offset_khz": {
+    "2500000.0": 948.9100367423831,
+    "5000000.0": 1410.2499988635975,
+    "10000000.0": 1414.0976378681366
+  },
+  "series": {
+    "2.5 MS/s": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 1227,
+        "fired": 115,
+        "rate_pct": 9.372453137734311,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 582,
+        "fired": 117,
+        "rate_pct": 20.103092783505154,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 1275,
+        "fired": 403,
+        "rate_pct": 31.607843137254903,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 512,
+        "fired": 203,
+        "rate_pct": 39.6484375,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 709,
+        "fired": 227,
+        "rate_pct": 32.01692524682652,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 154,
+        "fired": 45,
+        "rate_pct": 29.22077922077922,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 287,
+        "fired": 62,
+        "rate_pct": 21.60278745644599,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 120,
+        "fired": 3,
+        "rate_pct": 2.5,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 334,
+        "fired": 4,
+        "rate_pct": 1.1976047904191616,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 600.0,
+        "mid_khz": 550.0,
+        "n": 305,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 700.0,
+        "mid_khz": 650.0,
+        "n": 710,
+        "fired": 11,
+        "rate_pct": 1.5492957746478873,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 850.0,
+        "mid_khz": 775.0,
+        "n": 466,
+        "fired": 4,
+        "rate_pct": 0.8583690987124464,
+        "plotted": true
+      },
+      {
+        "low_khz": 850.0,
+        "high_khz": 1000.0,
+        "mid_khz": 925.0,
+        "n": 68,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1450.0,
+        "mid_khz": 1225.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "5 MS/s": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 785,
+        "fired": 131,
+        "rate_pct": 16.687898089171973,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 564,
+        "fired": 173,
+        "rate_pct": 30.673758865248228,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 1328,
+        "fired": 529,
+        "rate_pct": 39.83433734939759,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 626,
+        "fired": 333,
+        "rate_pct": 53.194888178913736,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 829,
+        "fired": 258,
+        "rate_pct": 31.12183353437877,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 350,
+        "fired": 72,
+        "rate_pct": 20.571428571428573,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 943,
+        "fired": 112,
+        "rate_pct": 11.876988335100743,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 404,
+        "fired": 5,
+        "rate_pct": 1.2376237623762376,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 539,
+        "fired": 9,
+        "rate_pct": 1.6697588126159555,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 600.0,
+        "mid_khz": 550.0,
+        "n": 362,
+        "fired": 1,
+        "rate_pct": 0.27624309392265195,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 700.0,
+        "mid_khz": 650.0,
+        "n": 532,
+        "fired": 1,
+        "rate_pct": 0.18796992481203006,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 850.0,
+        "mid_khz": 775.0,
+        "n": 649,
+        "fired": 11,
+        "rate_pct": 1.694915254237288,
+        "plotted": true
+      },
+      {
+        "low_khz": 850.0,
+        "high_khz": 1000.0,
+        "mid_khz": 925.0,
+        "n": 335,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1450.0,
+        "mid_khz": 1225.0,
+        "n": 214,
+        "fired": 4,
+        "rate_pct": 1.8691588785046729,
+        "plotted": true
+      }
+    ],
+    "10 MS/s": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 572,
+        "fired": 158,
+        "rate_pct": 27.622377622377623,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 462,
+        "fired": 217,
+        "rate_pct": 46.96969696969697,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 822,
+        "fired": 395,
+        "rate_pct": 48.05352798053528,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 337,
+        "fired": 205,
+        "rate_pct": 60.83086053412463,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 499,
+        "fired": 205,
+        "rate_pct": 41.08216432865731,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 212,
+        "fired": 61,
+        "rate_pct": 28.77358490566038,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 656,
+        "fired": 83,
+        "rate_pct": 12.652439024390244,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 247,
+        "fired": 3,
+        "rate_pct": 1.214574898785425,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 402,
+        "fired": 8,
+        "rate_pct": 1.9900497512437811,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 600.0,
+        "mid_khz": 550.0,
+        "n": 374,
+        "fired": 4,
+        "rate_pct": 1.0695187165775402,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 700.0,
+        "mid_khz": 650.0,
+        "n": 458,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 850.0,
+        "mid_khz": 775.0,
+        "n": 515,
+        "fired": 15,
+        "rate_pct": 2.912621359223301,
+        "plotted": true
+      },
+      {
+        "low_khz": 850.0,
+        "high_khz": 1000.0,
+        "mid_khz": 925.0,
+        "n": 248,
+        "fired": 2,
+        "rate_pct": 0.8064516129032258,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1450.0,
+        "mid_khz": 1225.0,
+        "n": 331,
+        "fired": 3,
+        "rate_pct": 0.9063444108761329,
+        "plotted": true
+      }
+    ]
+  },
+  "reference_reported": {
+    "2.5 MS/s": [
+      10.6,
+      25.3,
+      36.4,
+      45.3,
+      39.0,
+      40.0,
+      26.7,
+      0.0,
+      1.2
+    ],
+    "5 MS/s": [
+      17.0,
+      33.5,
+      43.6,
+      55.9,
+      31.0,
+      19.7,
+      12.1,
+      2.0,
+      1.9
+    ],
+    "10 MS/s": [
+      24.1,
+      49.0,
+      50.6,
+      60.4,
+      38.9,
+      28.6,
+      10.8,
+      1.6,
+      1.8
+    ]
+  },
+  "reference_reported_n": {
+    "5 MS/s": [
+      481,
+      355,
+      937,
+      422,
+      554,
+      239,
+      605,
+      247,
+      309
+    ]
+  },
+  "reference_vs_corpus_delta_pct": {
+    "2.5 MS/s": [
+      -1.2,
+      -5.2,
+      -4.8,
+      -5.7,
+      -7.0,
+      -10.8,
+      -5.1,
+      2.5,
+      -0.0
+    ],
+    "5 MS/s": [
+      -0.3,
+      -2.8,
+      -3.8,
+      -2.7,
+      0.1,
+      0.9,
+      -0.2,
+      -0.8,
+      -0.2
+    ],
+    "10 MS/s": [
+      3.5,
+      -2.0,
+      -2.5,
+      0.4,
+      2.2,
+      0.2,
+      1.9,
+      -0.4,
+      0.2
+    ]
+  },
+  "reference_top_bin_note": "The reviewers' ninth bin is reproduced as 400-500 kHz, not as an open-ended >=400 kHz bin: with the top bin open its n is 2631 at 5 MS/s against the reported 309, while 400-500 gives 539 and every one of the nine bins then scales by the same 1.4-1.7x the corpus has grown by.",
+  "cliff_robustness_by_probe_ms": {
+    "2.5 MS/s / 80 ms": {
+      "before_300_350": {
+        "n": 137,
+        "rate_pct": 13.86861313868613
+      },
+      "after_350_400": {
+        "n": 54,
+        "rate_pct": 3.7037037037037037
+      }
+    },
+    "2.5 MS/s / 160 ms": {
+      "before_300_350": {
+        "n": 80,
+        "rate_pct": 25.0
+      },
+      "after_350_400": {
+        "n": 32,
+        "rate_pct": 3.125
+      }
+    },
+    "2.5 MS/s / 640 ms": {
+      "before_300_350": {
+        "n": 70,
+        "rate_pct": 32.857142857142854
+      },
+      "after_350_400": {
+        "n": 34,
+        "rate_pct": 0.0
+      }
+    },
+    "5 MS/s / 80 ms": {
+      "before_300_350": {
+        "n": 270,
+        "rate_pct": 13.333333333333334
+      },
+      "after_350_400": {
+        "n": 107,
+        "rate_pct": 1.8691588785046729
+      }
+    },
+    "5 MS/s / 160 ms": {
+      "before_300_350": {
+        "n": 418,
+        "rate_pct": 15.07177033492823
+      },
+      "after_350_400": {
+        "n": 172,
+        "rate_pct": 1.744186046511628
+      }
+    },
+    "5 MS/s / 640 ms": {
+      "before_300_350": {
+        "n": 255,
+        "rate_pct": 5.098039215686274
+      },
+      "after_350_400": {
+        "n": 125,
+        "rate_pct": 0.0
+      }
+    },
+    "10 MS/s / 80 ms": {
+      "before_300_350": {
+        "n": 249,
+        "rate_pct": 11.646586345381525
+      },
+      "after_350_400": {
+        "n": 82,
+        "rate_pct": 1.2195121951219512
+      }
+    },
+    "10 MS/s / 160 ms": {
+      "before_300_350": {
+        "n": 245,
+        "rate_pct": 19.183673469387756
+      },
+      "after_350_400": {
+        "n": 86,
+        "rate_pct": 1.1627906976744187
+      }
+    },
+    "10 MS/s / 640 ms": {
+      "before_300_350": {
+        "n": 162,
+        "rate_pct": 4.320987654320987
+      },
+      "after_350_400": {
+        "n": 79,
+        "rate_pct": 1.2658227848101267
+      }
+    }
+  },
+  "cliff_robustness_note": "All nine (rate, probe length) cells collapse into the 350-400 kHz bin, so the cliff is not an artefact of pooling probe lengths inside a rate -- which is otherwise unsafe, see the 2.5 MS/s 0-50 kHz bin at 17.0% (80 ms) against 2.1% (640 ms)."
+}

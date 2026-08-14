@@ -1,0 +1,74 @@
+{
+  "figure": "outage-timeline",
+  "generated_utc": "2026-08-14T06:51:04+00:00",
+  "sources": {
+    "sweeps": "/mnt/qnap01/mouse9911/leo-scans/sync-*/sweep.json",
+    "collector_log": "/mnt/leo-nvme/leo-tracker/sync-scans/collector.log"
+  },
+  "census": {
+    "committed_sweeps": 3069,
+    "paired": 2176,
+    "single_radio": 893,
+    "first_sweep_utc": "20260814T000315Z",
+    "last_sweep_utc": "20260814T065001Z",
+    "note": "the collector is live; totals are a floor"
+  },
+  "outage": {
+    "single_radio_sweeps": 893,
+    "window_utc": [
+      "20260814T032415Z",
+      "20260814T050741Z"
+    ],
+    "duration": "1:43:26",
+    "episodes": 1,
+    "contiguous": true,
+    "surviving_radio": [
+      "pluto-19f2"
+    ],
+    "genuine_hardware_events": 1,
+    "genuine_event_utc": "20260814T032415Z",
+    "genuine_event_error": "OSError: [Errno 5] Input/output error",
+    "self_inflicted_keyerror_sweeps": 892,
+    "collector_log": {
+      "reopen_failed_total": 893,
+      "genuine_usb_loss": 1,
+      "keyerror": 892
+    }
+  },
+  "recovery": {
+    "first_paired_after_utc": "20260814T050756Z",
+    "sweeps_after_the_fix": 840,
+    "paired_after_the_fix": 840,
+    "single_after_the_fix": 0
+  },
+  "at_the_reports_snapshot": {
+    "sweeps_examined": 2594,
+    "single_radio": 893,
+    "paired_after_the_fix": 365,
+    "single_after_the_fix": 0
+  },
+  "runs_plotted": [
+    {
+      "state": "paired",
+      "sweeps": 1336,
+      "from_utc": "20260814T000315Z",
+      "to_utc": "20260814T032404Z"
+    },
+    {
+      "state": "single",
+      "sweeps": 893,
+      "from_utc": "20260814T032415Z",
+      "to_utc": "20260814T050741Z"
+    },
+    {
+      "state": "paired",
+      "sweeps": 840,
+      "from_utc": "20260814T050756Z",
+      "to_utc": "20260814T065001Z"
+    }
+  ],
+  "cumulative_endpoints": {
+    "paired": 2176,
+    "single_radio": 893
+  }
+}

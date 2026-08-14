@@ -23,9 +23,13 @@ The method it was built to serve does not. The validation offered for the
 coincidence model was that the eight algorithms agree on `f`. Run the identical
 estimator on two joins where the model is **definitionally false** — radio B
 taken two instants later, and radio A joined to a different sweep entirely — and
-the eight agree just as tightly. More tightly: spread 0.036 on the scrambled
-join against 0.042 on the real one, each at or below its own sampling noise. The
-check has no failure mode
+the eight agree at least as tightly: spread 0.036 on the scrambled join against
+0.042 on the real one, each at or below its own sampling noise. Under a
+sweep-cluster bootstrap the control-minus-real differences span zero (−0.0062,
+CI −0.0219…+0.0167), so the controls are not demonstrably *tighter* — they are
+indistinguishable, which is all the argument needs. Under the model's own
+separation rule no control separates from the real join under any resampling
+unit. The check has no failure mode
 ([section 6](#6-did-it-work-the-negative-controls)).
 
 The reason is measurable. Over 30,192 observations every pair of the eight
@@ -34,16 +38,18 @@ statistic counted eight times, and near-duplicates are obliged to return
 near-identical `f` whatever they are fed
 ([section 7](#7-why-it-failed-the-detectors-are-near-duplicates)).
 
-Three things survive. The sky is structured, and the structure is not spectral:
-a channel's own two edges agree at phi 0.453 while any two different channels
-agree at 0.118, and that term does not fade with channel separation. Agreement
-between two chains is costed one factor at a time, and **changing the LNB is the
-entire effect** — the edge costs phi −0.0000 and the radio boundary +0.0046,
-both indistinguishable from zero, while swapping the receiver costs −0.0868
-([section 8](#8-what-the-sky-looks-like)). And the instrument yields two hard,
-reusable numbers: a rate-independent ~350 kHz offset tolerance, and a
-+604.2 kHz local-oscillator offset on one port that makes a healthy receiver
-look deaf ([section 9](#9-what-survives-the-instrument)).
+What survives is observational rather than causal. A channel's own two edges
+agree at phi 0.44–0.47, far above any two different channels at 0.07–0.09 once
+the acquisition arm is controlled — and that weaker cross-channel term *rises*
+with channel separation rather than staying flat, which no uniform common mode
+produces and which this report does not explain. Agreement between two chains
+varies with receiver configuration, but the design is not factorial and cannot
+say whether receiver, radio, edge, water or timing is responsible; the earlier
+claim that the LNB was the entire cause is withdrawn in
+[section 8](#8-what-the-sky-looks-like). The instrument yields two associations
+worth acting on: a scoring-pipeline detection cliff near 350–400 kHz of corrected
+offset, and a +604.2 kHz configured centre correction on one port without which a
+working receiver reads as deaf ([section 9](#9-what-survives-the-instrument)).
 
 Every `d` in this report is a **model output**, never a measurement. It is
 inferred from a model whose own consistency check is the one shown above to be
@@ -111,14 +117,25 @@ each later batch is later sky, and later sky was busier.
 | Matched-arm cells behind the coincidence estimate | 18,176 | |
 | Live target observations behind the correlation matrix | 30,192 | |
 | Live cross-edge null observations behind the measured false-alarm rate | 15,072 | |
-| `lnb-a` observations excluded as a dead port | 15,104 | |
+| `lnb-a` observations excluded as a dead port — **an error, see below** | 15,104 | |
 
 Four receivers exist; three are live. `lnb-c` and `lnb-d` are the two inputs of
-`pluto-19f2`; `lnb-b` and `lnb-a` are the two inputs of `pluto-5d4d`. `lnb-a`
-returns a flat ~1.19 peak-to-median at every tuning since 2026-08-13 04:44 UTC
-and is excluded from both the target and the null arms throughout — an exclusion
-whose stated reason this corpus does not reproduce, recorded in
-[section 9](#9-what-survives-the-instrument).
+`pluto-19f2`; `lnb-b` and `lnb-a` are the two inputs of `pluto-5d4d`. All four are live in this corpus. `lnb-a` was excluded throughout on the grounds
+that it "returns a flat ~1.19 peak-to-median at every tuning since 2026-08-13
+04:44 UTC". **That exclusion is wrong for this corpus, and the figures inherit
+it.** Re-measured on the same freeze with the repository's own fire logic,
+`lnb-a` shows own-edge agreement phi 0.417 against 0.091 across channels (ratio
+4.60, indistinguishable from `lnb-c`); a target/null fire ratio of 4.90, *equal*
+to `lnb-c`'s; `differential-32` score separation of 7.1x against `lnb-b`'s 7.4x;
+and a coarse peak-to-median of median 1.104, max 2.007, sd 0.078 — not flat, and
+not distinguishable from `lnb-b`. The cited 04:44 UTC failure falls inside
+`pluto-5d4d`'s 03:24:04Z–05:07:56Z outage, a window in which that radio produced
+no data at all, and the scored corpus stops at 03:21:55Z regardless. Within this
+corpus `lnb-a` was a working receiver. Restoring it changes no headline number —
+redrawing thresholds with its null included moves every receiver pair by less
+than 0.004 — but it supplies the same-model cross-radio contrast that section 8b
+needs, and its absence is why that section previously reached a conclusion it
+could not support.
 
 Only 1,261 of the 6,161 pairable sweeps have been scored. That gap is the
 cheapest available improvement to every number in this report, and it is the
@@ -132,7 +149,7 @@ Each Starlink downlink channel is 240 MHz wide and carries eight known pilot
 subcarriers just inside each band edge. They sit at fixed, published offsets, so
 a receiver that can decide whether they are present can decide whether that
 channel is lit — and at what frequency offset — without decoding anything. That
-is the whole motivation: a cheap, blind channel-occupancy sensor built out of
+is the whole motivation: a cheap, known-code channel-occupancy sensor built out of
 one known waveform feature.
 
 **The pilots are not visible in any spectrum in this corpus.** Ranked over all
@@ -145,9 +162,12 @@ about 16 dB below what a spectrum could show. And the next shoulder out sits at
 −0.12 dB, so +0.0588 dB is inside this receiver's own passband curvature, not
 above it.
 
-There is also almost nothing to resolve even in principle. A 4.4 us OFDM symbol
-spreads each pilot to a ~227 kHz main lobe against 234.375 kHz subcarrier
-spacing, so adjacent pilots merge. With the noise removed entirely the on-pilot
+There is also almost nothing to resolve even in principle — though not for the
+reason first given. The OFDM *useful* interval is the 4.4 us symbol minus its
+0.13333 us cyclic prefix, 4.26667 us, whose reciprocal is 234.375 kHz: exactly
+the subcarrier spacing, by construction rather than coincidence. Adjacent pilots
+are critically spaced, and the empirical consequence stands even though the
+arithmetic first offered for it did not. With the noise removed entirely the on-pilot
 minus between-pilot contrast in 117.2 kHz windows is **+0.39 dB** — a comb
 exists, but a 0.39 dB one; on the real capture it is −0.05 dB. Treat the eight
 edge pilots as a 1.875 MHz **block** rather than a resolvable comb: the comb is
@@ -196,7 +216,7 @@ detectors — count how often each one fires on sky — cannot work, and the
 measurement shows why.
 
 Across the eight detectors, how often a detector fires on sky tracks how often
-it fires on a **measured** empty-sky null: least squares over the eight points
+it fires on a **measured** cross-edge target-code null: least squares over the eight points
 gives slope 1.99, r = 0.84, **r-squared = 0.70**. Roughly two-thirds of the
 between-detector spread in fire rate is just the null rate. That fit is eight
 points and it moves with the corpus: recomputed independently at three census
@@ -225,7 +245,7 @@ failing in [section 6](#6-did-it-work-the-negative-controls).*
 
 Two of those three rankings are **measurements**, and they agree with each
 other: Spearman rho = **+0.833** between rank-by-count and rank-by-excess.
-Correcting for the measured empty-sky rate nudges the order; it does not
+Correcting for the measured cross-edge null rate nudges the order; it does not
 overturn it. The one column that overturns it is the model output: rho =
 **−0.952** against the fire count and **−0.762** against the excess. `glrt-32`
 fires least of the eight and comes out most sensitive.
@@ -238,7 +258,7 @@ not earned the right to**, because its own consistency check fails — that is
 ![Fire rate against measured null rate, and three rankings of the same eight detectors](figures/fire-rate-problem.png)
 
 ***Figure 2 — a fire count cannot rank detectors when nothing is injected.***
-*Left: raw fire rate on sky against the measured empty-sky rate `p`, one point
+*Left: raw fire rate on sky against the measured cross-edge null rate `p`, one point
 per detector, bars are 95% marginal binomial intervals; all eight score the same
 observations, so the differences are paired and better determined than the bars
 alone suggest. The dashed line is least squares over the eight (r = 0.84,
@@ -458,11 +478,18 @@ The model's own consistency check is
 
 Two things are worth reading off that table before going further.
 
-**The empty-sky rate is measured, and it is not the nominal 1%.** It is
-5.47–6.74% across the eight, drawn from the cross-edge null arms. Every `d`
-above depends on that denominator; assuming the nominal value instead pushes
-methods out of physical range for reasons that have nothing to do with the
-methods.
+**The null rate is measured per cell, and the units matter.** A per-*point* 1%
+threshold, maximised over roughly seven candidate points to decide one tuning,
+predicts 1 − 0.99^7 = 6.8% per cell. The measured 5.47–6.74% is therefore what
+correct calibration looks like, not a broken threshold — framing it as "6%, not
+the nominal 1%" implied a defect that is not there. What does matter is that
+every `d` above depends on this denominator, and that assuming the per-point
+figure at cell level pushes methods out of physical range for reasons unrelated
+to the methods. Two caveats travel with it: this is the **cross-edge
+target-code null**, target-code-free by construction rather than physically
+empty sky, and it may still hold other Starlink energy, interference and
+receiver structure; and the calibration is **in-sample**, since the same null
+population sets the threshold and then measures the rate.
 
 **The one sky parameter does not come out as one number.** Pooled, the eight
 return `f` 0.3388–0.3788, a spread of 0.0400. That is the model's own check,
@@ -496,6 +523,30 @@ experimental answer.
 
 ---
 
+### 5b. What the model assumes, and what this corpus already contradicts
+
+The implementation passes **one pooled `p`** to both chains, uses **`p^2`** for
+joint null firing rather than a measured joint null, and fits **one `d_A`, `d_B`
+pair across every included cell**. That requires:
+
+| Assumption | Status in this corpus |
+|---|---|
+| Both chains share one false-alarm rate | contradicted — `p` runs 5.47–6.74% across methods and varies by receiver |
+| False alarms independent across chains, so joint null firing is `p^2` | untested; common interference or shared receiver structure would break it |
+| `d` constant across acquisition arms | contradicted — `f` moves 0.015 to 0.401–0.510 across the twelve arms |
+| `d` constant across receivers, channels and time | contradicted on all three — see 8b, 8a, and the 0.094 fire-rate swing across the window |
+| Detections conditionally independent given occupancy | untestable here; latent signal-strength variation alone would break it |
+
+Pooling heterogeneous strata can generate covariance and distort `f`, `d_A` and
+`d_B` even when the chains are conditionally independent *within* each
+homogeneous stratum. A version worth trusting would need separate `p_A` and
+`p_B`, arm- and receiver-specific parameters, sweep-level effects, and probably
+a hierarchical treatment of latent signal strength.
+
+None of this weakens section 6 — it is a second, independent reason not to read
+the `d` values as measurements.
+
+
 ## 6. Did it work? The negative controls
 
 This is the test that decides the report, and it is cheap: build joins where the
@@ -512,7 +563,7 @@ Two controls, alongside the real join:
   median 4,847 s apart (minimum 3,651 s, maximum 7,130 s), so the two sides
   never saw the sky at the same time.
 
-Thresholds and the empty-sky rate `p` are drawn **once** from the cross-edge
+Thresholds and the cross-edge null rate `p` are drawn **once** from the cross-edge
 null arms and held fixed across all three joins, so the join is the only thing
 that changes.
 
@@ -537,7 +588,7 @@ move is the thing being used as evidence.
 
 ***Figure 7 — the consistency check cannot fail.*** *Same estimator, same 16,560
 matched-arm cells in each of the three joins, same thresholds and same empty-sky
-rate; only the pairing changes. Left: `f` moves 3x across the joins while all
+rate; only the pairing changes. Left: `f` moves 2.23x across the joins while all
 eight algorithms move together, so every cluster stays tight — including on the
 two joins the model forbids. Right: each join's observed spread against the
 p05–p95 band of 200 joint resamples of that same join, with the noise median
@@ -572,7 +623,15 @@ eight makes the same fire / no-fire call at phi **0.847–0.945**.
 | Band previously reported, on 2,160 observations | 0.82–0.94 |
 | Band here, on 30,192 observations (14.0x) | **0.847–0.945** |
 
-Eight independent opinions would sit near phi = 0. At 14x the observations the
+Note what this does *not* say. Detectors with statistically independent errors
+are still positively correlated whenever both have skill, because they observe
+the same latent occupancy: Cov(Y1,Y2) = f(1−f)(d1−p1)(d2−p2) > 0. A high phi is
+therefore expected, and does not by itself prove shared errors — "one statistic
+counted eight times" overstates it. What the band establishes is that the eight
+produce **highly redundant binary verdicts on identical IQ** and cannot be
+treated as eight independent witnesses for validating `f`. Separating shared
+truth from shared error needs correlations on the null arm, conditional on arm,
+receiver and time block, or against injected truth. At 14x the observations the
 band is **higher at both ends** than previously reported, so this is not a
 small-sample artefact being sanded down — it firms up. Grouping by family barely
 matters: the same-family blocks hold the tightest pairs, but no pair anywhere in
@@ -610,33 +669,54 @@ Two independent readings of the same corpus. Neither depends on the coincidence
 model; both use only counted fire / no-fire decisions, so both survive
 everything above.
 
-### 8a. Channels are not independent, but the structure is not spectral
+### 8a. Channels are not independent, and the structure is not what it first looked like
 
 Take one receiver chain's pass over one sweep as the unit of observation — it
 visits all eight tunings (4 channels x 2 edges) exactly once. There are 3,774
 such units, identical in every cell of the matrix.
 
-- A channel's **own two edges** agree at phi **0.441–0.466**, mean **0.453**.
-- Any **two different channels** agree at phi **0.072–0.161**, mean **0.118** —
-  3.8x weaker, but not zero.
-- And the cross-channel term **does not fade with separation**: phi 0.103 at
-  channel distance 1, 0.130 at distance 2, 0.141 at distance 3. If anything it
-  rises.
+- A channel's **own two edges** agree at phi **0.441–0.466**, mean **0.453** —
+  the only strong structure here, and robust: controlling time, acquisition arm
+  and receiver together moves it to 0.417, 92% of raw.
+- Any **two different channels** agree at phi 0.118 raw — but **most of that is
+  the acquisition arm, not the sky.**
 
-The thin margin is worth stating rather than rounding away. The weakest
-cross-channel cell is phi 0.072 against a shuffled null whose 99th percentile of
-abs(phi) is 0.062. Every cross-channel cell clears the null, but the weakest clears
-it by 0.010. The null shuffles each tuning column independently across units,
-destroying every between-tuning association while preserving each tuning's own
-fire rate; its mean abs(phi) is 0.013 over 200 draws.
+The first version of this section shuffled each tuning column independently
+across all units, which destroys the time trend, the arm composition and the
+receiver state along with the association being tested. Stratifying the
+permutation instead changes the answer:
 
-The pattern is consistent across all three live receivers: same-channel means
-0.425 (`lnb-c`), 0.461 (`lnb-b`), 0.468 (`lnb-d`); cross-channel means 0.102,
-0.115, 0.121.
+| Null keeps | any-of-eight | `glrt-32` alone |
+|---|---:|---:|
+| nothing (the original) | 0.1182 | 0.1770 |
+| time (8 blocks) x receiver | 0.1107 | 0.1685 |
+| arm x receiver | 0.0679 | 0.0953 |
+| **time x arm x receiver** | **0.0662** | **0.0908** |
 
-A satellite lighting one channel would produce a cross-channel term that decays
-with frequency separation. A flat one that does not decay is a **sweep-wide
-common mode** sitting under every tuning.
+The chronological trend costs only ~5%. **The acquisition arm costs ~43%** — a
+confound this report had not considered, though its own axis table records `f`
+moving from 0.015 to 0.401–0.510 across arms. Pooling twelve arms into one 8x8
+matrix induces a positive floor by aggregation alone.
+
+What remains is still real: the observed cross-channel mean exceeds all 1,000
+draws of a null that *keeps* trend, arm and receiver (p < 0.001, both
+combiners). But it is about **half** the published size, and the per-cell claim
+fails — under family-wise correction only 30 of 48 cells (union) and 32 of 48
+(`glrt-32`) clear their null, against the original assertion that every cell
+did. On the gentler uncorrected test 46 of 48 still reject at p < 0.05.
+
+**And it is not flat.** Corrected for arm, time and receiver, the cross-channel
+term *rises* with separation: 0.0522 / 0.0763 / 0.0879 (union) and 0.0671 /
+0.1029 / 0.1376 (`glrt-32`) at distance 1 / 2 / 3 — factors of 1.68 and 2.05,
+independently in all three receivers. A uniform additive common mode is
+separation-flat by construction, so **the sweep-wide common mode reading is
+withdrawn**. What produces a sweep-level term that prefers *distant* channels is
+not explained here. Caveat: distance 3 rests on only the four ch1xch4 cells.
+
+Using one predeclared detector rather than the any-of-eight union does not
+weaken this — `glrt-32` alone *raises* both terms (0.658 and 0.177 against 0.453
+and 0.118) at a lower fire rate, with the same-to-cross ratio essentially
+unchanged. The union dilutes rather than amplifies.
 
 ![Phi between all eight tunings, and the cross-channel term against channel separation](figures/channel-edge-correlation.png)
 
@@ -651,16 +731,18 @@ against channel-number distance, with the shuffled null's 99th percentile of
 abs(phi) shaded. Values in
 [`figures/channel-edge-correlation.json`](figures/channel-edge-correlation.json).*
 
-### 8b. What costs agreement is the receiver, not the timing and not the edge
+### 8b. Agreement varies with receiver configuration, but this design cannot say why
 
-The obvious reading of "two chains agree" is that simultaneity matters.
-Decompose it one factor at a time and it does not. Four rungs, each changing
-exactly one thing relative to its neighbour:
+The obvious reading of "two chains agree" is that simultaneity matters. An
+earlier version of this section presented a four-rung ladder as changing exactly
+one thing per step and concluded the receiver was the entire cause. **That
+conclusion is withdrawn: the ladder is not factorial.** The rungs remain useful
+as descriptions, with what each step actually changes stated honestly:
 
 | Rung | What is different | n pairs | sweeps | mean phi across the eight | bootstrap 95% CI |
 |---|---|---:|---:|---:|---|
 | Same receiver, both edges of one channel | one dwell apart in its own scan order: **a time gap, one LNB, one clock** | 15,096 | 1,258 | **0.605** | 0.590–0.620 |
-| Two receivers, one radio, same tuning | **different LNB**, shared clock and bus, simultaneous | 10,064 | 1,258 | **0.518** | 0.502–0.535 |
+| Two receivers, one radio, same tuning | **three things at once**: different LNB, *and* same-edge instead of opposite-edge, *and* the gap removed | 10,064 | 1,258 | **0.518** | 0.502–0.535 |
 | Two radios, **same** edge, same tuning | **plus the radio boundary**: two clocks, two buses | 9,632 | 602 | **0.523** | 0.497–0.546 |
 | Two radios, **opposite** edges | **plus the edge**: both edges of one channel at one instant | 10,496 | 656 | **0.523** | 0.500–0.546 |
 
@@ -670,23 +752,50 @@ The contrasts between adjacent rungs are the result:
 |---|---|---:|---|:--:|
 | opposite-edge minus same-edge, two radios | **the edge alone**, at fixed hardware and zero time gap | **−0.0000** | −0.035 … +0.037 | yes |
 | two radios same-edge minus two receivers one radio | **the radio boundary**, at a fixed edge | **+0.0046** | −0.021 … +0.030 | yes |
-| two receivers one radio minus same receiver both edges | **changing the LNB**, with the time gap removed | **−0.0868** | −0.101 … −0.070 | **no** |
+| two receivers one radio minus same receiver both edges | ~~changing the LNB~~ — **nothing singly** | −0.0868 | −0.101 … −0.070 | no |
 
 *Bootstrap over paired sweeps, 400 draws — not over cells, because a sweep's
 eight tunings and two receiver pairs are not independent draws.*
 
-**Receiver-to-receiver variation is the entire effect. Timing is free and the
-edge is free.** Removing the scan gap makes agreement *worse* — 0.605 down to
-0.523 — and the reason is not that simultaneity hurts; it is that you had to
-change LNBs to get simultaneity, and changing LNBs costs 0.087 on its own with
-the gap already removed. The ordering is the same in all four channels — channel
-by channel, 0.612 / 0.618 / 0.610 / 0.581 for the same-receiver rung against
-0.510 / 0.549 / 0.525 / 0.504 for two radios on opposite edges.
+**The −0.0868 is not the cost of changing the LNB.** It compares one chain's own
+two edges against two chains at one tuning, and those two chains are `lnb-c` and
+`lnb-d` — the *same radio*, the *same LNB model*, and both carrying water on
+their bias-tee SMA pins. No receiver model is substituted anywhere in that step,
+and the edge relation and the time gap move with it.
 
-One asymmetry in that ladder is worth flagging: only `pluto-19f2` can supply the
-second rung, because the other port of `pluto-5d4d` is the dead `lnb-a`. That
-rung is therefore one radio's pair of LNBs rather than both radios', which is
-why its sweep count matches the first rung's while its pair count does not.
+The substitution that step was thought to make becomes available once `lnb-a` is
+restored. All six receiver pairs then exist on the same 1,258 paired sweeps and
+the same tuning instants, n = 10,064 each:
+
+| Pair | Radio | LNB model | Water | phi | 95% CI |
+|---|---|---|---|---:|---|
+| `lnb-a`\|`lnb-b` | same | cross | dry\|dry | **0.5521** | 0.5331–0.5712 |
+| `lnb-d`\|`lnb-b` | cross | cross | wet\|dry | 0.5337 | 0.5163–0.5541 |
+| `lnb-c`\|`lnb-a` | cross | **same** | wet\|dry | 0.5279 | 0.5084–0.5493 |
+| `lnb-c`\|`lnb-d` | same | same | wet\|wet | 0.5180 | 0.5017–0.5355 |
+| `lnb-c`\|`lnb-b` | cross | cross | wet\|dry | 0.5164 | 0.4941–0.5380 |
+| `lnb-d`\|`lnb-a` | cross | **same** | wet\|dry | **0.4623** | 0.4424–0.4831 |
+
+Substituting the far-side LNB model gives **+0.0115** (CI −0.0053…+0.0307) with
+`lnb-c` as near side and **−0.0714** (CI −0.0899…−0.0553) with `lnb-d` —
+**opposite signs from the same substitution**. There is no consistent model
+effect. The spread across all six pairs is 0.0898, the same magnitude as the
+−0.0868 above, and it orders by neither model nor water nor radio. Part of the
+ordering is a marginal-rate artefact: phi is capped by the two chains' fire
+rates, which run 0.345–0.460 across ports, and the ranking changes under
+phi/phi_max.
+
+What survives, now at fixed LNB model: the radio boundary is still free.
+`lnb-c`\|`lnb-a` minus `lnb-c`\|`lnb-d` is +0.0099, CI −0.0110…+0.0288.
+
+**What this design cannot identify, stated once.** Water is confounded with
+radio — both wet ports are on `pluto-19f2`, both dry on `pluto-5d4d` — so no
+contrast separates "wet" from "on 19f2". Receiver index is confounded too: rx0
+fires less than rx1 on *both* radios (0.2641 against 0.3069, and 0.2881 against
+its sibling), independently of the LNB attached. Identifying receiver, radio,
+edge, water and timing separately needs a design that rotates LNB and radio
+assignments across simultaneous L/L, U/U, L/U and U/L observations, with
+first-sample timing measured and dry ports on both radios.
 
 The two readings in this section cross-check each other. Under the any-method
 fire rule, the top rung's per-channel agreement is phi 0.448 / 0.466 / 0.459 /
@@ -695,7 +804,7 @@ a different script and a different unit of observation.
 
 ![Four rungs of agreement, isolating the gap, the receiver, the radio boundary and the edge](figures/edge-agreement.png)
 
-***Figure 10 — the edge costs nothing; the LNB costs everything.*** *Upper
+***Figure 10 — agreement by configuration. The caption inside this image predates the analysis above and reads the third contrast as an LNB cost; the text is correct and the image is not.*** *Upper
 panel: the four rungs, with one open circle per algorithm, a bar for the
 bootstrap 95% CI over paired sweeps, and a heavy rule at the mean phi across the
 eight. The bracketed contrasts on the right are the three isolations tabled
@@ -808,10 +917,10 @@ record.*
 | Finding | The number it rests on | Status |
 |---|---|---|
 | A rate-independent ~350 kHz offset tolerance | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
-| `lnb-c` carries a +604.2 kHz LO offset and is the best port once corrected | `receiver_centers_hz` = +604,159.8, applied at scoring; 65.9% (n = 3,352) against `lnb-b` 43.8% (n = 4,791) | **stands** |
+| `lnb-c` needs a +604.2 kHz configured centre correction; corrected, it has the highest fire rate in the examined slice | `receiver_centers_hz` = +604,159.8, applied at scoring; 65.9% (n = 3,352) against `lnb-b` 43.8% (n = 4,791) | **stands** |
 | The 1.25 MS/s arm cannot work at any probe length | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
-| The detector bank is one statistic counted eight times | phi 0.847–0.945 over 30,192 observations | **stands** |
-| The measured empty-sky rate is ~6%, not the nominal 1% | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
+| The eight detectors produce highly redundant verdicts on identical IQ | phi 0.847–0.945 over 30,192 observations | **stands** |
+| A per-point 1% threshold yields 5.47–6.74% per cell after maximising over ~7 candidates, as expected | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
 | Recorded skew is a lower bound and is blind to geometry | barrier-release stamp; 0.0437 against 0.0446 ms across geometries whose true offsets differ ~5x | **stands** |
 | `lnb-a` is excluded as a dead port | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.52% of 60,095 against `lnb-b`'s 17.98% of 59,604) | applied, **unexplained** |
 | Cross-radio beats within-radio | not shown: the radio boundary costs phi +0.0046, CI −0.021…+0.030 | **not established** |
@@ -825,9 +934,12 @@ pooling the 1.25 MS/s arm with arms whose pilot band fits.
 ## 10. What real ground truth would take
 
 The single sentence: **every limitation above traces back to having no known
-input.** One injected tone of known amplitude at a known offset converts the
-whole corpus from model output to measurement, and it is the only item on this
-list that changes what the apparatus is capable of proving.
+input.** Injecting a known edge-pilot *waveform* — not a tone — with controlled
+amplitude, carrier offset, epoch and frame occupancy converts the corpus from
+model output to measurement, and it is the only item here that changes what the
+apparatus can prove. A tone calibrates the local oscillator and the gain, but it
+cannot validate a code-aided detector: the thing under test is a correlation
+against a known code, so the injected signal must carry that code.
 
 Short of that, in order of cost:
 

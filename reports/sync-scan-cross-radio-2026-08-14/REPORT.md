@@ -33,8 +33,12 @@ and all three claims are withdrawn here:
   all three live ports collapse onto one curve and a cliff appears between 350
   and 400 kHz at 2.5, 5.0 *and* 10 MS/s. The guard bands at those rates are
   +312.5, +1562.5 and +4062.5 kHz — a 13× range that does not move the cliff.
-  It is a rate-independent ≈350 kHz offset tolerance, which is the CFO search
-  span, not the pilot band.
+  It is a rate-independent ≈350 kHz offset tolerance. What *sets* that
+  tolerance is not established: the survey scorer's bank spans ±700 kHz
+  (`SURVEY_OFFSET_SPAN_HZ`), and the ±350 kHz constant in the codebase
+  (`acquisition.py:125`, `pilots.py:223`) belongs to the acquisition path,
+  which this scoring path does not use. The cliff is real and it is not the
+  guard; its mechanism is open.
 
 What survives is smaller and mostly instrumental: an LO bias on `lnb-c` large
 enough to have been mistaken for a weak receiver, a genuinely handicapped
@@ -273,7 +277,7 @@ Every detector sits near 6.5%, within a 1.1-point band. Nothing in that column
 singles the differentials out; the gap is between the assumption and the whole
 instrument.
 
-## Retraction 3 — there is a cliff, and it is the CFO search span
+## Retraction 3 — there is a cliff, and it is not the guard band
 
 The withdrawn claim was that there is no detection cliff at the pilot guard
 band and that only 1.25 MS/s is handicapped. The conclusion that 1.25 MS/s is
@@ -304,8 +308,29 @@ The pilot guard bands at those rates, read from the scored records, are:
 | 10.0 MS/s | +4,062,500 | true |
 
 The guard spans a 13× range across the three live rates and the cliff does not
-move. A rate-independent ≈350 kHz tolerance is the CFO search span, not the
-pilot band.
+move. That rules the guard band out. It does **not** establish what does set
+the tolerance, and the earlier claim that it is "the CFO search span" is
+withdrawn as unsupported: the survey scorer evaluates each candidate at its own
+CFO against a ±700 kHz bank (`fast_scan.SURVEY_OFFSET_SPAN_HZ`, 13 hypotheses
+at 116,666.67 Hz), while the ±350 kHz constant that matches this cliff so
+neatly (`acquisition.py:125`, `pilots.py:223`) lives in the acquisition path
+these scores never touch. The coincidence is suggestive and unexplained.
+
+Two limits on the figure below, both found in review and neither visible in it:
+
+- **The 2.5 MS/s cliff point is 86% one port.** Its 350–400 kHz bin holds
+  n = 120, of which 103 are `lnb-c`. Since 2.5 MS/s is the only rate whose
+  guard is anywhere near the cliff, the crux datum leans on the biased port.
+  It does survive disaggregation — `lnb-b`+`lnb-d` alone collapse 10.9→1.0%
+  at 5 MS/s and 11.5→1.5% at 10 MS/s — but the 2.5 MS/s row alone would not
+  carry it.
+- **The guard verticals are a raw-axis quantity drawn on a corrected axis.**
+  The guard clips within the receiver's captured band, so for `lnb-c` it truly
+  sits 604.16 kHz from where the figure draws it. On the raw axis at 2.5 MS/s
+  there is no cliff at all — the rate *rises* through the guard, 22.1%
+  (300–350, n = 331) → 58.1% (350–400, n = 86) → 76.5% (400–500, n = 183).
+  The corrected axis is the right one for asking about detection, but the guard
+  does not live on it.
 
 ![Detection rate against bias-corrected offset for three sample rates, with
 each rate's pilot guard marked](figures/cfo-cliff.png)

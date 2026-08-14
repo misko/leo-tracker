@@ -230,18 +230,34 @@ if (( do_import )); then
   # names are UTC stamps and the arm is drawn per sweep, so a contiguous split
   # would hand one worker an hour of whichever arm was running then.
   mkdir -p "${corpus_root}"
-  # What the corpus already holds, read in one pass. manifest.json is written
-  # last and by rename, so its presence is the commit marker -- the same fact
-  # the importer resumes on. Built as a set up front rather than probed per
-  # sweep because the corpus is thousands of entries on a network share and a
-  # glob per sweep would make the deal quadratic.
+  # What the corpus already holds, read in one pass. The test has to be the
+  # importer's own entry_complete(), not "manifest.json exists": the manifest
+  # also names the size it wrote, and an entry whose IQ was truncated or whose
+  # schema is stale is NOT finished. Testing only for the file would skip such
+  # an entry here as done and it would never be repaired, turning silent
+  # corruption into a green report. Reading each manifest costs more than
+  # globbing for one, but it is still a single pass, so the deal stays linear
+  # in the corpus rather than quadratic. Called rather than reimplemented in
+  # bash, because a second copy of the rule is how it drifted in the first
+  # place.
   declare -A committed=()
   if (( ! rebuild )); then
-    for manifest in "${corpus_root}"/*/manifest.json; do
-      [[ -f "${manifest}" ]] || continue
-      entry="${manifest%/manifest.json}"
-      committed["${entry##*/}"]=1
-    done
+    while IFS= read -r entry; do
+      [[ -n "${entry}" ]] && committed["${entry}"]=1
+    done < <(nice -n "${niceness}" "${repo_env[@]}" "${uv_bin}" run --active \
+               --no-sync python - "${corpus_root}" <<'PY'
+import sys
+from pathlib import Path
+
+from leo_tracker.radio.beacon.sync_import import entry_complete
+
+root = Path(sys.argv[1])
+if root.is_dir():
+    for entry in sorted(root.iterdir()):
+        if entry.is_dir() and entry_complete(entry):
+            print(entry.name)
+PY
+    )
   fi
   # A sweep is done when every radio it captured has a committed entry. The
   # radios are counted from the sweep's own IQ files, which is what the entries

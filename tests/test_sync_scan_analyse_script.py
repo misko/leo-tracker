@@ -15,6 +15,7 @@ pinned below is that it really does hand off, that it names the missing pieces
 instead of reporting no work, and that it cannot be talked into oversubscribing
 the host it runs on.
 """
+import json
 import os
 from pathlib import Path
 import re
@@ -360,3 +361,60 @@ def test_rebuild_still_reimports_what_the_skip_would_pass_over(tmp_path):
     assert forced.returncode == 0, forced.stderr
     assert "dealing 2 sweeps" in forced.stdout, forced.stdout
     assert "imported 4" in forced.stdout, forced.stdout
+
+
+def test_a_truncated_entry_is_repaired_rather_than_skipped_as_finished(tmp_path):
+    """An entry whose IQ is short is not finished, and a re-run must redo it.
+
+    The skip that keeps --limit advancing has to use the same test the importer
+    resumes on. "manifest.json exists" is weaker: the manifest also names the
+    size it wrote, so an entry whose IQ was truncated by an interrupted copy
+    still has a manifest and would be skipped here as done. That is the one
+    failure this script must never report as success, because nothing else
+    looks at the entry again.
+    """
+    root = tmp_path / "shared"
+    sweeps = _sweeps(root, count=1)
+    assert _run(["--import-only", "--copy"], root=root, sweep_root=sweeps,
+                timeout=300).returncode == 0
+    corpus = root / "surveys" / "sync-corpus"
+    entry = sorted(path for path in corpus.iterdir() if path.is_dir())[0]
+    iq = entry / "survey.ci16"
+    full = iq.stat().st_size
+    with open(iq, "r+b") as handle:
+        handle.truncate(full - 8)
+
+    result = _run(["--import-only", "--copy"], root=root, sweep_root=sweeps,
+                  timeout=300)
+    assert result.returncode == 0, result.stderr
+    assert iq.stat().st_size == full, (
+        "the short entry was skipped as already imported and never repaired; "
+        f"still {iq.stat().st_size} of {full} bytes\n{result.stdout}")
+
+
+def test_a_stale_manifest_schema_is_reimported_rather_than_skipped(tmp_path):
+    """A schema bump has to re-import, not read as already done.
+
+    entry_complete() requires the manifest schema to match, so after a bump
+    every old entry is unfinished by definition and the next run rebuilds it.
+    A skip keyed only on the file's presence would leave the whole corpus at
+    the old schema with nothing reporting a problem.
+    """
+    root = tmp_path / "shared"
+    sweeps = _sweeps(root, count=1)
+    assert _run(["--import-only", "--copy"], root=root, sweep_root=sweeps,
+                timeout=300).returncode == 0
+    corpus = root / "surveys" / "sync-corpus"
+    entry = sorted(path for path in corpus.iterdir() if path.is_dir())[0]
+    manifest_path = entry / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    fresh = manifest["schema"]
+    manifest["schema"] = "leo-tracker.synchronised-sweep-survey/v0"
+    manifest_path.write_text(json.dumps(manifest))
+
+    result = _run(["--import-only", "--copy"], root=root, sweep_root=sweeps,
+                  timeout=300)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(manifest_path.read_text())["schema"] == fresh, (
+        "the stale-schema entry was skipped as already imported\n"
+        f"{result.stdout}")

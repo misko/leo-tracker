@@ -1129,8 +1129,15 @@ def command_starlink_cross_radio(args: argparse.Namespace) -> int:
     The first measurement here that is not self-referential: two chains that
     share nothing but the sky make a coincidence model identifiable, so this
     reports a detection probability where every earlier comparison could only
-    report a firing rate. The spread of the sky occupancy across the eight
-    algorithms is its own consistency check and leads the output.
+    report a firing rate.
+
+    The spread of that occupancy across the eight algorithms used to lead the
+    output as the model's consistency check. It no longer does on its own: the
+    same spread appears on a join of two radios from different sweeps and on a
+    join with one radio shifted two instants, neither of which the coincidence
+    model can fit, so tightness alone certifies nothing. Both of those joins are
+    now rebuilt on every run and printed beside the real estimate, and the
+    headline is the verdict on whether they separate.
     """
     from .beacon.cross_radio import format_review, review
     corpus = args.corpus_root or (Path(args.root) / "surveys" / "corpus")
@@ -2835,7 +2842,8 @@ def build_parser() -> argparse.ArgumentParser:
     sync_import.set_defaults(handler=command_starlink_sync_import)
     cross_radio = commands.add_parser("starlink-cross-radio",
         help="occupancy and detection probability from synchronised paired "
-             "sweeps: two radios, one sky, one instant")
+             "sweeps: two radios, one sky, one instant, with the two negative "
+             "controls that say whether the consistency check can fail")
     cross_radio.add_argument("action", choices=("review",))
     cross_radio.add_argument("root", type=Path, help="shared root")
     cross_radio.add_argument("--corpus-root", type=Path,

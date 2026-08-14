@@ -1120,6 +1120,9 @@ def command_starlink_sync_import(args: argparse.Namespace) -> int:
                          rebuild=args.rebuild, link=not args.copy,
                          sweeps=listed),
                      indent=2, sort_keys=True))
+    return 0
+
+
 def command_starlink_cross_radio(args: argparse.Namespace) -> int:
     """Occupancy and detection probability from two radios on one sky.
 

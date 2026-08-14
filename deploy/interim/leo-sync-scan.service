@@ -1,0 +1,20 @@
+[Unit]
+Description=Synchronised paired scan collector (both radios, one process, barrier per tuning)
+After=network.target
+# One process opens both radios; a USB context is an exclusive claim.
+Conflicts=leo-tracker-beacon-watch@pluto-new.service leo-tracker-beacon-watch@pluto-old.service
+
+[Service]
+Type=simple
+User=satpi01
+Group=satpi01
+WorkingDirectory=/home/satpi01/leo-tracker
+Nice=5
+ExecStart=/home/satpi01/leo-tracker/.venv/bin/python3 /mnt/leo-nvme/leo-tracker/bin/synccollect.py
+StandardOutput=append:/mnt/leo-nvme/leo-tracker/sync-scans/collector.log
+StandardError=append:/mnt/leo-nvme/leo-tracker/sync-scans/collector.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

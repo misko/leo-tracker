@@ -1,0 +1,14 @@
+[Unit]
+Description=Import transferred synchronised sweeps into the survey corpus
+After=network.target
+
+[Service]
+Type=oneshot
+User=satpi01
+Group=satpi01
+Nice=15
+IOSchedulingClass=idle
+WorkingDirectory=/home/satpi01/leo-tracker
+ExecStart=/home/satpi01/leo-tracker/.venv/bin/python3 /mnt/leo-nvme/leo-tracker/bin/importsync.py /mnt/qnap01/mouse9911/leo-scans /mnt/qnap01/mouse9911/leo/surveys/corpus
+StandardOutput=append:/mnt/leo-nvme/leo-tracker/sync-scans/import.log
+StandardError=append:/mnt/leo-nvme/leo-tracker/sync-scans/import.log

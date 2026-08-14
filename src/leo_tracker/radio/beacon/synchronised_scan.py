@@ -8,8 +8,9 @@ cross-method agreement on identical samples reaches 0.97, and the arm
 comparison reversed three times.
 
 This module removes time from both comparisons by driving both Plutos from one
-process, one thread each, meeting at a :class:`threading.Barrier` before every
-tuning:
+process, one thread each, meeting at a :class:`threading.Barrier` once per
+tuning -- **after** each radio has written its local oscillator and settled,
+and immediately before either of them samples:
 
   - **matched arms** (90% of sweeps) hold probe length and sample rate fixed
     across the two radios, so a difference between them is hardware or sky;
@@ -23,16 +24,34 @@ tuning:
 
 Cross-process coordination was built and discarded: marker files and POSIX
 semaphores solve a problem that does not exist once one process owns both
-radios.  A stdlib ``threading.Barrier(2)`` measured median 0.037 ms and max
-0.180 ms skew across an eight-tuning sweep, against the 0.2--0.5 s the operator
-asked for.
+radios.
+
+**Where the barrier sits is not a detail.**  It sat before the retune, and the
+sweep reported the difference between the two threads leaving ``wait()`` as its
+skew.  That is when the rendezvous ended, not when the radios began observing:
+each thread still had a local oscillator to write, and on an opposite-order
+sweep the two are writing *different* frequencies, so the writes cost different
+amounts.  Measured over 256 paired tunings on the real radios, barrier before
+the retune::
+
+                       reported (release)   true (sample start)
+    same order              0.023 ms           0.086 ms median, 3.36 max
+    opposite order          0.029 ms           0.274 ms median, 18.96 max
+
+and the error was not noise.  On opposite-order sweeps tunings 2 and 4 sat at
+~16.9 ms *every sweep*, always the same way round -- a deterministic bias
+correlated with the edge order, which is the variable the experiment exists to
+study.  Moving the rendezvous after the write removes it rather than reporting
+it: 0.0163 ms median / 0.026 ms max same order, 0.0155 ms / 0.054 ms opposite,
+flat across all eight tunings and indistinguishable between the two relations.
 
 **The record states the outcome, never the request.**  Per tuning it carries
-each radio's own measured arrival time and the skew between them, so a sweep
-where one radio fell behind or ran alone is a different row from a genuinely
-simultaneous one.  ``deployed_shape`` once recorded the scorer's configuration
-rather than the capture's, which made a heterogeneous corpus look uniform and
-hid a second defect underneath it; nothing here is allowed to do that again.
+each radio's own sample-start stamp and the offset between them -- the barrier
+release is kept too, subordinate and named -- so a sweep where one radio fell
+behind or ran alone is a different row from a genuinely simultaneous one.
+``deployed_shape`` once recorded the scorer's configuration rather than the
+capture's, which made a heterogeneous corpus look uniform and hid a second
+defect underneath it; nothing here is allowed to do that again.
 """
 from __future__ import annotations
 
@@ -372,6 +391,58 @@ def draw_sweep_plan(radios, *, draws: dict) -> dict:
 #: survivor for a minute.
 SWEEP_BARRIER_TIMEOUT_S = 30.0
 
+#: Added to twice the barrier timeout to bound how long the sweep waits for a
+#: radio's thread to come back at all.
+#:
+#: Every *failure* path aborts the rendezvous, so a radio that raises releases
+#: the survivor.  A radio that **hangs** -- a blocked USB read, firmware that
+#: stopped answering, a cable pulled mid-transfer -- raises nothing and aborts
+#: nothing, and an unbounded join then holds the record, the write and the next
+#: sweep behind a thread that is never coming back.  Measured directly: with an
+#: unbounded join the survivor finished in 0.2 s and ``sweep_pair`` returned
+#: 8.00 s later, when the hung side happened to release.
+#:
+#: Sized against the dearest arm, which measured 21.8 s of wall for its eight
+#: tunings, plus the one barrier timeout a lost partner costs before the
+#: survivor runs free.  Two barrier timeouts and sixty seconds is 120 s at the
+#: deployed setting -- more than twice the worst legitimate sweep -- and it is
+#: derived from the barrier timeout rather than fixed beside it so that raising
+#: one cannot silently leave the other too small.
+SWEEP_JOIN_MARGIN_S = 60.0
+
+
+def sweep_join_timeout_s(barrier_timeout_s: float) -> float:
+    """How long to wait for both radio threads before giving up on one."""
+    if barrier_timeout_s <= 0:
+        raise ValueError("the barrier wait must be bounded and positive")
+    return 2.0 * float(barrier_timeout_s) + SWEEP_JOIN_MARGIN_S
+
+
+MEMORY_BASIS = (
+    "a bound, not an observation of one run. collect_radio allocates one "
+    "(tuning, sample, receiver, component) array per radio before the sweep "
+    "starts and fills it in place, so the retained IQ is never transiently "
+    "doubled by np.stack building a second copy beside the list that still "
+    "holds the first. Both radios sample at once by construction, so the "
+    "floor is the two arrays -- 819 MB on the dearest matched arm, 640 ms at "
+    "10 MS/s -- plus one driver block each. Measured peak RSS for that arm on "
+    "this 4 GB host: 1,452 MB stacking against 1,014 MB preallocated. Each "
+    "radio's array is also released as soon as its bytes are on disk, so the "
+    "second write does not hold the first radio's sweep as well")
+
+JOIN_BASIS = (
+    "bounded. A radio that raises aborts the rendezvous and releases the "
+    "survivor; a radio that HANGS raises nothing, and an unbounded join then "
+    "holds the record, the write and every later sweep behind a thread that "
+    "is never coming back -- measured at 8.00 s behind a survivor that "
+    "finished in 0.2 s, and unbounded in general. The join is therefore "
+    "bounded at 2x the barrier timeout plus 60 s, sized against the dearest "
+    "arm's measured 21.8 s sweep plus the one barrier timeout a lost partner "
+    "costs. A radio still running when that expires is recorded as hung, its "
+    "IQ is not taken -- it may still be writing into it -- and the sweep is "
+    "written and the loop carries on. The threads are daemons so that a hung "
+    "one cannot hold the process at interpreter exit either")
+
 #: What the operator asked for, kept where it cannot be mistaken for what was
 #: measured.  ``threading.Barrier`` beats it by about 2,000x; the number is
 #: recorded so a later reader can see the requirement the design was judged
@@ -379,21 +450,38 @@ SWEEP_BARRIER_TIMEOUT_S = 30.0
 REQUESTED_SKEW_TOLERANCE_MS = (200.0, 500.0)
 
 SKEW_BASIS = (
-    "measured, not requested: each radio reads host UTC in its own thread the "
-    "instant threading.Barrier.wait() returns for that tuning, and the skew is "
-    "the difference between those two stamps. A tuning only one radio reached "
-    "has no skew at all and is recorded with skew_ms null rather than zero, "
-    "because 'the other radio was not there' and 'the two arrived together' "
-    "are opposite facts and must not share a column")
+    "measured, not requested, and measured at the event that matters: each "
+    "radio reads host UTC in its own thread the instant it begins sampling "
+    "that tuning, and the skew is the difference between those two stamps. It "
+    "is NOT the difference between the two threads leaving the barrier. Those "
+    "are different events and the gap between them is not small: the barrier "
+    "released a median 0.038 ms apart while sampling began 0.2-0.8 ms apart on "
+    "same-order sweeps and about 4 ms apart on opposite-order ones, where the "
+    "two radios are writing their local oscillators to different frequencies. "
+    "That bias was deterministic in the edge order, which is the variable "
+    "under study, so reporting the barrier release correlated the error with "
+    "the experiment. A tuning only one radio SAMPLED has no skew at all and is "
+    "recorded with skew_ms null rather than zero, because 'the other radio was "
+    "not there' and 'the two started together' are opposite facts and must not "
+    "share a column")
+
+BARRIER_RELEASE_SKEW_BASIS = (
+    "how far apart the two threads left threading.Barrier.wait(), which is "
+    "what the rendezvous itself cost and is NOT when the radios began "
+    "observing. Kept beside the sample-start skew rather than instead of it, "
+    "so the cost of the rendezvous and the offset between the observations can "
+    "each be read for what they are")
 
 
-def _host_clock(radio_id: str, tuning_index: int) -> int:
+def _host_clock(radio_id: str, tuning_index: int, event: str) -> int:
     """Host UTC in nanoseconds, read in the calling radio's own thread.
 
-    Both arguments are ignored.  They exist so a test can pin what each radio
-    measured at each tuning and check that the recorded skew is the difference
-    of two stamps rather than a constant; a seam is cheaper than trusting that
-    a number labelled "measured" was.
+    All three arguments are ignored.  They exist so a test can pin what each
+    radio measured, at which tuning, and at which of the events a sweep stamps
+    -- ``barrier_release``, ``sample_start``, ``sample_end`` -- and check that
+    the recorded skew is the difference of two stamps of the *right* event
+    rather than a constant or the wrong one.  A seam is cheaper than trusting
+    that a number labelled "measured" was measured where it says.
     """
     return time.time_ns()
 
@@ -446,7 +534,8 @@ class TuningRendezvous:
             # rather than raising, and the record says it was alone.
             synchronised = False
         arrival = {"radio_id": radio_id, "tuning_index": int(tuning_index),
-                   "utc_ns": int(self._clock(radio_id, tuning_index)),
+                   "utc_ns": int(self._clock(radio_id, tuning_index,
+                                             "barrier_release")),
                    "waited_ms": (time.perf_counter() - entered) * 1000,
                    "synchronised": bool(synchronised)}
         with self._lock:
@@ -456,6 +545,20 @@ class TuningRendezvous:
     def abort(self) -> None:
         """Release whoever is waiting, and everyone who arrives after."""
         self._barrier.abort()
+
+    def snapshot(self) -> dict[int, dict[str, dict]]:
+        """The arrivals as they stand, copied under the lock.
+
+        A radio the sweep has given up waiting for is still running, and it
+        still holds a reference to this object.  Building the record from the
+        live dictionaries would let it change underneath the arithmetic and
+        produce a row that describes neither the state before nor the state
+        after.  The record is a statement about one instant, so it is taken as
+        one.
+        """
+        with self._lock:
+            return {index: dict(radios)
+                    for index, radios in self.arrivals.items()}
 
 
 def _open_radio_context(spec: RadioSpec):
@@ -490,9 +593,33 @@ def _receiver_state(context) -> dict:
         return {"unavailable": f"{type(exc).__name__}: {exc}"}
 
 
+def _radio_outcome(spec: RadioSpec, entry: dict) -> dict:
+    """This radio's record before it has done anything.
+
+    Built by the caller rather than by the sweeping thread, so a thread that
+    hangs -- or one the scheduler has not run yet when the join gives up --
+    still has a record to be recorded against.  A radio the sweep cannot
+    describe at all is worse than one it describes as hung.
+    """
+    arm = entry["arm"]
+    return {"radio_id": spec.radio_id, "serial": spec.serial,
+            "uri": spec.uri, "receiver_labels": list(spec.receiver_labels),
+            "arm": dict(arm), "edge_order": entry["edge_order"],
+            "edge_order_draw_u32": entry["edge_order_draw_u32"],
+            "tunings": [list(item) for item in entry["tunings"]],
+            "state": "failed_to_open", "error": None,
+            "per_tuning": [],
+            "pilot_band_clipped": bool(arm["pilot_band_clipped"]),
+            "pilot_guard_hz": arm["pilot_guard_hz"],
+            "pilot_band_outside_fraction": arm["pilot_band_outside_fraction"],
+            "pilot_band_note": arm["pilot_band_note"],
+            "measured_receiver_state": None,
+            "iq_bytes": 0}
+
+
 def _sweep_one_radio(spec: RadioSpec, entry: dict, rendezvous: TuningRendezvous,
                      *, open_context, collect, lnb_lo_hz: float,
-                     outcomes: dict, collected: dict) -> None:
+                     outcome: dict, collected: dict, clock=_host_clock) -> None:
     """Sweep one radio's eight tunings, and never hold the other one up.
 
     Every *failing* exit aborts the rendezvous, so a radio that cannot be
@@ -512,35 +639,37 @@ def _sweep_one_radio(spec: RadioSpec, entry: dict, rendezvous: TuningRendezvous,
     """
     arm = entry["arm"]
     tunings = [tuple(item) for item in entry["tunings"]]
-    per_tuning: list[dict] = []
-    outcome = {"radio_id": spec.radio_id, "serial": spec.serial,
-               "uri": spec.uri, "receiver_labels": list(spec.receiver_labels),
-               "arm": dict(arm), "edge_order": entry["edge_order"],
-               "edge_order_draw_u32": entry["edge_order_draw_u32"],
-               "tunings": [list(item) for item in tunings],
-               "state": "failed_to_open", "error": None,
-               "per_tuning": per_tuning,
-               "pilot_band_clipped": bool(arm["pilot_band_clipped"]),
-               "pilot_guard_hz": arm["pilot_guard_hz"],
-               "pilot_band_outside_fraction": arm["pilot_band_outside_fraction"],
-               "pilot_band_note": arm["pilot_band_note"],
-               "measured_receiver_state": None,
-               "iq_bytes": 0}
-    outcomes[spec.radio_id] = outcome
+    per_tuning: list[dict] = outcome["per_tuning"]
 
     def before(index: int) -> dict:
         return rendezvous.arrive(spec.radio_id, index)
 
+    def stamp(index: int, event: str) -> int:
+        return clock(spec.radio_id, index, event)
+
     def after(index: int, plan_entry: dict) -> None:
+        # Everything below the tuning index comes from ``plan_entry``, which is
+        # what the reader reports it *did*, and never from ``entry["tunings"]``,
+        # which is what it was asked to do.  ``deployed_shape`` recorded the
+        # request rather than the outcome and made a heterogeneous corpus look
+        # uniform for days; a radio that landed on another tuning has to be a
+        # visibly different row rather than a correctly labelled one.
         arrival = rendezvous.arrivals.get(index, {}).get(spec.radio_id, {})
         per_tuning.append({
             "tuning_index": int(index),
             "channel": plan_entry["channel"], "region": plan_entry["region"],
             "if_center_hz": plan_entry.get("if_center_hz"),
             "rf_center_hz": plan_entry.get("rf_center_hz"),
+            # When this radio actually began observing.  The headline offset is
+            # the difference of these, never of the barrier releases below.
+            "sample_start_utc_ns": plan_entry.get("sample_start_utc_ns"),
+            "sample_end_utc_ns": plan_entry.get("sample_end_utc_ns"),
             "arrival_utc_ns": arrival.get("utc_ns"),
             "barrier_wait_ms": arrival.get("waited_ms"),
             "synchronised": bool(arrival.get("synchronised")),
+            "tune_ms": plan_entry.get("tune_ms"),
+            "settle_ms": plan_entry.get("settle_ms"),
+            "listen_ms": plan_entry.get("listen_ms"),
             "tuning_ms": plan_entry.get("tuning_ms")})
 
     context = None
@@ -557,7 +686,12 @@ def _sweep_one_radio(spec: RadioSpec, entry: dict, rendezvous: TuningRendezvous,
                                                 arm["sample_rate_hz"]),
                          sample_rate_hz=arm["sample_rate_hz"],
                          lnb_lo_hz=lnb_lo_hz,
-                         before_tuning=before, after_tuning=after)
+                         # The rendezvous hangs off ``before_listen``, which
+                         # fires with the radio already parked on frequency and
+                         # settled, and never off ``before_tuning``, which
+                         # fires with the local oscillator write still to come.
+                         before_listen=before, after_tuning=after,
+                         sample_clock=stamp)
         collected[spec.radio_id] = result
         outcome["state"] = "complete"
         outcome["radio_ms"] = result.get("radio_ms")
@@ -582,59 +716,114 @@ def _sweep_one_radio(spec: RadioSpec, entry: dict, rendezvous: TuningRendezvous,
         del context
 
 
-def _tuning_records(rendezvous: TuningRendezvous, outcomes: dict,
+def _tuning_records(arrivals_by_index: dict, outcomes: dict,
                     order: tuple[str, ...]) -> list[dict]:
-    """One row per tuning index, saying who arrived and how far apart.
+    """One row per tuning index, saying who observed it and how far apart.
 
-    Built from the arrival stamps rather than from what was planned, so a
-    tuning that only one radio reached is a visibly different row from one they
-    reached together.
+    Built from the stamps each radio took rather than from what was planned, so
+    a tuning that only one radio reached is a visibly different row from one
+    they reached together.
+
+    ``skew_ms`` is the difference of the two **sample-start** stamps and never
+    of the two barrier releases.  The barrier releasing is not the radios
+    observing: each thread still writes its local oscillator and settles
+    afterwards, and on an opposite-order sweep the two are moving to different
+    frequencies, so that work costs different amounts.  Measured on the radios,
+    the barrier released 0.038 ms apart while sampling began about 4 ms apart,
+    and the error was deterministic in the edge order rather than random --
+    correlated, that is, with the exact variable the sweep is built to study.
     """
     where = {radio_id: {int(item["tuning_index"]): item
                         for item in outcomes[radio_id]["per_tuning"]}
              for radio_id in order}
     records = []
-    for index in sorted(rendezvous.arrivals):
-        arrivals = rendezvous.arrivals[index]
+    for index in sorted(arrivals_by_index):
+        arrivals = arrivals_by_index[index]
         present = [radio_id for radio_id in order if radio_id in arrivals]
+        started = {radio_id: where[radio_id].get(int(index), {}).get(
+            "sample_start_utc_ns") for radio_id in present}
+        sampled = [radio_id for radio_id in present
+                   if started[radio_id] is not None]
         row = {"tuning_index": int(index),
                "radios_arrived": len(present),
+               "radios_sampled": len(sampled),
+               # Three conditions, and each one of them can fail on its own:
+               # both radios had to be here, the barrier had to actually hold
+               # them (rather than break and let each proceed alone), and both
+               # had to go on to sample.  Dropping the middle clause is the one
+               # change that lets a sweep which was not simultaneous be
+               # recorded as simultaneous, so it is asserted directly.
                "simultaneous": bool(len(present) == len(order) and all(
-                   arrivals[radio_id]["synchronised"] for radio_id in present)),
+                   arrivals[radio_id]["synchronised"]
+                   for radio_id in present) and len(sampled) == len(order)),
                "arrivals": {}}
         for radio_id in present:
             completed = where[radio_id].get(int(index), {})
             row["arrivals"][radio_id] = {
                 "utc_ns": arrivals[radio_id]["utc_ns"],
+                "sample_start_utc_ns": started[radio_id],
                 "synchronised": arrivals[radio_id]["synchronised"],
+                # From what the reader reported it captured, never from the
+                # plan it was handed.
                 "channel": completed.get("channel"),
                 "region": completed.get("region"),
                 "completed": bool(completed)}
-        if len(present) == 2:
-            first, second = (arrivals[radio_id]["utc_ns"] for radio_id in present)
+        if len(sampled) == len(order) == 2:
+            first, second = (started[radio_id] for radio_id in sampled)
             row["skew_ms"] = abs(first - second) / 1e6
         else:
-            # Not zero.  A tuning one radio reached alone has no skew at all,
+            # Not zero.  A tuning one radio sampled alone has no offset at all,
             # and a zero here would read as a perfectly simultaneous pair.
             row["skew_ms"] = None
+        if len(present) == 2:
+            first, second = (arrivals[radio_id]["utc_ns"]
+                             for radio_id in present)
+            row["barrier_release_skew_ms"] = abs(first - second) / 1e6
+        else:
+            row["barrier_release_skew_ms"] = None
         row["pilot_band_clipped"] = any(
             outcomes[radio_id]["pilot_band_clipped"] for radio_id in present)
         records.append(row)
     return records
 
 
+def _distribution(values: list[float]) -> dict:
+    """Median, extremes and p95 of whatever offsets were actually measured."""
+    ordered = sorted(values)
+    if not ordered:
+        return {"count": 0, "median_ms": None, "max_ms": None, "min_ms": None,
+                "p95_ms": None}
+    median = (ordered[len(ordered) // 2] if len(ordered) % 2 else
+              (ordered[len(ordered) // 2 - 1] + ordered[len(ordered) // 2]) / 2)
+    return {"count": len(ordered), "median_ms": median, "max_ms": ordered[-1],
+            "min_ms": ordered[0],
+            "p95_ms": ordered[min(len(ordered) - 1,
+                                  int(round(0.95 * (len(ordered) - 1))))]}
+
+
+def _frozen(outcome: dict) -> dict:
+    """This radio's record as it stands, detached from the thread writing it."""
+    return {**outcome, "per_tuning": list(outcome["per_tuning"])}
+
+
 def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
                collect=collect_radio,
                barrier_timeout_s: float = SWEEP_BARRIER_TIMEOUT_S,
+               join_timeout_s: float | None = None,
                lnb_lo_hz: float = 9_750_000_000.0,
                clock=_host_clock) -> tuple[dict, dict]:
     """Sweep both radios in lockstep; return the record and the collected IQ.
 
     One thread per radio, one barrier per tuning.  ``open_context`` and
     ``collect`` are parameters so the whole failure surface -- a radio that
-    never opens, one that dies half way, two radios doing unequal work -- can be
-    exercised without unplugging anything, and so that the production path is
-    this same code with :func:`fast_scan.collect_radio` passed in.
+    never opens, one that dies half way, one that hangs, two radios doing
+    unequal work -- can be exercised without unplugging anything, and so that
+    the production path is this same code with :func:`fast_scan.collect_radio`
+    passed in.
+
+    The join is bounded; see :data:`JOIN_BASIS`.  A radio still running when it
+    expires is recorded as hung and abandoned, its half-written IQ is left
+    alone, and the sweep returns so the loop can take the next one.
     """
     specs = tuple(radios)
     entries = {item["radio_id"]: item for item in plan["radios"]}
@@ -643,24 +832,63 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
     order = tuple(spec.radio_id for spec in specs)
     rendezvous = TuningRendezvous(len(specs), timeout_s=barrier_timeout_s,
                                   clock=clock)
-    outcomes: dict[str, dict] = {}
+    outcomes: dict[str, dict] = {spec.radio_id: _radio_outcome(
+        spec, entries[spec.radio_id]) for spec in specs}
     collected: dict[str, dict] = {}
     started_ns = time.time_ns()
     started = time.perf_counter()
+    join_timeout = (sweep_join_timeout_s(barrier_timeout_s)
+                    if join_timeout_s is None else float(join_timeout_s))
+    if join_timeout <= 0:
+        raise ValueError("the join must be bounded and positive")
     threads = [threading.Thread(
-        target=_sweep_one_radio, name=f"sweep-{spec.radio_id}",
+        # Daemons: a hung radio must not hold the process at interpreter exit
+        # either.  The bound below stops the sweep waiting for it; this stops
+        # the shutdown waiting for it.
+        target=_sweep_one_radio, name=f"sweep-{spec.radio_id}", daemon=True,
         args=(spec, entries[spec.radio_id], rendezvous),
         kwargs={"open_context": open_context, "collect": collect,
-                "lnb_lo_hz": lnb_lo_hz, "outcomes": outcomes,
-                "collected": collected}) for spec in specs]
+                "lnb_lo_hz": lnb_lo_hz, "outcome": outcomes[spec.radio_id],
+                "collected": collected, "clock": clock}) for spec in specs]
     for thread in threads:
         thread.start()
+    deadline = time.perf_counter() + join_timeout
     for thread in threads:
-        thread.join()
+        thread.join(timeout=max(0.0, deadline - time.perf_counter()))
+    abandoned = [spec.radio_id for spec, thread in zip(specs, threads,
+                                                       strict=True)
+                 if thread.is_alive()]
+    if abandoned:
+        # Release anything still waiting on a radio that is not coming, so a
+        # survivor blocked at the barrier is not left there by the give-up.
+        rendezvous.abort()
     wall_ms = (time.perf_counter() - started) * 1000
     finished_ns = time.time_ns()
 
-    tunings = _tuning_records(rendezvous, outcomes, order)
+    # Detached from the still-running threads before anything is computed from
+    # them, so the record describes one instant rather than a moving target.
+    arrivals_by_index = rendezvous.snapshot()
+    outcomes = {radio_id: _frozen(outcomes[radio_id]) for radio_id in order}
+    collected = {radio_id: result for radio_id, result in collected.items()
+                 if radio_id not in abandoned}
+    for radio_id in abandoned:
+        outcome = outcomes[radio_id]
+        # Not "failed to open" and not "failed mid-sweep": those are radios
+        # that said something. This one said nothing at all, and the three are
+        # different observations of the hardware.
+        outcome["state"] = "hung"
+        outcome["error"] = (
+            f"the radio did not return within {join_timeout:g} s and was "
+            "abandoned; the thread was left running rather than killed, "
+            "because there is no safe way to interrupt a blocked driver call")
+        outcome["partial_iq_note"] = (
+            "no IQ is taken from an abandoned radio: the thread may still be "
+            "writing into the buffers this record would have described")
+    for radio_id in order:
+        outcome = outcomes[radio_id]
+        outcome["abandoned"] = bool(radio_id in abandoned)
+
+    tunings = _tuning_records(arrivals_by_index, outcomes, order)
     for radio_id in order:
         outcome = outcomes[radio_id]
         outcome["completed_tuning_count"] = len(outcome["per_tuning"])
@@ -686,10 +914,8 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
                  if not item["synchronised"]]
         outcome["solo_from_tuning_index"] = min(alone) if alone else None
     skews = [item["skew_ms"] for item in tunings if item["skew_ms"] is not None]
-    ordered = sorted(skews)
-    median = (None if not ordered else
-              ordered[len(ordered) // 2] if len(ordered) % 2 else
-              (ordered[len(ordered) // 2 - 1] + ordered[len(ordered) // 2]) / 2)
+    released = [item["barrier_release_skew_ms"] for item in tunings
+                if item["barrier_release_skew_ms"] is not None]
     simultaneous = [item for item in tunings if item["simultaneous"]]
     clipped = [radio_id for radio_id in order
                if outcomes[radio_id]["pilot_band_clipped"]]
@@ -713,23 +939,52 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
             "mechanism": "threading.Barrier, two parties, one wait per tuning",
             "parties": rendezvous.parties,
             "timeout_s": rendezvous.timeout_s,
+            # Where in the per-tuning sequence the two radios meet, which is
+            # the difference between a skew that carries the local oscillator
+            # write and one that does not.
+            "meets_at": "before_listen",
             "basis": ("one process owns both radios, so coordination is a "
                       "barrier rather than a protocol. Marker files and POSIX "
                       "semaphores were built and discarded: they solve a "
-                      "cross-process problem that does not exist here"),
+                      "cross-process problem that does not exist here. The "
+                      "wait is placed after the local oscillator write and the "
+                      "settle, so both radios are already on frequency when it "
+                      "releases and the write -- about 6 ms, and a different "
+                      "6 ms on each radio whenever the two are moving to "
+                      "different frequencies -- is outside the offset "
+                      "entirely rather than merely reported inside it"),
+        },
+        "join": {
+            "bounded": True,
+            "timeout_s": join_timeout,
+            "abandoned_radios": [radio_id for radio_id in order
+                                 if radio_id in abandoned],
+            "basis": JOIN_BASIS,
         },
         "radios": [outcomes[radio_id] for radio_id in order],
         "tunings": tunings,
         "skew": {
             "measured": True,
+            # Named, so no reader has to guess which of the two instants a
+            # sweep stamps this number came from.
+            "event": "sample_start",
             "basis": SKEW_BASIS,
-            "count": len(skews),
-            "median_ms": median,
-            "max_ms": max(skews) if skews else None,
-            "min_ms": min(skews) if skews else None,
+            **_distribution(skews),
             "per_tuning_ms": [item["skew_ms"] for item in tunings],
             "simultaneous_tuning_count": len(simultaneous),
             "operator_requested_tolerance_ms": list(REQUESTED_SKEW_TOLERANCE_MS),
+            # Kept, and kept subordinate.  It is what the rendezvous cost, not
+            # when the radios began observing, and it was the headline until it
+            # was measured against the sample starts and found 10-130x
+            # optimistic -- worst on exactly the opposite-order sweeps the
+            # experiment exists for.
+            "barrier_release": {
+                "event": "barrier_release",
+                "basis": BARRIER_RELEASE_SKEW_BASIS,
+                **_distribution(released),
+                "per_tuning_ms": [item["barrier_release_skew_ms"]
+                                  for item in tunings],
+            },
         },
         "pilot_band": {
             "any_clipped": bool(clipped),
@@ -740,6 +995,13 @@ def sweep_pair(radios, plan: dict, *, open_context=_open_radio_context,
                       "healthy-looking samples regardless, so the flag is "
                       "stored on every record the arm produces rather than "
                       "left to be inferred from the rate"),
+        },
+        "memory": {
+            "retained_iq_bytes": {radio_id: int(outcomes[radio_id]["iq_bytes"])
+                                  for radio_id in order},
+            "retained_iq_bytes_total": sum(int(outcomes[radio_id]["iq_bytes"])
+                                           for radio_id in order),
+            "basis": MEMORY_BASIS,
         },
         "sweep_mode": sweep_mode,
         "paired_tuning_count": len(simultaneous),
@@ -887,6 +1149,11 @@ def write_sweep(record: dict, collected: dict, *, storage_root,
         destination = captures / name
         destination.mkdir(parents=True, exist_ok=False)
         chunk = _write_iq(destination, result["samples"])
+        # Released the moment its bytes are on disk.  Both radios' sweeps are
+        # held at once by construction -- they sample together -- but there is
+        # no reason for the second radio's write to hold the first radio's as
+        # well, and on the dearest arm that is 410 MB on a 4 GB host.
+        collected[radio_id] = result = {**result, "samples": None}
         manifest = _capture_manifest(record, radio, result, chunk,
                                      name=name, sweep_id=sweep_id)
         _atomic_json(destination / "manifest.json", manifest)
@@ -916,6 +1183,7 @@ def draw_u32() -> int:
 def run_sweep(radios, *, storage_root, sweep_id: str, draws: dict | None = None,
               open_context=_open_radio_context, collect=collect_radio,
               barrier_timeout_s: float = SWEEP_BARRIER_TIMEOUT_S,
+              join_timeout_s: float | None = None,
               lnb_lo_hz: float = 9_750_000_000.0, enqueue: bool = True) -> dict:
     """Draw, sweep, write and queue: one whole cycle of the loop."""
     resolved = dict(draws or {})
@@ -931,7 +1199,8 @@ def run_sweep(radios, *, storage_root, sweep_id: str, draws: dict | None = None,
     plan = draw_sweep_plan(specs, draws=resolved)
     record, collected = sweep_pair(
         specs, plan, open_context=open_context, collect=collect,
-        barrier_timeout_s=barrier_timeout_s, lnb_lo_hz=lnb_lo_hz)
+        barrier_timeout_s=barrier_timeout_s, join_timeout_s=join_timeout_s,
+        lnb_lo_hz=lnb_lo_hz)
     written = write_sweep(record, collected, storage_root=storage_root,
                           sweep_id=sweep_id, enqueue=enqueue)
     record["written"] = written

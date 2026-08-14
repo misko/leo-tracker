@@ -930,3 +930,68 @@ def test_failed_reconciliation_accepts_matching_pre_v2_completion_only(tmp_path)
     rejected = reconcile_failed_jobs(
         tmp_path, pipeline_id="kalman-v1", archive_root=tmp_path / "archive")
     assert rejected["preserved"] == ["changed.job"]
+
+
+def test_a_recording_the_exporter_cannot_classify_does_not_stop_the_export(tmp_path):
+    """A capture loop the exporter has not been taught about must not stop the
+    offload of every other capture type on the host.
+
+    ``observation_mode`` raises on a mode it does not know.  The reconciliation
+    walk catches that per recording, and then ``main`` exits non-zero because
+    the error list is not empty -- and the exporter runs under ``set -e``, so
+    the loop dies, systemd restarts it, it reconciles again, and it dies again.
+    Every capture type stops reaching shared storage, not just the new one.
+    That is exactly what happened when a sync-scan loop was started against an
+    unmerged branch.
+
+    An unrecognised recording is a recording to leave alone, not a reason to
+    stop draining the queue: it is counted, named and skipped, and everything
+    the exporter does understand still goes.
+    """
+    from leo_tracker.radio.beacon.offload import main
+
+    source = tmp_path / "source"; shared = tmp_path / "shared"
+    captures = source / "captures"; captures.mkdir(parents=True)
+    for name, mode in (("ch1-narrow", "narrow"), ("from-the-future", "quasar")):
+        capture = captures / name; capture.mkdir()
+        (capture / "manifest.json").write_text(json.dumps({
+            "state": "complete", "metadata": {"observation_mode": mode}}))
+    (shared / "captures").mkdir(parents=True)
+    for name in ("ch1-narrow", "from-the-future"):
+        source_capture = captures / name
+        shared_capture = shared / "captures" / name
+        shared_capture.mkdir()
+        (shared_capture / "manifest.json").write_text(
+            (source_capture / "manifest.json").read_text())
+    create_context_bundle(shared / "context")
+
+    result = enqueue_export_backfill(source, shared, pipeline_id="kalman-v1")
+    analysis = enqueue_analysis_backfill(shared, pipeline_id="kalman-v1")
+
+    assert result["queued"] == ["ch1-narrow"]
+    assert result["unsupported"] == [
+        {"name": "from-the-future", "observation_mode": "quasar"}]
+    assert analysis["queued"] == ["ch1-narrow"]
+    assert analysis["unsupported"] == [
+        {"name": "from-the-future", "observation_mode": "quasar"}]
+    # Not an error.  An error is what makes the exporter exit non-zero, and a
+    # non-zero exit under ``set -e`` is what takes the whole offload down.
+    assert result["errors"] == []
+    assert analysis["errors"] == []
+    assert main(["enqueue-export-backfill", str(source), str(shared),
+                 "--pipeline-id", "kalman-v1", "--summary-only"]) == 0
+
+
+def test_a_reconciliation_that_fails_does_not_kill_the_export_loop():
+    """The loop's job is draining the queue; reconciling is a side errand.
+
+    ``set -euo pipefail`` plus a reconcile that exits non-zero is a crash loop
+    that takes every capture type's offload down with it -- and the queue drain
+    it interrupted had nothing to do with the recording that failed.
+    """
+    script = (Path(__file__).parents[1] /
+              "scripts/starlink-analysis-export.sh").read_text()
+
+    body = script.split("reconcile_exports() {", 1)[1].split("\n}\n", 1)[0]
+    assert body.count("|| reconcile_failed=1") == 2
+    assert "reconcile_warning" in body

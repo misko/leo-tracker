@@ -472,7 +472,8 @@ def command_starlink_synchronised_scan(args: argparse.Namespace) -> int:
         radios, storage_root=args.storage, sweep_id=args.sweep_id,
         draws={"arm": args.arm_draw_u32, "pairing": args.pairing_draw_u32,
                "second_arm": args.second_arm_draw_u32, "edge_order": orders},
-        barrier_timeout_s=args.barrier_timeout_s, lnb_lo_hz=args.lnb_lo_hz,
+        barrier_timeout_s=args.barrier_timeout_s,
+        join_timeout_s=args.join_timeout_s, lnb_lo_hz=args.lnb_lo_hz,
         enqueue=not args.no_enqueue)
     print(json.dumps({
         "sweep_id": args.sweep_id,
@@ -2308,6 +2309,10 @@ def build_parser() -> argparse.ArgumentParser:
     sync_scan.add_argument("--lnb-lo-hz", type=float, default=9_750_000_000)
     sync_scan.add_argument("--barrier-timeout-s", type=float, default=30.0,
         help="bounded so a radio that died cannot hold the survivor")
+    sync_scan.add_argument("--join-timeout-s", type=float,
+        help="bounded so a radio that HUNG -- which aborts nothing and "
+             "releases nobody -- cannot hold the sweep, the record and every "
+             "later sweep behind it; defaults to 2x the barrier timeout + 60 s")
     sync_scan.add_argument("--no-enqueue", action="store_true",
         help="write the recordings but do not hand them to the offload queue")
     sync_scan.set_defaults(handler=command_starlink_synchronised_scan)

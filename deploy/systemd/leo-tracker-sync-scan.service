@@ -1,6 +1,23 @@
 [Unit]
 Description=Synchronised paired Starlink edge scans across both Plutos
 Documentation=file:/home/satpi01/leo-tracker/docs/multi_pluto_operations.md
+#
+# RUN INSTRUCTIONS -- READ BEFORE `systemctl start`.
+#
+# THE BRANCH MUST BE MERGED INTO THE DEPLOYED CHECKOUT AT
+# /home/satpi01/leo-tracker BEFORE THIS UNIT IS STARTED.
+#
+# leo-tracker-analysis-export.service imports leo_tracker from that checkout,
+# not from a worktree. Started against an unmerged tree it meets sync-scan
+# recordings it has never heard of on every reconciliation pass. It now
+# tolerates them -- they are counted as `unsupported` and left alone rather
+# than treated as errors -- but they will simply pile up on NVMe unexported
+# until the merge lands, and an older exporter without that tolerance exits
+# non-zero, which under `set -e` and `Restart=always` is a crash loop that
+# stops ALL offload to QNAP for every capture type, not only for this one.
+#
+# starlink-sync-scan-watch.sh checks this at startup and refuses to sweep if
+# the deployed checkout cannot classify what it is about to write.
 After=network-online.target mnt-leo\x2dnvme.mount
 Wants=network-online.target
 Requires=mnt-leo\x2dnvme.mount

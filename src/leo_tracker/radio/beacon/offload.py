@@ -35,6 +35,23 @@ OBSERVATION_MODES = frozenset({"narrow", "wide", "oversample", "hop",
 OBSERVATION_MODE_ALIASES = {"channel-hop": "hop"}
 
 
+class UnknownObservationMode(ValueError):
+    """A recording this build has not been taught to classify.
+
+    Its own type rather than a bare :class:`ValueError` because the two mean
+    different things to the exporter, and treating them alike is what turned a
+    capture loop running against an unmerged branch into a total offload
+    outage.  A corrupt manifest is an error: something is wrong with a file
+    that should be readable.  A mode this build does not know is not -- the
+    recording is fine, this build is simply older than it is, and the right
+    response is to leave it where it is and carry on moving everything else.
+    """
+
+    def __init__(self, mode: str) -> None:
+        super().__init__(f"unknown observation mode {mode!r}")
+        self.mode = mode
+
+
 def observation_mode(name: str, metadata: dict) -> str:
     """Resolve a capture's pipeline mode from its manifest, falling back to its name."""
     mode = str(metadata.get("observation_mode") or
@@ -44,7 +61,7 @@ def observation_mode(name: str, metadata: dict) -> str:
                 "sync-scan" if name.startswith("sync-") else "narrow"))
     mode = OBSERVATION_MODE_ALIASES.get(mode, mode)
     if mode not in OBSERVATION_MODES:
-        raise ValueError(f"unknown observation mode {mode!r}")
+        raise UnknownObservationMode(mode)
     return mode
 
 
@@ -770,7 +787,7 @@ def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
                 active_names.add(parse_job(marker)[0])
             except (OSError, ValueError):
                 continue
-    queued, skipped, errors = [], [], []
+    queued, skipped, errors, unsupported = [], [], [], []
     captures_root = root / "captures"
     captures = (sorted(captures_root.iterdir(), key=lambda path: path.stat().st_mtime)
                 if captures_root.is_dir() else [])
@@ -800,11 +817,16 @@ def enqueue_analysis_backfill(root: Path, *, pipeline_id: str,
             queued.append(name); active_names.add(name)
             if limit is not None and len(queued) >= limit:
                 break
+        except UnknownObservationMode as exc:
+            # Left alone and named, never counted as an error: see
+            # :class:`UnknownObservationMode`.
+            unsupported.append({"name": name, "observation_mode": exc.mode})
         except Exception as exc:
             errors.append(f"{name}: {type(exc).__name__}: {exc}")
     return {"schema": "leo-tracker.analysis-backfill/v1",
             "pipeline_id": pipeline_id, "queued": queued,
-            "skipped": skipped, "errors": errors, "dry_run": dry_run}
+            "skipped": skipped, "unsupported": unsupported,
+            "errors": errors, "dry_run": dry_run}
 
 
 def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
@@ -836,7 +858,7 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
                     active_names.add(parse_job(marker)[0])
                 except (OSError, ValueError):
                     continue
-    queued, skipped, errors = [], [], []
+    queued, skipped, errors, unsupported = [], [], [], []
     for name, capture in preserved_recordings(source_root):
         completion = (shared_root / "reports" / "runs" / pipeline_id / name /
                       "completion.json")
@@ -880,11 +902,20 @@ def enqueue_export_backfill(source_root: Path, shared_root: Path, *,
             queued.append(name); active_names.add(name)
             if limit is not None and len(queued) >= limit:
                 break
+        except UnknownObservationMode as exc:
+            # A recording this build cannot classify is preserved where it is
+            # and reported, and it never makes this walk exit non-zero. The
+            # exporter runs under `set -e`; a non-zero exit here restarts the
+            # unit, which reconciles again and exits again, which stops the
+            # offload of every capture type on the host over one recording that
+            # was written by a newer capture loop than this exporter knows.
+            unsupported.append({"name": name, "observation_mode": exc.mode})
         except Exception as exc:
             errors.append(f"{name}: {type(exc).__name__}: {exc}")
     return {"schema": "leo-tracker.export-backfill/v1",
             "pipeline_id": pipeline_id, "queued": queued,
-            "skipped": skipped, "errors": errors, "dry_run": dry_run}
+            "skipped": skipped, "unsupported": unsupported,
+            "errors": errors, "dry_run": dry_run}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -973,6 +1004,8 @@ def main(argv: list[str] | None = None) -> int:
             report = {"schema": report["schema"], "pipeline_id": report["pipeline_id"],
                       "queued_count": len(report["queued"]),
                       "skipped_count": len(report["skipped"]),
+                      "unsupported_count": len(report["unsupported"]),
+                      "unsupported": report["unsupported"][:20],
                       "error_count": len(report["errors"]),
                       "errors": report["errors"][:20], "dry_run": report["dry_run"]}
         print(json.dumps(report, sort_keys=True))
@@ -986,6 +1019,8 @@ def main(argv: list[str] | None = None) -> int:
             report = {"schema": report["schema"], "pipeline_id": report["pipeline_id"],
                       "queued_count": len(report["queued"]),
                       "skipped_count": len(report["skipped"]),
+                      "unsupported_count": len(report["unsupported"]),
+                      "unsupported": report["unsupported"][:20],
                       "error_count": len(report["errors"]),
                       "errors": report["errors"][:20], "dry_run": report["dry_run"]}
         print(json.dumps(report, sort_keys=True))

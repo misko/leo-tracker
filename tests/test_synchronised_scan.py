@@ -262,6 +262,110 @@ def test_the_recorded_skew_is_the_difference_of_two_measured_arrival_stamps():
     assert record["skew"]["operator_requested_tolerance_ms"] == [200.0, 500.0]
 
 
+def test_the_headline_skew_is_when_sampling_began_not_when_the_barrier_released():
+    """The barrier releasing is not the radios observing.
+
+    After the barrier releases, each thread still has work to do before any
+    sample exists, and on an opposite-order sweep the two radios are moving to
+    *different* frequencies, so that work takes different times.  A record that
+    reports the barrier release as the skew therefore reports a number that is
+    optimistic by a factor of ten to a hundred and is biased by exactly the
+    variable the sweep exists to study.  Measured on the radios: the barrier
+    released a median 0.038 ms apart while sampling began about 4 ms apart on
+    the opposite-order sweeps.
+
+    So the headline is stamped where sampling begins.  The barrier release is
+    kept -- it is how long the rendezvous itself cost -- but it is kept
+    somewhere a reader cannot mistake for the answer.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, collect=_fake_collect({}),
+        clock=_scripted_clock({"pluto-19f2": 0, "pluto-5d4d": 0},
+                              {"pluto-19f2": 0, "pluto-5d4d": 3_990_000}))
+
+    assert record["skew"]["event"] == "sample_start"
+    assert [item["skew_ms"] for item in record["tunings"]] == [3.99] * 8
+    assert record["skew"]["median_ms"] == 3.99
+    assert record["skew"]["max_ms"] == 3.99
+    # The old number survives, demoted, so the two can be compared rather than
+    # one of them quietly replacing the other.
+    assert [item["barrier_release_skew_ms"]
+            for item in record["tunings"]] == [0.0] * 8
+    assert record["skew"]["barrier_release"]["median_ms"] == 0.0
+    assert record["skew"]["barrier_release"]["event"] == "barrier_release"
+    for item in record["tunings"]:
+        for radio_id, arrival in item["arrivals"].items():
+            assert arrival["sample_start_utc_ns"] == \
+                _BASE_NS + item["tuning_index"] * 1_000_000_000 + (
+                    3_990_000 if radio_id == "pluto-5d4d" else 0)
+            assert arrival["sample_start_utc_ns"] != arrival["utc_ns"] or \
+                radio_id == "pluto-19f2"
+
+
+def test_a_tuning_one_radio_never_sampled_has_no_skew_rather_than_a_zero():
+    """"The other radio was not there" and "they started together" are opposites.
+
+    The dying radio reaches the barrier at tuning three and raises before it
+    reads a sample, so that tuning has one sample start and not two.  A zero
+    there would read as the most perfectly simultaneous tuning in the sweep.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, barrier_timeout_s=1.0,
+        collect=_fake_collect({"pluto-19f2": 0.002, "pluto-5d4d": 0.002},
+                              fail_at={"pluto-5d4d": 3}))
+
+    skews = [item["skew_ms"] for item in record["tunings"]]
+    assert skews[:3] == [pytest.approx(item, abs=25.0) for item in [0.0] * 3]
+    assert skews[3:] == [None] * 5
+    assert record["skew"]["count"] == 3
+    # Both radios did reach the barrier at three; only one of them sampled.
+    assert record["tunings"][3]["radios_arrived"] == 2
+    assert record["tunings"][3]["barrier_release_skew_ms"] is not None
+    assert record["tunings"][3]["simultaneous"] is False
+
+
+def test_the_two_radios_are_already_on_frequency_when_the_rendezvous_releases():
+    """Tune, settle, THEN meet, THEN sample -- the fix, not the report of it.
+
+    Recording the true offset makes the bias visible; moving the local
+    oscillator write out of the critical path removes it.  The write costs
+    about 6 ms and costs *different* amounts on the two radios whenever they
+    are moving to different frequencies, which on an opposite-order sweep is
+    every tuning -- so meeting before the write puts a deterministic,
+    edge-order-correlated difference inside the offset the sweep is trying to
+    make small.
+
+    One radio here spends 30 ms writing its oscillator and the other spends
+    none.  Meeting before the write, that 30 ms lands in the offset between the
+    two sample starts.  Meeting after it, the fast radio waits at the barrier
+    instead and the two begin sampling together.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws(edge_orders=(0, 1)))
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake,
+        collect=_fake_collect({}, tune_delays={"pluto-19f2": 0.030,
+                                               "pluto-5d4d": 0.0}))
+
+    slow, fast = record["radios"]
+    # The expensive retune is real and is still measured...
+    assert all(item["tune_ms"] > 25 for item in slow["per_tuning"])
+    assert all(item["tune_ms"] < 5 for item in fast["per_tuning"])
+    # ...and it is no longer inside the offset between the observations.
+    skews = [item["skew_ms"] for item in record["tunings"]]
+    assert len(skews) == 8 and all(item is not None for item in skews)
+    assert max(skews) < 5.0
+    # The fast radio pays for it by waiting, which is the point: the wait is
+    # outside the measurement rather than inside it.
+    assert fast["barrier_wait_ms"] > 8 * 20
+    assert record["barrier"]["meets_at"] == "before_listen"
+    assert "on frequency" in record["barrier"]["basis"]
+
+
 def test_each_radio_keeps_its_own_arrival_time_per_tuning():
     plan = sync.draw_sweep_plan(_RADIOS, draws=_draws(edge_orders=(0, 1)))
     record, _ = sync.sweep_pair(_RADIOS, plan, open_context=_open_fake,
@@ -389,6 +493,131 @@ def test_a_radio_that_dies_mid_sweep_leaves_the_other_completing():
     assert "no IQ survives" in dead["partial_iq_note"]
     # The survivor finishes rather than blocking on a radio that is gone.
     assert elapsed < 1.0
+
+
+def test_a_radio_that_hangs_rather_than_raises_does_not_wedge_the_sweep():
+    """A hung radio is not a failed one, and only one of them is handled.
+
+    Every failure path here aborts the rendezvous, which releases the survivor.
+    A radio that neither returns nor raises -- a blocked USB read, a firmware
+    that stopped answering -- aborts nothing.  The survivor finishes, the join
+    never returns, the record is never written and the loop stops making
+    observations at all.  Radios were physically unplugged twice in one day,
+    so this is a Tuesday rather than a thought experiment.
+
+    Bounded, recorded, and on to the next sweep.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+    release = threading.Event()
+
+    started = time.perf_counter()
+    try:
+        record, collected = sync.sweep_pair(
+            _RADIOS, plan, open_context=_open_fake, barrier_timeout_s=0.2,
+            join_timeout_s=1.5,
+            collect=_fake_collect({}, hang={"pluto-5d4d": 3,
+                                            "event": release}))
+        elapsed = time.perf_counter() - started
+    finally:
+        release.set()
+
+    survivor, hung = record["radios"]
+    assert elapsed < 5.0
+    assert survivor["state"] == "complete"
+    assert survivor["completed_tuning_count"] == 8
+    # Named for what it was, not folded into the failure that it is not.
+    assert hung["state"] == "hung"
+    assert hung["abandoned"] is True
+    assert "did not return" in hung["error"]
+    assert record["join"]["timeout_s"] == 1.5
+    assert record["join"]["abandoned_radios"] == ["pluto-5d4d"]
+    assert record["sweep_mode"] != "paired"
+    assert record["solo"] is True
+    # And nothing is taken from a radio that is still, as far as this process
+    # knows, in the middle of writing into its own buffers.
+    assert set(collected) == {"pluto-19f2"}
+
+
+def test_each_tuning_records_where_the_radio_landed_not_where_it_was_sent():
+    """This project's exact historical failure, in a new record.
+
+    ``deployed_shape`` recorded the scorer's configuration rather than the
+    capture's.  Every row then agreed with every other row, a heterogeneous
+    corpus looked uniform, and a second defect hid underneath that for days.
+    The plan and the outcome are the same thing on every healthy sweep, which
+    is exactly what makes the substitution invisible -- so the reader is made
+    to disagree with the plan and the record has to follow the reader.
+
+    Radio B is sent down order U and reports landing on order L instead.  A
+    record built from the plan would label its probes with the frequencies it
+    was asked for; the probes are of the other edge.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws(edge_orders=(0, 1)))
+    landed = list(sync.edge_order_tunings("L"))
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake,
+        collect=_fake_collect({}, reports={"pluto-5d4d": landed}))
+
+    sent, arrived = record["radios"]
+    # What it was asked for is still recorded, unchanged...
+    assert arrived["edge_order"] == "U"
+    assert arrived["tunings"][0] == [1, "upper"]
+    # ...and what it captured is recorded separately, and is not that.
+    assert [(item["channel"], item["region"])
+            for item in arrived["per_tuning"]] == [
+                (channel, f"{edge}-edge") for channel, edge in landed]
+    assert arrived["per_tuning"][0]["region"] == "lower-edge"
+    assert sent["per_tuning"][0]["region"] == "lower-edge"
+    # And the per-tuning rows the analysis host reads say the same thing: this
+    # sweep put both radios on the *same* edge at index 0, whatever the plan
+    # said, so it is not the both-edges observation it was drawn to be.
+    first = record["tunings"][0]["arrivals"]
+    assert first["pluto-19f2"]["region"] == "lower-edge"
+    assert first["pluto-5d4d"]["region"] == "lower-edge"
+    assert [item["arrivals"]["pluto-5d4d"]["region"]
+            for item in record["tunings"]] == [
+                f"{edge}-edge" for _, edge in landed]
+
+
+def test_two_radios_that_both_sampled_but_never_met_are_not_simultaneous():
+    """The one property that stops a non-simultaneous sweep being filed as one.
+
+    Both radios reach every tuning and both sample every tuning, so counting
+    who turned up says "simultaneous" at all eight.  They were nowhere near
+    simultaneous: the barrier timed out, each radio proceeded alone, and the
+    two observations are a quarter of a second apart.  ``synchronised`` is the
+    only thing separating those two sweeps, and a record that stopped
+    consulting it would file this one -- 250 ms apart, the barrier broken --
+    as the very thing the experiment claims to produce.
+    """
+    plan = sync.draw_sweep_plan(_RADIOS, draws=_draws())
+
+    record, _ = sync.sweep_pair(
+        _RADIOS, plan, open_context=_open_fake, barrier_timeout_s=0.05,
+        collect=_fake_collect({}, tune_delays={"pluto-19f2": 0.0,
+                                               "pluto-5d4d": 0.250}))
+
+    assert all(item["radios_arrived"] == 2 for item in record["tunings"])
+    assert all(item["radios_sampled"] == 2 for item in record["tunings"])
+    assert all(item["skew_ms"] > 100.0 for item in record["tunings"])
+    for item in record["tunings"]:
+        assert not all(entry["synchronised"]
+                       for entry in item["arrivals"].values())
+        assert item["simultaneous"] is False
+    assert record["paired_tuning_count"] == 0
+    assert record["sweep_mode"] == "solo"
+    assert record["skew"]["simultaneous_tuning_count"] == 0
+
+
+def test_a_sweep_where_both_radios_return_records_no_abandonment():
+    record, _ = _run()
+
+    assert record["join"]["abandoned_radios"] == []
+    assert record["join"]["bounded"] is True
+    assert record["join"]["timeout_s"] > 0
+    for entry in record["radios"]:
+        assert entry["abandoned"] is False
 
 
 def test_the_lowest_rate_arm_is_flagged_pilot_band_clipped_on_every_record():
@@ -609,29 +838,94 @@ def test_collect_radio_takes_a_rendezvous_hook_before_and_after_each_tuning():
     """
     from leo_tracker.radio.beacon.fast_scan import collect_radio, survey_profile
 
+    from leo_tracker.radio.beacon.channels import starlink_edge_pilot_if_hz
+
     context, calls = _fake_context(), []
     tunings = [(1, "lower"), (1, "upper"), (2, "lower")]
+    centres = [int(starlink_edge_pilot_if_hz(channel, edge, 9_750_000_000.0))
+               for channel, edge in tunings]
 
     collected = collect_radio(
         context, tunings, profile=survey_profile(0.002, 250_000.0),
         sample_rate_hz=250_000.0,
         before_tuning=lambda index: calls.append(("before", index,
                                                   context.tuned_hz)),
+        before_listen=lambda index: calls.append(("listen", index,
+                                                  context.tuned_hz)),
         after_tuning=lambda index, entry: calls.append(
             ("after", index, entry["channel"], entry["region"])))
 
     assert [item[0] for item in calls] == [
-        "before", "after", "before", "after", "before", "after"]
-    assert [item[1] for item in calls] == [0, 0, 1, 1, 2, 2]
-    # The hook fires before the retune, which is what makes the two radios
-    # change frequency together rather than merely start together.
-    assert calls[0][2] == 0
-    assert calls[2][2] != 0
+        "before", "listen", "after"] * 3
+    assert [item[1] for item in calls] == [0, 0, 0, 1, 1, 1, 2, 2, 2]
+    # ``before_tuning`` fires with the local oscillator write still to come:
+    # it sees the *previous* tuning's centre, and nothing at all on the first.
+    assert [item[2] for item in calls if item[0] == "before"] == [
+        0, centres[0], centres[1]]
+    # ``before_listen`` fires with the radio already parked on this tuning's
+    # centre, which is the whole reason a paired sweep meets there and not
+    # above: everything that costs a different amount on the two radios has
+    # been paid by the time it fires.
+    assert [item[2] for item in calls if item[0] == "listen"] == centres
     assert [item[2:] for item in calls if item[0] == "after"] == [
         (1, "lower-edge"), (1, "upper-edge"), (2, "lower-edge")]
     assert [item["tuning_index"] for item in collected["plan"]] == [0, 1, 2]
     assert all(item["tuning_ms"] > 0 for item in collected["plan"])
+    assert all(item["sample_start_utc_ns"] > 0 for item in collected["plan"])
+    assert all(item["sample_end_utc_ns"] >= item["sample_start_utc_ns"]
+               for item in collected["plan"])
     assert collected["samples"].shape[0] == 3
+
+
+def test_the_reader_never_holds_two_copies_of_the_sweep_it_is_collecting():
+    """A 4 GB host, two radios, and the dearest arm is 410 MB of probes each.
+
+    ``np.stack`` at the end of a sweep builds a second copy of every probe in
+    it while the first is still held by the list it was appended to, so the
+    reader transiently needs twice what it returns.  Both radios do that at
+    once, and peak RSS on the dearest matched arm reached 1.4-1.5 GB of the
+    host's 4 GB while two other capture services were running.
+
+    Measured here rather than argued: the reader fills one array it allocated
+    up front, so the transient is one driver block and not a second sweep.
+    """
+    import tracemalloc
+
+    from leo_tracker.radio.beacon.fast_scan import collect_radio, survey_profile
+
+    tunings = [(channel, edge) for channel in (1, 2, 3, 4)
+               for edge in ("lower", "upper")]
+    profile = survey_profile(0.020, 1_000_000.0)
+
+    tracemalloc.start()
+    try:
+        collected = collect_radio(_fake_context(), tunings, profile=profile,
+                                  sample_rate_hz=1_000_000.0)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    retained = collected["samples"].nbytes
+    assert collected["samples"].shape == (8, 20_000, 2, 2)
+    assert retained == 8 * 20_000 * 2 * 2 * 2
+    # One sweep, plus one tuning's worth of driver block in flight, plus slack.
+    # Stacking a list of eight would need 2x the sweep and nothing else here
+    # is large enough to make up the difference.
+    assert peak < retained * 1.45, (
+        f"peak {peak} bytes against {retained} bytes retained: the reader is "
+        "holding the sweep more than once")
+
+
+def test_the_sweep_states_the_bound_on_what_it_holds():
+    """The number an operator sizes the host against, in the record."""
+    record, _ = _run()
+
+    held = record["memory"]["retained_iq_bytes"]
+    assert set(held) == {"pluto-19f2", "pluto-5d4d"}
+    assert record["memory"]["retained_iq_bytes_total"] == sum(held.values())
+    for entry in record["radios"]:
+        assert held[entry["radio_id"]] == entry["iq_bytes"]
+    assert "preallocat" in record["memory"]["basis"]
 
 
 def test_collect_radio_still_works_with_no_hooks_at_all():
@@ -766,6 +1060,42 @@ def test_the_unit_an_operator_starts_binds_both_radios_and_neither_dwell():
     assert "/mnt/qnap01" not in unit
 
 
+def test_the_loop_refuses_to_start_against_an_exporter_that_cannot_file_it():
+    """Starting this loop unmerged took down the offload of everything.
+
+    The exporter's reconciliation walk classifies every preserved recording,
+    and until this branch is merged the deployed checkout has never heard of
+    ``sync-scan``.  It reported an error per sweep per pass, exited non-zero,
+    and ``set -e`` plus ``Restart=always`` turned that into a crash loop that
+    stopped ALL offload to QNAP -- narrow dwells, wide, hop, everything --
+    over recordings nothing was wrong with.
+
+    The exporter is now tolerant of a recording it cannot classify, which is
+    the fix that matters.  This is the second half: the loop that writes them
+    checks, before it writes any, that the exporter running beside it can file
+    what it is about to produce, and says why in one line rather than filling a
+    volume nothing will drain.
+    """
+    watch = (Path(__file__).parents[1] /
+             "scripts" / "starlink-sync-scan-watch.sh").read_text()
+    unit = (Path(__file__).parents[1] / "deploy" / "systemd" /
+            "leo-tracker-sync-scan.service").read_text()
+
+    # Said plainly, where an operator starting the unit will read it.
+    assert "must be merged" in unit.lower()
+    assert "must be merged" in watch.lower()
+    assert "stops all offload" in unit.lower()
+    # And checked, before the first sweep, against the checkout the exporter
+    # actually imports rather than against this one.
+    assert "OBSERVATION_MODES" in watch
+    assert "sync_scan_exporter_unaware" in watch
+    guard = watch.split("# --- exporter compatibility gate ---", 1)[1]
+    assert "exit 2" in guard.split("\nfi\n", 1)[0]
+    # Before anything is drawn or written, not after a volume of sweeps.
+    assert watch.index("# --- exporter compatibility gate ---") < \
+        watch.index("draw_u32() {")
+
+
 def test_the_leave_it_alone_beacon_watch_path_is_untouched():
     """This must be reversible: the old loop stays in the tree, unused."""
     root = Path(__file__).parents[1]
@@ -817,24 +1147,54 @@ def _open_fake(spec):
     return _FakeContext(spec.radio_id)
 
 
-def _fake_collect(delays, *, fail_at=None):
-    """A ``collect_radio`` stand-in that spends a fixed time per tuning."""
+def _fake_collect(delays, *, tune_delays=None, fail_at=None, hang=None,
+                  reports=None):
+    """A ``collect_radio`` stand-in, in the reader's own order.
+
+    Tune, settle, *then* rendezvous, then sample: the same order the real
+    reader runs in, because a stand-in that met the barrier somewhere else
+    would let the sweep pass a test the radios would fail.  ``delays`` is time
+    spent sampling, after the barrier; ``tune_delays`` is time spent writing
+    the local oscillator, before it.
+
+    ``reports`` lets a radio say it landed somewhere other than where it was
+    asked to go, which is the only way to tell a record that states the
+    capture from one that states the plan.
+    """
     import numpy as np
 
     def collect(context, tunings, *, profile, sample_rate_hz, lnb_lo_hz,
-                before_tuning=None, after_tuning=None):
+                before_tuning=None, before_listen=None, after_tuning=None,
+                sample_clock=None):
         pause = delays.get(context.radio_id, 0.0)
+        tune_pause = (tune_delays or {}).get(context.radio_id, 0.0)
+        stamp = sample_clock or (lambda index, event: time.time_ns())
+        reported = (reports or {}).get(context.radio_id)
         plan = []
         for index, (channel, edge) in enumerate(tunings):
             if before_tuning is not None:
                 before_tuning(index)
+            if tune_pause:
+                time.sleep(tune_pause)
+            if before_listen is not None:
+                before_listen(index)
+            if hang is not None and hang.get(context.radio_id) == index:
+                hang["event"].wait(30.0)
+            started = int(stamp(index, "sample_start"))
             if fail_at is not None and fail_at.get(context.radio_id) == index:
                 raise RuntimeError("radio disappeared mid-sweep")
             if pause:
                 time.sleep(pause)
-            entry = {"channel": channel, "region": f"{edge}-edge", "edge": edge,
+            landed = reported[index] if reported is not None else (channel, edge)
+            entry = {"channel": landed[0], "region": f"{landed[1]}-edge",
+                     "edge": landed[1],
                      "if_center_hz": 1.7e9, "rf_center_hz": 1.15e10,
-                     "tuning_index": index, "tuning_ms": pause * 1000}
+                     "tuning_index": index,
+                     "sample_start_utc_ns": started,
+                     "sample_end_utc_ns": int(stamp(index, "sample_end")),
+                     "tune_ms": tune_pause * 1000,
+                     "settle_ms": 0.0, "listen_ms": pause * 1000,
+                     "tuning_ms": (tune_pause + pause) * 1000}
             plan.append(entry)
             if after_tuning is not None:
                 after_tuning(index, entry)
@@ -861,14 +1221,24 @@ def _fake_collect(delays, *, fail_at=None):
 _BASE_NS = 1_700_000_000_000_000_000
 
 
-def _scripted_clock(offsets):
-    """A clock that pins each radio's arrival at each tuning.
+def _scripted_clock(offsets, sample=None):
+    """A clock that pins each radio's stamps at each tuning.
 
-    Two arguments rather than none precisely so a test can say what each radio
-    measured at each tuning; production passes host UTC and ignores both.
+    Three arguments rather than none precisely so a test can say what each
+    radio measured, at which tuning, and at *which event*; production passes
+    host UTC and ignores all three.  ``sample`` defaults to ``offsets``, so a
+    test that does not care makes the barrier release and the sample start
+    coincide; a test that does care can drive them apart, which is the whole
+    difference between the number that was reported and the number that
+    matters.
     """
-    def clock(radio_id, tuning_index):
-        return _BASE_NS + tuning_index * 1_000_000_000 + offsets[radio_id]
+    starts = offsets if sample is None else sample
+
+    def clock(radio_id, tuning_index, event="barrier_release"):
+        base = _BASE_NS + tuning_index * 1_000_000_000
+        if event == "barrier_release":
+            return base + offsets[radio_id]
+        return base + starts[radio_id] + (1_000_000 if event == "sample_end" else 0)
     return clock
 
 

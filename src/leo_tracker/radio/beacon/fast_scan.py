@@ -888,10 +888,21 @@ def scan_tunings(read_probe, tunings, *, sample_rate_hz: float = 2_500_000.0,
     return results
 
 
+def _sample_clock(tuning_index: int, event: str) -> int:
+    """Host UTC in nanoseconds, read in the calling reader's own thread.
+
+    Both arguments are ignored.  They exist so a paired sweep can pin what each
+    radio stamped, at which tuning, and at which event, and check that the
+    offset it reports is the difference of two stamps rather than a constant.
+    """
+    return time.time_ns()
+
+
 def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
                   sample_rate_hz: float = 2_500_000.0,
                   lnb_lo_hz: float = 9_750_000_000.0,
-                  before_tuning=None, after_tuning=None) -> dict:
+                  before_tuning=None, before_listen=None, after_tuning=None,
+                  sample_clock=_sample_clock) -> dict:
     """Tune, listen, and hand the IQ back.  Nothing here scores anything.
 
     This is everything that needs the radio and nothing else.  The split is the
@@ -930,13 +941,28 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     capture path left behind: a survey wants a shallow queue and a block the
     size of its probe, which is the opposite of what a long dwell wants.
 
-    ``before_tuning`` is called with the tuning index **before** the local
-    oscillator is written, and ``after_tuning`` with the index and that
-    tuning's plan entry once its probe is in hand.  Both are optional and the
-    survey passes neither.  They exist so two radios in one process can be held
-    at a barrier and change frequency together rather than merely start
-    together, and so a radio that dies half way still leaves a record of the
-    tunings it completed; see :mod:`.synchronised_scan`.
+    Three optional hooks, and **which one a paired sweep meets at is the whole
+    design**.  ``before_tuning`` fires with the tuning index before the local
+    oscillator is written; ``before_listen`` fires once the oscillator is
+    written and the settle buffers are drained, with the radio parked on
+    frequency and one statement away from its first sample; ``after_tuning``
+    fires with the index and that tuning's entry once its probe is in hand.
+    The survey passes none of them.
+
+    A rendezvous belongs at ``before_listen``, not at ``before_tuning``.  The
+    oscillator write is not free and is not constant -- it costs about 6 ms and
+    it costs *different* amounts on the two radios whenever they are moving to
+    different frequencies, which on an opposite-order paired sweep is every
+    tuning.  Meeting before the write leaves that difference inside the
+    interval the sweep is trying to make small, and leaves it correlated with
+    the edge order, which is the variable under study.  Meeting after it puts
+    both radios on frequency first and rendezvous immediately before sampling;
+    see :mod:`.synchronised_scan`.
+
+    ``sample_clock`` is read in this reader's own thread at the instant
+    sampling begins and again when it ends, and both stamps travel in the
+    tuning's entry.  That is what a paired sweep reports as its offset, because
+    it is the only stamp taken when the radio is actually observing.
     """
     import iio                                    # kept local: host-only import
 
@@ -956,28 +982,46 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
     stream.set_kernel_buffers_count(profile.kernel_buffers)
     buffer = iio.Buffer(stream, profile.block_size, False)
     wanted = int(round(profile.probe_s * sample_rate_hz))
-    plan, retained = [], []
+    ordered = [tuple(item) for item in tunings]
+    # Allocated once, up front, and filled in place.  Appending each probe to a
+    # list and calling ``np.stack`` at the end builds a second copy of the
+    # whole sweep while the first is still held by the list, so the reader
+    # transiently needs twice what it returns -- on the dearest arm that is a
+    # second 410 MB, on both radios at once, on a 4 GB host already running two
+    # capture services.  Measured peak RSS for a matched 640 ms / 10 MS/s
+    # sweep: 1,452 MB stacking, 1,014 MB filling this array.  The bound is now
+    # arithmetic rather than hope: tunings x samples x 2 x 2 x 2 bytes per
+    # radio, knowable before the sweep starts.
+    retained = (np.empty((len(ordered), wanted, 2, 2), "<i2")
+                if ordered else None)
+    plan = []
     timing = {"tune": 0.0, "settle": 0.0, "listen": 0.0}
     try:
-        for tuning_index, (channel_number, edge) in enumerate(tunings):
+        for tuning_index, (channel_number, edge) in enumerate(ordered):
             centre = starlink_edge_pilot_if_hz(channel_number, edge, lnb_lo_hz)
 
-            # Before the retune, not after it: what a paired sweep needs is
-            # that both radios move the local oscillator at one instant.
             if before_tuning is not None:
                 before_tuning(tuning_index)
-            tuning_started = time.perf_counter()
 
             mark = time.perf_counter()
             lo.attrs["frequency"].value = str(int(centre))
-            timing["tune"] += time.perf_counter() - mark
+            tune_s = time.perf_counter() - mark
+            timing["tune"] += tune_s
 
             mark = time.perf_counter()
             for _ in range(profile.settle_buffers):
                 buffer.refill()
-            timing["settle"] += time.perf_counter() - mark
+            settle_s = time.perf_counter() - mark
+            timing["settle"] += settle_s
+
+            # On frequency and settled.  Everything that costs a different
+            # amount on the two radios has now been paid, so this is where a
+            # paired sweep meets -- not before the write above.
+            if before_listen is not None:
+                before_listen(tuning_index)
 
             mark = time.perf_counter()
+            sample_started_ns = int(sample_clock(tuning_index, "sample_start"))
             pieces, remaining = [], wanted
             while remaining > 0:
                 buffer.refill()
@@ -989,18 +1033,36 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
             # so keeping both costs no radio time at all -- and the capture this
             # precedes keeps both, so a survey of one port could not be set
             # beside what that capture found.
-            raw = np.concatenate(pieces).reshape(-1, 2, 2)[:wanted]
-            # Copied rather than kept as a view, so a read that overshot the
-            # probe releases the surplus instead of pinning it for the whole
-            # survey.
-            retained.append(raw.copy())
-            timing["listen"] += time.perf_counter() - mark
+            #
+            # One copy, straight into the slice: a read that overshot the probe
+            # releases its surplus here rather than pinning it for the whole
+            # sweep, and a read that needed exactly one block is not
+            # concatenated with itself first.
+            block = pieces[0] if len(pieces) == 1 else np.concatenate(pieces)
+            retained[tuning_index] = block.reshape(-1, 2, 2)[:wanted]
+            del pieces, block, raw
+            sample_ended_ns = int(sample_clock(tuning_index, "sample_end"))
+            listen_s = time.perf_counter() - mark
+            timing["listen"] += listen_s
 
             entry = {"channel": channel_number, "region": f"{edge}-edge",
                      "edge": edge, "if_center_hz": centre,
                      "rf_center_hz": centre + lnb_lo_hz,
                      "tuning_index": tuning_index,
-                     "tuning_ms": (time.perf_counter() - tuning_started) * 1000}
+                     # Stamped in this reader's own thread the instant sampling
+                     # began, which is the only instant at which "the two
+                     # radios were observing together" is a statement about the
+                     # radios rather than about the scheduler.
+                     "sample_start_utc_ns": sample_started_ns,
+                     "sample_end_utc_ns": sample_ended_ns,
+                     "tune_ms": tune_s * 1000,
+                     "settle_ms": settle_s * 1000,
+                     "listen_ms": listen_s * 1000,
+                     # Radio time for this tuning, and nothing else: any wait
+                     # at a rendezvous belongs to the rendezvous, which records
+                     # it separately, and adding it here would hide the cost of
+                     # one radio inside the timing of the other.
+                     "tuning_ms": (tune_s + settle_s + listen_s) * 1000}
             plan.append(entry)
             # Published per tuning rather than only at the end, so a sweep that
             # dies on its fourth tuning still records the three it finished.
@@ -1011,7 +1073,9 @@ def collect_radio(context, tunings, *, profile: ScanProfile = SURVEY_PROFILE,
         # reference goes, and a leaked one holds the context so that whatever
         # opens the radio next fails with EBUSY.
         del buffer
-    samples = np.stack(retained) if retained else None
+    # A view onto the rows that were actually filled, so a sweep that stopped
+    # early never hands back uninitialised memory as if it were sky.
+    samples = None if retained is None or not plan else retained[:len(plan)]
     radio_s = sum(timing.values())
     return {
         "samples": samples, "plan": plan,

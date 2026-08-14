@@ -9,6 +9,16 @@
 # This script draws the raw 32-bit numbers and logs them; every mapping from a
 # draw to an assignment is computed in Python, where it is tested.  Two copies
 # of an assignment rule is how they drift apart.
+#
+# RUN INSTRUCTIONS.  The branch must be merged into the deployed checkout at
+# /home/satpi01/leo-tracker before this loop is started.  The exporter imports
+# leo_tracker from that checkout and not from a worktree, so an unmerged tree
+# leaves it meeting recordings it cannot classify on every reconciliation pass:
+# today it counts them as unsupported and carries on, and they accumulate
+# unexported; an older exporter exited non-zero instead, and `set -e` plus
+# `Restart=always` made that a crash loop that stopped ALL offload to shared
+# storage for every capture type.  The gate below refuses to sweep rather than
+# fill a volume nothing is draining.
 set -euo pipefail
 
 repo_dir="${LEO_TRACKER_REPO:-/home/satpi01/leo-tracker}"
@@ -50,6 +60,20 @@ fi
 
 mkdir -p "${storage_root}/captures" "${storage_root}/staging/analysis-queue"
 cd "${repo_dir}"
+
+# --- exporter compatibility gate ---
+# Asked of the checkout the exporter actually imports, which is ${repo_dir} and
+# never a worktree, and asked before a single byte is written. A sweep this
+# host cannot file is a sweep that fills NVMe and never reaches the share.
+if ! env UV_CACHE_DIR="${uv_cache}" "${uv_bin}" run --active --no-sync python -c \
+  'import sys
+from leo_tracker.radio.beacon.offload import OBSERVATION_MODES
+from leo_tracker.radio.beacon.synchronised_scan import SCAN_OBSERVATION_MODE
+sys.exit(0 if SCAN_OBSERVATION_MODE in OBSERVATION_MODES else 1)' 2>/dev/null; then
+  printf '{"sync_scan_exporter_unaware":true,"repo_dir":"%s","detail":"the deployed checkout cannot classify a sync-scan recording; the branch must be merged into %s before this unit is started, or every sweep this loop writes will sit on NVMe unexported"}\n' \
+    "${repo_dir}" "${repo_dir}" >&2
+  exit 2
+fi
 
 # A sensor that exists but reads unusably is a hard error rather than a
 # silently skipped safety check; a host with no zone at all runs without one.

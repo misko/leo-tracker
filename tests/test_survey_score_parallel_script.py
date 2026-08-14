@@ -13,6 +13,7 @@ a worker were one core.
 """
 import os
 from pathlib import Path
+import re
 import subprocess
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "starlink-survey-score-parallel.sh"
@@ -143,3 +144,27 @@ def test_a_nonsense_worker_count_is_refused_rather_than_clamped(tmp_path):
         result = _run(["--workers", bad], root=root)
         assert result.returncode == 2, bad
         assert "positive integer" in result.stderr, bad
+
+
+def test_the_blas_pools_are_pinned_so_workers_do_not_oversubscribe():
+    """Each worker must not build a core-count-sized BLAS pool of its own.
+
+    The kernel's omp_set_num_threads() covers the scan kernel only. numpy links
+    scipy-openblas, which sizes its pool to the core count in every worker that
+    touches a BLAS path, and the script already runs one worker per three cores.
+    Pinning them is insurance: the hot path is FFT work today, but one BLAS call
+    added later would silently oversubscribe the host.
+    """
+    text = SCRIPT.read_text()
+    for variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+        assert re.search(rf"^export {variable}=1$", text, re.M), variable
+
+
+def test_the_thread_pins_are_exported_before_any_worker_starts():
+    """Setting them after the fan-out would leave every worker unpinned."""
+    text = SCRIPT.read_text()
+    pin = text.index("export OPENBLAS_NUM_THREADS=1")
+    launched = [m.start() for m in re.finditer(r"^\s*\(\s*$|&\s*$", text, re.M)]
+    assert launched, "no background launch found; update this test"
+    assert pin < max(launched), (
+        "workers are launched before the BLAS pins are exported")

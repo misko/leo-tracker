@@ -64,6 +64,22 @@ fi
 if ! [[ "${workers}" =~ ^[0-9]+$ ]] || (( workers < 1 )); then
   echo "--workers must be a positive integer" >&2; exit 2
 fi
+
+# The kernel's own omp_set_num_threads(DEFAULT_THREADS) covers the scan kernel and
+# nothing else. numpy links scipy-openblas, which builds a pool sized to the core
+# count in EVERY worker the moment a BLAS path is touched -- measured here at 5
+# threads on 4 cores against 2 with these set. Multiply that by a worker per three
+# cores and a 24-core host carries a few hundred threads it never asked for.
+#
+# This is insurance rather than a measured speedup: the hot path is FFT work, which
+# numpy does in single-threaded pocketfft, and an idle pool costs no CPU. It is set
+# because the cost of being wrong later -- one BLAS call added to the scoring path,
+# silently oversubscribing the box -- is much larger than the cost of pinning it now.
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
 if [[ -n "${limit}" ]] && { ! [[ "${limit}" =~ ^[0-9]+$ ]] || (( limit < 1 )); }; then
   echo "--limit must be a positive integer" >&2; exit 2
 fi

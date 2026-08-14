@@ -1049,6 +1049,31 @@ def command_starlink_survey_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_starlink_sync_import(args: argparse.Namespace) -> int:
+    """File the interim synchronised sweeps into a survey corpus.
+
+    Imports only. Scoring is the existing survey scorer's job and runs against
+    the corpus this writes, which is why the two halves are separate commands
+    and one script drives both.
+    """
+    from .beacon.sync_import import import_status, run
+    sweeps = args.sweep_root or (Path(args.root) / "sync-scans")
+    corpus = args.corpus_root or (Path(args.root) / "surveys" / "sync-corpus")
+    if args.action == "status":
+        print(json.dumps(import_status(sweeps, corpus), indent=2,
+                         sort_keys=True))
+        return 0
+    listed = None
+    if args.sweeps_from:
+        listed = [Path(line) for line in
+                  Path(args.sweeps_from).read_text().splitlines() if line]
+    print(json.dumps(run(sweeps, corpus, limit=args.limit,
+                         rebuild=args.rebuild, link=not args.copy,
+                         sweeps=listed),
+                     indent=2, sort_keys=True))
+    return 0
+
+
 def command_starlink_probe_index(args: argparse.Namespace) -> int:
     """Build, inspect or query the per-probe projection."""
     from .beacon.probe_index import (ProbeIndexUnavailable, build,
@@ -2684,6 +2709,34 @@ def build_parser() -> argparse.ArgumentParser:
     survey_score.add_argument("--json", action="store_true",
         help="print the review as JSON rather than as a table")
     survey_score.set_defaults(handler=command_starlink_survey_score)
+    sync_import = commands.add_parser("starlink-sync-import",
+        help="file the interim synchronised sweeps into a survey corpus, one "
+             "corpus entry per radio per sweep; scoring is a separate command")
+    sync_import.add_argument("action", choices=("run", "status"))
+    sync_import.add_argument("root", type=Path,
+        help="shared root; the sweeps default to ROOT/sync-scans and the "
+             "corpus to ROOT/surveys/sync-corpus")
+    sync_import.add_argument("--sweep-root", type=Path,
+        help="where the sync-<UTC>/ sweep directories are; the collector "
+             "writes them to the capture host's NVMe, so on an analysis host "
+             "this is wherever they were rsynced to")
+    sync_import.add_argument("--corpus-root", type=Path,
+        help="corpus to write into; defaults to ROOT/surveys/sync-corpus, "
+             "deliberately not the pre-dwell survey corpus the analysis "
+             "service is scoring now")
+    sync_import.add_argument("--sweeps-from", type=Path,
+        help="file of sweep directories, one per line, instead of scanning "
+             "SWEEP_ROOT; this is how the parallel driver deals its shards")
+    sync_import.add_argument("--limit", type=int,
+        help="sweeps to import this pass, not entries: half a pair in the "
+             "corpus is the one state that makes the pairing unusable")
+    sync_import.add_argument("--rebuild", action="store_true",
+        help="re-import sweeps that already have complete corpus entries")
+    sync_import.add_argument("--copy", action="store_true",
+        help="copy the IQ instead of hard-linking it; only needed when the "
+             "corpus and the sweeps are on different filesystems, which the "
+             "importer detects and falls back to on its own")
+    sync_import.set_defaults(handler=command_starlink_sync_import)
     probe_index = commands.add_parser("starlink-probe-index",
         help="project per-probe facts into day-partitioned parquet")
     probe_index.add_argument("action", choices=("build", "status", "query"))

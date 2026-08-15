@@ -69,8 +69,18 @@ def profile_for(arm):
 print(f"opening both radios...", flush=True)
 ctx = {}
 for name, serial, _ in RADIOS:
-    ctx[name] = _open_context("pluto://usb:", serial)
-print("  both open", flush=True)
+    # Tolerant, because the alternative is a crash loop: a radio that has
+    # dropped off USB takes the whole collector down here, systemd restarts it
+    # five seconds later, and it dies again -- so a dropout that would have
+    # cost a few sweeps costs the rest of the run instead. ``context_for``
+    # opens lazily, so a radio that comes back is picked up by the next sweep.
+    try:
+        ctx[name] = _open_context("pluto://usb:", serial)
+        print(f"  {name} open", flush=True)
+    except Exception as exc:
+        print(f"  {name} NOT ATTACHED: {exc}", flush=True)
+if not ctx:
+    print("  no radios attached; waiting for one to appear", flush=True)
 
 sweeps = 0
 started = time.monotonic()
@@ -101,6 +111,25 @@ while True:
     arrive = {n: [] for n, _, _ in RADIOS}
     errs, wrote = {}, {}
 
+    def context_for(name):
+        """This radio's open context, re-opening it if a earlier sweep lost it.
+
+        A reopen that fails leaves no entry, and reading ctx[name] then raises
+        KeyError on every later sweep -- which reads like a collector bug and is
+        not one: the radio is absent.  Saying so keeps a USB dropout diagnosable
+        from the log, and re-opening here means a radio that comes back is picked
+        up by the next sweep whether or not the reopen loop below caught it.
+        """
+        existing = ctx.get(name)
+        if existing is not None:
+            return existing
+        serial = dict((n, s) for n, s, _ in RADIOS)[name]
+        try:
+            ctx[name] = _open_context("pluto://usb:", serial)
+        except Exception as exc:
+            raise RuntimeError(f"{name} is not attached: {exc}") from None
+        return ctx[name]
+
     def sweep(name):
         try:
             p = plan[name]
@@ -111,7 +140,7 @@ while True:
                 try: barrier.wait(timeout=60.0)
                 except threading.BrokenBarrierError: pass
                 arrive[name].append(time.monotonic())
-                blocks.append(collect_radio(ctx[name], [(ch, edge)], profile=prof,
+                blocks.append(collect_radio(context_for(name), [(ch, edge)], profile=prof,
                                             sample_rate_hz=p["arm"]["sample_rate_hz"])["samples"])
             a = np.concatenate([np.asarray(b) for b in blocks], axis=0)
             path = out / f"{name}.ci16"

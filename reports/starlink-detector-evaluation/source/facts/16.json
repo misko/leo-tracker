@@ -1,0 +1,528 @@
+{
+  "s16a_lnba_gen1_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen1/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnba_gen1_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen1/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnba_gen1_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen1/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnba_gen1_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-a|gen1/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnba_gen1_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-a|gen1/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnba_gen1_n": {
+    "expr": "live + corpus",
+    "inputs": {
+      "live": "s16a_lnba_gen1_n_live",
+      "corpus": "s16a_lnba_gen1_n_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnba_gen1_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen1/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnba_gen2_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnba_gen2_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen2/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnba_gen2_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen2/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnba_gen2_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-a|gen2/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnba_gen2_n_sync_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-a|gen2/sync_corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnba_gen2_n": {
+    "expr": "corpus + sync_corpus",
+    "inputs": {
+      "corpus": "s16a_lnba_gen2_n_corpus",
+      "sync_corpus": "s16a_lnba_gen2_n_sync_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnba_gen2_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen2/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen1_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen1/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnbb_gen1_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen1/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnbb_gen1_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen1/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnbb_gen1_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-b|gen1/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen1_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-b|gen1/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen1_n": {
+    "expr": "live + corpus",
+    "inputs": {
+      "live": "s16a_lnbb_gen1_n_live",
+      "corpus": "s16a_lnbb_gen1_n_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnbb_gen1_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen1/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen2_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnbb_gen2_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen2/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnbb_gen2_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen2/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnbb_gen2_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-b|gen2/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen2_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-b|gen2/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen2_n_sync_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-b|gen2/sync_corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbb_gen2_n": {
+    "expr": "live + corpus + sync_corpus",
+    "inputs": {
+      "live": "s16a_lnbb_gen2_n_live",
+      "corpus": "s16a_lnbb_gen2_n_corpus",
+      "sync_corpus": "s16a_lnbb_gen2_n_sync_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnbb_gen2_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen2/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen1_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen1/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnbc_gen1_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen1/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnbc_gen1_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen1/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnbc_gen1_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-c|gen1/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen1_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-c|gen1/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen1_n": {
+    "expr": "live + corpus",
+    "inputs": {
+      "live": "s16a_lnbc_gen1_n_live",
+      "corpus": "s16a_lnbc_gen1_n_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnbc_gen1_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen1/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen2_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnbc_gen2_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnbc_gen2_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnbc_gen2_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-c|gen2/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen2_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-c|gen2/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen2_n_sync_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-c|gen2/sync_corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbc_gen2_n": {
+    "expr": "live + corpus + sync_corpus",
+    "inputs": {
+      "live": "s16a_lnbc_gen2_n_live",
+      "corpus": "s16a_lnbc_gen2_n_corpus",
+      "sync_corpus": "s16a_lnbc_gen2_n_sync_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnbc_gen2_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen1_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen1/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnbd_gen1_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen1/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnbd_gen1_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen1/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnbd_gen1_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-d|gen1/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen1_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-d|gen1/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen1_n": {
+    "expr": "live + corpus",
+    "inputs": {
+      "live": "s16a_lnbd_gen1_n_live",
+      "corpus": "s16a_lnbd_gen1_n_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnbd_gen1_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen1/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen2_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s16a_lnbd_gen2_ppm": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen2/consensus_hz",
+    "fmt": "ppm1"
+  },
+  "s16a_lnbd_gen2_spread": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen2/method_spread_hz",
+    "fmt": "ci_int"
+  },
+  "s16a_lnbd_gen2_n_live": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-d|gen2/live/n",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen2_n_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-d|gen2/corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen2_n_sync_corpus": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-d|gen2/sync_corpus/n",
+    "fmt": "int"
+  },
+  "s16a_lnbd_gen2_n": {
+    "expr": "live + corpus + sync_corpus",
+    "inputs": {
+      "live": "s16a_lnbd_gen2_n_live",
+      "corpus": "s16a_lnbd_gen2_n_corpus",
+      "sync_corpus": "s16a_lnbd_gen2_n_sync_corpus"
+    },
+    "fmt": "int",
+    "note": "total observations across every population examined for this port-epoch; not all of them necessarily enter the consensus"
+  },
+  "s16a_lnbd_gen2_npop": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen2/n_populations",
+    "fmt": "int"
+  },
+  "s16a_lnba_move": {
+    "expr": "after - before",
+    "fmt": "signed_khz1",
+    "inputs": {
+      "before": "s16a_lnba_gen1_centre",
+      "after": "s16a_lnba_gen2_centre"
+    }
+  },
+  "s16a_lnbb_move": {
+    "expr": "after - before",
+    "fmt": "signed_khz1",
+    "inputs": {
+      "before": "s16a_lnbb_gen1_centre",
+      "after": "s16a_lnbb_gen2_centre"
+    }
+  },
+  "s16a_lnbc_move": {
+    "expr": "after - before",
+    "fmt": "signed_khz1",
+    "inputs": {
+      "before": "s16a_lnbc_gen1_centre",
+      "after": "s16a_lnbc_gen2_centre"
+    }
+  },
+  "s16a_lnbd_move": {
+    "expr": "after - before",
+    "fmt": "signed_khz1",
+    "inputs": {
+      "before": "s16a_lnbd_gen1_centre",
+      "after": "s16a_lnbd_gen2_centre"
+    }
+  },
+  "s16b_before_centroid": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/before_centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s16b_before_negative": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/before_fraction_negative",
+    "fmt": "pct1"
+  },
+  "s16b_before_n": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/n_before",
+    "fmt": "int"
+  },
+  "s16b_after_centroid": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/after_centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s16b_after_negative": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/after_fraction_negative",
+    "fmt": "pct1"
+  },
+  "s16b_after_n": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/n_after",
+    "fmt": "int"
+  },
+  "s16c_lnba_epochmove_lost": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/detection_lost_fraction",
+    "fmt": "pct1"
+  },
+  "s16c_lnba_epochmove_miscentring": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/miscentring_hz",
+    "fmt": "signed_khz1"
+  },
+  "s16c_lnba_epochmove_control": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/partner_control",
+    "fmt": "raw"
+  },
+  "s16c_lnbc_gen1_lost": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen1/detection_lost_fraction",
+    "fmt": "pct1"
+  },
+  "s16c_lnbc_gen1_miscentring": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen1/miscentring_hz",
+    "fmt": "signed_khz1"
+  },
+  "s16c_lnbc_gen1_control": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen1/partner_control",
+    "fmt": "raw"
+  },
+  "s16c_lnbc_gen2_lost": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen2/detection_lost_fraction",
+    "fmt": "pct1"
+  },
+  "s16c_lnbc_gen2_miscentring": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen2/miscentring_hz",
+    "fmt": "signed_khz1"
+  },
+  "s16c_lnbc_gen2_control": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen2/partner_control",
+    "fmt": "raw"
+  },
+  "s16d_lnbc_applied": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-19f2/applied_centers_hz/0",
+    "fmt": "signed_int"
+  },
+  "s16d_lnbc_miscentred": {
+    "expr": "measured - applied",
+    "fmt": "signed_int",
+    "inputs": {
+      "measured": "s16a_lnbc_gen2_centre",
+      "applied": "s16d_lnbc_applied"
+    }
+  },
+  "s16d_lnbd_applied": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-19f2/applied_centers_hz/1",
+    "fmt": "signed_int"
+  },
+  "s16d_lnbd_miscentred": {
+    "expr": "measured - applied",
+    "fmt": "signed_int",
+    "inputs": {
+      "measured": "s16a_lnbd_gen2_centre",
+      "applied": "s16d_lnbd_applied"
+    }
+  },
+  "s16d_pluto19f2_recommended": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/recommendation/pluto-19f2|gen2/measured_centers_hz",
+    "fmt": "raw"
+  },
+  "s16d_pluto19f2_residual": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/recommendation/pluto-19f2|gen2/rx0_residual_miscentring_hz",
+    "fmt": "khz1"
+  },
+  "s16d_lnba_applied": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-5d4d/applied_centers_hz/0",
+    "fmt": "signed_int"
+  },
+  "s16d_lnba_miscentred": {
+    "expr": "measured - applied",
+    "fmt": "signed_int",
+    "inputs": {
+      "measured": "s16a_lnba_gen2_centre",
+      "applied": "s16d_lnba_applied"
+    }
+  },
+  "s16d_lnbb_applied": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-5d4d/applied_centers_hz/1",
+    "fmt": "signed_int"
+  },
+  "s16d_lnbb_miscentred": {
+    "expr": "measured - applied",
+    "fmt": "signed_int",
+    "inputs": {
+      "measured": "s16a_lnbb_gen2_centre",
+      "applied": "s16d_lnbb_applied"
+    }
+  },
+  "s16d_pluto5d4d_recommended": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/recommendation/pluto-5d4d|gen2/measured_centers_hz",
+    "fmt": "raw"
+  },
+  "s16d_pluto5d4d_residual": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/recommendation/pluto-5d4d|gen2/rx0_residual_miscentring_hz",
+    "fmt": "khz1"
+  },
+  "s16d_timer_next": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/timer/next_elapse",
+    "fmt": "raw"
+  },
+  "s16d_reports_examined": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/reports_examined",
+    "fmt": "int"
+  },
+  "s16d_artifact_utc": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/created_utc",
+    "fmt": "raw"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "artifact_mtime_utc": "2026-08-14T19:01:37+00:00",
+  "captured_utc": "2026-08-15T02:19:46+00:00",
+  "created_utc": "2026-08-14T19:01:37.716871Z",
+  "radios": {
+    "pluto-19f2": {
+      "applied_centers_hz": [
+        602869.4,
+        0.0
+      ],
+      "measured": true,
+      "measured_centers_hz": null,
+      "mismatch_hz": 602869.4,
+      "ports": [
+        "lnb-c",
+        "lnb-d"
+      ],
+      "receiver_candidate_counts": [
+        2243,
+        4757
+      ]
+    },
+    "pluto-5d4d": {
+      "applied_centers_hz": [
+        -906.6,
+        0.0
+      ],
+      "measured": true,
+      "measured_centers_hz": null,
+      "mismatch_hz": -906.6,
+      "ports": [
+        "lnb-a",
+        "lnb-b"
+      ],
+      "receiver_candidate_counts": [
+        1523,
+        3317
+      ]
+    }
+  },
+  "raw_artifact": {
+    "alerts": [],
+    "created_utc": "2026-08-14T19:01:37.716871Z",
+    "radios": {
+      "pluto-19f2": {
+        "measured": true,
+        "mismatch_hz": 602869.4,
+        "p10_hz": 433030.7,
+        "p90_hz": 607376.5,
+        "receiver_candidate_counts": [
+          2243,
+          4757
+        ],
+        "receiver_labels": [
+          "lnb-c",
+          "lnb-d"
+        ],
+        "sample_count": 1641,
+        "spread_hz": 174345.8
+      },
+      "pluto-5d4d": {
+        "measured": true,
+        "mismatch_hz": -906.6,
+        "p10_hz": -8773.3,
+        "p90_hz": 6934.1,
+        "receiver_candidate_counts": [
+          1523,
+          3317
+        ],
+        "receiver_labels": [
+          "lnb-a",
+          "lnb-b"
+        ],
+        "sample_count": 984,
+        "spread_hz": 15707.5
+      }
+    },
+    "receiver_centers_hz": {
+      "pluto-19f2": [
+        602869.4,
+        0.0
+      ],
+      "pluto-5d4d": [
+        -906.6,
+        0.0
+      ]
+    },
+    "reports_examined": 900,
+    "schema": "leo-tracker.lnb-calibration/v1"
+  },
+  "reports_examined": 900,
+  "schema": "live-calibration-snapshot/1",
+  "source": "/mnt/qnap01/mouse9911/leo/reports/lnb-calibration.json",
+  "timer": {
+    "next_elapse": "Sat 2026-08-15 11:59:52 PDT",
+    "unit": "leo-tracker-lnb-calibration.timer"
+  }
+}

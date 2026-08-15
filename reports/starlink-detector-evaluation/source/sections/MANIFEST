@@ -1,0 +1,24 @@
+# Every section the finished report must contain, in document order.
+# source/build.py refuses to write REPORT.md until all of them exist, so a
+# half-converted document can never replace the published one.
+000-front-matter.md
+010-exec-summary.md
+020-how-to-read.md
+030-corpus.md
+100-s01-why-edge-pilots.md
+110-s02-nothing-injected.md
+120-s03-apparatus.md
+130-s04-dataset.md
+140-s05-coincidence-model.md
+150-s06-negative-controls.md
+160-s07-near-duplicates.md
+170-s08-sky.md
+180-s09-instrument.md
+190-s10-real-ground-truth.md
+200-s11-measured-pd.md
+210-s12-the-cliff.md
+220-s13-two-radios.md
+230-s14-dead-port.md
+240-s15-three-experiments.md
+250-s16-absolute-calibration.md
+900-provenance.md

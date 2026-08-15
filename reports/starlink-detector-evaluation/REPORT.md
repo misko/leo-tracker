@@ -67,7 +67,9 @@ say whether receiver, radio, edge, water or timing is responsible; the earlier
 claim that the LNB was the entire cause is withdrawn in
 [section 8](#8-what-the-sky-looks-like). The instrument yields two associations
 worth acting on: a scoring-pipeline detection cliff near 350–400 kHz of corrected
-offset, and a large positive centre correction on one port without which a
+offset — since **measured to be the coarse bank's own ±300.0 kHz search
+span**, not a limit of the hardware
+([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) — and a large positive centre correction on one port without which a
 working receiver reads as deaf ([section 9](#9-what-survives-the-instrument)) —
 though the specific +604.2 kHz value is itself wrong by 178 kHz, as
 [section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs) measures.
@@ -85,6 +87,20 @@ partly works and the check does not, and nothing here validates the pooled model
 on the heterogeneous sky corpus; the 350–400 kHz cliff does not exist against a *known* offset,
 falling instead at the 700 kHz bank edge; and the thresholds are calibrated on
 truly empty input.
+
+**And the cliff has a cause, which is a number somebody chose.** Over a closed
+cable, sample rate and receiver bandwidth can be set independently — on sky
+they cannot, because the capture path writes one equal to the other. Across
+432 cells the measured analog corner sweeps −241.3 kHz to
+3805.6 kHz and the predicted digital edge sweeps thirteenfold, while
+**the measured knee does not move at all**: it sits at each search bank's own
+span plus the ±113.6 kHz window inside which the relative-phase statistics are
+unique. Change the bank and the cliff moves with it; change the bandwidth by a
+factor of sixteen and it does not. The received-power control shows the filter
+demonstrably cutting where the score does not follow. So the collapse is
+geometric in the search rather than energetic in the passband, and
+`offset_span_hz` is a design parameter that can be widened
+([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)).
 
 **And the instrument itself is losing detections right now.**
 [Section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
@@ -1025,7 +1041,7 @@ the tidy one.*
 
 | Finding | The number it rests on | Status |
 |---|---|---|
-| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
+| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism **now measured** — the coarse bank's own search span, not bandwidth ([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) |
 | ~~`lnb-c` needs a +604.2 kHz configured centre correction~~ **superseded — +604.2 kHz is itself 179.2 kHz too high and costs 25.5% of its detections ([16c](#16c-miscentring-costs-detections-and-this-is-measured-not-modelled))** | its measured absolute centre is **+424,990 Hz**; the direction of the original finding — `lnb-c` needs a large positive correction, and corrected it has the highest fire rate in the slice — **stands** | **corrected value** |
 | The 1.25 MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
 | The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.946 over 40,256 observations | **stands** |
@@ -1387,16 +1403,57 @@ tooth points, firing at a higher rate than the refined points in the same bin.
 The cliff exists and is sharp; the plateau it appears to fall from is
 mostly grid.
 
-### What is still unexplained
+### Both halves are now measured, and neither is physics
 
-The window centre is no longer among the open questions:
+The window **centre** is each receiver's own oscillator error:
 [section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
-measures all four receivers absolutely, finds four independent constants between
-−15.3 and +43.6 ppm, and shows that correcting each one separately moves the
-pooled window onto **+3.5 kHz** in a genuinely out-of-sample test. What remains
-open is the **~±175 kHz half-width**, given that injection shows the detectors
-themselves flat out to ±700 kHz — so the width belongs to the acquisition stage,
-not to the decision statistics.
+measures all four absolutely, finds four independent constants between
+−15.3 and +43.6 ppm, and shows that correcting each one
+separately moves the pooled window onto **+3.5 kHz** in a
+genuinely out-of-sample test.
+
+The window **width** is the coarse bank's own search span — a number somebody
+chose, not a limit of the hardware or the detectors.
+
+On sky the two candidate physical limits cannot be told apart, because
+`fast_scan.py` writes `rf_bandwidth` equal to `sampling_frequency`
+([section 4](#4-the-dataset-twelve-arms-and-two-geometries-for-free)), so the
+Nyquist window and the analog filter move together on every arm. Over a closed
+cable they separate. Across 432 cells — three sample rates, four RX
+bandwidths, three transmit drives, carrier offset imposed on the waveform so the
+axis is known by construction:
+
+| | Sweeps across the matrix | Measured knee |
+|---|---|---|
+| Predicted digital edge | 312.5 kHz → 4062.5 kHz | — |
+| Measured analog corner, off the receiver's own thermal noise | −241.3 kHz → 3805.6 kHz | — |
+| `coarse-A` (3×8, ±300.0 kHz) — **the deployed front end** | — | **350–400 kHz in 4 cells, 400–450 in the other 8** |
+| `full-frame-full` on `coarse-E` (13×8, ±700.0 kHz) | — | **810–840 kHz in 12 of 12** |
+
+**The predicted edges sweep by a factor of sixteen. The measured knees do not
+move.** And each lands on its own bank's span plus the ±113.6 kHz window
+`survey_scoring` documents as the range in which every relative-phase statistic
+is unique: 300 + 113.6 = 413.6, and 700 + 113.6 = 813.6. Swap the bank and the
+cliff moves to the new bank's span.
+
+The falsifier was fixed before the data was taken. `Fs =
+10000000 MS/s` with a measured corner at
+3805.6 kHz, and `Fs = 2500000 MS/s` with a
+measured corner at 254.9 kHz, share a `coarse-A` knee at
+400.0 kHz. No bandwidth account permits that.
+
+The positive control carries as much weight as the result. At the narrowest RX
+bandwidth the pilot block does not fit the passband even at zero offset, and the
+power panel shows it — several dB of roll-off across the sweep and about a dB
+down at zero. So the filter is demonstrably cutting; the score simply does not
+follow it, and the score collapses where power is flat. **The collapse is
+geometric in the search, not energetic in the passband.**
+
+![Predicted edges sweep sixteenfold; the measured knees do not move](figures/injection/cfo-bandwidth.png)
+
+What this leaves open is narrower and more useful than what it closes: whether
+±300.0 kHz is the right span to deploy. It is a design parameter, and
+widening it trades hypotheses searched against offsets reachable.
 
 ## 13. The same experiment, on two radios, with the answer known
 

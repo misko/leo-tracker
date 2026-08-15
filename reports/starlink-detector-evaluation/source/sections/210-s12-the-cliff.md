@@ -120,13 +120,54 @@ tooth points, firing at a higher rate than the refined points in the same bin.
 The cliff exists and is sharp; the plateau it appears to fall from is
 mostly grid.
 
-### What is still unexplained
+### Both halves are now measured, and neither is physics
 
-The window centre is no longer among the open questions:
+The window **centre** is each receiver's own oscillator error:
 [section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
-measures all four receivers absolutely, finds four independent constants between
-{{s12_ppm_min}} and {{s12_ppm_max}} ppm, and shows that correcting each one separately moves the
-pooled window onto **{{s12_after_centroid_khz}} kHz** in a genuinely out-of-sample test. What remains
-open is the **~±{{s12_window_halfwidth_khz}} kHz half-width**, given that injection shows the detectors
-themselves flat out to ±{{s12_flat_offset_khz}} kHz — so the width belongs to the acquisition stage,
-not to the decision statistics.
+measures all four absolutely, finds four independent constants between
+{{s12_ppm_min}} and {{s12_ppm_max}} ppm, and shows that correcting each one
+separately moves the pooled window onto **{{s12_after_centroid_khz}} kHz** in a
+genuinely out-of-sample test.
+
+The window **width** is the coarse bank's own search span — a number somebody
+chose, not a limit of the hardware or the detectors.
+
+On sky the two candidate physical limits cannot be told apart, because
+`fast_scan.py` writes `rf_bandwidth` equal to `sampling_frequency`
+([section 4](#4-the-dataset-twelve-arms-and-two-geometries-for-free)), so the
+Nyquist window and the analog filter move together on every arm. Over a closed
+cable they separate. Across {{s12_cb_cells}} cells — three sample rates, four RX
+bandwidths, three transmit drives, carrier offset imposed on the waveform so the
+axis is known by construction:
+
+| | Sweeps across the matrix | Measured knee |
+|---|---|---|
+| Predicted digital edge | {{s12_cb_dig_min}} → {{s12_cb_dig_max}} | — |
+| Measured analog corner, off the receiver's own thermal noise | {{s12_cb_clip_min}} → {{s12_cb_clip_max}} | — |
+| `coarse-A` (3×8, ±{{s12_cb_span_A}}) — **the deployed front end** | — | **350–400 kHz in 4 cells, 400–450 in the other 8** |
+| `full-frame-full` on `coarse-E` (13×8, ±{{s12_cb_span_E}}) | — | **810–840 kHz in 12 of 12** |
+
+**The predicted edges sweep by a factor of sixteen. The measured knees do not
+move.** And each lands on its own bank's span plus the ±113.6 kHz window
+`survey_scoring` documents as the range in which every relative-phase statistic
+is unique: 300 + 113.6 = 413.6, and 700 + 113.6 = 813.6. Swap the bank and the
+cliff moves to the new bank's span.
+
+The falsifier was fixed before the data was taken. `Fs =
+{{s12_cb_wide_fast_fs}} MS/s` with a measured corner at
+{{s12_cb_wide_fast_clip}}, and `Fs = {{s12_cb_wide_slow_fs}} MS/s` with a
+measured corner at {{s12_cb_wide_slow_clip}}, share a `coarse-A` knee at
+{{s12_cb_wide_fast_kneeA}}. No bandwidth account permits that.
+
+The positive control carries as much weight as the result. At the narrowest RX
+bandwidth the pilot block does not fit the passband even at zero offset, and the
+power panel shows it — several dB of roll-off across the sweep and about a dB
+down at zero. So the filter is demonstrably cutting; the score simply does not
+follow it, and the score collapses where power is flat. **The collapse is
+geometric in the search, not energetic in the passband.**
+
+![Predicted edges sweep sixteenfold; the measured knees do not move](figures/injection/cfo-bandwidth.png)
+
+What this leaves open is narrower and more useful than what it closes: whether
+±{{s12_cb_span_A}} is the right span to deploy. It is a design parameter, and
+widening it trades hypotheses searched against offsets reachable.

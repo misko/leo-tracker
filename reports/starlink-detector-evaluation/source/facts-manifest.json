@@ -24,6 +24,10 @@
     "exec_bank_edge_hz",
     "exec_bank_edge_khz",
     "exec_before_centroid",
+    "exec_cb_cells",
+    "exec_cb_clip_hi",
+    "exec_cb_clip_lo",
+    "exec_cb_span_A",
     "exec_cliff_high_khz",
     "exec_cliff_low_khz",
     "exec_cross_channel_phi_max",
@@ -963,6 +967,18 @@
     "s11_transmitting_rungs",
     "s12_after_centroid_khz",
     "s12_bank_span_khz",
+    "s12_cb_cells",
+    "s12_cb_clip_max",
+    "s12_cb_clip_min",
+    "s12_cb_dig_max",
+    "s12_cb_dig_min",
+    "s12_cb_span_A",
+    "s12_cb_span_E",
+    "s12_cb_wide_fast_clip",
+    "s12_cb_wide_fast_fs",
+    "s12_cb_wide_fast_kneeA",
+    "s12_cb_wide_slow_clip",
+    "s12_cb_wide_slow_fs",
     "s12_coarse_a_span_hz",
     "s12_coarse_a_tooth_khz",
     "s12_coarse_e_span_hz",
@@ -972,8 +988,6 @@
     "s12_edge_300",
     "s12_edge_350",
     "s12_edge_400",
-    "s12_flat_offset_hz",
-    "s12_flat_offset_khz",
     "s12_gap_before",
     "s12_if_high_mhz",
     "s12_if_lever",
@@ -1447,7 +1461,7 @@
     "s900_recheck_sweeps_added",
     "s900_rl_utc"
   ],
-  "fact_count": 1464,
+  "fact_count": 1481,
   "facts": {
     "corpus_entries_imported": {
       "defined_in": "030.json",
@@ -1686,6 +1700,38 @@
       "ptr": "/panel_b/before_centroid_khz",
       "src": "figures/absolute-centres.json",
       "value": -130.45968648727487
+    },
+    "exec_cb_cells": {
+      "defined_in": "010.json",
+      "fact": "exec_cb_cells",
+      "format": "int",
+      "ptr": "/census/cells_all_arms",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 432
+    },
+    "exec_cb_clip_hi": {
+      "defined_in": "010.json",
+      "fact": "exec_cb_clip_hi",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 3805646.155886282
+    },
+    "exec_cb_clip_lo": {
+      "defined_in": "010.json",
+      "fact": "exec_cb_clip_lo",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/0/measured_analog_clip_offset_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": -241311.96811618702
+    },
+    "exec_cb_span_A": {
+      "defined_in": "010.json",
+      "fact": "exec_cb_span_A",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_span_hz/coarse-A",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 300000.0
     },
     "exec_cliff_high_khz": {
       "defined_in": "010.json",
@@ -11211,6 +11257,102 @@
       "note": "the coarse-E bank searches +/- half its offset span",
       "value": 350.0
     },
+    "s12_cb_cells": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_cells",
+      "format": "int",
+      "ptr": "/census/cells_all_arms",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 432
+    },
+    "s12_cb_clip_max": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_clip_max",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 3805646.155886282
+    },
+    "s12_cb_clip_min": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_clip_min",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/0/measured_analog_clip_offset_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": -241311.96811618702
+    },
+    "s12_cb_dig_max": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_dig_max",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/8/predicted_digital_edge_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 4062500.0
+    },
+    "s12_cb_dig_min": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_dig_min",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/0/predicted_digital_edge_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 312500.0
+    },
+    "s12_cb_span_A": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_span_A",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_span_hz/coarse-A",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 300000.0
+    },
+    "s12_cb_span_E": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_span_E",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_span_hz/coarse-E",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 700000.0
+    },
+    "s12_cb_wide_fast_clip": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_wide_fast_clip",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 3805646.155886282
+    },
+    "s12_cb_wide_fast_fs": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_wide_fast_fs",
+      "format": "f0",
+      "ptr": "/measured_edge_per_cell/11/sample_rate_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 10000000.0
+    },
+    "s12_cb_wide_fast_kneeA": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_wide_fast_kneeA",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/11/measured_knee_coarse_A_hz/0",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 400000.0
+    },
+    "s12_cb_wide_slow_clip": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_wide_slow_clip",
+      "format": "khz1",
+      "ptr": "/measured_edge_per_cell/3/measured_analog_clip_offset_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 254888.9280325775
+    },
+    "s12_cb_wide_slow_fs": {
+      "defined_in": "210.json",
+      "fact": "s12_cb_wide_slow_fs",
+      "format": "f0",
+      "ptr": "/measured_edge_per_cell/3/sample_rate_hz",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 2500000.0
+    },
     "s12_coarse_a_span_hz": {
       "defined_in": "210.json",
       "fact": "s12_coarse_a_span_hz",
@@ -11303,32 +11445,6 @@
       "ptr": "/bin_edges_khz/8",
       "src": "figures/cfo-cliff.json",
       "value": 400.0
-    },
-    "s12_flat_offset_hz": {
-      "defined_in": "210.json",
-      "fact": "s12_flat_offset_hz",
-      "format": "hz",
-      "ptr": "/passes/1/table/9/offset_hz",
-      "src": "figures/injection/offset-cliff.json",
-      "value": 700000.0
-    },
-    "s12_flat_offset_khz": {
-      "defined_in": "210.json",
-      "expr": "hz / 1000",
-      "fact": "s12_flat_offset_khz",
-      "format": "f0",
-      "inputs": {
-        "hz": {
-          "defined_in": "210.json",
-          "fact": "s12_flat_offset_hz",
-          "format": "hz",
-          "ptr": "/passes/1/table/9/offset_hz",
-          "src": "figures/injection/offset-cliff.json",
-          "value": 700000.0
-        }
-      },
-      "note": "the furthest imposed offset at which injection still holds every detector flat, at the detection knee",
-      "value": 700.0
     },
     "s12_gap_before": {
       "defined_in": "210.json",
@@ -16908,6 +17024,9 @@
     "s04_rej_19f2_2083",
     "s04_rej_5d4d_125",
     "s04_rej_5d4d_2083",
+    "s12_cb_wide_slow_kneeA",
+    "s12_flat_offset_hz",
+    "s12_flat_offset_khz",
     "s16a_lnba_gen1_npop",
     "s16a_lnba_gen2_npop",
     "s16a_lnba_gen2_spread",

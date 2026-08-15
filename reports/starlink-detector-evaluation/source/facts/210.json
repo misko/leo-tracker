@@ -15,7 +15,6 @@
     "ptr": "/bin_edges_khz/8",
     "fmt": "f0"
   },
-
   "s12_lnbb_recorded_centre": {
     "src": "figures/injection/raw-vs-corrected.json",
     "ptr": "/receiver_centers_hz/lnb-b",
@@ -33,7 +32,6 @@
     "fmt": "signed_f1",
     "note": "already in Hz; signed_f1 keeps the tenth of a hertz the artifact records"
   },
-
   "s12_lnbb_raw_pre": {
     "src": "figures/injection/raw-vs-corrected.json",
     "ptr": "/curves/raw_abs/lnb-b/6/pct",
@@ -115,7 +113,6 @@
     },
     "fmt": "f0"
   },
-
   "s12_precliff_lnbb_share": {
     "src": "figures/cfo-cliff.json",
     "ptr": "/bin_port_composition/5 MS~1s/6/ports/lnb-b/share_pct",
@@ -136,7 +133,6 @@
     "fmt": "f0",
     "note": "the two zero-centre ports' combined share of the pre-cliff bin"
   },
-
   "s12_pluto19f2_rederived": {
     "src": "figures/injection/lnba-centre.json",
     "ptr": "/measurement/pluto-19f2.all_points/point",
@@ -151,7 +147,6 @@
     },
     "fmt": "hz"
   },
-
   "s12_lnbb_window_lo": {
     "src": "figures/port-bias.json",
     "ptr": "/signed_axis/lnb-b/3/low_khz",
@@ -191,7 +186,6 @@
     },
     "fmt": "f0"
   },
-
   "s12_coarse_e_span_hz": {
     "src": "figures/injection/raw-vs-corrected.json",
     "ptr": "/coarse_configs/E/offset_span_hz",
@@ -225,7 +219,6 @@
     },
     "fmt": "f1"
   },
-
   "s12_live_window_lo": {
     "src": "figures/port-bias.json",
     "ptr": "/live_window_khz/0",
@@ -244,7 +237,6 @@
     },
     "fmt": "f0"
   },
-
   "s12_sweeps": {
     "src": "figures/injection/tle-residual.json",
     "ptr": "/population/sweeps",
@@ -266,7 +258,6 @@
     "ptr": "/diagnostics/in_view_doppler_elev_ge_40/p95_khz",
     "fmt": "f0"
   },
-
   "s12_lnbb_before": {
     "src": "figures/injection/tle-residual.json",
     "ptr": "/by_port/lnb-b|gen1/residual_vs_maxel/mean_khz",
@@ -323,7 +314,6 @@
     },
     "fmt": "signed_f0"
   },
-
   "s12_if_low_mhz": {
     "src": "figures/injection/tle-residual.json",
     "ptr": "/by_tuning/lnb-d|gen2/rows/0/if_mhz",
@@ -385,7 +375,6 @@
     "fmt": "signed_f0",
     "note": "a Pluto-side fractional error big enough to BE a measured -150 kHz centre would be proportional to the IF, so it would add this much more across the span"
   },
-
   "s12_lnba_recorded_centre": {
     "src": "figures/injection/lnba-centre.json",
     "ptr": "/recorded_centres_hz/lnb-a",
@@ -434,7 +423,6 @@
     },
     "fmt": "pct1"
   },
-
   "s12_ppm_min": {
     "src": "figures/absolute-centres.json",
     "ptr": "/panel_a/lnb-b|gen2/consensus_hz",
@@ -465,5 +453,70 @@
     },
     "fmt": "f0",
     "note": "the furthest imposed offset at which injection still holds every detector flat, at the detection knee"
+  },
+  "s12_cb_cells": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/census/cells_all_arms",
+    "fmt": "int"
+  },
+  "s12_cb_span_A": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_span_hz/coarse-A",
+    "fmt": "khz1"
+  },
+  "s12_cb_span_E": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_span_hz/coarse-E",
+    "fmt": "khz1"
+  },
+  "s12_cb_wide_fast_fs": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/11/sample_rate_hz",
+    "fmt": "f0"
+  },
+  "s12_cb_wide_fast_clip": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
+    "fmt": "khz1"
+  },
+  "s12_cb_wide_fast_kneeA": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/11/measured_knee_coarse_A_hz/0",
+    "fmt": "khz1"
+  },
+  "s12_cb_wide_slow_fs": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/3/sample_rate_hz",
+    "fmt": "f0"
+  },
+  "s12_cb_wide_slow_clip": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/3/measured_analog_clip_offset_hz",
+    "fmt": "khz1"
+  },
+  "s12_cb_wide_slow_kneeA": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/3/measured_knee_coarse_A_hz/0",
+    "fmt": "khz1"
+  },
+  "s12_cb_clip_min": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/0/measured_analog_clip_offset_hz",
+    "fmt": "khz1"
+  },
+  "s12_cb_clip_max": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
+    "fmt": "khz1"
+  },
+  "s12_cb_dig_min": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/0/predicted_digital_edge_hz",
+    "fmt": "khz1"
+  },
+  "s12_cb_dig_max": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/8/predicted_digital_edge_hz",
+    "fmt": "khz1"
   }
 }

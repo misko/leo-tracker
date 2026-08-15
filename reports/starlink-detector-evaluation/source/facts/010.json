@@ -182,5 +182,25 @@
     "ptr": "/panel_b/after_centroid_khz",
     "fmt": "signed_f1",
     "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "exec_cb_cells": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/census/cells_all_arms",
+    "fmt": "int"
+  },
+  "exec_cb_span_A": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_span_hz/coarse-A",
+    "fmt": "khz1"
+  },
+  "exec_cb_clip_lo": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/0/measured_analog_clip_offset_hz",
+    "fmt": "khz1"
+  },
+  "exec_cb_clip_hi": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
+    "fmt": "khz1"
   }
 }

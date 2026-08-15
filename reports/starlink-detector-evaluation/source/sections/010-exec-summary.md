@@ -40,7 +40,9 @@ say whether receiver, radio, edge, water or timing is responsible; the earlier
 claim that the LNB was the entire cause is withdrawn in
 [section 8](#8-what-the-sky-looks-like). The instrument yields two associations
 worth acting on: a scoring-pipeline detection cliff near {{exec_cliff_low_khz}}–{{exec_cliff_high_khz}} kHz of corrected
-offset, and a large positive centre correction on one port without which a
+offset — since **measured to be the coarse bank's own ±{{exec_cb_span_A}} search
+span**, not a limit of the hardware
+([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) — and a large positive centre correction on one port without which a
 working receiver reads as deaf ([section 9](#9-what-survives-the-instrument)) —
 though the specific {{exec_lnbc_applied_figure}} value is itself wrong by {{exec_lnbc_miscentred_khz}} kHz, as
 [section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs) measures.
@@ -58,6 +60,20 @@ partly works and the check does not, and nothing here validates the pooled model
 on the heterogeneous sky corpus; the {{exec_cliff_low_khz}}–{{exec_cliff_high_khz}} kHz cliff does not exist against a *known* offset,
 falling instead at the {{exec_bank_edge_khz}} kHz bank edge; and the thresholds are calibrated on
 truly empty input.
+
+**And the cliff has a cause, which is a number somebody chose.** Over a closed
+cable, sample rate and receiver bandwidth can be set independently — on sky
+they cannot, because the capture path writes one equal to the other. Across
+{{exec_cb_cells}} cells the measured analog corner sweeps {{exec_cb_clip_lo}} to
+{{exec_cb_clip_hi}} and the predicted digital edge sweeps thirteenfold, while
+**the measured knee does not move at all**: it sits at each search bank's own
+span plus the ±113.6 kHz window inside which the relative-phase statistics are
+unique. Change the bank and the cliff moves with it; change the bandwidth by a
+factor of sixteen and it does not. The received-power control shows the filter
+demonstrably cutting where the score does not follow. So the collapse is
+geometric in the search rather than energetic in the passband, and
+`offset_span_hz` is a design parameter that can be widened
+([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)).
 
 **And the instrument itself is losing detections right now.**
 [Section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)

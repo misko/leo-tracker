@@ -1,10 +1,11 @@
 """Shared figure style: the dataviz reference palette, unchanged.
 
-Light surface only (these are PNGs on a light page).  Categorical slots are used
-in fixed order and never cycled; no figure here puts more than three categorical
-hues in play at once, which is the documented all-pairs cap for scatter-like
-forms.  Where eight algorithms appear they are ONE colour with emphasis, because
-the story is one number, not eight identities.
+Copied from reports/starlink-detector-evaluation/figures/injection/figstyle.py so
+these figures match the published ones.  Light surface only (PNGs on a light
+page).  Categorical slots are used in fixed order and never cycled; no figure
+here puts more than three categorical hues in play at once.  Where eight
+algorithms appear they are ONE colour with emphasis, because the story is one
+number, not eight identities.
 """
 from __future__ import annotations
 
@@ -25,9 +26,14 @@ S3 = "#1baf7a"     # aqua
 CRITICAL = "#d03b3b"
 GOOD = "#0ca30c"
 
-CAVEAT = ("TWO CABLED LOOPBACKS on independent radios (separate oscillators, clocks, noise; no RF path "
-          "between them)\nsharing ONLY the injected schedule. Tests the estimator and the detectors "
-          "- not LNBs, antennas or sky.")
+#: A1/A3 run on two radios; A2 re-analyses the single-radio ladder.
+CAVEAT_TWO = (
+    "CABLED LOOPBACK on TWO INDEPENDENT RADIOS (separate oscillators, clocks and noise; no RF path between them),\n"
+    "each TX2 -> splitter -> 2x30 dB -> RX1. Tests the DETECTORS and the digital pipeline - not LNBs, antennas or sky.\n"
+    "Carrier offset is near zero by construction: inside each radio TX and RX share one reference.")
+CAVEAT_ONE = (
+    "CABLED LOOPBACK on ONE RADIO (TX2 -> splitter -> 2x30 dB -> RX1,RX2). Tests the DETECTORS and the digital\n"
+    "pipeline - not LNBs, antennas or sky. Carrier offset is near zero by construction: TX and RX share one reference.")
 
 
 def setup():
@@ -50,11 +56,11 @@ def setup():
     })
 
 
-def finish(fig, ax_list, caveat_y: float = 0.012):
+def finish(fig, ax_list, caveat: str, caveat_y: float = 0.012, axis="y"):
     for ax in (ax_list if isinstance(ax_list, (list, tuple)) else [ax_list]):
         ax.set_axisbelow(True)
-        ax.grid(True, axis="y", alpha=1.0)
+        ax.grid(True, axis=axis, alpha=1.0)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
-    fig.text(0.5, caveat_y, CAVEAT, ha="center", va="bottom",
+    fig.text(0.5, caveat_y, caveat, ha="center", va="bottom",
              fontsize=7.6, color=MUTED, linespacing=1.35)

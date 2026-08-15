@@ -44,8 +44,8 @@ separation rule no control separates from the real join under any resampling
 unit. The check has no failure mode
 ([section 6](#6-did-it-work-the-negative-controls)).
 
-The reason is measurable. Over 30,192 observations every pair of the eight
-detectors makes the same fire / no-fire call at phi 0.847–0.945. They are one
+The reason is measurable. Over 40,256 observations every pair of the eight
+detectors makes the same fire / no-fire call at phi 0.841–0.947. They are one
 statistic counted eight times, and near-duplicates are obliged to return
 near-identical `f` whatever they are fed
 ([section 7](#7-why-it-failed-the-detectors-are-near-duplicates)).
@@ -155,7 +155,7 @@ each later batch is later sky, and later sky was busier.
 | Paired sweeps the analysis could use | 1,261 at the widest freeze | grows with scoring |
 | — same-edge / opposite-edge | 603 / 658 | |
 | Matched-arm cells behind the coincidence estimate | 18,176 | |
-| Live target observations behind the correlation matrix | 30,192 | |
+| Live target observations behind the correlation matrix | 40,256 | |
 | Live cross-edge null observations behind the measured false-alarm rate | 15,072 | |
 | `lnb-a` observations excluded as a dead port — **an error, see below** | 15,104 | |
 
@@ -620,7 +620,7 @@ its own sampling-noise median. There is no failure mode: whatever you feed this
 check, it passes.
 
 The result is not that the estimator returns the same answer three times. `f`
-itself moves **3x** across the joins, 0.358 to 0.679 to 0.798, so these really
+itself moves **2.23x** across the joins, 0.358 to 0.679 to 0.798, so these really
 are different data and the estimator really is responding to them. What does not
 move is the thing being used as evidence.
 
@@ -655,13 +655,13 @@ pair of the eight makes the same fire / no-fire call at phi **0.841–0.946**.
 
 | Pair | phi |
 |---|---:|
-| Loosest pair anywhere in the matrix: `anchor-8` / `differential-16` | 0.847 |
+| Loosest pair anywhere in the matrix: `anchor-8` / `differential-16` | 0.841 |
 | Tightest pair anywhere: `full-frame-full` / `full-frame-verify` | 0.945 |
 | `glrt-32` / `glrt-64` | 0.936 |
 | `differential-16` / `differential-32` | 0.917 |
 | Mean over all 28 pairs | 0.888 |
 | Band previously reported, on 2,160 observations | 0.82–0.94 |
-| Band here, on 30,192 observations (14.0x) | **0.847–0.945** |
+| Band here, on 40,256 observations (14.0x) | **0.841–0.947** |
 
 Note what this does *not* say. Detectors with statistically independent errors
 are still positively correlated whenever both have skill, because they observe
@@ -672,7 +672,7 @@ produce **highly redundant binary verdicts on identical IQ** and cannot be
 treated as eight independent witnesses for validating `f`. Separating shared
 truth from shared error needs correlations on the null arm, conditional on arm,
 receiver and time block, or against injected truth. At 14x the observations the
-band is **higher at both ends** than previously reported, so this is not a
+band is **wider at the bottom** than previously reported, so this is not a
 small-sample artefact being sanded down — it firms up. Grouping by family barely
 matters: the same-family blocks hold the tightest pairs, but no pair anywhere in
 the matrix falls below 0.85.
@@ -687,7 +687,7 @@ agree with each other, and they do.
 ![Pairwise phi between the eight detectors on the same observations](figures/algorithm-correlation.png)
 
 ***Figure 8 — not eight opinions but one, counted eight times.*** *phi between
-every pair of the eight confirmers on the same 30,192 live target observations
+every pair of the eight confirmers on the same 40,256 live target observations
 (1,258 paired sweeps, 2,516 scored sidecars). An observation enters only if all
 eight detectors returned a verdict, so every cell rests on one identical
 population. Each detector is judged against the threshold drawn for its own
@@ -715,10 +715,11 @@ Take one receiver chain's pass over one sweep as the unit of observation — it
 visits all eight tunings (4 channels x 2 edges) exactly once. With `lnb-a`
 restored there are **5,032** such units, identical in every cell of the matrix.
 
-- A channel's **own two edges** agree at phi **0.411** across the four live
-  receivers —
-  the only strong structure here, and robust: controlling time, acquisition arm
-  and receiver together moves it to 0.417, 92% of raw.
+- A channel's **own two edges** agree at phi **0.446** raw across the four live
+  receivers, falling to **0.411** once time, arm and receiver are controlled —
+  92% of raw —
+  the only strong structure here, and the one thing every control leaves
+  essentially intact.
 - Any **two different channels** agree at phi 0.118 raw — but **most of that is
   the acquisition arm, not the sky.**
 
@@ -739,8 +740,8 @@ confound this report had not considered, though its own axis table records `f`
 moving from 0.015 to 0.401–0.510 across arms. Pooling twelve arms into one 8x8
 matrix induces a positive floor by aggregation alone.
 
-What remains is still real: the observed cross-channel mean exceeds all 1,000
-draws of a null that *keeps* trend, arm and receiver (p < 0.001, both
+What remains is still real: the observed cross-channel mean exceeds all 400
+draws of a null that *keeps* trend, arm and receiver (p < 0.0025, the floor at 400 draws, for both
 combiners). But it is about **half** the published size, and the per-cell claim
 fails — under family-wise correction only **32 of 48** cells (union) and **34 of
 48** (`glrt-32`) clear their null, against the original assertion that every cell
@@ -986,7 +987,7 @@ record.*
 | ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
 | `lnb-c` needs a +604.2 kHz configured centre correction; corrected, it has the highest fire rate in the examined slice | `receiver_centers_hz` = +604,159.8, applied at scoring; 65.9% (n = 3,352) against `lnb-b` 43.8% (n = 4,791) | **stands** |
 | The 1.25 MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
-| The eight detectors produce highly redundant verdicts on identical IQ | phi 0.847–0.945 over 30,192 observations | **stands** |
+| The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.947 over 40,256 observations | **stands** |
 | A per-point 1% threshold yields 5.47–6.74% per cell after maximising over ~7 candidates, as expected | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
 | Recorded skew is a lower bound and is blind to geometry | barrier-release stamp; 0.0437 against 0.0446 ms across geometries whose true offsets differ ~5x | **stands** |
 | ~~`lnb-a` is excluded as a dead port~~ **withdrawn — its LO moved 567 kHz out of the search grid ([14](#14-the-dead-port-and-the-stale-calibration-are-one-fault))** | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.52% of 60,095 against `lnb-b`'s 17.98% of 59,604) | applied, **unexplained** |
@@ -1017,7 +1018,7 @@ Short of that, in order of cost:
 | Derive the skew bound the coincidence model actually needs | analysis only | 0.054 ms and the README's 0.2–0.5 s operator target cannot both be the requirement |
 | Measure the `gen2` LO offsets with `lo_sweep` | one sweep | turns +604.2 kHz from one number into a measurement with an error bar |
 | Widen the offset search past 350 kHz and re-score one arm | one arm | if the cliff moves, the search span explains it; if not, that explanation is wrong |
-| Add a genuinely different statistic to the bank | development | at phi 0.847–0.945 the eight are one detector; agreement among them is not information |
+| Add a genuinely different statistic to the bank | development | at phi 0.841–0.947 the eight are one detector; agreement among them is not information |
 | **Inject a known signal** | hardware | replaces every model-output `d` in this report with a measurement |
 
 **The cheapest item is first, and it is very cheap.** 7,054 sweeps were
@@ -1054,6 +1055,14 @@ though **not** for the LNBs, the antenna or the sky, none of which the cable
 contains.
 
 ### 11a. Measured ranking under one condition — 20 ms, 5 MS/s, cabled loopback
+
+> **Superseded in part.** The ranking below compares the eight at 1% per
+> *candidate point*, which leaves their per-*cell* false-alarm rates spread over
+> 6.2–9.8% — not equal operational cost. Redrawing thresholds to a common 5% per
+> cell moves `glrt-32` from first to third and collapses the resolved pairs from
+> 21 to 13 of 28. See
+> [section 15b](#15b-at-equal-false-alarm-cost-the-ranking-changes-and-the-head-dissolves).
+> The SNR50 values themselves reproduce to 0.0000 dB; only the threshold changed.
 
 SNR at 50% detection, 20 ms probes at 5 MS/s, thresholds set to 1% per point on
 a genuinely empty channel, 160 cells per rung across 18 rungs:
@@ -1108,9 +1117,10 @@ and +0.048 respectively.*
 
 With occupancy set by hand to `f_true` = 0.2775 at an SNR where Pd ~ 0.6:
 
-- The eight point estimates span **0.283–0.331** and bracket the truth. Per
-  method they are noisier than that range suggests, and the plotted intervals
-  are 5th–95th percentiles — central 90%, not 95%.
+- The eight point estimates span **0.283–0.331** — and every one of them lies
+  **above** the true 0.2775. They do not bracket it. Mean bias is **+0.0302**,
+  and all eight read high in 81.8% of resamples. The plotted intervals are
+  5th–95th percentiles, central 90%, not 95%.
 - **Null** false alarms are approximately independent: on known-empty cells,
   P(AB) − P(A)P(B) <= 0.007. That is *not* conditional independence, which the
   model also requires on **occupied** cells, where P(AB | T=1) must equal
@@ -1134,7 +1144,7 @@ corpus, whose heterogeneity in `p`, `d`, arm, receiver and time is listed in
 One systematic bias appeared here — the solver reading `d` **low** against
 direct measurement in 15 of 16 cases — but it does **not** survive independent
 radios and is withdrawn in
-[section 13c](#13c-one-earlier-finding-does-not-survive-independence). It was a
+[section 13c](#13c-one-earlier-finding-reverses-under-independence). It was a
 property of this rig's shared oscillator, not of the estimator.
 
 ![Recovered f against the f that was set](figures/injection/coincidence-recovery.png)
@@ -1292,7 +1302,7 @@ The decisive numbers are what the receivers did across the LNB swap:
 **Two radios watching the same sky at the same instant sat 150 kHz apart before
 the swap.** A tuning-plan or beacon-frequency error cannot do that — it would
 move both alike. They only came to agree near −150 kHz *after* two LNBs were
-physically replaced, with `lnb-d` moving −207 kHz across the boundary while
+physically replaced, with `lnb-d` moving −167.9 kHz across the boundary while
 `lnb-b`, on the untouched radio, moved −22 kHz.
 
 The frequency dependence closes it. The eight tunings give a 2.02× lever on the
@@ -1448,17 +1458,23 @@ a join whose spread is median for its size.
 the sky join at full size with its observed 0.0422; and the spread-versus-n
 shrinkage curve that explains the original discrepancy.*
 
-### 13c. One earlier finding does not survive independence
+### 13c. One earlier finding reverses under independence
 
 The single-radio run found the solver reading `d` **low** against direct
 measurement in 15 of 16 cases, and this report carried that as a caveat: that
-the published `d` values are floors rather than estimates. On two independent
-radios it reads low in **20 of 48** — indistinguishable from chance.
+the published `d` values are floors rather than estimates.
 
-That bias was a property of the shared-oscillator configuration, not of the
-estimator. The floors caveat is withdrawn. Median bias here is 0.005, though the
-worst case is 0.17, so `d` remains imprecise per algorithm even without a
-systematic direction.
+On two independent radios the bias does not vanish — **it reverses.** It reads
+low in only **10 of 48** cases, which is to say it reads *high* in 38, with a
+median bias of **+0.0372** and a worst case of **0.277**. Against chance that is
+p ≈ 1e-4, so the direction is systematic, not noise.
+
+So the floors caveat is withdrawn and replaced by its opposite: with the shared
+oscillator removed, the solver **over-estimates** `d`. Published `d` values on
+the sky corpus were produced under the shared-clock-free cross-radio geometry,
+which is the configuration that over-reads here, so they should be treated as
+ceilings rather than floors — and in either case as model outputs whose sign of
+bias depends on the rig.
 
 ![Recovered d against directly measured d](figures/injection/fig_d2_d_bias.png)
 
@@ -1556,6 +1572,92 @@ common-mode offset of [section 12](#12-what-the-cliff-actually-is), shared by
 both radios, invisible to every differential measurement, and still unexplained.
 
 
+## 15. Three experiments that revise the ranking
+
+### 15a. Conditional independence holds — and the prior finding was never significant
+
+The coincidence model needs P(AB | T=1) = d_A·d_B on **occupied** cells, and only
+the empty-cell version had ever been tested. On two independent radios at a
+common 5% per-cell false-alarm rate, 1,647 occupied cells, Pd 0.64 and 0.48:
+
+| Detector | Two-radio excess | 95% CI | Single-radio prior |
+|---|---:|---|---:|
+| `anchor-8` | +0.0016 | [−0.0099, +0.0133] | −0.0331 |
+| `differential-16` | +0.0061 | [−0.0051, +0.0176] | −0.0404 |
+| `differential-32` | +0.0002 | [−0.0111, +0.0117] | −0.0497 |
+| `glrt-32` | +0.0014 | [−0.0100, +0.0132] | −0.0312 |
+| `full-frame-verify` | −0.0012 | [−0.0125, +0.0103] | −0.0126 |
+
+Mean excess **+0.0019**; **0 of 8** intervals exclude zero under Fisher,
+permutation, or a within-sweep stratified permutation with Bonferroni; empty-cell
+control +0.0004. **The assumption holds.**
+
+But the single-radio prior this was meant to explain **was never significant on
+its own data.** Recomputing it from the archived records reproduces −0.0331 /
+−0.0404 / −0.0497 exactly — at n = 111, where the standard error is 0.022 and
+**7 of 8 intervals already covered zero.** So an effect of that size can now be
+ruled out, but attributing the original number to the shared oscillator was
+reading signal into small-sample noise. This report did that, and it was wrong to.
+
+![Occupied-cell excess with intervals, two radios against the single-radio prior](figures/injection/a1-occupied-cell-independence.png)
+
+### 15b. At equal false-alarm cost the ranking changes, and the head dissolves
+
+[Section 11a](#11a-measured-ranking-under-one-condition-20-ms-5-ms-s-cabled-loopback)
+ranked the eight at 1% per *point*, which left their per-*cell* rates spread over
+6.2–9.8% — so they were not compared at equal operational cost. Redrawing
+thresholds on the ladder's own TX-off rungs puts all eight at exactly **5.0% per
+cell**. The pipeline reproduces the published SNR50 to **0.0000 dB**, so only the
+threshold changed:
+
+| | Order |
+|---|---|
+| Published (1% per point) | `glrt-32`, `ffv`, `ffa`, `fff`, `glrt-64` \| `anchor-8`, `diff-32`, `diff-16` |
+| **Equal 5% per cell** | **`ffv` −18.64, `fff` −18.57, `glrt-32` −18.56, `ffa` −18.46, `glrt-64` −18.39** \| `anchor-8` −17.38, `diff-32` −17.34, `diff-16` −16.94 |
+
+**`glrt-32` falls from first to third.** And the resolution collapses: the
+published **21 of 28** pairs becomes **13 of 28** under a max-t family-wise band,
+and 17 of 28 under the new calibration. The defensible statement is a partial
+order with an unordered head:
+
+> `{ffv, fff, glrt-32, ffa, glrt-64}` — 0.24 dB apart, **no internal pair
+> resolved** — beats `{anchor-8, differential-32}`, which beats `differential-16`.
+
+So "`glrt-32` is the most sensitive detector" was never supported. What is
+supported is a leading group of five, a trailing pair, and `differential-16` last.
+
+![SNR50 at a common per-cell false-alarm rate](figures/injection/a2-common-false-alarm-ranking.png)
+
+### 15c. And it is condition-dependent
+
+| Arm | Spread | Pairs resolved | Inter-detector agreement |
+|---|---:|---:|---:|
+| 80 ms / 2.5 MS/s | 7.69 dB | 20/28 | 0.816 |
+| 80 ms / 1.25 MS/s | 4.92 dB | 16/28 | 0.878 |
+| 640 ms / 2.5 MS/s | 5.51 dB | 1/28 | 0.859 |
+| **160 ms / 5 MS/s** | **0.68 dB** | **0/28** | **0.939** |
+
+The two-group split survives in all three arms that resolve anything, and
+`glrt-32` sits at rank 3, 5 and 5 — consistent with an unordered head. **1.25 MS/s
+costs 6.1 dB** against 2.5 MS/s at the same probe, confirming the pilot-band
+argument in [section 4](#4-the-dataset-twelve-arms-and-two-geometries-for-free)
+by measurement.
+
+The most useful row is the last. At 160 ms / 5 MS/s **nothing resolves at all** —
+the eight agree on 94% of per-cell decisions. **As probe length grows, detector
+choice stops being an operational choice.** For a survey that can afford the
+dwell, this is the finding that matters: pick any of them.
+
+![SNR50 by arm, showing the ranking is condition-dependent](figures/injection/a3-ranking-across-arms.png)
+
+*Caveats carried from the run: the 640 ms / 10 MS/s corner was unreachable at
+74 s and 1.04 GB per probe, so 640 ms / 2.5 MS/s was substituted; that arm's
+trailing-group SNR50 is extrapolated past the ladder top and is not trustworthy,
+though only 1 of 28 pairs resolved there anyway. Absolute SNR50 is not comparable
+across sample rates because the noise bandwidth changes — only the within-arm
+order is clean.*
+
+
 ## Figures and provenance
 
 Every figure is computed from the read-only corpus at
@@ -1574,7 +1676,7 @@ without re-running anything.
 | 5 | [`geometry.png`](figures/geometry.png) | [`geometry.json`](figures/geometry.json) | 2,554 | 7,054 captured, 6,161 imported pairs, 1,261 scored pairs |
 | 6 | [`coincidence-model.png`](figures/coincidence-model.png) | [`coincidence-model.json`](figures/coincidence-model.json) | 2,544 | 18,176 joined matched-arm cells from 1,136 matched-arm sweeps |
 | 7 | [`negative-control.png`](figures/negative-control.png) | [`negative-control.json`](figures/negative-control.json) | 2,339 | 16,560 matched-arm cells in each of three joins; 1,035 matched-arm sweeps |
-| 8 | [`algorithm-correlation.png`](figures/algorithm-correlation.png) | [`algorithm-correlation.json`](figures/algorithm-correlation.json) | 2,547 | 30,192 live target observations; 1,258 paired sweeps |
+| 8 | [`algorithm-correlation.png`](figures/algorithm-correlation.png) | [`algorithm-correlation.json`](figures/algorithm-correlation.json) | 2,547 | 40,256 live target observations; 1,258 paired sweeps |
 | 9 | [`channel-edge-correlation.png`](figures/channel-edge-correlation.png) | [`channel-edge-correlation.json`](figures/channel-edge-correlation.json) | 2,547 | 5,032 receiver-chain passes, `lnb-a` included (1,258 pairs x 3 live receivers) |
 | 10 | [`edge-agreement.png`](figures/edge-agreement.png) | [`edge-agreement.json`](figures/edge-agreement.json) | 2,547 | six receiver pairs, n = 10,064 each, `lnb-a` included |
 | 11 | [`cfo-cliff.png`](figures/cfo-cliff.png) | [`cfo-cliff.json`](figures/cfo-cliff.json) | 2,339 | 178,399 live target points from 1,146 paired sweeps |

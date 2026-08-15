@@ -15,12 +15,44 @@ from leo_tracker.radio.beacon.presurvey import _open_context
 from leo_tracker.radio.beacon.fast_scan import collect_radio, ScanProfile, SURVEY_PROFILE
 
 ROOT = Path("/mnt/leo-nvme/leo-tracker/sync-scans")
+# A sweep costs about 171 MB here and about 118 MB per radio again once it is
+# imported, so an unthrottled run writes roughly 186 GB per hour to a share that
+# does not have that many hours left in it.  Coverage across the clock is worth
+# more than raw count -- the whole corpus so far is one contiguous six-hour
+# block -- so a minimum period lets a long run trade cadence for span.  Zero is
+# the historical behaviour and stays the default.
+SWEEP_PERIOD_S = float(os.environ.get("SYNC_SWEEP_PERIOD_S", "0") or 0)
+# And a floor, because the failure this guards is not a slow disk but a full
+# one: the drain cannot ship what the collector could not write, and a wedged
+# share takes the import and the scoring host down with it.
+MIN_FREE_BYTES = float(os.environ.get("SYNC_MIN_FREE_BYTES", "0") or 0)
+FREE_CHECK = Path(os.environ.get("SYNC_FREE_CHECK", "/mnt/qnap01/mouse9911"))
+
+
+def free_bytes(path: Path) -> float:
+    """Free space where the sweeps are going to end up, not where they start."""
+    try:
+        stat = os.statvfs(path)
+    except OSError:
+        return float("inf")          # unreadable is not the same as full
+    return stat.f_bavail * stat.f_frsize
 RADIOS = [("pluto-19f2", "10400056f695001322002d0010ad1719f2", ("lnb-c", "lnb-d")),
           ("pluto-5d4d", "1040005e0b100007100010000bf33a5d4d", ("lnb-a", "lnb-b"))]
 PROBES = (0.080, 0.160, 0.640)
 RATES = (1_250_000.0, 2_500_000.0, 5_000_000.0, 10_000_000.0)
+# Rates the AD9361 will refuse without a decimating FIR loaded.  Its floor is
+# 25 MHz/12 = 2.083 MS/s bare, so 1.25 MS/s only ever worked because some
+# earlier tool had left an FIR in the part -- and re-plugging the radios cleared
+# it, after which every 1.25 MS/s draw died with EINVAL and burned its slot.
+# Dropping the rate is honest about that; loading an FIR of unknown provenance
+# to resurrect the arm would change the receive response the arm is measuring.
+SKIP_RATES = {float(x) for x in
+              (os.environ.get("SYNC_SKIP_RATES_HZ") or "").replace(",", " ").split()}
 ARMS = [{"name": f"{int(p*1000)}ms-{r/1e6:.2f}MSps", "probe_s": p, "sample_rate_hz": r,
-         "pilot_band_fits": r >= 1_875_000.0} for p in PROBES for r in RATES]
+         "pilot_band_fits": r >= 1_875_000.0}
+        for p in PROBES for r in RATES if r not in SKIP_RATES]
+if SKIP_RATES:
+    print(f"arms: {len(ARMS)} (skipping {sorted(SKIP_RATES)})", flush=True)
 ORDER_L = tuple((c, e) for c in (1,2,3,4) for e in ("lower","upper"))
 ORDER_U = tuple((c, e) for c in (1,2,3,4) for e in ("upper","lower"))
 
@@ -41,7 +73,16 @@ for name, serial, _ in RADIOS:
 print("  both open", flush=True)
 
 sweeps = 0
+started = time.monotonic()
 while True:
+    if MIN_FREE_BYTES:
+        free = free_bytes(FREE_CHECK)
+        if free < MIN_FREE_BYTES:
+            print(f"stopping: {free/1e9:.1f} GB free at {FREE_CHECK}, "
+                  f"below the {MIN_FREE_BYTES/1e9:.1f} GB floor after "
+                  f"{sweeps} sweeps", flush=True)
+            break
+    cycle = time.monotonic()
     sweeps += 1
     d_arm, d_pair = u32(), u32()
     arm_common = ARMS[d_arm % len(ARMS)]
@@ -127,3 +168,12 @@ while True:
           f"{plan['pluto-5d4d']['arm']['name']:>15}/{plan['pluto-5d4d']['order']} "
           f"wall {wall:5.2f}s skew med {rec['skew_ms']['median']}ms max {rec['skew_ms']['max']}ms "
           f"{mb:6.1f} MB {'ERR '+str(errs) if errs else ''}", flush=True)
+
+    # Paced from the start of the sweep, not the end, so the period is the
+    # thing held constant rather than the gap: a 640 ms / 10 MS/s arm takes
+    # several times longer than the cheapest one, and pacing on the gap would
+    # let the expensive arms set the real cadence.
+    if SWEEP_PERIOD_S:
+        remaining = SWEEP_PERIOD_S - (time.monotonic() - cycle)
+        if remaining > 0:
+            time.sleep(remaining)

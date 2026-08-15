@@ -121,9 +121,54 @@ fall between that first row and zero. What is measured is that three healthy
 receivers are each paying roughly a quarter of their yield as a tax nobody
 noticed, because they still detect.
 
-The survey and corpus paths are unaffected: they ignore `receiver_centers`
-outright. This cost lands entirely on the live dwell path and everything
-downstream of it.
+The survey and corpus paths do not lose detections to this, because their coarse
+bank is fixed about raw zero and is never steered by `receiver_centers`. That
+detection cost lands entirely on the live dwell path and everything downstream
+of it.
+
+### 16c-bis. One radio's agreement check is switched off, and the corpus records it
+
+`survey_scoring` does read `receiver_centers`. Not to place its search — but to
+form `bias = centers[0] − centers[1]` for `cross_receiver_checks`, which marks a
+pair as agreeing only when `|cfo_difference − bias|` is within
+`CROSS_RECEIVER_CFO_HZ`, a {{s16e_gate}} Hz gate. That check needs only the
+*difference*, which is the one thing a differential calibration genuinely
+establishes, and its docstring says so. The design is sound.
+
+What defeats it is that the artifact carries **one differential per radio and no
+epoch**, while the differential moved by hundreds of kilohertz when the LNBs were
+swapped. Reading the bias actually applied out of {{s16e_sampled}} scored
+sidecars — not out of any calibration file, because the scoring host's artifact
+turns out not to be the one on the share:
+
+| Radio | Bias applied | Measured differential | Residual | Checks | Agree | Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `pluto-19f2` | {{s16e_19f2_applied}} | {{s16e_19f2_measured}} | {{s16e_19f2_residual}} | {{s16e_19f2_checks}} | {{s16e_19f2_agree}} | **{{s16e_19f2_rate}}** |
+| `pluto-5d4d` | {{s16e_5d4d_applied}} | {{s16e_5d4d_measured}} | **{{s16e_5d4d_residual}}** | {{s16e_5d4d_checks}} | {{s16e_5d4d_agree}} | **{{s16e_5d4d_rate}}** |
+
+`pluto-19f2` happens to be carrying a bias correct to 1.4 kHz, comfortably inside
+the gate, and agrees on {{s16e_19f2_rate}} of its checks. `pluto-5d4d` is
+carrying its **pre-swap** differential, wrong by {{s16e_5d4d_residual}} Hz — 38
+times the gate — and agrees on {{s16e_5d4d_agree}} of {{s16e_5d4d_checks}}
+checks. A factor of {{s16e_ratio}} between two radios watching the same sky
+through the same code.
+
+**That {{s16e_5d4d_rate}} is not a measurement of the sky.** No real coincidence
+can pass a gate offset by half a megahertz, so what survives is whatever the
+false-alarm floor happens to be. On this radio the check is switched off, and
+nothing in the sidecar says so — `agrees: false` looks identical whether the sky
+was empty or the bias was wrong.
+
+![Agreement rate against the bias each radio was scored with](figures/cross-receiver-bias.png)
+
+This is not a historical note: the census moved from {{s16e_census_before}} to
+{{s16e_census_after}} scored entries while this audit was reading it. Every
+sidecar written from here on records the same epoch-blind bias. The fix is the
+one [16d](#16d-what-to-write-and-the-trap-waiting-for-whoever-writes-it) asks
+for, with an epoch bound added — and it needs no re-scoring, because each check
+stores `bias_hz` and `cfo_difference_hz` alongside its verdict, so `agrees` can
+be recomputed offline once the right differential is known. Until then, **no
+`agrees` field on `pluto-5d4d` should be read as evidence about the sky.**
 
 ### 16d. What to write, and the trap waiting for whoever writes it
 

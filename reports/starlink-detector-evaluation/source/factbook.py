@@ -185,7 +185,7 @@ def _fmt_pct2(value):
     return f"{number * 100:.2f}%".replace("-", MINUS)
 
 
-for _places in (0, 1, 2, 3, 4):
+for _places in (0, 1, 2, 3, 4, 5, 6):
     def _fixed(value, places=_places):
         return f"{float(value):.{places}f}".replace("-", MINUS)
 

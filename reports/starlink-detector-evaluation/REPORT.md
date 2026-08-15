@@ -1809,9 +1809,9 @@ measurement, and is offered only to size the problem. What is measured is that
 three healthy receivers are each paying roughly a quarter of their yield as a
 tax nobody noticed, because they still detect.
 
-The survey and corpus paths are unaffected: they ignore `receiver_centers`
-outright. This cost lands entirely on the live dwell path and everything
-downstream of it.
+The survey path loses no detections to this, its bank being fixed about raw
+zero; but it does read `receiver_centers` to form the bias for its cross-receiver
+agreement check, which an epoch-blind differential silently disables.
 
 ### 16d. What to write, and the trap waiting for whoever writes it
 

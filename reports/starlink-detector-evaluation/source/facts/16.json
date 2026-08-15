@@ -524,5 +524,113 @@
     "src": "figures/live-calibration-snapshot.json",
     "ptr": "/created_utc",
     "fmt": "raw"
+  },
+  "s16e_gate": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/gate_hz",
+    "fmt": "int"
+  },
+  "s16e_sampled": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/sampled",
+    "fmt": "int"
+  },
+  "s16e_census_before": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/census_scored_before",
+    "fmt": "int"
+  },
+  "s16e_census_after": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/census_scored_after",
+    "fmt": "int"
+  },
+  "s16e_19f2_rate": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/agree_fraction",
+    "fmt": "pct2"
+  },
+  "s16e_19f2_checks": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/checks",
+    "fmt": "int"
+  },
+  "s16e_19f2_agree": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/agree",
+    "fmt": "int"
+  },
+  "s16e_19f2_sweeps": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/sweeps",
+    "fmt": "int"
+  },
+  "s16e_19f2_applied": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/applied_bias_hz",
+    "fmt": "signed_int",
+    "note": "read out of the scored sidecars, not out of a calibration file: the scoring host's artifact is not the one on the share"
+  },
+  "s16e_19f2_measured": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/measured_differential_hz",
+    "fmt": "signed_int"
+  },
+  "s16e_19f2_residual": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/residual_hz",
+    "fmt": "signed_int"
+  },
+  "s16e_5d4d_rate": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/agree_fraction",
+    "fmt": "pct2"
+  },
+  "s16e_5d4d_checks": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/checks",
+    "fmt": "int"
+  },
+  "s16e_5d4d_agree": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/agree",
+    "fmt": "int"
+  },
+  "s16e_5d4d_sweeps": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/sweeps",
+    "fmt": "int"
+  },
+  "s16e_5d4d_applied": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/applied_bias_hz",
+    "fmt": "signed_int",
+    "note": "read out of the scored sidecars, not out of a calibration file: the scoring host's artifact is not the one on the share"
+  },
+  "s16e_5d4d_measured": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/measured_differential_hz",
+    "fmt": "signed_int"
+  },
+  "s16e_5d4d_residual": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/residual_hz",
+    "fmt": "signed_int"
+  },
+  "s16e_ratio": {
+    "expr": "good / bad",
+    "fmt": "f0",
+    "inputs": {
+      "good": "s16e_19f2_rate",
+      "bad": "s16e_5d4d_rate"
+    }
+  },
+  "s16e_total_checks": {
+    "expr": "a + b",
+    "fmt": "int",
+    "inputs": {
+      "a": "s16e_19f2_checks",
+      "b": "s16e_5d4d_checks"
+    }
   }
 }

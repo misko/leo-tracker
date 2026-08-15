@@ -1,0 +1,42 @@
+{
+  "boundary": "20260813T044620Z",
+  "census_scored_after": 5352,
+  "census_scored_before": 5328,
+  "gate_hz": 15000.0,
+  "generated_utc": "2026-08-15T02:56:19+00:00",
+  "rows": [
+    {
+      "agree": 18593,
+      "agree_fraction": 0.09478486949429038,
+      "applied_bias_hz": 604159.8,
+      "checks": 196160,
+      "distinct_biases_seen": {
+        "604159.8": 196160
+      },
+      "epoch": "gen2",
+      "measured_differential_hz": 605521.1464540842,
+      "radio": "pluto-19f2",
+      "residual_hz": 1361.3464540841524,
+      "sweeps": 3065,
+      "within_gate": true
+    },
+    {
+      "agree": 264,
+      "agree_fraction": 0.001822801590808661,
+      "applied_bias_hz": 1170.0,
+      "checks": 144832,
+      "distinct_biases_seen": {
+        "1170.0": 144832
+      },
+      "epoch": "gen2",
+      "measured_differential_hz": 567402.0,
+      "radio": "pluto-5d4d",
+      "residual_hz": 566232.0,
+      "sweeps": 2263,
+      "within_gate": false
+    }
+  ],
+  "sample_seed": null,
+  "sampled": 5328,
+  "schema": "cross-receiver-bias/1"
+}

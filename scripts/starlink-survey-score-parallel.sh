@@ -134,14 +134,41 @@ schema="$(radio starlink-survey-score status "${shared_root}" 2>/dev/null \
   | grep -o 'survey-detector-comparison/v[0-9]*' | head -1 || true)"
 schema="${schema:-survey-detector-comparison/v2}"
 
+# Say what is about to happen before doing it. This pass touches every sidecar
+# in the corpus over NFS -- minutes with no output and no CPU on a large one --
+# and twice now that has been reported as a hang, because a script that prints
+# "scoring with 10 workers" and then goes quiet is indistinguishable from one
+# that has died.
+scanned=0
+total_entries="$(ls -1 "${corpus_root}" 2>/dev/null | wc -l)"
+echo "scanning ${total_entries} corpus entries for what is already scored..."
+
 pending=()
 for entry in "${corpus_root}"/*/; do
+  scanned=$(( scanned + 1 ))
+  if (( scanned % 2000 == 0 )); then
+    echo "  scanned ${scanned}/${total_entries}, ${#pending[@]} to score so far"
+  fi
   [[ -f "${entry}survey.ci16" ]] || continue
-  if (( ! rebuild )) && grep -q "${schema}" "${entry}scores.json" 2>/dev/null; then
-    continue
+  # Only the head of the sidecar, not all of it. These are ~1.2 MB each and
+  # there are ~18,000 of them, so grepping whole files cost 117 ms apiece over
+  # NFS -- 35 minutes of single-threaded reads, 21 GB, before the first worker
+  # starts, with no output and no CPU. It looked exactly like a hang, twice.
+  # The schema is the first thing in the object (byte 24 in every sidecar
+  # checked), so 512 bytes is generous. Measured 14.8 ms per entry against
+  # 117 ms, so the pass drops from ~35 min to ~4.4 min on this corpus; the
+  # residual is NFS open latency and does not go away. A
+  # miss here only re-scores an entry that was already done: wasteful, never
+  # wrong.  A bash read rather than `head | grep`, because two forks per entry
+  # across 18,000 entries is itself most of the remaining cost.
+  if (( ! rebuild )); then
+    head=""
+    IFS= read -r -N 512 head < "${entry}scores.json" 2>/dev/null || true
+    [[ "${head}" == *"${schema}"* ]] && continue
   fi
   pending+=( "${entry%/}" )
 done
+echo "scan complete: ${#pending[@]} of ${total_entries} entries need scoring"
 
 # Entries are named sync-<UTC>-<radio>, so the glob above is chronological and a
 # bounded pass scores the EARLIEST N. That is how the scored corpus became a

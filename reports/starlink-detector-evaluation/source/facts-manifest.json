@@ -211,6 +211,7 @@
     "s03_sweeps_beyond",
     "s03_tunings",
     "s03_worst_vs_bound",
+    "s04_ad9361_floor_khz",
     "s04_arm0_bytes",
     "s04_arm0_guard_hz",
     "s04_arm0_guard_khz",
@@ -401,6 +402,7 @@
     "s04_edge_mc_draws",
     "s04_edge_p_mc",
     "s04_expected_per_arm",
+    "s04_fir_19f2",
     "s04_geometry_agreeing",
     "s04_geometry_disagreements",
     "s04_geometry_pairs_checked",
@@ -428,6 +430,7 @@
     "s04_rate_125",
     "s04_rate_250",
     "s04_rate_500_axis",
+    "s04_ratecheck_utc",
     "s04_scored_n",
     "s04_scored_opposite",
     "s04_scored_same",
@@ -1436,7 +1439,7 @@
     "s900_recheck_sidecars_removed",
     "s900_recheck_sweeps_added"
   ],
-  "fact_count": 1446,
+  "fact_count": 1456,
   "facts": {
     "corpus_entries_imported": {
       "defined_in": "030.json",
@@ -3512,6 +3515,14 @@
       },
       "value": 154.4611111111111
     },
+    "s04_ad9361_floor_khz": {
+      "defined_in": "130.json",
+      "fact": "s04_ad9361_floor_khz",
+      "format": "khz1",
+      "ptr": "/ad9361_floor_hz",
+      "src": "figures/rate-limits.json",
+      "value": 2083333.3333333333
+    },
     "s04_arm0_bytes": {
       "defined_in": "130.json",
       "fact": "s04_arm0_bytes",
@@ -5418,6 +5429,14 @@
       "src": "figures/arm-matrix.json",
       "value": 530.3333333333334
     },
+    "s04_fir_19f2": {
+      "defined_in": "130.json",
+      "fact": "s04_fir_19f2",
+      "format": "raw",
+      "ptr": "/radios/pluto-19f2/filter_fir_config",
+      "src": "figures/rate-limits.json",
+      "value": "FIR Rx: 0,0 Tx: 0,0"
+    },
     "s04_geometry_agreeing": {
       "defined_in": "130.json",
       "expr": "checked - disagreements",
@@ -5673,6 +5692,14 @@
       "ptr": "/plotted_grid/columns_rate_msps/2",
       "src": "figures/arm-matrix.json",
       "value": 5.0
+    },
+    "s04_ratecheck_utc": {
+      "defined_in": "130.json",
+      "fact": "s04_ratecheck_utc",
+      "format": "raw",
+      "ptr": "/measured_utc",
+      "src": "figures/rate-limits.json",
+      "value": "2026-08-15T04:16:20+00:00"
     },
     "s04_scored_n": {
       "defined_in": "130.json",
@@ -16785,6 +16812,13 @@
   },
   "schema": "report-facts/1",
   "uncited": [
+    "s04_acc_19f2_250",
+    "s04_acc_5d4d_250",
+    "s04_fir_5d4d",
+    "s04_rej_19f2_125",
+    "s04_rej_19f2_2083",
+    "s04_rej_5d4d_125",
+    "s04_rej_5d4d_2083",
     "s16a_lnba_gen1_npop",
     "s16a_lnba_gen2_npop",
     "s16a_lnba_gen2_spread",

@@ -1,0 +1,92 @@
+{
+  "accepted_hz": {
+    "pluto-19f2": [
+      2500000,
+      5000000,
+      10000000
+    ],
+    "pluto-5d4d": [
+      2500000,
+      5000000,
+      10000000
+    ]
+  },
+  "ad9361_floor_hz": 2083333.3333333333,
+  "floor_basis": "AD9361 minimum ADC rate divided by the maximum non-FIR decimation; below it a decimating FIR is required in the receive path",
+  "measured_utc": "2026-08-15T04:16:20+00:00",
+  "radios": {
+    "pluto-19f2": {
+      "filter_fir_config": "FIR Rx: 0,0 Tx: 0,0",
+      "rates": {
+        "10000000": {
+          "accepted": true,
+          "readback_hz": 10000000
+        },
+        "1250000": {
+          "accepted": false,
+          "errno": 22,
+          "error": "[Errno 22] Invalid argument"
+        },
+        "2083333": {
+          "accepted": false,
+          "errno": 22,
+          "error": "[Errno 22] Invalid argument"
+        },
+        "2500000": {
+          "accepted": true,
+          "readback_hz": 2500000
+        },
+        "5000000": {
+          "accepted": true,
+          "readback_hz": 5000000
+        }
+      },
+      "rf_bandwidth_available": "[200000 1 56000000]",
+      "sampling_frequency_before": "5000000",
+      "sampling_frequency_restored": "2500000",
+      "serial": "10400056f695001322002d0010ad1719f2"
+    },
+    "pluto-5d4d": {
+      "filter_fir_config": "FIR Rx: 0,0 Tx: 0,0",
+      "rates": {
+        "10000000": {
+          "accepted": true,
+          "readback_hz": 10000000
+        },
+        "1250000": {
+          "accepted": false,
+          "errno": 22,
+          "error": "[Errno 22] Invalid argument"
+        },
+        "2083333": {
+          "accepted": false,
+          "errno": 22,
+          "error": "[Errno 22] Invalid argument"
+        },
+        "2500000": {
+          "accepted": true,
+          "readback_hz": 2500000
+        },
+        "5000000": {
+          "accepted": true,
+          "readback_hz": 5000000
+        }
+      },
+      "rf_bandwidth_available": "[200000 1 56000000]",
+      "sampling_frequency_before": "5000000",
+      "sampling_frequency_restored": "2500000",
+      "serial": "1040005e0b100007100010000bf33a5d4d"
+    }
+  },
+  "rejected_hz": {
+    "pluto-19f2": [
+      1250000,
+      2083333
+    ],
+    "pluto-5d4d": [
+      1250000,
+      2083333
+    ]
+  },
+  "schema": "ad9361-rate-limits/1"
+}

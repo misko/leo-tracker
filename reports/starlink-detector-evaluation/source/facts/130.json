@@ -1232,5 +1232,55 @@
     "src": "figures/geometry.json",
     "ptr": "/authoritative_comparison/now_same_edge_pct",
     "fmt": "f2"
+  },
+  "s04_ad9361_floor_khz": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/ad9361_floor_hz",
+    "fmt": "khz1"
+  },
+  "s04_fir_19f2": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-19f2/filter_fir_config",
+    "fmt": "raw"
+  },
+  "s04_fir_5d4d": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-5d4d/filter_fir_config",
+    "fmt": "raw"
+  },
+  "s04_ratecheck_utc": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/measured_utc",
+    "fmt": "raw"
+  },
+  "s04_rej_19f2_125": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-19f2/rates/1250000/accepted",
+    "fmt": "raw"
+  },
+  "s04_rej_19f2_2083": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-19f2/rates/2083333/accepted",
+    "fmt": "raw"
+  },
+  "s04_acc_19f2_250": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-19f2/rates/2500000/accepted",
+    "fmt": "raw"
+  },
+  "s04_rej_5d4d_125": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-5d4d/rates/1250000/accepted",
+    "fmt": "raw"
+  },
+  "s04_rej_5d4d_2083": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-5d4d/rates/2083333/accepted",
+    "fmt": "raw"
+  },
+  "s04_acc_5d4d_250": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/radios/pluto-5d4d/rates/2500000/accepted",
+    "fmt": "raw"
   }
 }

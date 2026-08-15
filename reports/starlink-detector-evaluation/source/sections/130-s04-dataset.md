@@ -35,6 +35,27 @@ axis, f = {{s04_axis_low_f}} on {{s04_axis_low_cells}} cells with only {{s04_axi
 f = {{s04_axis_high_f}} for {{s04_rate_1000}} MS/s at {{s04_probe_80}} ms, over an arm axis spanning f {{s04_axis_f_low}}–{{s04_axis_f_high}} on {{s04_axis_cells}}
 cells.
 
+**And that column had a second handicap nobody recorded.** On
+{{s04_ratecheck_utc}}, after both radios were unplugged and re-attached, every
+{{s04_rate_125}} MS/s draw began failing outright — `EINVAL` on the write of
+`sampling_frequency` — while every other rate kept working. Probing the parts
+directly, both refuse {{s04_rate_125}} MS/s and both refuse
+{{s04_ad9361_floor_khz}}, which is the AD9361's own floor: its minimum ADC rate
+over the largest decimation it can do without a filter. Going below that needs a
+**decimating FIR in the receive path**, and both parts report
+`{{s04_fir_19f2}}` — none loaded.
+
+So this column only ever worked because some earlier tool had left a filter in
+the part, and re-plugging cleared it. The consequence for the corpus is not
+operational but analytical: **the {{s04_rate_125}} MS/s captures went through a
+receive chain no other arm had, and its coefficients were never recorded.**
+`collect_radio` writes `sampling_frequency` and `rf_bandwidth` and reads back
+neither; the collector records neither. The arm this section already calls
+handicapped by arithmetic turns out to be handicapped a second time, by a filter
+that cannot now be reconstructed. Treat its results as indicative at best, and
+do not read the arm axis as a clean sample-rate ladder at its bottom rung.
+Values in [`figures/rate-limits.json`](figures/rate-limits.json).
+
 ![The twelve arms as a grid, with sweep counts, sample budgets and the pilot-band verdict](figures/arm-matrix.png)
 
 ***Figure 4 — the draw was flat; one column is beaten by arithmetic.*** *Each

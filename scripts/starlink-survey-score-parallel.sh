@@ -20,18 +20,22 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 [--limit N] [--workers N] [--rebuild] [SHARED_ROOT]" >&2
+  echo "usage: $0 [--limit N] [--stratify] [--workers N] [--rebuild] [SHARED_ROOT]" >&2
   echo "  --limit N    entries to score in total (default: every unscored entry)" >&2
+  echo "  --stratify   spread those N across the whole capture window rather" >&2
+  echo "               than scoring the earliest N" >&2
   echo "  --workers N  parallel workers (default: cores/3, since each takes 3 threads)" >&2
   echo "  --rebuild    also re-score entries that already carry a current sidecar" >&2
 }
 
 limit=""
+stratify=0
 workers=""
 rebuild=0
 while (( $# )); do
   case "$1" in
     --limit)   limit="${2:-}"; shift 2 ;;
+    --stratify) stratify=1; shift ;;
     --workers) workers="${2:-}"; shift 2 ;;
     --rebuild) rebuild=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -116,15 +120,44 @@ schema="$(radio starlink-survey-score status "${shared_root}" 2>/dev/null \
   | grep -o 'survey-detector-comparison/v[0-9]*' | head -1 || true)"
 schema="${schema:-survey-detector-comparison/v2}"
 
-dealt=0
+pending=()
 for entry in "${corpus_root}"/*/; do
   [[ -f "${entry}survey.ci16" ]] || continue
   if (( ! rebuild )) && grep -q "${schema}" "${entry}scores.json" 2>/dev/null; then
     continue
   fi
+  pending+=( "${entry%/}" )
+done
+
+# Entries are named sync-<UTC>-<radio>, so the glob above is chronological and a
+# bounded pass scores the EARLIEST N. That is how the scored corpus became a
+# contiguous block of one collection day while looking like a sample of it, and
+# every absolute rate measured on it inherits that. --stratify spends the same
+# budget across the whole window instead. It spreads the SAMPLE, not the CLOCK:
+# capture cadence was not uniform, so evenly spaced by position is only evenly
+# spaced in time if it had been.
+if (( stratify )) && [[ -n "${limit}" ]] && (( ${#pending[@]} > limit )); then
+  mapfile -t pending < <(
+    printf '%s\n' "${pending[@]}" |
+    awk -v want="${limit}" '
+      { line[NR] = $0 }
+      END {
+        if (NR <= want) { for (i = 1; i <= NR; i++) print line[i]; exit }
+        if (want == 1) { print line[int((NR + 1) / 2)]; exit }
+        for (i = 0; i < want; i++) {
+          idx = int(i * (NR - 1) / (want - 1)) + 1
+          if (idx != last) print line[idx]
+          last = idx
+        }
+      }')
+  echo "stratified: ${#pending[@]} entries spread across the window, not the earliest ${limit}"
+fi
+
+dealt=0
+for entry in "${pending[@]}"; do
   shard=$(( dealt % workers ))
   mkdir -p "${shard_root}/${shard}"
-  ln -s "${entry%/}" "${shard_root}/${shard}/" 2>/dev/null || true
+  ln -s "${entry}" "${shard_root}/${shard}/" 2>/dev/null || true
   dealt=$(( dealt + 1 ))
   if [[ -n "${limit}" ]] && (( dealt >= limit )); then break; fi
 done

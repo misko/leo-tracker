@@ -8,7 +8,7 @@
 
 # Evaluating Starlink edge-pilot detectors with two radios
 
-Date: 2026-08-14 UTC
+Date: 2026-08-15 UTC
 Status: **the apparatus works; the closed-form coincidence solver brackets
 occupancy at moderate and high levels under controlled loopback conditions and
 reads low at low occupancy, while the check used to validate it refuses to
@@ -20,10 +20,11 @@ matches neither of the rankings this report previously offered**
 **How to read this document.** It is written in the order the work happened.
 Sections 1–10 are the sky analysis and the contradictions it ran into; sections
 11–15 are controlled injection and section 16 returns to the sky with the
-instrument calibrated, and together they supersede several of the earlier
-conclusions and says so at each point. Where the two disagree, **the injection
+instrument calibrated; together they supersede several of the earlier
+conclusions, and say so at each point. Where the two disagree, **the injection
 sections are current.** Section 9's surviving-findings table carries a status
 column for exactly this reason.
+
 ## Executive summary
 
 Eight algorithms were built to decide whether a Starlink downlink channel is
@@ -101,6 +102,7 @@ Every `d` in the sections below is a **model output**, never a measurement. It i
 inferred from a model whose own consistency check is the one shown above to be
 incapable of failing. That caveat is repeated wherever a `d` appears, because it
 is load-bearing every time.
+
 ## How to read this report
 
 Each numbered section is one idea, one figure, one takeaway, and is meant to be
@@ -151,6 +153,7 @@ window and is unaffected, which is why the results in sections 6, 7 and 8
 stand regardless. It also explains why the census numbers above drift
 monotonically rather than randomly: each later batch is later sky, and later
 sky was busier.
+
 ## The corpus
 
 | Quantity | Measured | Moves? |
@@ -191,6 +194,7 @@ cheapest available improvement to every number in this report, and it is the
 first item in [section 10](#10-what-real-ground-truth-would-take).
 
 ---
+
 ## 1. Why edge pilots, and why nothing here is visible
 
 Each Starlink downlink channel is 240 MHz wide and carries eight known pilot
@@ -255,6 +259,7 @@ right, which is exactly why ground truth has to be manufactured — the subject 
 the next two sections.
 
 ---
+
 ## 2. The hard part: nothing was injected
 
 No signal of known amplitude was ever put into either front end at this site.
@@ -322,6 +327,7 @@ detector. Ground truth has to come from somewhere else, and the only thing this
 site has is a second radio.
 
 ---
+
 ## 3. The apparatus: two radios, one instant
 
 One collector process opens both Plutos and runs one thread per radio, with a
@@ -389,6 +395,7 @@ the rendezvous, not the radios, and cannot distinguish the two geometries the
 experiment was built to compare.
 
 ---
+
 ## 4. The dataset: twelve arms, and two geometries for free
 
 Twelve arms cross probe length {80, 160, 640} ms with sample rate
@@ -497,6 +504,7 @@ corpus has on simultaneity — the recorded skew, from
 [section 3](#3-the-apparatus-two-radios-one-instant), is not one.
 
 ---
+
 ## 5. Ground truth by coincidence: the model
 
 Two chains that share only the sky are the substitute for injection. Let a sky
@@ -610,6 +618,7 @@ a hierarchical treatment of latent signal strength.
 
 None of this weakens section 6 — it is a second, independent reason not to read
 the `d` values as measurements.
+
 ## 6. Did it work? The negative controls
 
 This is the test that decides the report, and it is cheap: build joins where the
@@ -668,6 +677,7 @@ model output from this model. Most detector comparisons never run this control.
 This one did, and it came back negative — that is the contribution.
 
 ---
+
 ## 7. Why it failed: the detectors are near-duplicates
 
 The negative control is not a surprise once you look at the detectors
@@ -724,6 +734,7 @@ about the sky. Either add a genuinely different statistic, or report one
 detector and its null.
 
 ---
+
 ## 8. What the sky looks like
 
 Two independent readings of the same corpus. Neither depends on the coincidence
@@ -885,6 +896,7 @@ different direction, and it is why what survives from this corpus is
 instrumental.
 
 ---
+
 ## 9. What survives: the instrument
 
 Two findings that do not depend on the coincidence model, do not depend on the
@@ -1027,6 +1039,7 @@ correct the `lnb-c` bias or widen the offset search past 350 kHz, and stop
 pooling the 1.25 MS/s arm with arms whose pilot band fits.
 
 ---
+
 ## 10. What real ground truth would take
 
 The single sentence: **every limitation above traces back to having no known
@@ -1068,6 +1081,7 @@ detectors — by fire count, by excess over the measured null, or by model outpu
 `d` — should be reported as a result.
 
 ---
+
 ## 11. Ground truth at last: measured detection probability
 
 Every number before this section is inferred. This one is measured.
@@ -1250,6 +1264,7 @@ and `RX2` share an LO and carry common-mode noise power; it produced no
 correlated false alarms, but two radios on sky are not quite this pair. One
 probe length, one sample rate, and a single occupancy and SNR for 11b. And no
 LNB, antenna or sky anywhere in the path.
+
 ## 12. What the cliff actually is
 
 [Section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
@@ -1382,6 +1397,7 @@ pooled window onto **+3.5 kHz** in a genuinely out-of-sample test. What remains
 open is the **~±175 kHz half-width**, given that injection shows the detectors
 themselves flat out to ±700 kHz — so the width belongs to the acquisition stage,
 not to the decision statistics.
+
 ## 13. The same experiment, on two radios, with the answer known
 
 [Section 11](#11-ground-truth-at-last-measured-detection-probability) used one
@@ -1524,6 +1540,7 @@ per-receiver −150 kHz LO errors of
 [16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs), the water on the `lnb-c` and
 `lnb-d` bias tees, and the LNB chain generally are all outside what a cable can
 say anything about.
+
 ## 14. The dead port and the stale calibration are one fault
 
 Two problems with `lnb-a` appear separately in this report: it was excluded as a
@@ -1601,6 +1618,7 @@ Note also that the differential step measured here, +562,248 Hz, and the move in
 Neither is wrong: they are marginal means over different detection sets, which
 [section 16b](#16b-the-correction-survives-being-tested-out-of-sample) shows sets
 a 20–40 kHz floor on any absolute per-receiver number.
+
 ## 15. Three experiments that revise the ranking
 
 ### 15a. Conditional independence holds — and the prior finding was never significant
@@ -1685,6 +1703,7 @@ trailing-group SNR50 is extrapolated past the ladder top and is not trustworthy,
 though only 1 of 28 pairs resolved there anyway. Absolute SNR50 is not comparable
 across sample rates because the noise bandwidth changes — only the within-arm
 order is clean.*
+
 ## 16. The −150 kHz, measured: four oscillators, and what it costs
 
 [Section 12](#12-what-the-cliff-actually-is) argued that the −150 kHz window
@@ -1898,6 +1917,7 @@ Four things the daily timer cannot do, and one it will actively undo:
    **Sat 2026-08-15 11:59:52 PDT** with `--apply`, so writing the values without first
    teaching the command to carry them forward from `previous`, or masking the
    timer, buys less than a day.
+
 ## Figures and provenance
 
 Every figure is computed from the read-only corpus at

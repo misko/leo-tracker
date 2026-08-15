@@ -95,7 +95,10 @@ def render(root: Path, complete: bool = True) -> tuple[str, FactBook]:
     if problems:
         raise FactError("unresolved references:\n  " + "\n  ".join(problems))
 
-    body = "\n".join(piece.rstrip("\n") for piece in pieces) + "\n"
+    # A blank line between sections, not a bare newline: a heading that
+    # butts against the previous paragraph is only a heading by the
+    # grace of the renderer, and this document is read on more than one.
+    body = "\n\n".join(piece.strip("\n") for piece in pieces) + "\n"
     return BANNER + "\n" + body, book
 
 

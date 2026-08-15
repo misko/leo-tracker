@@ -1,6 +1,6 @@
 {
  "schema": "leo-tracker.hardware-epochs/v1",
- "note": "Receiver labels are reused across hardware changes: reports and corpus entries before and after a swap both say 'lnb-c'. These boundaries are the only way to separate them. Split on capture start time, not on label. A boundary can move a receiver on a radio nobody touched: pluto-5d4d.lnb-a jumped +566 kHz across the pluto-19f2 swap window, which was recorded here as leaving 5d4d valid. Split on capture start time for every radio, not only the one that was worked on.",
+ "note": "Receiver labels are reused across hardware changes: reports and corpus entries before and after a swap both say 'lnb-c'. These boundaries are the only way to separate them. Split on capture start time, not on label. A boundary can move a receiver on a radio nobody touched: pluto-5d4d.lnb-a jumped +566 kHz across the pluto-19f2 swap window, which was recorded here as leaving 5d4d valid. Split on capture start time for every radio, not only the one that was worked on. Absolute per-receiver centres for every epoch were measured in section 16 of the detector-evaluation report and are recorded here; a differential alone leaves both ports of a radio free to sit 150 kHz off together, which is what lnb-b and lnb-d do.",
  "epochs": [
   {
    "id": "pluto-19f2.lnb-cd.gen1",
@@ -14,11 +14,14 @@
    "measured": {
     "lnb-c": {
      "absolute_offset_hz": 430700,
-     "source": "lo_sweep corrected, 240 probes, n=13, SE 12600"
+     "source": "lo_sweep corrected, 240 probes, n=13, SE 12600",
+     "reconciliation": "section 16a measures +420,686 Hz, spread [+402,447, +438,925]. The +430,700 recorded here sits inside that bracket; both stand."
     },
     "lnb-d": {
      "absolute_offset_hz": 20000,
-     "source": "lo_sweep corrected, 240 probes, n=61, SE 5800"
+     "source": "lo_sweep corrected, 240 probes, n=61, SE 5800",
+     "reconciliation": "section 16a measures +14,996 Hz, spread [+12,280, +17,712], n=14,602. The +20,000 recorded here is OUTSIDE that bracket. It came from a 13-point lo_sweep with SE 5,800; the section 16 value draws on two independent populations and supersedes it. Kept as recorded rather than overwritten, because the lo_sweep is what the epoch was declared from.",
+     "superseded_by_hz": 14996
     },
     "mismatch_hz": 434408.4,
     "mismatch_source": "lnb-calibration.json 2026-08-12T19:01:53Z, sample_count 230",
@@ -38,9 +41,36 @@
     "lnb-d"
    ],
    "from_utc": "2026-08-13T04:46:20Z",
-   "hardware_note": "Both units replaced at once and are identical to each other. Identical model does not imply identical LO: free-running crystals, no shared 10 MHz reference in the chain, so the two offsets are independent draws.",
-   "measured": null,
-   "pending": "absolute offsets unknown; measure with lo_sweep once ~40 post-swap corpus probes exist, then write measured_centers_hz"
+   "hardware_note": "Both units replaced at once and are identical to each other. Identical model does not imply identical LO: free-running crystals, no shared 10 MHz reference in the chain, so the two offsets are independent draws. Measured, both ports are +43.6 and -14.7 ppm at a 9.75 GHz LO: independent draws, as predicted, and both inside an ordinary LNB specification.",
+   "measured": {
+    "lnb-c": {
+     "absolute_offset_hz": 424990,
+     "spread_hz": [
+      416732,
+      435332
+     ],
+     "n": 6173,
+     "n_populations": 3,
+     "source": "reports/starlink-detector-evaluation/figures/absolute-centres.json, section 16a: mean of the independent populations that could measure the port, bracket = spread across those populations"
+    },
+    "lnb-d": {
+     "absolute_offset_hz": -143566,
+     "spread_hz": [
+      -149101,
+      -138197
+     ],
+     "n": 9484,
+     "n_populations": 3,
+     "source": "reports/starlink-detector-evaluation/figures/absolute-centres.json, section 16a: mean of the independent populations that could measure the port, bracket = spread across those populations"
+    },
+    "mismatch_hz": 605521,
+    "mismatch_ci95_hz": [
+     605083,
+     605930
+    ],
+    "mismatch_source": "live narrow reports via the repository's own _paired_differences, 1,095 dual candidates"
+   },
+   "action": "set measured_centers_hz: [443472.7, -162048.5] for pluto-19f2. The pair is slid so rx0-rx1 equals the measured 605,521 Hz differential -- survey_scoring.cross_receiver_checks gates on exactly that difference -- leaving +/-18.5 kHz of residual halved between the ports rather than dumped on one."
   },
   {
    "id": "pluto-5d4d.lnb-a.gen1",
@@ -80,11 +110,29 @@
     ],
     "n_points": 2585,
     "n_sweeps": 931,
-    "source": "survey path, coarse bank E (+/-700 kHz about raw zero), refined points where both ports fired"
+    "source": "survey path, coarse bank E (+/-700 kHz about raw zero), refined points where both ports fired",
+    "lnb-a": {
+     "absolute_offset_hz": 375663,
+     "uncertainty_hz": 40000,
+     "n": 1304,
+     "n_populations": 1,
+     "source": "reports/starlink-detector-evaluation/figures/absolute-centres.json, section 16a: mean of the independent populations that could measure the port, bracket = spread across those populations; ONE population only -- the live search is blind here and the survey arm fires at 5.0%"
+    },
+    "lnb-b": {
+     "absolute_offset_hz": -149146,
+     "spread_hz": [
+      -155439,
+      -141969
+     ],
+     "n": 7103,
+     "n_populations": 3,
+     "source": "reports/starlink-detector-evaluation/figures/absolute-centres.json, section 16a: mean of the independent populations that could measure the port, bracket = spread across those populations"
+    }
    },
    "fault": "lnb-a's LO moved about +566 kHz across the same window that brackets pluto-19f2's LNB swap, even though 5d4d was believed untouched. Its fire rate stepped 8.26% -> 0.24% while lnb-b was unchanged at 6.49% -> 6.87%, and its surviving detections pinned at +349.8 kHz, the search-grid edge. This single event produced BOTH the 'flat ~1.19 peak-to-median, dead port' exclusion in cross_radio.DEAD_RECEIVERS AND the stale receiver_centers_hz. They are one fault, not two: the port was never dead, it moved out of the search.",
    "why_it_cannot_self_heal": "acquisition.py builds frequency_offsets = arange(-350_000, 350_001, 25_000) + centre, where centre is the ALREADY APPLIED receiver_centers value. A port anchored near zero is blind past about +/-356 kHz and can never discover that it has moved. pluto-19f2's replacement LNB was findable only because its stale +434 kHz calibration had already displaced its grid into range. The daily timer will keep returning ~0 Hz for this port forever; the value must be written as measured_centers_hz from the survey path.",
-   "action": "set measured_centers_hz: [567402.0, 0.0] for pluto-5d4d; receiver_centers() already prefers that field. Verified: with it applied, lnb-a's signed live window moves from +250..+550 kHz to -300..0 kHz, centroid -158.4 kHz against lnb-b -151.8, lnb-c -155.0, lnb-d -144.1, and the paired per-instant residual is 0.000 kHz, CI [-61, +153] Hz."
+   "action": "set measured_centers_hz: [396959.5, -170442.5] for pluto-5d4d. SUPERSEDES the earlier [567402.0, 0.0]: that pair carried the differential into rx0 and anchored rx1 at zero, which is right for lnb-a and leaves lnb-b sitting 149 kHz off, costing about a quarter of its detections for no reason. Measuring both ports absolutely is what made the difference visible.",
+   "superseded_action": "set measured_centers_hz: [567402.0, 0.0] -- correct about lnb-a, wrong to leave lnb-b at zero"
   }
  ],
  "backups": [

@@ -23,12 +23,18 @@ import json
 from pathlib import Path
 import statistics
 
+from .analysis import LEARNED_MAXIMUM_CFO_DIFFERENCE_HZ
+
 CALIBRATION_SCHEMA = "leo-tracker.lnb-calibration/v1"
 #: Twice the diurnal wander observed in the field, so ordinary thermal
 #: behaviour is silent while a swapped cable or failing PLL is caught at once.
 ALERT_THRESHOLD_HZ = 20_000.0
 #: Below this a median is noise; a real measurement has hundreds of pairs.
 MINIMUM_SAMPLES = 40
+#: How far a carried absolute pair may drift from the difference measured this
+#: run before it is called stale. The same gate ``cross_receiver_checks`` marks
+#: two ports as agreeing on, because that is what a wrong pair goes on to break.
+CENTRE_DISAGREEMENT_HZ = float(LEARNED_MAXIMUM_CFO_DIFFERENCE_HZ)
 
 
 def _paired_differences(report: dict) -> list[float]:
@@ -144,6 +150,63 @@ def compare_calibration(previous: dict, current: dict, *,
             "reason": ("mismatch changed sign, ports appear exchanged" if swapped
                        else f"mismatch moved {abs(shift):.0f} Hz, "
                             f"beyond the {threshold_hz:.0f} Hz threshold")})
+    return alerts
+
+
+def carry_measured_centers(previous: dict, current: dict, *,
+                           tolerance_hz: float = CENTRE_DISAGREEMENT_HZ
+                           ) -> list[dict]:
+    """Keep absolute centres across a run that has no way to measure them.
+
+    ``measure_mismatch`` produces a difference and nothing else, while
+    ``write_calibration`` replaces the artifact wholesale. An absolute pair
+    written into ``measured_centers_hz`` therefore survives exactly until the
+    next timer firing, which is long enough to look like it worked and short
+    enough to be gone before anyone checks.
+
+    Carrying it forward is not sufficient on its own, because a stale absolute
+    is worse than none: :func:`receiver_centers` prefers it over the measured
+    difference, so a pair left behind by hardware that has since moved steers
+    the search *away* from the signal and keeps doing so. That is the failure
+    this repository has already had once, when one port's oscillator moved
+    567 kHz and the recorded centre stayed correct-looking for the epoch before
+    it.
+
+    So the carried pair is checked against the difference measured this run.
+    Their difference is the one quantity both representations share, and it is
+    what ``survey_scoring.cross_receiver_checks`` gates agreement on. A pair
+    that no longer reproduces it is still carried -- discarding a hand-measured
+    absolute on a noisy night would be worse -- but it is carried with an
+    alert, so the disagreement is visible instead of silently applied.
+    """
+    alerts = []
+    old = (previous or {}).get("radios") or {}
+    for radio, entry in ((current or {}).get("radios") or {}).items():
+        centres = (old.get(radio) or {}).get("measured_centers_hz")
+        if not centres or len(centres) != 2:
+            continue
+        entry["measured_centers_hz"] = [float(centres[0]), float(centres[1])]
+        entry["measured_centers_carried_from"] = (previous or {}).get("created_utc")
+        if not entry.get("measured"):
+            continue
+        implied = float(centres[0]) - float(centres[1])
+        drift = implied - float(entry["mismatch_hz"])
+        if abs(drift) <= tolerance_hz:
+            continue
+        alerts.append({
+            "radio_id": radio,
+            "carried_centers_hz": entry["measured_centers_hz"],
+            "implied_mismatch_hz": round(implied, 1),
+            "measured_mismatch_hz": entry["mismatch_hz"],
+            "drift_hz": round(drift, 1),
+            "receiver_labels": entry.get("receiver_labels"),
+            "stale_absolute": True,
+            "reason": (f"carried absolute centres imply {implied:.0f} Hz between "
+                       f"the ports but this run measured "
+                       f"{float(entry['mismatch_hz']):.0f} Hz, a "
+                       f"{abs(drift):.0f} Hz disagreement beyond the "
+                       f"{tolerance_hz:.0f} Hz gate; the absolutes are applied "
+                       f"but are probably from a superseded epoch")})
     return alerts
 
 

@@ -1200,12 +1200,17 @@ def command_starlink_analysis_index(args: argparse.Namespace) -> int:
 
 def command_starlink_lnb_calibration(args: argparse.Namespace) -> int:
     """Measure LNB mismatch, and report anything that moved since last time."""
-    from .beacon.lnb_calibration import (compare_calibration, load_calibration,
+    from .beacon.lnb_calibration import (carry_measured_centers,
+                                         compare_calibration, load_calibration,
                                          measure_mismatch, receiver_centers,
                                          write_calibration)
     previous = load_calibration(args.root)
     current = measure_mismatch(args.root / "reports", limit=args.limit)
     alerts = compare_calibration(previous, current)
+    # Before the centres are resolved, because this is what they resolve from:
+    # this command cannot measure an absolute offset, so one that was measured
+    # elsewhere has to survive the rewrite or it lasts until the next firing.
+    alerts += carry_measured_centers(previous, current)
     current["alerts"] = alerts
     current["receiver_centers_hz"] = {
         radio: list(receiver_centers(current, radio))

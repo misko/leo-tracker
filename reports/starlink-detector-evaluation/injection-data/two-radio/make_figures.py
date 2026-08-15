@@ -109,7 +109,7 @@ def d1():
     for lv in levels:
         lv["label_y"] = lowest - 0.02
     return render("fig_d1_recovered_f", {
-        "title": "D1: the estimator recovers the injected occupancy at every level",
+        "title": "D1: the estimator brackets injected occupancy at 0.30 and 0.50,\nand reads LOW at 0.15 - every algorithm below truth",
         "levels": levels, "methods": RES["methods"], "draws": 600})
 
 

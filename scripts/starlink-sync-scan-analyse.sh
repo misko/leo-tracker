@@ -206,6 +206,22 @@ if (( plan )); then
   exit 0
 fi
 
+
+# Phase tracing. Every phase says what it is about to do, and how long the last
+# one took, because this pipeline's failure mode is not crashing -- it is going
+# quiet for tens of minutes inside a loop over a network share while the
+# operator watches an idle CPU and reasonably concludes it has died. That has
+# now happened three times, each with a different cause, and each time the only
+# way to tell was to attach to the process. LEO_TRACE=0 turns it off.
+: "${LEO_TRACE:=1}"
+_trace_last=$SECONDS
+trace() {
+  (( LEO_TRACE )) || return 0
+  local now=$SECONDS
+  printf '[%s +%4ds] %s\n' "$(date -u +%H:%M:%S)" "$(( now - _trace_last ))" "$*" >&2
+  _trace_last=$now
+}
+
 repo_env=(env "UV_CACHE_DIR=${repo_dir}/.uv-cache")
 # How to reach the package. `uv run` is the fallback, not the default: it takes
 # a lock on the environment before doing anything, and a stale lock makes it
@@ -263,6 +279,7 @@ if (( do_import )); then
   # in the corpus rather than quadratic. Called rather than reimplemented in
   # bash, because a second copy of the rule is how it drifted in the first
   # place.
+  trace "censusing ${corpus_root} for entries already imported"
   declare -A committed=()
   if (( ! rebuild )); then
     while IFS= read -r entry; do
@@ -417,7 +434,8 @@ if (( do_score )); then
   # deals a corpus into shards of symlinks, warms the compiled kernel once
   # before fanning out, and kills its own workers on the way out; it takes the
   # corpus by environment, which is exactly the hook needed here.
-  echo "scoring ${corpus_root} with ${score_workers} workers"
+  trace "handing off to ${score_script}"
+echo "scoring ${corpus_root} with ${score_workers} workers"
   score_args=(--workers "${score_workers}")
   [[ -n "${score_limit}" ]] && score_args+=(--limit "${score_limit}")
   (( rebuild )) && score_args+=(--rebuild)

@@ -84,6 +84,22 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
+
+# Phase tracing. Every phase says what it is about to do, and how long the last
+# one took, because this pipeline's failure mode is not crashing -- it is going
+# quiet for tens of minutes inside a loop over a network share while the
+# operator watches an idle CPU and reasonably concludes it has died. That has
+# now happened three times, each with a different cause, and each time the only
+# way to tell was to attach to the process. LEO_TRACE=0 turns it off.
+: "${LEO_TRACE:=1}"
+_trace_last=$SECONDS
+trace() {
+  (( LEO_TRACE )) || return 0
+  local now=$SECONDS
+  printf '[%s +%4ds] %s\n' "$(date -u +%H:%M:%S)" "$(( now - _trace_last ))" "$*" >&2
+  _trace_last=$now
+}
+
 if [[ -n "${limit}" ]] && { ! [[ "${limit}" =~ ^[0-9]+$ ]] || (( limit < 1 )); }; then
   echo "--limit must be a positive integer" >&2; exit 2
 fi
@@ -99,12 +115,12 @@ for candidate in "${LEO_PYTHON:-}" "${VIRTUAL_ENV:-}/bin/python" \
   py_bin="${candidate}"; break
 done
 if [[ -n "${py_bin}" ]]; then
-  py()    { "${py_bin}" "$@"; }
-  radio() { "${py_bin}" -m leo_tracker.radio.cli "$@"; }
+  py()    { nice -n "${niceness}" "${py_bin}" "$@"; }
+  radio() { nice -n "${niceness}" "${py_bin}" -m leo_tracker.radio.cli "$@"; }
 else
   [[ -n "${uv_bin}" ]] || { echo "no usable python and no uv on PATH" >&2; exit 2; }
-  py()    { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python "$@"; }
-  radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
+  py()    { nice -n "${niceness}" env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python "$@"; }
+  radio() { nice -n "${niceness}" env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
 fi
 
 # Shards are symlinks and live on local disk, never on the share: a shard is
@@ -130,9 +146,17 @@ trap cleanup EXIT INT TERM
 # Deal unscored entries round-robin so every shard holds a mix rather than a
 # contiguous slice: entries sort by channel first, so a contiguous split would
 # give one worker every ch1 probe and skew both the load and the sample.
-schema="$(radio starlink-survey-score status "${shared_root}" 2>/dev/null \
-  | grep -o 'survey-detector-comparison/v[0-9]*' | head -1 || true)"
-schema="${schema:-survey-detector-comparison/v2}"
+# The schema is a compile-time constant, so ask for the constant. This used to
+# run `starlink-survey-score status`, which walks every entry in the corpus --
+# two stats and a prefix read each, plus a full manifest parse for every
+# unscored one -- and then grep the answer out of its JSON. On an 18,000-entry
+# corpus over NFS that is many minutes of silence before anything starts, to
+# recover a string that is in the source.
+trace "resolving the scores schema (a constant; no corpus walk)"
+schema="$(py -c 'from leo_tracker.radio.beacon.survey_scoring import SCORES_SCHEMA
+print(SCORES_SCHEMA)' 2>/dev/null | tail -1 || true)"
+schema="${schema:-leo-tracker.survey-detector-comparison/v2}"
+echo "schema:         ${schema}"
 
 # Say what is about to happen before doing it. This pass touches every sidecar
 # in the corpus over NFS -- minutes with no output and no CPU on a large one --
@@ -141,7 +165,9 @@ schema="${schema:-survey-detector-comparison/v2}"
 # that has died.
 scanned=0
 total_entries="$(ls -1 "${corpus_root}" 2>/dev/null | wc -l)"
+trace "listing the corpus"
 echo "scanning ${total_entries} corpus entries for what is already scored..."
+trace "scanning ${total_entries} entries: one 512-byte read each, over the share"
 
 pending=()
 for entry in "${corpus_root}"/*/; do
@@ -161,13 +187,19 @@ for entry in "${corpus_root}"/*/; do
   # miss here only re-scores an entry that was already done: wasteful, never
   # wrong.  A bash read rather than `head | grep`, because two forks per entry
   # across 18,000 entries is itself most of the remaining cost.
-  if (( ! rebuild )); then
+  if (( ! rebuild )) && [[ -f "${entry}scores.json" ]]; then
+    # The existence test is not redundant with the redirect: `2>/dev/null` on a
+    # read does not silence a FAILED REDIRECT, which the shell reports itself
+    # before the command runs. Without the test, every entry that still needs
+    # scoring -- the ones this loop exists to find -- printed an error, and a
+    # real failure would have scrolled past in the noise.
     head=""
-    IFS= read -r -N 512 head < "${entry}scores.json" 2>/dev/null || true
+    IFS= read -r -N 512 head < "${entry}scores.json" || true
     [[ "${head}" == *"${schema}"* ]] && continue
   fi
   pending+=( "${entry%/}" )
 done
+trace "scan complete"
 echo "scan complete: ${#pending[@]} of ${total_entries} entries need scoring"
 
 # Entries are named sync-<UTC>-<radio>, so the glob above is chronological and a
@@ -215,8 +247,9 @@ echo "dealt ${dealt} entries into ${workers} shards (~$(( (dealt + workers - 1) 
 # -march=native resolved to), so a host that has never run this code has no
 # object, and N workers starting together would each compile onto the same path.
 # The compile is not atomic, and the live capture path loads the same object.
+trace "warming the compiled kernel once, before the workers fan out"
 echo "warming the kernel cache..."
-nice -n "${niceness}" py - <<'PY'
+py - <<'PY'
 from leo_tracker.radio.beacon import fast_scan
 fast_scan._load_kernel()
 print("kernel ready")
@@ -227,12 +260,13 @@ PY
 echo "at ~86 s/entry this is at least $(( dealt * 86 / workers / 60 )) min; the"
 echo "slowest shard sets the finish, historically about 1.5x the even split."
 
+trace "launching ${workers} workers"
 started="$(date +%s)"
 for shard in $(seq 0 $(( workers - 1 ))); do
   [[ -d "${shard_root}/${shard}" ]] || continue
   extra=()
   (( rebuild )) && extra+=(--rebuild)
-  nice -n "${niceness}" radio starlink-survey-score run \
+  radio starlink-survey-score run \
     "${shared_root}" --corpus-root "${shard_root}/${shard}" "${extra[@]}" \
     > "${shard_root}/${shard}.log" 2>&1 &
   pids+=("$!")

@@ -992,14 +992,22 @@ from the survey-path values in `hardware/epochs.json`; the conclusion — every
 port about 150 kHz below zero, none near it — is the same either way. Values in
 [`figures/port-bias.json`](figures/port-bias.json).*
 
-***Audit note, recorded and unresolved.*** *`lnb-a` is excluded throughout
-because `cross_radio.DEAD_RECEIVERS` records it as flat ~1.19 at every tuning
-since 2026-08-13 04:44 UTC. Scored on `differential-32`, this corpus does not
-reproduce that: `lnb-a` fires on 15.82% of its 65,948 target points against
-`lnb-b`'s 18.21% of 65,420, and its cross-edge null is not silence — median
-0.0180 and p99 0.0835, against `lnb-b`'s 0.0187 and 0.0856. The exclusion is
-applied everywhere in this report regardless; the disagreement belongs in the
-record.*
+***Audit note, now resolved — and the exclusion was wrong.*** *Every figure
+above was produced with `lnb-a` excluded, because `cross_radio.DEAD_RECEIVERS`
+recorded it as flat ~1.19 at every tuning since 2026-08-13 04:44 UTC. Scored on
+`differential-32`, this corpus never reproduced that: `lnb-a` fires on
+15.82% of its 65,948 target points against
+`lnb-b`'s 18.21% of 65,420, and its cross-edge
+null is not silence — median 0.0180 and p99
+0.0835, against `lnb-b`'s 0.0187 and
+0.0856. [Section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault)
+explains the flat reading — the oscillator moved out of the **narrow** search
+grid, which the survey path this report scores does not use — and
+`DEAD_RECEIVERS` is now empty. The exclusion cost twice over, because it took
+the port's null with it and so moved every threshold drawn beside it. **The
+figures in this section still carry it**; they were computed before the
+withdrawal and have not been recomputed, which is the honest state rather than
+the tidy one.*
 
 ### The surviving findings, in one place
 
@@ -1011,7 +1019,7 @@ record.*
 | The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.946 over 40,256 observations | **stands** |
 | A per-point 1% threshold yields 5.47–6.74% per cell after maximising over ~7 candidates, as expected | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
 | Recorded skew is a lower bound and is blind to geometry | barrier-release stamp; 0.0437 against 0.0446 ms across geometries whose true offsets differ ~5x | **stands** |
-| ~~`lnb-a` is excluded as a dead port~~ **withdrawn — its LO moved 567 kHz out of the search grid ([14](#14-the-dead-port-and-the-stale-calibration-are-one-fault))** | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.82% of 65,948 against `lnb-b`'s 18.21% of 65,420) | applied, **unexplained** |
+| ~~`lnb-a` is excluded as a dead port~~ **withdrawn — its LO moved 567 kHz out of the search grid ([14](#14-the-dead-port-and-the-stale-calibration-are-one-fault))** | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.82% of 65,948 against `lnb-b`'s 18.21% of 65,420) | **withdrawn in code**; figures above predate it |
 | Cross-radio beats within-radio | not shown: no committed artefact isolates a radio-boundary effect on phi | **not established** |
 
 **Takeaway.** The instrument findings are the practical payoff of this corpus:

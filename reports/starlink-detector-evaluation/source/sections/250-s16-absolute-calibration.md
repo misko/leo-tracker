@@ -68,8 +68,16 @@ The third row shares no detector, no arm and no fitted quantity with what it is
 scored on. The window moves onto zero, and the one-sided distribution that
 [section 12](#12-what-the-cliff-actually-is) found becomes symmetric. Per port
 the out-of-sample residuals span −33.7 to +17.0 kHz. The single exception is
-`lnb-a` gen2 at −92.5 kHz, whose corpus detections are censored at the bank edge;
-it needs a direct `lo_sweep` once scoring is idle.
+`lnb-a` gen2 at −92.5 kHz, whose corpus detections are censored at the bank edge.
+
+That one is not waiting on a tool, and earlier drafts of this report said it was
+— they prescribed an `lo_sweep`, which exists nowhere in this repository. What
+`lnb-a` gen2 is waiting on is **data**: the method used here already measures an
+absolute centre, and it fails on that port only because its single usable
+population is too thin. More post-swap survey sweeps make its corpus arm usable,
+and the measurement then follows from the pipeline in
+[`figures/abscal-pipeline-abscal.py`](figures/abscal-pipeline-abscal.py) with
+nothing new written.
 
 **But the differential and the absolute centre are not interchangeable, and this
 report should not pretend they are.** Differencing two absolute centres does not

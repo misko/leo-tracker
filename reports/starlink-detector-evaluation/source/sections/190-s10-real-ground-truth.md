@@ -15,7 +15,7 @@ Short of that, in order of cost:
 | **Score the rest of the pairable corpus** | none — no new collection, no new code | every interval in this report tightens; ~{{s10_data_multiple}}x more data, already on disk |
 | Fix the skew stamp: retune before the barrier, bump the schema | one collector change | makes `skew_ms` the sample-start offset, and lets `sweep_skew_event()` certify it |
 | Derive the skew bound the coincidence model actually needs | analysis only | {{s10_design_max_ms}} ms and the README's 0.2–0.5 s operator target cannot both be the requirement |
-| Measure the `gen2` LO offsets with `lo_sweep` | one sweep | turns {{s10_lnbc_applied_khz}} from one number into a measurement with an error bar |
+| Measure the `gen2` LO offsets | more post-swap sweeps, no new code | turns {{s10_lnbc_applied_khz}} from one number into a measurement with an error bar. **Done for three of four ports** in [16a](#16a-four-independent-constants-not-one-shared-error); `lnb-a` gen2 still rests on one population |
 | Widen the offset search past {{s10_cliff_edge}} kHz and re-score one arm | one arm | if the cliff moves, the search span explains it; if not, that explanation is wrong |
 | Add a genuinely different statistic to the bank | development | at phi {{s10_phi_min}}–{{s10_phi_max}} the eight are one detector; agreement among them is not information |
 | **Inject a known signal** | hardware | replaces every model-output `d` in this report with a measurement |

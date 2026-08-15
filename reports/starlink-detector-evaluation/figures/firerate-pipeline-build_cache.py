@@ -23,7 +23,8 @@ sys.path.insert(0, "/home/satpi01/leo-tracker/src")
 sys.path.insert(0, "/home/satpi01/leo-tracker/reports/"
                    "sync-scan-cross-radio-2026-08-14/figures")
 
-import fcore  # noqa: E402
+from _pipeline import load as _load_pipeline  # noqa: E402
+fcore = _load_pipeline("fcore")
 
 WORK = Path("/tmp/claude-1000/-home-satpi01-leo-tracker/"
             "07c4f545-58c8-40cb-8d33-da0c19e82a08/scratchpad/summary/firerate/work")

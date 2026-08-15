@@ -66,12 +66,13 @@ for _candidate in (HERE, HERE.parent / "work"):
         break
 sys.path.insert(0, "/home/satpi01/leo-tracker/src")
 from leo_tracker.radio.beacon import cross_radio as cr  # noqa: E402
-import extract_heatmaps as ex  # noqa: E402
+from _pipeline import load as _load_pipeline  # noqa: E402
+ex = _load_pipeline("extract_heatmaps")
 
 OUT_PNG = HERE / "coincidence-model.png"
 OUT_JSON = HERE / "coincidence-model.json"
-SNAPSHOT = PIPELINE / "snapshot.json"
-DRIFT = PIPELINE / "drift.json"
+SNAPSHOT = PIPELINE / "heatmaps-pipeline-snapshot.json"
+DRIFT = PIPELINE / "heatmaps-pipeline-drift.json"
 
 INK, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#d7d6d2", "#fcfcfb"
 BAND, SKY = "#eceae5", "#e3ecf7"

@@ -71,7 +71,8 @@ for _candidate in (HERE, HERE.parent / "work"):
         break
 sys.path.insert(0, "/home/satpi01/leo-tracker/src")
 from leo_tracker.radio.beacon import cross_radio as cr  # noqa: E402
-import hcore  # noqa: E402
+from _pipeline import load as _load_pipeline  # noqa: E402
+hcore = _load_pipeline("hcore")
 
 NAME = "edge-agreement"
 INK, MUTED, SURFACE, GRID = "#0b0b0b", "#52514e", "#fcfcfb", "#d7d6d2"

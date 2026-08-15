@@ -25,6 +25,11 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
+# The harness helper lives with the records it reads, under
+# injection-data/, not beside the figures. Inserting figures/ instead --
+# which is what this did -- leaves the import unresolvable from a clean
+# checkout, so every one of these scripts failed at its import line.
+sys.path.insert(0, str(HERE.parent.parent / "injection-data" / "one-radio"))
 import analysis as A
 import style
 

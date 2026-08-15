@@ -75,7 +75,8 @@ from matplotlib.lines import Line2D  # noqa: E402
 sys.path.insert(0, "/home/satpi01/leo-tracker/reports/"
                    "sync-scan-cross-radio-2026-08-14/figures")
 
-import fcore  # noqa: E402
+from _pipeline import load as _load_pipeline  # noqa: E402
+fcore = _load_pipeline("fcore")
 
 HERE = Path(__file__).resolve().parent
 PNG = HERE / "f-strata.png"

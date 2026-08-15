@@ -31,7 +31,8 @@ sys.path.insert(0, "/home/satpi01/leo-tracker/src")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from leo_tracker.radio.beacon import cross_radio as cr  # noqa: E402
 
-import extract_heatmaps as ex  # noqa: E402
+from _pipeline import load as _load_pipeline  # noqa: E402
+ex = _load_pipeline("extract_heatmaps")
 
 SLICE = int(sys.argv[1]) if len(sys.argv) > 1 else 240
 

@@ -22,7 +22,8 @@ REPORT_FIGURES = Path("/home/satpi01/leo-tracker/reports/"
                       "sync-scan-cross-radio-2026-08-14/figures")
 sys.path.insert(0, str(REPORT_FIGURES))
 
-import snapshot as snap  # noqa: E402
+from _pipeline import load as _load_pipeline  # noqa: E402
+snap = _load_pipeline("snapshot")
 
 OUT = HERE / "drift.json"
 

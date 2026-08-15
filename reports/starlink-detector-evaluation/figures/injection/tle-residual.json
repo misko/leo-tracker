@@ -1,0 +1,2542 @@
+{
+ "by_port": {
+  "lnb-a|gen1": {
+   "fire_rate": 0.3239657459896273,
+   "maxel_regression": {
+    "intercept_khz": -134.20899252726392,
+    "n": 2686,
+    "r": 0.13776586188038076,
+    "slope": 0.34089262662651926
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -144.67,
+     -126.49
+    ],
+    "mean_khz": -135.63335148420168,
+    "median_khz": -121.82066666666663,
+    "n": 2686,
+    "p10_khz": -238.4873333333333,
+    "p90_khz": -5.154,
+    "sd_khz": 82.71304050493848
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -140.08,
+     -124.11
+    ],
+    "mean_khz": -132.05409507481923,
+    "median_khz": -133.7282050012532,
+    "n": 1803,
+    "p10_khz": -224.3303586550629,
+    "p90_khz": -39.71861499885434,
+    "sd_khz": 71.14702955038695
+   },
+   "n_fires": 2686,
+   "n_points": 8291,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -4.15,
+     2.01
+    ],
+    "mean_khz": -1.0079638180764683,
+    "median_khz": 0.1491035041809082,
+    "n": 2686,
+    "p10_khz": -26.33516796875,
+    "p90_khz": 22.398869140625,
+    "sd_khz": 18.197449736745867
+   },
+   "radio": "pluto-5d4d",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -21.89,
+     -14.43
+    ],
+    "mean_khz": -18.11827996370947,
+    "median_khz": -3.818150638435385,
+    "n": 2686,
+    "p10_khz": -66.96279427083331,
+    "p90_khz": 7.745904114527151,
+    "sd_khz": 35.50559848198181
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -140.86,
+     -121.48
+    ],
+    "mean_khz": -131.4550300841959,
+    "median_khz": -128.85343689936064,
+    "n": 2686,
+    "p10_khz": -241.50737441259773,
+    "p90_khz": -15.1375742180835,
+    "sd_khz": 84.83519224255346
+   }
+  },
+  "lnb-a|gen2": {
+   "fire_rate": 0.04987531172069826,
+   "maxel_regression": {
+    "intercept_khz": -277.611841894866,
+    "n": 700,
+    "r": -0.16063543841522554,
+    "slope": -1.1416175420406067
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -308.04,
+     -228.78
+    ],
+    "mean_khz": -262.9528995189651,
+    "median_khz": -186.06009507155414,
+    "n": 700,
+    "p10_khz": -684.0686666666667,
+    "p90_khz": -91.2242195016082,
+    "sd_khz": 231.12578815349994
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -324.15,
+     -239.5
+    ],
+    "mean_khz": -277.0926406077667,
+    "median_khz": -176.11981242895104,
+    "n": 499,
+    "p10_khz": -684.0686666666667,
+    "p90_khz": -63.09791978080126,
+    "sd_khz": 255.5127177395474
+   },
+   "n_fires": 700,
+   "n_points": 14035,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -8.7,
+     -1.35
+    ],
+    "mean_khz": -5.13297130582537,
+    "median_khz": -5.43864794921875,
+    "n": 700,
+    "p10_khz": -24.3885666015625,
+    "p90_khz": 15.3954248046875,
+    "sd_khz": 15.297621861969702
+   },
+   "radio": "pluto-5d4d",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -160.58,
+     -87.18
+    ],
+    "mean_khz": -118.48934907253657,
+    "median_khz": -12.368222067488562,
+    "n": 700,
+    "p10_khz": -487.9595682291666,
+    "p90_khz": 6.934294019301763,
+    "sd_khz": 210.27812017825352
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -297.61,
+     -213.58
+    ],
+    "mean_khz": -250.11239748034183,
+    "median_khz": -158.95665780094714,
+    "n": 700,
+    "p10_khz": -651.807761023625,
+    "p90_khz": -67.56555325520824,
+    "sd_khz": 238.51963004163053
+   }
+  },
+  "lnb-b|gen1": {
+   "fire_rate": 0.2823445318084346,
+   "maxel_regression": {
+    "intercept_khz": -134.1660789727755,
+    "n": 2370,
+    "r": 0.11564008549650381,
+    "slope": 0.2900090506600904
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -144.73,
+     -125.86
+    ],
+    "mean_khz": -135.02962078681264,
+    "median_khz": -127.99633626441226,
+    "n": 2370,
+    "p10_khz": -233.33333333333331,
+    "p90_khz": 0.0,
+    "sd_khz": 84.25683448764693
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -138.05,
+     -122.16
+    ],
+    "mean_khz": -130.29572406587798,
+    "median_khz": -135.27325795921817,
+    "n": 1590,
+    "p10_khz": -215.11701149655315,
+    "p90_khz": -41.16062973487626,
+    "sd_khz": 73.62908326185921
+   },
+   "n_fires": 2370,
+   "n_points": 8394,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -4.03,
+     2.03
+    ],
+    "mean_khz": -1.0215618410714065,
+    "median_khz": 0.3522216339111328,
+    "n": 2370,
+    "p10_khz": -25.48355859375,
+    "p90_khz": 22.08294140625,
+    "sd_khz": 17.5782543484667
+   },
+   "radio": "pluto-5d4d",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -20.7,
+     -13.24
+    ],
+    "mean_khz": -16.846486489241325,
+    "median_khz": -3.4236544744486745,
+    "n": 2370,
+    "p10_khz": -65.63655677083331,
+    "p90_khz": 9.367306207084566,
+    "sd_khz": 35.69498359965584
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -141.93,
+     -121.76
+    ],
+    "mean_khz": -132.05198332318426,
+    "median_khz": -130.99345733221085,
+    "n": 2370,
+    "p10_khz": -242.29691389973956,
+    "p90_khz": -14.779890805012881,
+    "sd_khz": 87.02456845302456
+   }
+  },
+  "lnb-b|gen2": {
+   "fire_rate": 0.3146574415281643,
+   "maxel_regression": {
+    "intercept_khz": -156.19998321402502,
+    "n": 4184,
+    "r": 0.10927978155764598,
+    "slope": 0.27169373670828323
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -163.61,
+     -150.39
+    ],
+    "mean_khz": -157.1054271634315,
+    "median_khz": -148.51172951100634,
+    "n": 4184,
+    "p10_khz": -265.73745265150313,
+    "p90_khz": -60.88506627600116,
+    "sd_khz": 87.18106884247553
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -152.93,
+     -141.68
+    ],
+    "mean_khz": -147.3061442924777,
+    "median_khz": -148.767651284777,
+    "n": 2730,
+    "p10_khz": -233.33333333333331,
+    "p90_khz": -66.46498024934472,
+    "sd_khz": 78.12092882656098
+   },
+   "n_fires": 4184,
+   "n_points": 13297,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -1.96,
+     2.91
+    ],
+    "mean_khz": 0.5090052052239388,
+    "median_khz": -0.6678307189941406,
+    "n": 4184,
+    "p10_khz": -20.39955078125,
+    "p90_khz": 22.006140625,
+    "sd_khz": 17.386182213503908
+   },
+   "radio": "pluto-5d4d",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -28.07,
+     -21.88
+    ],
+    "mean_khz": -25.003111354572777,
+    "median_khz": -6.275124408140211,
+    "n": 4184,
+    "p10_khz": -99.70308522726937,
+    "p90_khz": 7.389208711014986,
+    "sd_khz": 46.66757950176345
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -160.91,
+     -146.7
+    ],
+    "mean_khz": -153.7728367240043,
+    "median_khz": -151.318168905815,
+    "n": 4184,
+    "p10_khz": -270.5941665364583,
+    "p90_khz": -51.573735142036824,
+    "sd_khz": 90.34373635870564
+   }
+  },
+  "lnb-c|gen1": {
+   "fire_rate": 0.17853433352567802,
+   "maxel_regression": {
+    "intercept_khz": -32.315689132301586,
+    "n": 1547,
+    "r": 0.08776918129570219,
+    "slope": 0.2940223944915116
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -43.93,
+     -22.09
+    ],
+    "mean_khz": -32.82073256877339,
+    "median_khz": -8.946752272755141,
+    "n": 1547,
+    "p10_khz": -134.40840000000003,
+    "p90_khz": 73.10802420996843,
+    "sd_khz": 115.1103736559108
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -38.74,
+     -15.33
+    ],
+    "mean_khz": -26.644605053382254,
+    "median_khz": -4.848678013499681,
+    "n": 1072,
+    "p10_khz": -107.48186710493982,
+    "p90_khz": 80.28975773140235,
+    "sd_khz": 127.93279568282377
+   },
+   "n_fires": 1547,
+   "n_points": 8665,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -6.74,
+     -0.38
+    ],
+    "mean_khz": -3.4566154754184955,
+    "median_khz": -4.30913916015625,
+    "n": 1547,
+    "p10_khz": -25.969552734375,
+    "p90_khz": 18.36559765625,
+    "sd_khz": 17.45452097240076
+   },
+   "radio": "pluto-19f2",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -15.63,
+     -8.65
+    ],
+    "mean_khz": -11.890196959158828,
+    "median_khz": -0.37130545444664315,
+    "n": 1547,
+    "p10_khz": -14.10815142045477,
+    "p90_khz": 10.178722017039824,
+    "sd_khz": 62.16930387865133
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -43.25,
+     -19.5
+    ],
+    "mean_khz": -31.10302859134267,
+    "median_khz": -7.530099127219757,
+    "n": 1547,
+    "p10_khz": -132.2359779974932,
+    "p90_khz": 71.52799790875399,
+    "sd_khz": 117.20412874868433
+   }
+  },
+  "lnb-c|gen2": {
+   "fire_rate": 0.2384874310678221,
+   "maxel_regression": {
+    "intercept_khz": -186.86816976169786,
+    "n": 3330,
+    "r": 0.03619710141825711,
+    "slope": 0.10775491521608335
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -194.19,
+     -179.31
+    ],
+    "mean_khz": -186.71440405101293,
+    "median_khz": -164.09137772615088,
+    "n": 3330,
+    "p10_khz": -304.1598,
+    "p90_khz": -90.86663684351907,
+    "sd_khz": 107.94410681958927
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -183.95,
+     -168.75
+    ],
+    "mean_khz": -176.2455910567473,
+    "median_khz": -162.35108787877869,
+    "n": 2271,
+    "p10_khz": -253.71590795454568,
+    "p90_khz": -83.78219583335316,
+    "sd_khz": 116.32180500959373
+   },
+   "n_fires": 3330,
+   "n_points": 13963,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -5.79,
+     -1.14
+    ],
+    "mean_khz": -3.4263805465933084,
+    "median_khz": -4.1064443359375,
+    "n": 3330,
+    "p10_khz": -24.516021484375,
+    "p90_khz": 17.239810546875,
+    "sd_khz": 16.378479436174313
+   },
+   "radio": "pluto-19f2",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -46.37,
+     -36.09
+    ],
+    "mean_khz": -40.93911287284745,
+    "median_khz": -8.208661969203764,
+    "n": 3330,
+    "p10_khz": -117.43148281250005,
+    "p90_khz": 6.045352888257749,
+    "sd_khz": 89.46921203557397
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -196.19,
+     -179.43
+    ],
+    "mean_khz": -188.1413989159539,
+    "median_khz": -174.58633090784525,
+    "n": 3330,
+    "p10_khz": -299.088595703125,
+    "p90_khz": -89.90313766976112,
+    "sd_khz": 112.62062598038918
+   }
+  },
+  "lnb-d|gen1": {
+   "fire_rate": 0.2957554758074496,
+   "maxel_regression": {
+    "intercept_khz": 17.543237649049985,
+    "n": 2390,
+    "r": 0.08902967819198149,
+    "slope": 0.18151536181568986
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     9.84,
+     24.89
+    ],
+    "mean_khz": 17.44684983288825,
+    "median_khz": 0.0,
+    "n": 2390,
+    "p10_khz": -72.37657221040291,
+    "p90_khz": 116.66666666666674,
+    "sd_khz": 68.46744398950604
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     12.61,
+     28.79
+    ],
+    "mean_khz": 20.624785407150227,
+    "median_khz": 18.9926189806857,
+    "n": 1688,
+    "p10_khz": -71.52284564395603,
+    "p90_khz": 112.77850215588174,
+    "sd_khz": 70.06727796636338
+   },
+   "n_fires": 2390,
+   "n_points": 8081,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -4.46,
+     1.36
+    ],
+    "mean_khz": -1.4648660736594739,
+    "median_khz": -2.384514892578125,
+    "n": 2390,
+    "p10_khz": -24.027432421874998,
+    "p90_khz": 20.03028515625,
+    "sd_khz": 17.536717887679504
+   },
+   "radio": "pluto-19f2",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -1.15,
+     0.18
+    ],
+    "mean_khz": -0.46188071145739334,
+    "median_khz": -0.861014760335267,
+    "n": 2390,
+    "p10_khz": -11.748258719875142,
+    "p90_khz": 11.16530593302255,
+    "sd_khz": 10.467271349393508
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     8.5,
+     26.92
+    ],
+    "mean_khz": 17.977867236581037,
+    "median_khz": 14.655277358559717,
+    "n": 2390,
+    "p10_khz": -76.58381419375193,
+    "p90_khz": 112.18705334550627,
+    "sd_khz": 73.52639023432037
+   }
+  },
+  "lnb-d|gen2": {
+   "fire_rate": 0.3632050996960937,
+   "maxel_regression": {
+    "intercept_khz": -148.4443186999927,
+    "n": 4900,
+    "r": 0.040917855798209446,
+    "slope": 0.10307078136825211
+   },
+   "measured_offset": {
+    "mean_ci95_khz": [
+     -155.44,
+     -141.19
+    ],
+    "mean_khz": -148.27376756838578,
+    "median_khz": -139.1528770523946,
+    "n": 4900,
+    "p10_khz": -268.1428721047328,
+    "p90_khz": -23.854996610317666,
+    "sd_khz": 95.80103165099996
+   },
+   "measured_offset_refined": {
+    "mean_ci95_khz": [
+     -146.28,
+     -133.78
+    ],
+    "mean_khz": -140.1459005578844,
+    "median_khz": -143.763736870608,
+    "n": 3140,
+    "p10_khz": -233.33333333333331,
+    "p90_khz": -51.41453598487254,
+    "sd_khz": 88.69395484794839
+   },
+   "n_fires": 4900,
+   "n_points": 13491,
+   "predicted_doppler_at_fire_instants": {
+    "mean_ci95_khz": [
+     -5.4,
+     -1.17
+    ],
+    "mean_khz": -3.2856070570589573,
+    "median_khz": -4.112844970703125,
+    "n": 4900,
+    "p10_khz": -24.60605078125,
+    "p90_khz": 17.368591796875,
+    "sd_khz": 16.262142410490377
+   },
+   "radio": "pluto-19f2",
+   "residual_nearest_of_high": {
+    "mean_ci95_khz": [
+     -26.44,
+     -20.22
+    ],
+    "mean_khz": -23.27349246235879,
+    "median_khz": -4.881944546729726,
+    "n": 4900,
+    "p10_khz": -99.69111705847683,
+    "p90_khz": 7.788937973845724,
+    "sd_khz": 49.377683344571416
+   },
+   "residual_vs_maxel": {
+    "mean_ci95_khz": [
+     -158.43,
+     -141.54
+    ],
+    "mean_khz": -149.9284666920517,
+    "median_khz": -149.26265571734018,
+    "n": 4900,
+    "p10_khz": -276.1150962239583,
+    "p90_khz": -27.40466271872324,
+    "sd_khz": 101.61737963947029
+   }
+  }
+ },
+ "by_tuning": {
+  "lnb-a|gen1": {
+   "constant_khz": -116.59249487189378,
+   "edge_half_step_khz": 19.014356561108517,
+   "fit_residual_rms_khz": 5.724945773057492,
+   "if_slope_ppm": -13.033143415144245,
+   "if_term_over_span_khz": -12.780300432890446,
+   "lower_mean_khz": -153.00202503490272,
+   "naive_if_slope_ppm": 10.950073389825123,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -141.70603640234918,
+     "mean_refined_khz": -149.94995946385237,
+     "n": 310,
+     "region": "lower-edge",
+     "resid_mean_khz": -134.10206586362534,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -108.27558705566786,
+     "mean_refined_khz": -98.0687285012962,
+     "n": 295,
+     "region": "upper-edge",
+     "resid_mean_khz": -101.76454218841415,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -155.6542389989316,
+     "mean_refined_khz": -160.5791552463649,
+     "n": 369,
+     "region": "lower-edge",
+     "resid_mean_khz": -154.2076139060556,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -123.48532630578603,
+     "mean_refined_khz": -110.4789478887907,
+     "n": 376,
+     "region": "upper-edge",
+     "resid_mean_khz": -118.62798271616565,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -162.17962844710618,
+     "mean_refined_khz": -165.31837895118906,
+     "n": 300,
+     "region": "lower-edge",
+     "resid_mean_khz": -155.11152528350146,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -122.9001459177829,
+     "mean_refined_khz": -110.75129740004762,
+     "n": 338,
+     "region": "upper-edge",
+     "resid_mean_khz": -122.04142857989805,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -152.46819629122385,
+     "mean_refined_khz": -155.05973228516126,
+     "n": 356,
+     "region": "lower-edge",
+     "resid_mean_khz": -148.17943179228817,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -117.25526317197645,
+     "mean_refined_khz": -102.47516518685863,
+     "n": 342,
+     "region": "upper-edge",
+     "resid_mean_khz": -115.36245978690275,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -117.9790806128033,
+   "upper_minus_lower_khz": 35.022944422099414
+  },
+  "lnb-a|gen2": {
+   "constant_khz": -294.3127843922201,
+   "edge_half_step_khz": 4.200621515169176,
+   "fit_residual_rms_khz": 37.81055269801896,
+   "if_slope_ppm": 20.20610024676897,
+   "if_term_over_span_khz": 19.814101901981644,
+   "lower_mean_khz": -271.54457648428,
+   "naive_if_slope_ppm": 25.504434491745723,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -306.0443820150115,
+     "mean_refined_khz": -303.5333435369864,
+     "n": 128,
+     "region": "lower-edge",
+     "resid_mean_khz": -294.81325958802483,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -219.45836708387532,
+     "mean_refined_khz": -229.8946056546654,
+     "n": 97,
+     "region": "upper-edge",
+     "resid_mean_khz": -203.35246353200677,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -233.61186815496072,
+     "mean_refined_khz": -251.36732519488004,
+     "n": 74,
+     "region": "lower-edge",
+     "resid_mean_khz": -223.39214500383108,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -285.4195889915207,
+     "mean_refined_khz": -320.4377976677066,
+     "n": 72,
+     "region": "upper-edge",
+     "resid_mean_khz": -276.19964408253094,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -300.16228172130326,
+     "mean_refined_khz": -340.8676154757546,
+     "n": 65,
+     "region": "lower-edge",
+     "resid_mean_khz": -283.952346964364,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -315.94907571885994,
+     "mean_refined_khz": -355.33036852573457,
+     "n": 61,
+     "region": "upper-edge",
+     "resid_mean_khz": -302.8867535412857,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -246.35977404584472,
+     "mean_refined_khz": -254.2366501240668,
+     "n": 112,
+     "region": "lower-edge",
+     "resid_mean_khz": -230.75785051264344,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -213.1061745438665,
+     "mean_refined_khz": -201.95705188427712,
+     "n": 91,
+     "region": "upper-edge",
+     "resid_mean_khz": -202.4409358903691,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -258.48330158453064,
+   "upper_minus_lower_khz": 13.061274899749378
+  },
+  "lnb-b|gen1": {
+   "constant_khz": -128.1780811355767,
+   "edge_half_step_khz": 16.560571627653218,
+   "fit_residual_rms_khz": 1.7876303286139033,
+   "if_slope_ppm": -4.321118008552438,
+   "if_term_over_span_khz": -4.23728831918652,
+   "lower_mean_khz": -150.50599495526984,
+   "naive_if_slope_ppm": 16.567087094985226,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -146.66418856854574,
+     "mean_refined_khz": -150.76157633190982,
+     "n": 295,
+     "region": "lower-edge",
+     "resid_mean_khz": -142.98993965043266,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -116.49629428343152,
+     "mean_refined_khz": -100.1312750970636,
+     "n": 258,
+     "region": "upper-edge",
+     "resid_mean_khz": -115.34558835666944,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -150.0318859421772,
+     "mean_refined_khz": -154.61075504441575,
+     "n": 351,
+     "region": "lower-edge",
+     "resid_mean_khz": -148.41486823354825,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -121.00052579033026,
+     "mean_refined_khz": -106.22720874012117,
+     "n": 320,
+     "region": "upper-edge",
+     "resid_mean_khz": -117.41215314705022,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -153.54834933311423,
+     "mean_refined_khz": -154.70962183899377,
+     "n": 287,
+     "region": "lower-edge",
+     "resid_mean_khz": -146.9557206520776,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -117.4270106002919,
+     "mean_refined_khz": -101.19105899429158,
+     "n": 271,
+     "region": "upper-edge",
+     "resid_mean_khz": -116.09320225969141,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -151.77955597724218,
+     "mean_refined_khz": -152.38380888245777,
+     "n": 292,
+     "region": "lower-edge",
+     "resid_mean_khz": -146.86540300432844,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -118.60180748868957,
+     "mean_refined_khz": -111.00068886047,
+     "n": 296,
+     "region": "upper-edge",
+     "resid_mean_khz": -117.68328178793999,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -118.38140954068582,
+   "upper_minus_lower_khz": 32.12458541458402
+  },
+  "lnb-b|gen2": {
+   "constant_khz": -149.39825063229242,
+   "edge_half_step_khz": 18.394596962332038,
+   "fit_residual_rms_khz": 5.935608307029437,
+   "if_slope_ppm": -5.467672178075401,
+   "if_term_over_span_khz": -5.361599337820738,
+   "lower_mean_khz": -175.09048130479954,
+   "naive_if_slope_ppm": 17.733828517981856,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -172.34488425912147,
+     "mean_refined_khz": -168.4736477918172,
+     "n": 582,
+     "region": "lower-edge",
+     "resid_mean_khz": -168.2328497162381,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -140.8172515306023,
+     "mean_refined_khz": -122.50727746999755,
+     "n": 563,
+     "region": "upper-edge",
+     "resid_mean_khz": -135.75253935239743,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -166.98843182729053,
+     "mean_refined_khz": -169.70394280857192,
+     "n": 559,
+     "region": "lower-edge",
+     "resid_mean_khz": -166.00621321685796,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -133.7772698955253,
+     "mean_refined_khz": -114.23962433035574,
+     "n": 533,
+     "region": "upper-edge",
+     "resid_mean_khz": -129.85252181730255,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -187.0388074367412,
+     "mean_refined_khz": -185.131750886196,
+     "n": 450,
+     "region": "lower-edge",
+     "resid_mean_khz": -184.93967692399502,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -146.19070478928944,
+     "mean_refined_khz": -122.69664320214389,
+     "n": 463,
+     "region": "upper-edge",
+     "resid_mean_khz": -143.51592455315856,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -173.98980169604505,
+     "mean_refined_khz": -170.83573377626772,
+     "n": 523,
+     "region": "lower-edge",
+     "resid_mean_khz": -170.1792755394536,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -137.4638508893995,
+     "mean_refined_khz": -121.32930392330186,
+     "n": 511,
+     "region": "upper-edge",
+     "resid_mean_khz": -133.7808112624139,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -139.56226927620412,
+   "upper_minus_lower_khz": 35.52821202859542
+  },
+  "lnb-c|gen1": {
+   "constant_khz": -27.127348944977598,
+   "edge_half_step_khz": 13.119674917017008,
+   "fit_residual_rms_khz": 6.797431099588899,
+   "if_slope_ppm": -2.9720280099017646,
+   "if_term_over_span_khz": -2.91437066650967,
+   "lower_mean_khz": -44.21375249646039,
+   "naive_if_slope_ppm": 13.576100081327956,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -31.903121013548017,
+     "mean_refined_khz": -31.994922936443814,
+     "n": 188,
+     "region": "lower-edge",
+     "resid_mean_khz": -32.71737947211164,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -21.810887469562026,
+     "mean_refined_khz": -8.211293441807735,
+     "n": 128,
+     "region": "upper-edge",
+     "resid_mean_khz": -18.82781943157527,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -50.44967392876337,
+     "mean_refined_khz": -50.47367997647407,
+     "n": 229,
+     "region": "lower-edge",
+     "resid_mean_khz": -43.48765724497665,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -16.79169283829402,
+     "mean_refined_khz": 0.06437514214378919,
+     "n": 197,
+     "region": "upper-edge",
+     "resid_mean_khz": -11.362950644520097,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -47.45194727874839,
+     "mean_refined_khz": -45.82582282905278,
+     "n": 184,
+     "region": "lower-edge",
+     "resid_mean_khz": -48.03366626094735,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -26.734698425074427,
+     "mean_refined_khz": -14.441496897735174,
+     "n": 165,
+     "region": "upper-edge",
+     "resid_mean_khz": -28.30852670321718,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -47.05026776478179,
+     "mean_refined_khz": -49.21573635520349,
+     "n": 258,
+     "region": "lower-edge",
+     "resid_mean_khz": -44.878210057697544,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -9.30202775590936,
+     "mean_refined_khz": 4.9180844598292905,
+     "n": 198,
+     "region": "upper-edge",
+     "resid_mean_khz": -11.468194564683133,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -18.65982662220996,
+   "upper_minus_lower_khz": 25.553925874250428
+  },
+  "lnb-c|gen2": {
+   "constant_khz": -204.7325213385626,
+   "edge_half_step_khz": 15.92806340209925,
+   "fit_residual_rms_khz": 5.774528679269477,
+   "if_slope_ppm": 13.362034893490655,
+   "if_term_over_span_khz": 13.102811416556934,
+   "lower_mean_khz": -202.8264437937561,
+   "naive_if_slope_ppm": 33.45244377102224,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -210.7381383461663,
+     "mean_refined_khz": -209.3182391981168,
+     "n": 462,
+     "region": "lower-edge",
+     "resid_mean_khz": -206.46107548114435,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -166.00191671548725,
+     "mean_refined_khz": -146.72684768209632,
+     "n": 391,
+     "region": "upper-edge",
+     "resid_mean_khz": -164.13880198063273,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -206.77830801612876,
+     "mean_refined_khz": -202.39807293851104,
+     "n": 433,
+     "region": "lower-edge",
+     "resid_mean_khz": -206.48527363909892,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -171.4412765674992,
+     "mean_refined_khz": -155.06583564333212,
+     "n": 364,
+     "region": "upper-edge",
+     "resid_mean_khz": -170.91128614733586,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -206.8014142839346,
+     "mean_refined_khz": -203.26647036779968,
+     "n": 455,
+     "region": "lower-edge",
+     "resid_mean_khz": -209.77210208280565,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -164.2351875135903,
+     "mean_refined_khz": -145.68187238921004,
+     "n": 403,
+     "region": "upper-edge",
+     "resid_mean_khz": -165.21505367117885,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -186.98791452879482,
+     "mean_refined_khz": -179.10408113609557,
+     "n": 446,
+     "region": "lower-edge",
+     "resid_mean_khz": -193.93850206771498,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -169.87640997240857,
+     "mean_refined_khz": -151.4085862534885,
+     "n": 376,
+     "region": "upper-edge",
+     "resid_mean_khz": -177.66806728906286,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -167.88869769224632,
+   "upper_minus_lower_khz": 34.93774610150979
+  },
+  "lnb-d|gen1": {
+   "constant_khz": 19.915694657453987,
+   "edge_half_step_khz": 18.629363432079582,
+   "fit_residual_rms_khz": 4.310831776935864,
+   "if_slope_ppm": -0.911889193896243,
+   "if_term_over_span_khz": -0.8941985435346558,
+   "lower_mean_khz": 0.06924411689600318,
+   "naive_if_slope_ppm": 22.585727498744863,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": 0.6285038234022505,
+     "mean_refined_khz": -2.3642155063363504,
+     "n": 305,
+     "region": "lower-edge",
+     "resid_mean_khz": 1.764750025214494,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": 34.31069254892939,
+     "mean_refined_khz": 46.96033394322388,
+     "n": 288,
+     "region": "upper-edge",
+     "resid_mean_khz": 30.74622009909689,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": 3.678426496857695,
+     "mean_refined_khz": 1.1143313217161777,
+     "n": 363,
+     "region": "lower-edge",
+     "resid_mean_khz": 5.459249336852099,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": 43.30484481557547,
+     "mean_refined_khz": 53.7311258261524,
+     "n": 302,
+     "region": "upper-edge",
+     "resid_mean_khz": 47.191188380272145,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -2.7152198109256243,
+     "mean_refined_khz": -5.307499919076987,
+     "n": 307,
+     "region": "lower-edge",
+     "resid_mean_khz": -1.856492252379589,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": 29.33227496945827,
+     "mean_refined_khz": 37.99850727869643,
+     "n": 244,
+     "region": "upper-edge",
+     "resid_mean_khz": 24.592554042079097,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -1.3147340417503082,
+     "mean_refined_khz": -5.558724934397788,
+     "n": 309,
+     "region": "lower-edge",
+     "resid_mean_khz": -0.22231502216849114,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": 41.52285380888837,
+     "mean_refined_khz": 53.302892470268254,
+     "n": 272,
+     "region": "upper-edge",
+     "resid_mean_khz": 44.03879200787555,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": 37.11766653571287,
+   "upper_minus_lower_khz": 37.04842241881687
+  },
+  "lnb-d|gen2": {
+   "constant_khz": -186.67162439533314,
+   "edge_half_step_khz": 14.134001278176111,
+   "fit_residual_rms_khz": 5.59336786428296,
+   "if_slope_ppm": 26.630622307740136,
+   "if_term_over_span_khz": 26.113988234969977,
+   "lower_mean_khz": -165.26206696214743,
+   "naive_if_slope_ppm": 44.458142049825526,
+   "rows": [
+    {
+     "channel": 1,
+     "if_mhz": 959.6875,
+     "iq": 0,
+     "mean_khz": -175.38927329188513,
+     "mean_refined_khz": -174.41361729722624,
+     "n": 618,
+     "region": "lower-edge",
+     "resid_mean_khz": -174.23348584079227,
+     "rf_ghz": 10.7096875
+    },
+    {
+     "channel": 1,
+     "if_mhz": 1190.3125,
+     "iq": 1,
+     "mean_khz": -141.69440992703045,
+     "mean_refined_khz": -123.98619530041992,
+     "n": 629,
+     "region": "upper-edge",
+     "resid_mean_khz": -141.18360047107393,
+     "rf_ghz": 10.9403125
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1209.6875,
+     "iq": 2,
+     "mean_khz": -165.5492545283858,
+     "mean_refined_khz": -167.31900468558442,
+     "n": 607,
+     "region": "lower-edge",
+     "resid_mean_khz": -165.0596660247949,
+     "rf_ghz": 10.9596875
+    },
+    {
+     "channel": 2,
+     "if_mhz": 1440.3125,
+     "iq": 3,
+     "mean_khz": -129.12525838359267,
+     "mean_refined_khz": -113.11856918169038,
+     "n": 614,
+     "region": "upper-edge",
+     "resid_mean_khz": -128.14851643387135,
+     "rf_ghz": 11.1903125
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1459.6875,
+     "iq": 4,
+     "mean_khz": -173.4187135840656,
+     "mean_refined_khz": -176.6107587836485,
+     "n": 660,
+     "region": "lower-edge",
+     "resid_mean_khz": -176.2255200142118,
+     "rf_ghz": 11.2096875
+    },
+    {
+     "channel": 3,
+     "if_mhz": 1690.3125,
+     "iq": 5,
+     "mean_khz": -129.24443129390158,
+     "mean_refined_khz": -111.66755269553336,
+     "n": 626,
+     "region": "upper-edge",
+     "resid_mean_khz": -133.2902442965154,
+     "rf_ghz": 11.4403125
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1709.6875,
+     "iq": 6,
+     "mean_khz": -146.6910264442532,
+     "mean_refined_khz": -141.0847681092141,
+     "n": 537,
+     "region": "lower-edge",
+     "resid_mean_khz": -153.11264068342552,
+     "rf_ghz": 11.4596875
+    },
+    {
+     "channel": 4,
+     "if_mhz": 1940.3125,
+     "iq": 7,
+     "mean_khz": -123.3454089397658,
+     "mean_refined_khz": -107.70084176111301,
+     "n": 609,
+     "region": "upper-edge",
+     "resid_mean_khz": -126.9692566366057,
+     "rf_ghz": 11.6903125
+    }
+   ],
+   "upper_mean_khz": -130.85237713607262,
+   "upper_minus_lower_khz": 34.40968982607481
+  }
+ },
+ "centres_applied_hz": {
+  "pluto-19f2|gen1": 434408.4,
+  "pluto-19f2|gen2": 604159.8,
+  "pluto-5d4d|gen1": 5154,
+  "pluto-5d4d|gen2": 567402
+ },
+ "diagnostics": {
+  "assignment_identifiability": {
+   "candidate_doppler_sd_khz": 105.735375,
+   "candidates_above_40_median": 26.0,
+   "candidates_above_40_p10_p90": [
+    21.0,
+    32.0
+   ],
+   "median_gap_between_adjacent_candidate_doppler_khz": 10.55446875,
+   "n_fires": 22259,
+   "note": "the nearest-candidate residual is bounded by half this gap by construction and is therefore not evidence about the centre"
+  },
+  "catalogue_source_disagreement_hz": {
+   "abs_median": 1176.52001953125,
+   "mean": -616.8887673492432,
+   "median": 0.0,
+   "n": 4000,
+   "p5": -13772.74912109375,
+   "p95": 13787.518933105417
+  },
+  "hourly": {
+   "lnb-a|gen1": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": -9.233165389411193,
+      "measured_mean_khz": -166.84906799406062,
+      "n": 177,
+      "residual_mean_khz": -165.38829795073602,
+      "utc": "2026-08-12T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.897137631269339,
+      "measured_mean_khz": -139.70592716219087,
+      "n": 279,
+      "residual_mean_khz": -132.80530251221327,
+      "utc": "2026-08-12T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.715497705732073,
+      "measured_mean_khz": -124.08220620473314,
+      "n": 224,
+      "residual_mean_khz": -105.68930536724359,
+      "utc": "2026-08-12T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.846521499086879,
+      "measured_mean_khz": -106.76951679378463,
+      "n": 279,
+      "residual_mean_khz": -86.09436227114517,
+      "utc": "2026-08-12T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 1.5813999198219992,
+      "measured_mean_khz": -133.71608153746195,
+      "n": 220,
+      "residual_mean_khz": -129.6886747026342,
+      "utc": "2026-08-12T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 5.394324031269251,
+      "measured_mean_khz": -108.64316569421548,
+      "n": 279,
+      "residual_mean_khz": -121.32160185012944,
+      "utc": "2026-08-12T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.7033982561747236,
+      "measured_mean_khz": -106.03067410023766,
+      "n": 180,
+      "residual_mean_khz": -100.46630975019427,
+      "utc": "2026-08-12T22:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -17.616681148830935,
+      "measured_mean_khz": -132.79189089800337,
+      "n": 139,
+      "residual_mean_khz": -127.14251663042525,
+      "utc": "2026-08-13T00:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.1852800383300781,
+      "measured_mean_khz": -152.8512176554148,
+      "n": 250,
+      "residual_mean_khz": -153.23338395448704,
+      "utc": "2026-08-13T01:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 4.794785985331632,
+      "measured_mean_khz": -153.61935880440785,
+      "n": 245,
+      "residual_mean_khz": -153.35920902039757,
+      "utc": "2026-08-13T02:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 2.0614024006819522,
+      "measured_mean_khz": -160.40933075222097,
+      "n": 238,
+      "residual_mean_khz": -157.40965816183302,
+      "utc": "2026-08-13T03:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 10.032349689592635,
+      "measured_mean_khz": -161.21268817938437,
+      "n": 140,
+      "residual_mean_khz": -162.97109095397715,
+      "utc": "2026-08-13T04:00:00+00:00"
+     }
+    ],
+    "sd_khz": 26.203960679870466,
+    "spread_khz": 79.29393567959085
+   },
+   "lnb-a|gen2": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": -2.2672971986282704,
+      "measured_mean_khz": -204.69887669252012,
+      "n": 129,
+      "residual_mean_khz": -184.86294357380342,
+      "utc": "2026-08-13T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.892217359270369,
+      "measured_mean_khz": -167.7400966831705,
+      "n": 154,
+      "residual_mean_khz": -149.62294038442164,
+      "utc": "2026-08-13T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.615689135233561,
+      "measured_mean_khz": -176.295025921605,
+      "n": 126,
+      "residual_mean_khz": -157.8266392929545,
+      "utc": "2026-08-13T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -8.898201652050018,
+      "measured_mean_khz": -146.07495277182323,
+      "n": 128,
+      "residual_mean_khz": -130.7089937880443,
+      "utc": "2026-08-13T22:00:00+00:00"
+     }
+    ],
+    "sd_khz": 22.48309476161156,
+    "spread_khz": 54.153949785759124
+   },
+   "lnb-b|gen1": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": -9.104319945511545,
+      "measured_mean_khz": -152.14521060367076,
+      "n": 157,
+      "residual_mean_khz": -150.26167888706289,
+      "utc": "2026-08-12T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -5.119448212456457,
+      "measured_mean_khz": -127.41476072241268,
+      "n": 291,
+      "residual_mean_khz": -119.64069079583945,
+      "utc": "2026-08-12T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.9406913108047172,
+      "measured_mean_khz": -117.46655866829654,
+      "n": 196,
+      "residual_mean_khz": -98.14282953048665,
+      "utc": "2026-08-12T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.340655161084627,
+      "measured_mean_khz": -96.08793471758597,
+      "n": 190,
+      "residual_mean_khz": -84.91100138853581,
+      "utc": "2026-08-12T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 0.6583218526106613,
+      "measured_mean_khz": -126.64933130526124,
+      "n": 208,
+      "residual_mean_khz": -124.35532832451547,
+      "utc": "2026-08-12T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 6.586495658296527,
+      "measured_mean_khz": -110.17010347334205,
+      "n": 264,
+      "residual_mean_khz": -123.02657599457488,
+      "utc": "2026-08-12T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.761081190770986,
+      "measured_mean_khz": -96.27777574163783,
+      "n": 147,
+      "residual_mean_khz": -88.40617004037293,
+      "utc": "2026-08-12T22:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -15.833979982629288,
+      "measured_mean_khz": -145.84529514733734,
+      "n": 113,
+      "residual_mean_khz": -137.22574025242582,
+      "utc": "2026-08-13T00:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.4461850247445587,
+      "measured_mean_khz": -161.83064416806457,
+      "n": 229,
+      "residual_mean_khz": -162.86333406042948,
+      "utc": "2026-08-13T01:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 4.503878879699707,
+      "measured_mean_khz": -162.79654905547304,
+      "n": 200,
+      "residual_mean_khz": -162.1117646127431,
+      "utc": "2026-08-13T02:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 2.058580344982746,
+      "measured_mean_khz": -161.3671244603228,
+      "n": 223,
+      "residual_mean_khz": -160.94404840326507,
+      "utc": "2026-08-13T03:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 7.126311742587353,
+      "measured_mean_khz": -170.67930320378943,
+      "n": 127,
+      "residual_mean_khz": -172.9794746073289,
+      "utc": "2026-08-13T04:00:00+00:00"
+     }
+    ],
+    "sd_khz": 30.589500715604128,
+    "spread_khz": 88.0684732187931
+   },
+   "lnb-b|gen2": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": -0.06724318007172131,
+      "measured_mean_khz": -191.74652412164997,
+      "n": 61,
+      "residual_mean_khz": -193.74216466660386,
+      "utc": "2026-08-13T04:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -5.265253150273883,
+      "measured_mean_khz": -165.91165141844417,
+      "n": 252,
+      "residual_mean_khz": -157.90506980572098,
+      "utc": "2026-08-13T05:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 2.9580001181278504,
+      "measured_mean_khz": -145.2146843252833,
+      "n": 209,
+      "residual_mean_khz": -137.13242104473417,
+      "utc": "2026-08-13T06:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 14.177758529875998,
+      "measured_mean_khz": -127.65042843760803,
+      "n": 215,
+      "residual_mean_khz": -130.27328732546232,
+      "utc": "2026-08-13T07:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 3.998895755968596,
+      "measured_mean_khz": -148.67361130645824,
+      "n": 228,
+      "residual_mean_khz": -143.29765883999542,
+      "utc": "2026-08-13T08:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 5.857215145438058,
+      "measured_mean_khz": -152.93909708486737,
+      "n": 245,
+      "residual_mean_khz": -162.1983530777723,
+      "utc": "2026-08-13T09:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.327299623686553,
+      "measured_mean_khz": -131.23212116260066,
+      "n": 237,
+      "residual_mean_khz": -143.65786825609106,
+      "utc": "2026-08-13T10:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.3624070761916984,
+      "measured_mean_khz": -162.07699588897273,
+      "n": 234,
+      "residual_mean_khz": -169.23840564935824,
+      "utc": "2026-08-13T11:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 6.002959366863311,
+      "measured_mean_khz": -181.2485395591793,
+      "n": 191,
+      "residual_mean_khz": -181.45703790871363,
+      "utc": "2026-08-13T12:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -11.379569257463727,
+      "measured_mean_khz": -164.78367793619563,
+      "n": 224,
+      "residual_mean_khz": -176.60502988752228,
+      "utc": "2026-08-13T13:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 2.298235560490535,
+      "measured_mean_khz": -201.20455224125686,
+      "n": 247,
+      "residual_mean_khz": -197.74406713093148,
+      "utc": "2026-08-13T14:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 5.279362344180837,
+      "measured_mean_khz": -175.19718963970084,
+      "n": 255,
+      "residual_mean_khz": -171.54959473604663,
+      "utc": "2026-08-13T15:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.140271855122334,
+      "measured_mean_khz": -190.89719051938084,
+      "n": 296,
+      "residual_mean_khz": -171.10934444365273,
+      "utc": "2026-08-13T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 1.9851507949553673,
+      "measured_mean_khz": -163.60655899692995,
+      "n": 277,
+      "residual_mean_khz": -142.96179455399033,
+      "utc": "2026-08-13T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.251647689527767,
+      "measured_mean_khz": -195.591072858001,
+      "n": 157,
+      "residual_mean_khz": -217.00791137064036,
+      "utc": "2026-08-13T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 3.148229537010193,
+      "measured_mean_khz": -152.64106678892145,
+      "n": 192,
+      "residual_mean_khz": -137.45796056231825,
+      "utc": "2026-08-13T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.8375554389328252,
+      "measured_mean_khz": -115.84240479141062,
+      "n": 244,
+      "residual_mean_khz": -100.51801178904125,
+      "utc": "2026-08-13T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.7551256237687736,
+      "measured_mean_khz": -129.76408673354356,
+      "n": 232,
+      "residual_mean_khz": -121.96389899045528,
+      "utc": "2026-08-13T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.52258161315918,
+      "measured_mean_khz": -104.39622156777698,
+      "n": 180,
+      "residual_mean_khz": -97.34793034921007,
+      "utc": "2026-08-13T22:00:00+00:00"
+     }
+    ],
+    "sd_khz": 31.76733448310664,
+    "spread_khz": 119.65998102143028
+   },
+   "lnb-c|gen1": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": -0.7813544088924632,
+      "measured_mean_khz": -25.383541170055402,
+      "n": 85,
+      "residual_mean_khz": -23.239055416378932,
+      "utc": "2026-08-12T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.064193729454363,
+      "measured_mean_khz": -7.277771893238214,
+      "n": 142,
+      "residual_mean_khz": -9.772787541233855,
+      "utc": "2026-08-12T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -7.4736616951886345,
+      "measured_mean_khz": -41.52773930079045,
+      "n": 170,
+      "residual_mean_khz": -41.6753340173001,
+      "utc": "2026-08-12T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 0.7093103064643013,
+      "measured_mean_khz": -66.51143956553948,
+      "n": 90,
+      "residual_mean_khz": -75.82518493229294,
+      "utc": "2026-08-12T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.028636105837522,
+      "measured_mean_khz": -2.6935866834299373,
+      "n": 143,
+      "residual_mean_khz": -11.124071326472436,
+      "utc": "2026-08-12T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.700732981695131,
+      "measured_mean_khz": -44.71735128724665,
+      "n": 215,
+      "residual_mean_khz": -28.780779880655995,
+      "utc": "2026-08-12T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.569043726824332,
+      "measured_mean_khz": -16.641852063124357,
+      "n": 69,
+      "residual_mean_khz": -32.962594133861444,
+      "utc": "2026-08-12T22:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -10.986828780973802,
+      "measured_mean_khz": -60.09344897515472,
+      "n": 99,
+      "residual_mean_khz": -28.804502115197742,
+      "utc": "2026-08-13T00:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.694535361253578,
+      "measured_mean_khz": -56.607970447818026,
+      "n": 131,
+      "residual_mean_khz": -47.40379481193421,
+      "utc": "2026-08-13T01:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.678885095484117,
+      "measured_mean_khz": -25.824105195173242,
+      "n": 119,
+      "residual_mean_khz": -37.25966760798015,
+      "utc": "2026-08-13T02:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.7849747495651245,
+      "measured_mean_khz": -14.72599991512557,
+      "n": 160,
+      "residual_mean_khz": -27.71455837412139,
+      "utc": "2026-08-13T03:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 12.583160949102723,
+      "measured_mean_khz": -27.544390549427522,
+      "n": 101,
+      "residual_mean_khz": -6.353625088799434,
+      "utc": "2026-08-13T04:00:00+00:00"
+     }
+    ],
+    "sd_khz": 18.99555965286349,
+    "spread_khz": 69.47155984349351
+   },
+   "lnb-c|gen2": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": 0.17048155289989406,
+      "measured_mean_khz": -214.91889042362087,
+      "n": 59,
+      "residual_mean_khz": -215.13633350161348,
+      "utc": "2026-08-13T04:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.3237785436349325,
+      "measured_mean_khz": -177.19473863971893,
+      "n": 129,
+      "residual_mean_khz": -189.9617005343827,
+      "utc": "2026-08-13T05:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.322938453588593,
+      "measured_mean_khz": -197.87904877205034,
+      "n": 178,
+      "residual_mean_khz": -189.98554104595965,
+      "utc": "2026-08-13T06:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.504830973905676,
+      "measured_mean_khz": -172.13214878722326,
+      "n": 170,
+      "residual_mean_khz": -184.59575064771846,
+      "utc": "2026-08-13T07:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 4.275609674200311,
+      "measured_mean_khz": -180.10502552193267,
+      "n": 143,
+      "residual_mean_khz": -188.11752634313297,
+      "utc": "2026-08-13T08:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -11.564609927707249,
+      "measured_mean_khz": -192.22679070199135,
+      "n": 144,
+      "residual_mean_khz": -183.20247644129662,
+      "utc": "2026-08-13T09:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.59896727386651,
+      "measured_mean_khz": -174.69820902530716,
+      "n": 173,
+      "residual_mean_khz": -183.71520109708732,
+      "utc": "2026-08-13T10:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.4867612501470054,
+      "measured_mean_khz": -188.37462176135975,
+      "n": 164,
+      "residual_mean_khz": -195.28404061363085,
+      "utc": "2026-08-13T11:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 3.1389361300355447,
+      "measured_mean_khz": -178.88802161745076,
+      "n": 211,
+      "residual_mean_khz": -195.932408842995,
+      "utc": "2026-08-13T12:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -14.290853198972524,
+      "measured_mean_khz": -197.2518728483918,
+      "n": 234,
+      "residual_mean_khz": -209.26972618456298,
+      "utc": "2026-08-13T13:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 2.837112758327175,
+      "measured_mean_khz": -171.53423259846232,
+      "n": 185,
+      "residual_mean_khz": -171.09877199838778,
+      "utc": "2026-08-13T14:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 1.0855941722595615,
+      "measured_mean_khz": -212.78233128559637,
+      "n": 306,
+      "residual_mean_khz": -195.97336741441958,
+      "utc": "2026-08-13T15:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -5.35848015585713,
+      "measured_mean_khz": -202.28597160417613,
+      "n": 174,
+      "residual_mean_khz": -225.71849492381514,
+      "utc": "2026-08-13T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -8.862269908510404,
+      "measured_mean_khz": -186.82851649900493,
+      "n": 232,
+      "residual_mean_khz": -182.23225020893221,
+      "utc": "2026-08-13T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -5.726425174438592,
+      "measured_mean_khz": -199.41134082551875,
+      "n": 132,
+      "residual_mean_khz": -187.42286967110348,
+      "utc": "2026-08-13T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -5.229931365966797,
+      "measured_mean_khz": -171.5770680396636,
+      "n": 176,
+      "residual_mean_khz": -192.12964262462452,
+      "utc": "2026-08-13T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 0.9846137422373598,
+      "measured_mean_khz": -174.5970065419993,
+      "n": 142,
+      "residual_mean_khz": -177.11178543311945,
+      "utc": "2026-08-13T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.651518628589527,
+      "measured_mean_khz": -191.4546894422673,
+      "n": 185,
+      "residual_mean_khz": -168.03602886965854,
+      "utc": "2026-08-13T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.3762963058287845,
+      "measured_mean_khz": -159.56963140794713,
+      "n": 166,
+      "residual_mean_khz": -148.44715856932703,
+      "utc": "2026-08-13T22:00:00+00:00"
+     }
+    ],
+    "sd_khz": 17.09910900753233,
+    "spread_khz": 77.27133635448811
+   },
+   "lnb-d|gen1": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": 3.633808432334711,
+      "measured_mean_khz": 1.0559774191093085,
+      "n": 121,
+      "residual_mean_khz": 3.369641207203317,
+      "utc": "2026-08-12T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.801923849280612,
+      "measured_mean_khz": 32.96371598081401,
+      "n": 251,
+      "residual_mean_khz": 31.44952227516784,
+      "utc": "2026-08-12T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -10.59772267460918,
+      "measured_mean_khz": 2.2968123769766637,
+      "n": 251,
+      "residual_mean_khz": 5.035320012450395,
+      "utc": "2026-08-12T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 5.735107667840045,
+      "measured_mean_khz": 23.18764443683676,
+      "n": 184,
+      "residual_mean_khz": 9.407204471547187,
+      "utc": "2026-08-12T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -2.1390002765266263,
+      "measured_mean_khz": 21.59483865151528,
+      "n": 196,
+      "residual_mean_khz": 10.645308898745029,
+      "utc": "2026-08-12T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -1.7365837291370738,
+      "measured_mean_khz": 7.912837255740005,
+      "n": 330,
+      "residual_mean_khz": 17.509538807142704,
+      "utc": "2026-08-12T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 3.8424199885615593,
+      "measured_mean_khz": 27.396282882550988,
+      "n": 162,
+      "residual_mean_khz": 16.415053297680476,
+      "utc": "2026-08-12T22:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.688008004995493,
+      "measured_mean_khz": 21.893876641446735,
+      "n": 156,
+      "residual_mean_khz": 48.305067680507676,
+      "utc": "2026-08-13T00:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.16086720255857,
+      "measured_mean_khz": 6.442014614064802,
+      "n": 181,
+      "residual_mean_khz": 8.219600937333963,
+      "utc": "2026-08-13T01:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.2485427189184275,
+      "measured_mean_khz": 10.55229990505108,
+      "n": 184,
+      "residual_mean_khz": 6.520051120446799,
+      "utc": "2026-08-13T02:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.3729671916045476,
+      "measured_mean_khz": 26.66884606088218,
+      "n": 229,
+      "residual_mean_khz": 12.932044345214587,
+      "utc": "2026-08-13T03:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 13.288725758386038,
+      "measured_mean_khz": 35.333033281184015,
+      "n": 126,
+      "residual_mean_khz": 57.75489837605009,
+      "utc": "2026-08-13T04:00:00+00:00"
+     }
+    ],
+    "sd_khz": 17.670047793914502,
+    "spread_khz": 54.38525716884678
+   },
+   "lnb-d|gen2": {
+    "hours": [
+     {
+      "candidate_doppler_mean_khz": -0.8701117475460737,
+      "measured_mean_khz": -182.88645622644012,
+      "n": 78,
+      "residual_mean_khz": -180.58849938299062,
+      "utc": "2026-08-13T04:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.7874339489995217,
+      "measured_mean_khz": -143.89981423684995,
+      "n": 245,
+      "residual_mean_khz": -158.33378065754906,
+      "utc": "2026-08-13T05:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.57184928567493,
+      "measured_mean_khz": -164.23313882167335,
+      "n": 257,
+      "residual_mean_khz": -154.02864151007012,
+      "utc": "2026-08-13T06:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.387843296234264,
+      "measured_mean_khz": -128.88618174399818,
+      "n": 229,
+      "residual_mean_khz": -150.20864499710274,
+      "utc": "2026-08-13T07:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 1.0635029676032788,
+      "measured_mean_khz": -145.01633213349314,
+      "n": 198,
+      "residual_mean_khz": -154.1963694894748,
+      "utc": "2026-08-13T08:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -7.309873781979739,
+      "measured_mean_khz": -150.75394277955996,
+      "n": 182,
+      "residual_mean_khz": -135.58340725844047,
+      "utc": "2026-08-13T09:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -5.870644005062705,
+      "measured_mean_khz": -133.45273019814945,
+      "n": 285,
+      "residual_mean_khz": -140.16364672861135,
+      "utc": "2026-08-13T10:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 0.7576363008672541,
+      "measured_mean_khz": -148.0770952791053,
+      "n": 264,
+      "residual_mean_khz": -147.40250135732836,
+      "utc": "2026-08-13T11:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 2.4789459349903438,
+      "measured_mean_khz": -160.40209692418787,
+      "n": 313,
+      "residual_mean_khz": -175.00653085567876,
+      "utc": "2026-08-13T12:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -15.001483946447342,
+      "measured_mean_khz": -152.99473645033882,
+      "n": 327,
+      "residual_mean_khz": -168.21165108250025,
+      "utc": "2026-08-13T13:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.8714161989670391,
+      "measured_mean_khz": -127.8675895596569,
+      "n": 258,
+      "residual_mean_khz": -132.0851675599843,
+      "utc": "2026-08-13T14:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 1.5755881203592823,
+      "measured_mean_khz": -191.85245322648018,
+      "n": 358,
+      "residual_mean_khz": -177.37548337102777,
+      "utc": "2026-08-13T15:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -6.332071660088711,
+      "measured_mean_khz": -159.2704233578358,
+      "n": 244,
+      "residual_mean_khz": -183.16076617729982,
+      "utc": "2026-08-13T16:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -8.77238081890366,
+      "measured_mean_khz": -157.9323432004853,
+      "n": 279,
+      "residual_mean_khz": -157.63170887588853,
+      "utc": "2026-08-13T17:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -3.920548072222422,
+      "measured_mean_khz": -176.47803253196113,
+      "n": 169,
+      "residual_mean_khz": -164.13384679150715,
+      "utc": "2026-08-13T18:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -4.812148041788737,
+      "measured_mean_khz": -142.98336061075204,
+      "n": 240,
+      "residual_mean_khz": -164.0234695320574,
+      "utc": "2026-08-13T19:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 0.6475772519366172,
+      "measured_mean_khz": -109.98519631175597,
+      "n": 281,
+      "residual_mean_khz": -104.39817961940093,
+      "utc": "2026-08-13T20:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.1875739771928737,
+      "measured_mean_khz": -137.08051247621842,
+      "n": 378,
+      "residual_mean_khz": -113.09107985878875,
+      "utc": "2026-08-13T21:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": -0.45036682226954694,
+      "measured_mean_khz": -133.329215946106,
+      "n": 249,
+      "residual_mean_khz": -134.60512604303668,
+      "utc": "2026-08-13T22:00:00+00:00"
+     },
+     {
+      "candidate_doppler_mean_khz": 3.6736488092595883,
+      "measured_mean_khz": -107.96783093120467,
+      "n": 66,
+      "residual_mean_khz": -75.52024465338745,
+      "utc": "2026-08-13T23:00:00+00:00"
+     }
+    ],
+    "sd_khz": 27.25344558205924,
+    "spread_khz": 107.64052152391237
+   }
+  },
+  "in_view_doppler_elev_ge_0": {
+   "fraction_negative": 0.5005742221721482,
+   "max_khz": 292.84625244140625,
+   "mean_khz": -0.0759502574801445,
+   "median_khz": -0.5199805498123169,
+   "min_khz": -288.43438720703125,
+   "n": 3443789,
+   "p5_khz": -248.04652404785156,
+   "p95_khz": 248.01658630371094
+  },
+  "in_view_doppler_elev_ge_20": {
+   "fraction_negative": 0.5004705662904962,
+   "max_khz": 263.1348571777344,
+   "mean_khz": -0.13717518746852875,
+   "median_khz": -0.30632615089416504,
+   "min_khz": -269.3304138183594,
+   "n": 707658,
+   "p5_khz": -219.20166015625,
+   "p95_khz": 219.50509643554688
+  },
+  "in_view_doppler_elev_ge_40": {
+   "fraction_negative": 0.503081476899968,
+   "max_khz": 214.5865936279297,
+   "mean_khz": -0.868961751461029,
+   "median_khz": -1.308262586593628,
+   "min_khz": -211.560791015625,
+   "n": 181082,
+   "p5_khz": -168.87515258789062,
+   "p95_khz": 168.6042938232422
+  },
+  "in_view_doppler_elev_ge_60": {
+   "fraction_negative": 0.49549508863046177,
+   "max_khz": 140.58619689941406,
+   "mean_khz": 0.022916315123438835,
+   "median_khz": 1.1328961849212646,
+   "min_khz": -136.96533203125,
+   "n": 44285,
+   "p5_khz": -105.84159851074219,
+   "p95_khz": 104.55097961425781
+  },
+  "strata": {
+   "candidate_doppler_quantile_of_measured": [
+    {
+     "hi": 0.1,
+     "lo": 0.0,
+     "measured_mean_khz": -226.71799962331733,
+     "n": 9494,
+     "residual_mean_khz": -222.0445608221088,
+     "residual_median_khz": -202.69938537763534
+    },
+    {
+     "hi": 0.25,
+     "lo": 0.1,
+     "measured_mean_khz": -121.14280316420707,
+     "n": 5289,
+     "residual_mean_khz": -123.28169727110681,
+     "residual_median_khz": -124.32330509440101
+    },
+    {
+     "hi": 0.5,
+     "lo": 0.25,
+     "measured_mean_khz": -56.80098974480618,
+     "n": 4334,
+     "residual_mean_khz": -57.850009237494646,
+     "residual_median_khz": -59.37580143229163
+    },
+    {
+     "hi": 0.75,
+     "lo": 0.5,
+     "measured_mean_khz": 18.866344126101158,
+     "n": 2478,
+     "residual_mean_khz": 21.532607892623137,
+     "residual_median_khz": 21.63649800174166
+    },
+    {
+     "hi": 0.9,
+     "lo": 0.75,
+     "measured_mean_khz": 102.72362113416355,
+     "n": 502,
+     "residual_mean_khz": 98.53568665415375,
+     "residual_median_khz": 103.7575127416619
+    },
+    {
+     "hi": 1.01,
+     "lo": 0.9,
+     "measured_mean_khz": 229.2607644393572,
+     "n": 162,
+     "residual_mean_khz": 223.088609746725,
+     "residual_median_khz": 157.23661751374576
+    }
+   ],
+   "max_elevation_deg": [
+    {
+     "hi": 75,
+     "lo": 60,
+     "measured_mean_khz": -148.3489974222179,
+     "n": 3270,
+     "residual_mean_khz": -145.6432077924456,
+     "residual_median_khz": -148.50301673177083
+    },
+    {
+     "hi": 90,
+     "lo": 75,
+     "measured_mean_khz": -127.37905839957864,
+     "n": 18989,
+     "residual_mean_khz": -126.15901501020141,
+     "residual_median_khz": -127.8147245576421
+    }
+   ],
+   "n_satellites_above_40": [
+    {
+     "hi": 20,
+     "lo": 10,
+     "measured_mean_khz": -147.78894516487316,
+     "n": 1122,
+     "residual_mean_khz": -151.08715330850518,
+     "residual_median_khz": -136.39835144507265
+    },
+    {
+     "hi": 30,
+     "lo": 20,
+     "measured_mean_khz": -126.97219957845716,
+     "n": 16825,
+     "residual_mean_khz": -125.19931323997001,
+     "residual_median_khz": -126.63055708353501
+    },
+    {
+     "hi": 40,
+     "lo": 30,
+     "measured_mean_khz": -139.55837364047352,
+     "n": 4312,
+     "residual_mean_khz": -138.1930877169233,
+     "residual_median_khz": -137.5682584108105
+    }
+   ],
+   "nearest_candidate_elevation_deg": [
+    {
+     "hi": 50,
+     "lo": 40,
+     "measured_mean_khz": -167.21091444733688,
+     "n": 13356,
+     "residual_mean_khz": -165.67433775822883,
+     "residual_median_khz": -168.4603545809644
+    },
+    {
+     "hi": 60,
+     "lo": 50,
+     "measured_mean_khz": -101.22649667250818,
+     "n": 5306,
+     "residual_mean_khz": -98.90240580739133,
+     "residual_median_khz": -108.24860255238193
+    },
+    {
+     "hi": 70,
+     "lo": 60,
+     "measured_mean_khz": -53.6944198572456,
+     "n": 2168,
+     "residual_mean_khz": -57.125412911661066,
+     "residual_median_khz": -76.56249320004898
+    },
+    {
+     "hi": 80,
+     "lo": 70,
+     "measured_mean_khz": -17.233625794038304,
+     "n": 961,
+     "residual_mean_khz": -11.699454663245648,
+     "residual_median_khz": -4.550907325968728
+    },
+    {
+     "hi": 90,
+     "lo": 80,
+     "measured_mean_khz": -1.1845730314375729,
+     "n": 468,
+     "residual_mean_khz": 1.5531323221607367,
+     "residual_median_khz": -0.365071866701066
+    }
+   ],
+   "range_rate_km_s": [
+    {
+     "hi": -2,
+     "lo": -4,
+     "measured_mean_khz": -138.66515951869465,
+     "n": 288,
+     "residual_mean_khz": -223.72426992451062,
+     "residual_median_khz": -194.78502576292604
+    },
+    {
+     "hi": 0,
+     "lo": -2,
+     "measured_mean_khz": -121.8636495165885,
+     "n": 10715,
+     "residual_mean_khz": -148.5656334094388,
+     "residual_median_khz": -146.87221744791663
+    },
+    {
+     "hi": 2,
+     "lo": 0,
+     "measured_mean_khz": -136.97816342581805,
+     "n": 10997,
+     "residual_mean_khz": -107.7509861807223,
+     "residual_median_khz": -110.27951219222334
+    },
+    {
+     "hi": 4,
+     "lo": 2,
+     "measured_mean_khz": -200.1881382814685,
+     "n": 259,
+     "residual_mean_khz": -118.28524617842798,
+     "residual_median_khz": -141.86656338601753
+    }
+   ]
+  }
+ },
+ "epoch_split_utc": [
+  "2026-08-13T04:38:23Z",
+  "2026-08-13T04:46:20Z"
+ ],
+ "false_alarm_rate": 0.01,
+ "method": "differential-32",
+ "population": {
+  "fires": 22259,
+  "refined_fires": 14889,
+  "refined_points": 63426,
+  "sweeps": 878,
+  "target_points": 88606,
+  "utc_range": [
+   "2026-08-12T16:29:27.047326+00:00",
+   "2026-08-13T23:11:41.198000+00:00"
+  ]
+ },
+ "thresholds": {
+  "2500000.0|160.0": {
+   "effective_rate": 0.00998366309675077,
+   "false_alarm_rate": 0.01,
+   "finest_rate": 0.0005445634416409512,
+   "samples": 5509,
+   "supported": true,
+   "threshold": 0.0895213857293129
+  },
+  "2500000.0|80.0": {
+   "effective_rate": 0.009987208501426745,
+   "false_alarm_rate": 0.01,
+   "finest_rate": 0.00014759421430679916,
+   "samples": 20326,
+   "supported": true,
+   "threshold": 0.10418988019227982
+  },
+  "5000000.0|160.0": {
+   "effective_rate": 0.009994342824816142,
+   "false_alarm_rate": 0.01,
+   "finest_rate": 0.0005657175183858194,
+   "samples": 5303,
+   "supported": true,
+   "threshold": 0.0797576978802681
+  },
+  "5000000.0|80.0": {
+   "effective_rate": 0.00997665039269794,
+   "false_alarm_rate": 0.01,
+   "finest_rate": 0.0006368074718743367,
+   "samples": 4711,
+   "supported": true,
+   "threshold": 0.10503553599119186
+  }
+ },
+ "tuning_plan_check": {
+  "ch1-lower-edge": {
+   "derived_hz": 10709687500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 10709687500.0
+  },
+  "ch1-upper-edge": {
+   "derived_hz": 10940312500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 10940312500.0
+  },
+  "ch2-lower-edge": {
+   "derived_hz": 10959687500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 10959687500.0
+  },
+  "ch2-upper-edge": {
+   "derived_hz": 11190312500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 11190312500.0
+  },
+  "ch3-lower-edge": {
+   "derived_hz": 11209687500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 11209687500.0
+  },
+  "ch3-upper-edge": {
+   "derived_hz": 11440312500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 11440312500.0
+  },
+  "ch4-lower-edge": {
+   "derived_hz": 11459687500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 11459687500.0
+  },
+  "ch4-upper-edge": {
+   "derived_hz": 11690312500.0,
+   "discrepancy_hz": 0.0,
+   "rf_hz": 11690312500.0
+  }
+ }
+}

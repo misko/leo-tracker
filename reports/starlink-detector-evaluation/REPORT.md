@@ -1,10 +1,11 @@
 # Evaluating Starlink edge-pilot detectors with two radios
 
 Date: 2026-08-14 UTC
-Status: **the apparatus works; the closed-form coincidence solver recovers
-occupancy under the controlled, homogeneous loopback conditions tested, while
-the check used to validate it is uninformative and its use on the heterogeneous
-sky corpus remains unvalidated; and a cabled injection rig now measures what the
+Status: **the apparatus works; the closed-form coincidence solver brackets
+occupancy at moderate and high levels under controlled loopback conditions and
+reads low at low occupancy, while the check used to validate it refuses to
+certify a correct model at any level and its use on the heterogeneous sky corpus
+remains unvalidated; and a cabled injection rig now measures what the
 model could only infer, giving a detector ranking — for one test condition — that
 matches neither of the rankings this report previously offered**
 
@@ -69,9 +70,10 @@ questions from inference into measurement.
 [Section 11](#11-ground-truth-at-last-measured-detection-probability) reports
 it: the measured detector ranking is uncorrelated with both the model's ranking
 (rho −0.048) and the fire-count ranking (+0.048); the coincidence estimator
-recovers a known `f` without bias under those controlled conditions, so the
-solver works and its diagnostic does not — though nothing here validates the
-pooled model on the heterogeneous sky corpus; the 350–400 kHz cliff does not exist against a *known* offset,
+brackets a known `f` at moderate and high occupancy but reads **low at low
+occupancy**, while its diagnostic refuses to certify at any level — so the solver
+partly works and the check does not, and nothing here validates the pooled model
+on the heterogeneous sky corpus; the 350–400 kHz cliff does not exist against a *known* offset,
 falling instead at the 700 kHz bank edge; and the thresholds are calibrated on
 truly empty input.
 
@@ -1123,8 +1125,9 @@ With occupancy set by hand to `f_true` = 0.2775 at an SNR where Pd ~ 0.6:
 That last line reframes [section 6](#6-did-it-work-the-negative-controls). The
 negative controls showed the agreement check cannot fail. This shows the
 quantity it measures was never diagnostic: **a spread of that size is what a
-correct model produces.** The solver works under these conditions; the
-instrument used to police it reads nothing. Neither statement extends to the sky
+correct model produces.** The solver partly works under these conditions — it
+brackets truth at 0.30 and 0.50 and reads low at 0.15 — while the instrument used
+to police it returns `VACUOUS` at every level. Neither statement extends to the sky
 corpus, whose heterogeneity in `p`, `d`, arm, receiver and time is listed in
 [section 5b](#5b-what-the-model-assumes-and-what-this-corpus-already-contradicts).
 
@@ -1265,14 +1268,52 @@ offset shared by both radios is invisible to a differential estimator, so it is
 never corrected — and what earlier sections read as a symmetric frequency
 tolerance is a ±175 kHz window about a centre that is not zero.
 
-**A common tuning or reference error is one hypothesis for that −150 kHz, not an
-identified cause.** The axis is built from carrier offsets *estimated by the
-same pipeline under test*, and the population is conditioned on candidates that
-fired, so estimator bias, a stable aggregate Doppler distribution, and geometry
-or beam-selection effects are all live alternatives. Stability by hour rules out
-a drifting cause, not a stationary one. Identifying it needs an external
-reference: the residual between measured carrier offset and TLE-predicted
-Doppler per detection, or an absolute signal injected through the LNB chain.
+**It has since been identified, and it is not the tuning plan.** Comparing each
+detection's measured carrier offset against TLE-predicted Doppler breaks the
+circularity of an axis the pipeline estimates for itself. The sync corpus cannot
+carry that test — every `sync-*` capture records `utc: null` and `rf_center_hz:
+null` — so it was run on the 878 narrow sky sweeps that do carry a probe UTC and
+a tuning carrier, 88,606 target points. Those sweeps agree with the sync corpus
+on the same receivers to within 2–4 kHz, and the geometry reproduces the
+repository's own `survey_truth` prior to a median 0.025 Hz.
+
+TLE Doppler over catalogued satellites in view is **symmetric about zero** —
+mean −0.9 kHz, p5/p95 ±169 kHz above 40° elevation — so residual ≈ measured
+everywhere, and no Doppler population can put a centre at −150 kHz.
+
+The decisive numbers are what the receivers did across the LNB swap:
+
+| Receiver | Before 2026-08-13 | After |
+|---|---:|---:|
+| `lnb-b` (5d4d rx1, untouched radio) | **−132.1** kHz | **−153.8** kHz |
+| `lnb-d` (19f2 rx1, **replaced**) | **+18.0** kHz | **−149.9** kHz |
+| `lnb-c` (19f2 rx0, **replaced**) | −31.1 kHz | −188.1 kHz |
+
+**Two radios watching the same sky at the same instant sat 150 kHz apart before
+the swap.** A tuning-plan or beacon-frequency error cannot do that — it would
+move both alike. They only came to agree near −150 kHz *after* two LNBs were
+physically replaced, with `lnb-d` moving −207 kHz across the boundary while
+`lnb-b`, on the untouched radio, moved −22 kHz.
+
+The frequency dependence closes it. The eight tunings give a 2.02× lever on the
+Pluto IF (959.7 → 1940.3 MHz) at a fixed 9.75 GHz LNB LO. Fitting each
+receiver-epoch as constant + IF-slope + edge term leaves an IF-proportional term
+of **−13 to +27 ppm — at most 26 kHz across the whole span**, where a tuner or
+reference error large enough to *be* the −150 kHz would contribute −153 kHz. It
+is not there. The constant term carries everything.
+
+**So the −150 kHz is each LNB's own local-oscillator error, per receiver, plus a
+small geometry term of 20–30 kHz.** That is a different and less convenient
+finding than a single tuning-plan mistake: there is no one number to correct.
+Each receiver needs its own measured centre — which is exactly what
+[section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault) had to do
+for `lnb-a`, and what the differential calibration structurally cannot supply for
+any of them.
+
+![Measured carrier offset against TLE-predicted Doppler, per receiver and epoch](figures/injection/tle-residual.png)
+
+*Residual between measured carrier offset and TLE-predicted Doppler, split by
+receiver and by hardware epoch, over 878 narrow sky sweeps.*
 
 ![Detection against raw and corrected offset, split by receiver](figures/injection/raw-vs-corrected.png)
 
@@ -1322,83 +1363,90 @@ means, and here it is set rather than inferred.
 Every structural property of the sky configuration is reproduced. The one
 unknown becomes a dial.
 
-### 13a. The estimator recovers a known occupancy
+### 13a. What the hardware actually returned
 
-500 cells per level, at an SNR where detection is partial so coincidence carries
-information:
+**A correction first, because it changes what this section is.** When these runs
+were first written up, the figures were built from `results_dry.json` — the
+output of `dryrun.py`, which exercises the analysis over `selftest.py`'s
+**synthetic** scores with a hard-coded `PD` and no radio in the loop. The numbers
+published here were therefore a simulation, not the two-radio rig this section
+describes. The committed `runs.tar.gz` has since been driven through the same
+`report.py` path and the hardware results are below. They are noisier, more
+level-dependent, and at the lowest occupancy the estimator fails outright.
 
-| `f` set | `f` realised | Range across the eight | Brackets truth? |
-|---:|---:|---|:--:|
-| 0.15 | 0.132 | 0.089 – 0.146 | yes |
-| 0.30 | 0.318 | 0.291 – 0.341 | yes |
-| 0.50 | 0.478 | 0.460 – 0.506 | yes |
+500 cells per level, both radios, occupancy set by a seeded schedule:
 
-The eight estimates collectively **bracket** the realised occupancy at every
-level. Per method they are not uniformly accurate: the plotted intervals are
-central 90% (5th–95th percentile), and at the lowest occupancy `anchor-8`'s
-interval is roughly 0.062–0.116, which does **not** contain the realised 0.132.
-The solver tracks occupancy on two radios sharing nothing but a schedule, with
-per-method noise worst where occupancy is lowest.
+| `f` set | `f` realised | Recovered across the eight | Brackets truth? | Spread |
+|---:|---:|---|:--:|---:|
+| 0.15 | 0.122 | 0.076 – 0.111 | **no** — all eight read low | 0.0352 |
+| 0.30 | 0.272 | 0.254 – 0.365 | yes | 0.1118 |
+| 0.50 | 0.500 | 0.419 – 0.523 | yes | 0.1038 |
 
-![Recovered f against the f that was set, three levels](figures/injection/fig_d1_recovered_f.png)
+At 0.30 and 0.50 the eight estimates bracket the realised occupancy. At 0.15
+every one of them lands **below** it — the solver is not merely noisy there, it
+is biased low. So the claim that the estimator recovers a known occupancy holds
+at moderate and high occupancy and **fails at low occupancy**, which is the
+regime the sky corpus mostly occupies.
 
-### 13b. And its consistency check never says "consistent"
+![Recovered f against the f that was set](figures/injection/fig_d1_recovered_f.png)
 
-The same runs, scored by the check the model uses to validate itself — on data
+*Figure retained from the earlier write-up and therefore showing the synthetic
+run; the table above is the hardware. Regenerating it from `results.json` is
+outstanding.*
+
+### 13b. And the check certifies nothing, on any of them
+
+The same runs, scored by the check the model uses to validate itself, on data
 where the model is **true by construction**:
 
-| `f` set | Verdict |
-|---:|---|
-| 0.15 | `ALGORITHMS DISAGREE` |
-| 0.30 | `VACUOUS — THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY` |
-| 0.50 | `NOT VALIDATED — NO USABLE NEGATIVE CONTROL` |
+| `f` set | Verdict | Controls separate? |
+|---:|---|---|
+| 0.15 | `VACUOUS — THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY` | no |
+| 0.30 | `VACUOUS — THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY` | no |
+| 0.50 | `VACUOUS — THE NEGATIVE CONTROLS AGREE JUST AS CLOSELY` | no |
 
-Three occupancy levels, three different non-consistent verdicts, and not once
-does it return the passing token. The check does not merely fail to detect a
-broken model — **it declines to certify a correct one.**
+`certified: false` at all three. Three levels, three refusals, on hardware where
+the answer is known and correct. **The check does not merely fail to detect a
+broken model — it declines to certify a correct one, every time it is asked.**
 
-It is worth being precise about *why*, because the three verdicts have three
-different causes and none of them is "the model is wrong".
+(An earlier version of this section reported three *different* verdicts across
+the three levels and read a mechanism into each. That came from the synthetic
+run. The hardware is simpler and says the same thing more plainly.)
 
-| `f` set | Real join | Scrambled | Shifted | Why the check failed |
-|---:|---|---|---|---|
-| 0.15 | spread 0.0569, 8 solvable | 0.3818, 8 solvable | 0.4539, 2 solvable | the controls **separate cleanly** — the check rejected the *real* join on its own spread before reaching them |
-| 0.30 | 0.0509, 8 solvable | 0.0, **1 solvable** | 0.1568, 8 solvable | one solvable method has zero spread by definition; the check read that degenerate case as a control agreeing more tightly |
-| 0.50 | 0.0460, 8 solvable | **0 solvable** | **0 solvable** | no control could be fitted at all |
+### The spread argument, corrected for sample size
 
-Note the first row especially. Here the negative controls did **exactly what a
-negative control should**: breaking the pairing drove `f` from 0.124 to 0.566
-and 0.752, destroying it. The controls worked. The check still refused to
-certify, because it had already rejected the real join for a spread of 0.057 —
-on data where the model is correct.
+This section previously argued that the injected spreads were **wider** than the
+0.040 seen on sky, and that the sky figure was therefore unusually tight. That
+comparison was not like for like: the injected levels rest on **500 cells each**
+against roughly **16,560** for the sky join, and spread shrinks with sample size.
 
-That spread is the deeper problem, with one caveat that must travel with it.
-**Every spread measured where `f` is one number by construction — 0.0569,
-0.0509, 0.0460 — is wider than the 0.040 observed on sky.** But those rest on
-**500 cells each** against roughly **16,560** for the sky join, and spread
-across noisy estimates shrinks with sample size. Comparing 0.05 at n=500 with
-0.04 at n=16,560 therefore does **not** establish that the sky figure is
-unusually tight; equalising n — subsampling the sky join to 500 cells and
-comparing spread distributions — is the test that would, and it has not been
-run.
+Matching n settles it. Resampling the sky join to 500 cells by **sweep** — the
+honest unit, since cells within a sweep share time, hardware and arm — over
+3,000 draws:
 
-What the comparison supports without any n correction is the weaker and
-sufficient claim: **a spread of that order is what a correct model produces**
-with eight near-duplicate detectors and finite samples. The single-radio run
-reached the same order independently at 0.048.
+| | Spread |
+|---|---|
+| Sky at n = 500 | median **0.0659**, p05–p95 0.0366 – 0.1020 |
+| Hardware injected, n = 500 | 0.0352, 0.1118, 0.1038 — percentiles **4, 98, 96** |
+| Sky at full n = 16,560 | observed **0.0422**, percentile **30** of its own-n distribution |
 
-So the check has at least three independent ways to fail on a correct model: it
-rejects real data whose spread is normal, it misreads a degenerate single-method
-control as agreement, and it cannot handle controls that do not fit. A
-diagnostic with three failure modes and no demonstrated success mode is not
-measuring the thing it names.
+And the shrinkage curve accounts for the entire original gap: median spread runs
+0.090 at n = 128, 0.065 at 500, 0.051 at 2,000, 0.044 at 16,560. **0.040 at
+n = 16,560 and 0.05 at n = 500 are the same number at two sample sizes.**
 
-This is the strongest available statement of
-[section 6](#6-did-it-work-the-negative-controls)'s result, and it is stronger
-than the one that section makes. The negative controls showed the check cannot
-fail. This shows the quantity behind it was never diagnostic at all.
+So both directions of the original claim are dead. The sky's 0.0422 is
+unremarkable for its own n, sitting at percentile 30. The hardware spreads
+straddle the sky distribution rather than exceeding it. What survives — and
+survives on the synthetic and hardware sets alike — is the weaker and sufficient
+claim: **a spread of 0.04–0.06 is simply what this estimator produces with eight
+near-duplicate detectors at these sample sizes.** The consistency check rejected
+a join whose spread is median for its size.
 
-![The check's verdict and spread at three known occupancies](figures/injection/fig_d4_controls.png)
+![Sky spread at matched n against the injected values](figures/injection/nmatch_spread.png)
+
+*Sky f-spread resampled to n = 500 by sweep, with the injected values marked;
+the sky join at full size with its observed 0.0422; and the spread-versus-n
+shrinkage curve that explains the original discrepancy.*
 
 ### 13c. One earlier finding does not survive independence
 

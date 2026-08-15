@@ -1,0 +1,283 @@
+{
+ "context": {
+  "hw_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+  "hw_model_variant": "1",
+  "hw_serial": "1040007c4a94000211000b009186843ef2",
+  "fw_version": "v0.38-plutoplus-spf-libiio-metadata-v5",
+  "ad9361-phy,xo_correction": "40000000",
+  "ad9361-phy,model": "ad9361",
+  "local,kernel": "5.15.0-gd798b0d821b8",
+  "uri": "ip:192.168.1.165",
+  "iio,buffer-metadata": "1",
+  "ip,ip-addr": "192.168.1.165"
+ },
+ "grid": [
+  {
+   "sample_rate_requested_hz": 2500000.0,
+   "rx_bandwidth_requested_hz": 1250000.0,
+   "sample_rate_applied_hz": 2500000.0,
+   "rx_bandwidth_applied_hz": 1250000.0,
+   "tx_sample_rate_applied_hz": 2500000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:80000000 R2:40000000 R1:20000000 RF:10000000 RXSAMP:2500000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:80000000 T2:40000000 T1:20000000 TF:10000000 TXSAMP:2500000"
+  },
+  {
+   "sample_rate_requested_hz": 2500000.0,
+   "rx_bandwidth_requested_hz": 2500000.0,
+   "sample_rate_applied_hz": 2500000.0,
+   "rx_bandwidth_applied_hz": 2500000.0,
+   "tx_sample_rate_applied_hz": 2500000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:80000000 R2:40000000 R1:20000000 RF:10000000 RXSAMP:2500000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:80000000 T2:40000000 T1:20000000 TF:10000000 TXSAMP:2500000"
+  },
+  {
+   "sample_rate_requested_hz": 2500000.0,
+   "rx_bandwidth_requested_hz": 5000000.0,
+   "sample_rate_applied_hz": 2500000.0,
+   "rx_bandwidth_applied_hz": 5000000.0,
+   "tx_sample_rate_applied_hz": 2500000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:80000000 R2:40000000 R1:20000000 RF:10000000 RXSAMP:2500000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:80000000 T2:40000000 T1:20000000 TF:10000000 TXSAMP:2500000"
+  },
+  {
+   "sample_rate_requested_hz": 2500000.0,
+   "rx_bandwidth_requested_hz": 10000000.0,
+   "sample_rate_applied_hz": 2500000.0,
+   "rx_bandwidth_applied_hz": 10000000.0,
+   "tx_sample_rate_applied_hz": 2500000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:80000000 R2:40000000 R1:20000000 RF:10000000 RXSAMP:2500000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:80000000 T2:40000000 T1:20000000 TF:10000000 TXSAMP:2500000"
+  },
+  {
+   "sample_rate_requested_hz": 2500000.0,
+   "rx_bandwidth_requested_hz": 10000000,
+   "sample_rate_applied_hz": 2500000.0,
+   "rx_bandwidth_applied_hz": 10000000.0,
+   "tx_sample_rate_applied_hz": 2500000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:80000000 R2:40000000 R1:20000000 RF:10000000 RXSAMP:2500000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:80000000 T2:40000000 T1:20000000 TF:10000000 TXSAMP:2500000"
+  },
+  {
+   "sample_rate_requested_hz": 5000000.0,
+   "rx_bandwidth_requested_hz": 1250000.0,
+   "sample_rate_applied_hz": 5000000.0,
+   "rx_bandwidth_applied_hz": 1250000.0,
+   "tx_sample_rate_applied_hz": 5000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:160000000 R2:80000000 R1:40000000 RF:20000000 RXSAMP:5000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:160000000 T2:80000000 T1:40000000 TF:20000000 TXSAMP:5000000"
+  },
+  {
+   "sample_rate_requested_hz": 5000000.0,
+   "rx_bandwidth_requested_hz": 2500000.0,
+   "sample_rate_applied_hz": 5000000.0,
+   "rx_bandwidth_applied_hz": 2500000.0,
+   "tx_sample_rate_applied_hz": 5000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:160000000 R2:80000000 R1:40000000 RF:20000000 RXSAMP:5000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:160000000 T2:80000000 T1:40000000 TF:20000000 TXSAMP:5000000"
+  },
+  {
+   "sample_rate_requested_hz": 5000000.0,
+   "rx_bandwidth_requested_hz": 5000000.0,
+   "sample_rate_applied_hz": 5000000.0,
+   "rx_bandwidth_applied_hz": 5000000.0,
+   "tx_sample_rate_applied_hz": 5000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:160000000 R2:80000000 R1:40000000 RF:20000000 RXSAMP:5000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:160000000 T2:80000000 T1:40000000 TF:20000000 TXSAMP:5000000"
+  },
+  {
+   "sample_rate_requested_hz": 5000000.0,
+   "rx_bandwidth_requested_hz": 10000000.0,
+   "sample_rate_applied_hz": 5000000.0,
+   "rx_bandwidth_applied_hz": 10000000.0,
+   "tx_sample_rate_applied_hz": 5000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:160000000 R2:80000000 R1:40000000 RF:20000000 RXSAMP:5000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:160000000 T2:80000000 T1:40000000 TF:20000000 TXSAMP:5000000"
+  },
+  {
+   "sample_rate_requested_hz": 5000000.0,
+   "rx_bandwidth_requested_hz": 10000000,
+   "sample_rate_applied_hz": 5000000.0,
+   "rx_bandwidth_applied_hz": 10000000.0,
+   "tx_sample_rate_applied_hz": 5000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:160000000 R2:80000000 R1:40000000 RF:20000000 RXSAMP:5000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:160000000 T2:80000000 T1:40000000 TF:20000000 TXSAMP:5000000"
+  },
+  {
+   "sample_rate_requested_hz": 10000000.0,
+   "rx_bandwidth_requested_hz": 1250000.0,
+   "sample_rate_applied_hz": 10000000.0,
+   "rx_bandwidth_applied_hz": 1250000.0,
+   "tx_sample_rate_applied_hz": 10000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:320000000 R2:160000000 R1:80000000 RF:40000000 RXSAMP:10000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:320000000 T2:160000000 T1:80000000 TF:40000000 TXSAMP:10000000"
+  },
+  {
+   "sample_rate_requested_hz": 10000000.0,
+   "rx_bandwidth_requested_hz": 2500000.0,
+   "sample_rate_applied_hz": 10000000.0,
+   "rx_bandwidth_applied_hz": 2500000.0,
+   "tx_sample_rate_applied_hz": 10000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:320000000 R2:160000000 R1:80000000 RF:40000000 RXSAMP:10000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:320000000 T2:160000000 T1:80000000 TF:40000000 TXSAMP:10000000"
+  },
+  {
+   "sample_rate_requested_hz": 10000000.0,
+   "rx_bandwidth_requested_hz": 5000000.0,
+   "sample_rate_applied_hz": 10000000.0,
+   "rx_bandwidth_applied_hz": 5000000.0,
+   "tx_sample_rate_applied_hz": 10000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:320000000 R2:160000000 R1:80000000 RF:40000000 RXSAMP:10000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:320000000 T2:160000000 T1:80000000 TF:40000000 TXSAMP:10000000"
+  },
+  {
+   "sample_rate_requested_hz": 10000000.0,
+   "rx_bandwidth_requested_hz": 10000000.0,
+   "sample_rate_applied_hz": 10000000.0,
+   "rx_bandwidth_applied_hz": 10000000.0,
+   "tx_sample_rate_applied_hz": 10000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:320000000 R2:160000000 R1:80000000 RF:40000000 RXSAMP:10000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:320000000 T2:160000000 T1:80000000 TF:40000000 TXSAMP:10000000"
+  },
+  {
+   "sample_rate_requested_hz": 10000000.0,
+   "rx_bandwidth_requested_hz": 10000000,
+   "sample_rate_applied_hz": 10000000.0,
+   "rx_bandwidth_applied_hz": 10000000.0,
+   "tx_sample_rate_applied_hz": 10000000.0,
+   "tx_bandwidth_applied_hz": 6000000.0,
+   "rx_gain_applied_db": 40.0,
+   "rx_gain_mode": "manual",
+   "rx_fir_en": 1.0,
+   "tx_fir_en": 1.0,
+   "rx_path_rates": "BBPLL:1280000000 ADC:320000000 R2:160000000 R1:80000000 RF:40000000 RXSAMP:10000000",
+   "tx_path_rates": "BBPLL:1280000000 DAC:320000000 T2:160000000 T1:80000000 TF:40000000 TXSAMP:10000000"
+  }
+ ],
+ "throughput": [
+  {
+   "sample_rate_hz": 2500000.0,
+   "probe_samples": 100000,
+   "seconds_per_capture": 0.1329338550567627,
+   "floor_rms_counts": 1.0421276344136985,
+   "floor_dbfs": -65.86818079872542
+  },
+  {
+   "sample_rate_hz": 5000000.0,
+   "probe_samples": 200000,
+   "seconds_per_capture": 0.19017728169759116,
+   "floor_rms_counts": 1.4257156147938368,
+   "floor_dbfs": -63.14594092345622
+  },
+  {
+   "sample_rate_hz": 10000000.0,
+   "probe_samples": 400000,
+   "seconds_per_capture": 0.2893211046854655,
+   "floor_rms_counts": 1.8065554377086717,
+   "floor_dbfs": -61.08957318028901
+  }
+ ],
+ "rf_bandwidth_available": "[200000 1 56000000]",
+ "sampling_frequency_available": "[520833 1 30720000]",
+ "rest": {
+  "rx0": {
+   "sampling_frequency": "2500000",
+   "rf_bandwidth": "2500000",
+   "filter_fir_en": "1",
+   "hardwaregain": "40.000000 dB",
+   "gain_control_mode": "manual"
+  },
+  "tx0": {
+   "sampling_frequency": "2500000",
+   "rf_bandwidth": "6000000",
+   "filter_fir_en": "1",
+   "hardwaregain": "-89.750000 dB"
+  },
+  "tx1": {
+   "sampling_frequency": "2500000",
+   "rf_bandwidth": "6000000",
+   "filter_fir_en": "1",
+   "hardwaregain": "-89.750000 dB"
+  },
+  "rx1": {
+   "sampling_frequency": "2500000",
+   "rf_bandwidth": "2500000",
+   "filter_fir_en": "1",
+   "hardwaregain": "40.000000 dB",
+   "gain_control_mode": "manual"
+  },
+  "rx_path_rates": "BBPLL:1280000000 ADC:80000000 R2:40000000 R1:20000000 RF:10000000 RXSAMP:2500000",
+  "tx_path_rates": "BBPLL:1280000000 DAC:80000000 T2:40000000 T1:20000000 TF:10000000 TXSAMP:2500000",
+  "rx_lo_hz": "1190312500",
+  "tx_lo_hz": "1190312500"
+ }
+}

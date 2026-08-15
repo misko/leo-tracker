@@ -1,0 +1,134 @@
+[null] Fs  2.50 B  1.25  floor 1.02 counts
+[null] Fs  2.50 B  2.50  floor 1.16 counts
+[null] Fs  2.50 B  5.00  floor 1.10 counts
+[null] Fs  2.50 B 10.00  floor 1.07 counts
+[null] Fs  5.00 B  1.25  floor 1.06 counts
+[null] Fs  5.00 B  2.50  floor 1.37 counts
+[null] Fs  5.00 B  5.00  floor 1.43 counts
+[null] Fs  5.00 B 10.00  floor 1.39 counts
+[null] Fs 10.00 B  1.25  floor 1.14 counts
+[null] Fs 10.00 B  2.50  floor 1.44 counts
+[null] Fs 10.00 B  5.00  floor 1.66 counts
+[null] Fs 10.00 B 10.00  floor 1.84 counts
+radio rested: manual gain, 2.5 MS/s, 2.5 MHz, TX at -89.75 dB
+[null] Fs  2.50 B  1.25  floor n/a counts
+[null] Fs  2.50 B  2.50  floor n/a counts
+[null] Fs  2.50 B  5.00  floor n/a counts
+[null] Fs  2.50 B 10.00  floor n/a counts
+Fs  2.50 B  1.25 CFO     0.0 kHz  cell 1/108  probes 40  eta 55 min
+Fs  2.50 B  2.50 CFO     0.0 kHz  cell 2/108  probes 80  eta 49 min
+Fs  2.50 B  5.00 CFO     0.0 kHz  cell 3/108  probes 120  eta 47 min
+Fs  2.50 B 10.00 CFO     0.0 kHz  cell 4/108  probes 160  eta 46 min
+Fs  2.50 B  1.25 CFO   200.0 kHz  cell 5/108  probes 200  eta 45 min
+Fs  2.50 B  2.50 CFO   200.0 kHz  cell 6/108  probes 240  eta 45 min
+Fs  2.50 B  5.00 CFO   200.0 kHz  cell 7/108  probes 280  eta 44 min
+Fs  2.50 B 10.00 CFO   200.0 kHz  cell 8/108  probes 320  eta 44 min
+Fs  2.50 B  1.25 CFO   300.0 kHz  cell 9/108  probes 360  eta 43 min
+Fs  2.50 B  2.50 CFO   300.0 kHz  cell 10/108  probes 400  eta 43 min
+Fs  2.50 B  5.00 CFO   300.0 kHz  cell 11/108  probes 440  eta 43 min
+Fs  2.50 B 10.00 CFO   300.0 kHz  cell 12/108  probes 480  eta 43 min
+Fs  2.50 B  1.25 CFO   350.0 kHz  cell 13/108  probes 520  eta 42 min
+Fs  2.50 B  2.50 CFO   350.0 kHz  cell 14/108  probes 560  eta 42 min
+Fs  2.50 B  5.00 CFO   350.0 kHz  cell 15/108  probes 600  eta 41 min
+Fs  2.50 B 10.00 CFO   350.0 kHz  cell 16/108  probes 640  eta 41 min
+Fs  2.50 B  1.25 CFO   400.0 kHz  cell 17/108  probes 680  eta 41 min
+Fs  2.50 B  2.50 CFO   400.0 kHz  cell 18/108  probes 720  eta 41 min
+Fs  2.50 B  5.00 CFO   400.0 kHz  cell 19/108  probes 760  eta 41 min
+Fs  2.50 B 10.00 CFO   400.0 kHz  cell 20/108  probes 800  eta 40 min
+Fs  2.50 B  1.25 CFO   500.0 kHz  cell 21/108  probes 840  eta 40 min
+Fs  2.50 B  2.50 CFO   500.0 kHz  cell 22/108  probes 880  eta 40 min
+Fs  2.50 B  5.00 CFO   500.0 kHz  cell 23/108  probes 920  eta 39 min
+Fs  2.50 B 10.00 CFO   500.0 kHz  cell 24/108  probes 960  eta 39 min
+Fs  2.50 B  1.25 CFO   600.0 kHz  cell 25/108  probes 1000  eta 39 min
+Fs  2.50 B  2.50 CFO   600.0 kHz  cell 26/108  probes 1040  eta 38 min
+Fs  2.50 B  5.00 CFO   600.0 kHz  cell 27/108  probes 1080  eta 38 min
+Fs  2.50 B 10.00 CFO   600.0 kHz  cell 28/108  probes 1120  eta 37 min
+Fs  2.50 B  1.25 CFO   700.0 kHz  cell 29/108  probes 1160  eta 37 min
+Fs  2.50 B  2.50 CFO   700.0 kHz  cell 30/108  probes 1200  eta 36 min
+Fs  2.50 B  5.00 CFO   700.0 kHz  cell 31/108  probes 1240  eta 36 min
+Fs  2.50 B 10.00 CFO   700.0 kHz  cell 32/108  probes 1280  eta 35 min
+Fs  2.50 B  1.25 CFO   800.0 kHz  cell 33/108  probes 1320  eta 35 min
+Fs  2.50 B  2.50 CFO   800.0 kHz  cell 34/108  probes 1360  eta 34 min
+Fs  2.50 B  5.00 CFO   800.0 kHz  cell 35/108  probes 1400  eta 34 min
+Fs  2.50 B 10.00 CFO   800.0 kHz  cell 36/108  probes 1440  eta 34 min
+[null] Fs  5.00 B  1.25  floor n/a counts
+[null] Fs  5.00 B  2.50  floor n/a counts
+[null] Fs  5.00 B  5.00  floor n/a counts
+[null] Fs  5.00 B 10.00  floor n/a counts
+Fs  5.00 B  1.25 CFO     0.0 kHz  cell 37/108  probes 1480  eta 34 min
+Fs  5.00 B  2.50 CFO     0.0 kHz  cell 38/108  probes 1520  eta 33 min
+Fs  5.00 B  5.00 CFO     0.0 kHz  cell 39/108  probes 1560  eta 33 min
+Fs  5.00 B 10.00 CFO     0.0 kHz  cell 40/108  probes 1600  eta 33 min
+Fs  5.00 B  1.25 CFO   200.0 kHz  cell 41/108  probes 1640  eta 32 min
+Fs  5.00 B  2.50 CFO   200.0 kHz  cell 42/108  probes 1680  eta 32 min
+Fs  5.00 B  5.00 CFO   200.0 kHz  cell 43/108  probes 1720  eta 32 min
+Fs  5.00 B 10.00 CFO   200.0 kHz  cell 44/108  probes 1760  eta 32 min
+Fs  5.00 B  1.25 CFO   300.0 kHz  cell 45/108  probes 1800  eta 32 min
+Fs  5.00 B  2.50 CFO   300.0 kHz  cell 46/108  probes 1840  eta 31 min
+Fs  5.00 B  5.00 CFO   300.0 kHz  cell 47/108  probes 1880  eta 31 min
+Fs  5.00 B 10.00 CFO   300.0 kHz  cell 48/108  probes 1920  eta 30 min
+Fs  5.00 B  1.25 CFO   350.0 kHz  cell 49/108  probes 1960  eta 30 min
+Fs  5.00 B  2.50 CFO   350.0 kHz  cell 50/108  probes 2000  eta 30 min
+Fs  5.00 B  5.00 CFO   350.0 kHz  cell 51/108  probes 2040  eta 29 min
+Fs  5.00 B 10.00 CFO   350.0 kHz  cell 52/108  probes 2080  eta 29 min
+Fs  5.00 B  1.25 CFO   400.0 kHz  cell 53/108  probes 2120  eta 29 min
+Fs  5.00 B  2.50 CFO   400.0 kHz  cell 54/108  probes 2160  eta 28 min
+Fs  5.00 B  5.00 CFO   400.0 kHz  cell 55/108  probes 2200  eta 28 min
+Fs  5.00 B 10.00 CFO   400.0 kHz  cell 56/108  probes 2240  eta 27 min
+Fs  5.00 B  1.25 CFO   500.0 kHz  cell 57/108  probes 2280  eta 27 min
+Fs  5.00 B  2.50 CFO   500.0 kHz  cell 58/108  probes 2320  eta 27 min
+Fs  5.00 B  5.00 CFO   500.0 kHz  cell 59/108  probes 2360  eta 26 min
+Fs  5.00 B 10.00 CFO   500.0 kHz  cell 60/108  probes 2400  eta 26 min
+Fs  5.00 B  1.25 CFO   600.0 kHz  cell 61/108  probes 2440  eta 25 min
+Fs  5.00 B  2.50 CFO   600.0 kHz  cell 62/108  probes 2480  eta 25 min
+Fs  5.00 B  5.00 CFO   600.0 kHz  cell 63/108  probes 2520  eta 24 min
+Fs  5.00 B 10.00 CFO   600.0 kHz  cell 64/108  probes 2560  eta 24 min
+Fs  5.00 B  1.25 CFO   700.0 kHz  cell 65/108  probes 2600  eta 23 min
+Fs  5.00 B  2.50 CFO   700.0 kHz  cell 66/108  probes 2640  eta 23 min
+Fs  5.00 B  5.00 CFO   700.0 kHz  cell 67/108  probes 2680  eta 23 min
+Fs  5.00 B 10.00 CFO   700.0 kHz  cell 68/108  probes 2720  eta 22 min
+Fs  5.00 B  1.25 CFO   800.0 kHz  cell 69/108  probes 2760  eta 22 min
+Fs  5.00 B  2.50 CFO   800.0 kHz  cell 70/108  probes 2800  eta 21 min
+Fs  5.00 B  5.00 CFO   800.0 kHz  cell 71/108  probes 2840  eta 21 min
+Fs  5.00 B 10.00 CFO   800.0 kHz  cell 72/108  probes 2880  eta 20 min
+[null] Fs 10.00 B  1.25  floor n/a counts
+[null] Fs 10.00 B  2.50  floor n/a counts
+[null] Fs 10.00 B  5.00  floor n/a counts
+[null] Fs 10.00 B 10.00  floor n/a counts
+Fs 10.00 B  1.25 CFO     0.0 kHz  cell 73/108  probes 2920  eta 20 min
+Fs 10.00 B  2.50 CFO     0.0 kHz  cell 74/108  probes 2960  eta 19 min
+Fs 10.00 B  5.00 CFO     0.0 kHz  cell 75/108  probes 3000  eta 19 min
+Fs 10.00 B 10.00 CFO     0.0 kHz  cell 76/108  probes 3040  eta 19 min
+Fs 10.00 B  1.25 CFO   200.0 kHz  cell 77/108  probes 3080  eta 18 min
+Fs 10.00 B  2.50 CFO   200.0 kHz  cell 78/108  probes 3120  eta 18 min
+Fs 10.00 B  5.00 CFO   200.0 kHz  cell 79/108  probes 3160  eta 17 min
+Fs 10.00 B 10.00 CFO   200.0 kHz  cell 80/108  probes 3200  eta 17 min
+Fs 10.00 B  1.25 CFO   300.0 kHz  cell 81/108  probes 3240  eta 17 min
+Fs 10.00 B  2.50 CFO   300.0 kHz  cell 82/108  probes 3280  eta 16 min
+Fs 10.00 B  5.00 CFO   300.0 kHz  cell 83/108  probes 3320  eta 16 min
+Fs 10.00 B 10.00 CFO   300.0 kHz  cell 84/108  probes 3360  eta 15 min
+Fs 10.00 B  1.25 CFO   350.0 kHz  cell 85/108  probes 3400  eta 15 min
+Fs 10.00 B  2.50 CFO   350.0 kHz  cell 86/108  probes 3440  eta 14 min
+Fs 10.00 B  5.00 CFO   350.0 kHz  cell 87/108  probes 3480  eta 14 min
+Fs 10.00 B 10.00 CFO   350.0 kHz  cell 88/108  probes 3520  eta 13 min
+Fs 10.00 B  1.25 CFO   400.0 kHz  cell 89/108  probes 3560  eta 13 min
+Fs 10.00 B  2.50 CFO   400.0 kHz  cell 90/108  probes 3600  eta 12 min
+Fs 10.00 B  5.00 CFO   400.0 kHz  cell 91/108  probes 3640  eta 11 min
+Fs 10.00 B 10.00 CFO   400.0 kHz  cell 92/108  probes 3680  eta 11 min
+Fs 10.00 B  1.25 CFO   500.0 kHz  cell 93/108  probes 3720  eta 10 min
+Fs 10.00 B  2.50 CFO   500.0 kHz  cell 94/108  probes 3760  eta 10 min
+Fs 10.00 B  5.00 CFO   500.0 kHz  cell 95/108  probes 3800  eta 9 min
+Fs 10.00 B 10.00 CFO   500.0 kHz  cell 96/108  probes 3840  eta 8 min
+Fs 10.00 B  1.25 CFO   600.0 kHz  cell 97/108  probes 3880  eta 8 min
+Fs 10.00 B  2.50 CFO   600.0 kHz  cell 98/108  probes 3920  eta 7 min
+Fs 10.00 B  5.00 CFO   600.0 kHz  cell 99/108  probes 3960  eta 6 min
+Fs 10.00 B 10.00 CFO   600.0 kHz  cell 100/108  probes 4000  eta 6 min
+Fs 10.00 B  1.25 CFO   700.0 kHz  cell 101/108  probes 4040  eta 5 min
+Fs 10.00 B  2.50 CFO   700.0 kHz  cell 102/108  probes 4080  eta 4 min
+Fs 10.00 B  5.00 CFO   700.0 kHz  cell 103/108  probes 4120  eta 4 min
+Fs 10.00 B 10.00 CFO   700.0 kHz  cell 104/108  probes 4160  eta 3 min
+Fs 10.00 B  1.25 CFO   800.0 kHz  cell 105/108  probes 4200  eta 2 min
+Fs 10.00 B  2.50 CFO   800.0 kHz  cell 106/108  probes 4240  eta 1 min
+Fs 10.00 B  5.00 CFO   800.0 kHz  cell 107/108  probes 4280  eta 1 min
+Fs 10.00 B 10.00 CFO   800.0 kHz  cell 108/108  probes 4320  eta 0 min
+radio rested: manual gain, 2.5 MS/s, 2.5 MHz, TX at -89.75 dB

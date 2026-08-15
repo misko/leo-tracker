@@ -80,6 +80,8 @@ and scored entries are skipped, so an interrupted run resumes.
   --score-workers N     parallel scorers (default: cores/3, because each
                         scoring process is 3 OpenMP threads)
   --limit N             sweeps to import this pass
+  --stratify            spread those N across the whole capture window
+                        instead of taking the earliest N
   --score-limit N       entries to score this pass
   --import-only         import and stop
   --score-only          score what is already imported
@@ -94,6 +96,7 @@ corpus_root=""
 import_workers=""
 score_workers=""
 limit=""
+stratify=0
 score_limit=""
 do_import=1
 do_score=1
@@ -107,6 +110,7 @@ while (( $# )); do
     --import-workers) import_workers="${2:-}"; shift 2 ;;
     --score-workers)  score_workers="${2:-}"; shift 2 ;;
     --limit)          limit="${2:-}"; shift 2 ;;
+    --stratify)       stratify=1; shift ;;
     --score-limit)    score_limit="${2:-}"; shift 2 ;;
     --import-only)    do_score=0; shift ;;
     --score-only)     do_import=0; shift ;;
@@ -277,6 +281,7 @@ PY
   }
   dealt=0
   done_already=0
+  pending=()
   for sweep in "${sweep_root}"/sync-*/; do
     [[ -f "${sweep}sweep.json" ]] || continue
     # Skip what is already imported BEFORE the limit is spent on it. --limit N
@@ -288,7 +293,41 @@ PY
       done_already=$(( done_already + 1 ))
       continue
     fi
-    printf '%s\n' "${sweep%/}" >> "${shard_root}/import-$(( dealt % import_workers )).list"
+    pending+=( "${sweep%/}" )
+  done
+
+  # Sweep directories are named sync-<UTC>, so the glob above is chronological
+  # and a bounded pass takes the EARLIEST N. That is how the scored corpus
+  # became a contiguous six-hour block of a single day while looking like a
+  # sample of the campaign: every absolute rate measured on it is a property of
+  # that stretch of sky rather than of the sky. --stratify spends the same
+  # budget on an evenly spaced subset of the whole window instead.
+  if (( stratify )) && [[ -n "${limit}" ]] && (( ${#pending[@]} > limit )); then
+    mapfile -t pending < <(
+      printf '%s\n' "${pending[@]}" |
+      nice -n "${niceness}" awk -v want="${limit}" '
+        { line[NR] = $0 }
+        END {
+          if (NR <= want) { for (i = 1; i <= NR; i++) print line[i]; exit }
+          # want == 1 would divide by zero below and deal nothing at all, which
+          # looks exactly like a finished corpus. One sweep from the middle is
+          # the honest answer to "give me one spread across the window".
+          if (want == 1) { print line[int((NR + 1) / 2)]; exit }
+          # Evenly spaced by position, which is evenly spaced in time only if
+          # the capture cadence was steady. It was not -- arms differ several
+          # fold in duration -- so this spreads the SAMPLE, and the report must
+          # not claim it spreads the CLOCK. Stated here rather than assumed.
+          for (i = 0; i < want; i++) {
+            idx = int(i * (NR - 1) / (want - 1)) + 1
+            if (idx != last) print line[idx]
+            last = idx
+          }
+        }')
+    echo "stratified: ${#pending[@]} sweeps spread across the window, not the earliest ${limit}"
+  fi
+
+  for sweep in "${pending[@]}"; do
+    printf '%s\n' "${sweep}" >> "${shard_root}/import-$(( dealt % import_workers )).list"
     dealt=$(( dealt + 1 ))
     if [[ -n "${limit}" ]] && (( dealt >= limit )); then break; fi
   done

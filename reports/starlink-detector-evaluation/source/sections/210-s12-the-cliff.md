@@ -1,9 +1,19 @@
 ## 12. What the cliff actually is
 
-[Section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
-established by injection that the {{s12_edge_350}}–{{s12_edge_400}} kHz collapse is not the detectors,
-the banks, the search span or the analogue filter. That left the sky, the LNBs,
-or the offset estimation. It is the third, and it is not what it looks like.
+[Section 11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit)
+established by injection that the {{s12_edge_350}}–{{s12_edge_400}} kHz collapse
+is not an intrinsic limit of the detectors or of the hardware: at a *known*
+imposed offset they run straight through it. That experiment used one bank, so
+it could not separate a detector limit from that bank's own geometry — and its
+50% crossing landed on that bank's span, which in hindsight was the answer
+rather than a coincidence.
+
+This section asks what the sky feature is on the sky's own axis. The short
+version, which took two more experiments to reach: its **centre** is each
+receiver's oscillator error, and its **width** is the search bank's span. Both
+are measured below and in
+[section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs).
+Neither is the analogue filter, and neither is a property of the detectors.
 
 **The obvious suspicion was wrong.** Since the banks search *raw* offset about
 each receiver's LO while the cliff is plotted on a *bias-corrected* axis, the
@@ -147,11 +157,21 @@ axis is known by construction:
 | `coarse-A` (3×8, ±{{s12_cb_span_A}}) — **the deployed front end** | — | **350–400 kHz in 4 cells, 400–450 in the other 8** |
 | `full-frame-full` on `coarse-E` (13×8, ±{{s12_cb_span_E}}) | — | **810–840 kHz in 12 of 12** |
 
+*These are **score knees**, not Pd crossings, and the distinction is
+deliberate. At this drive the continuous statistic collapses by a factor of
+seventeen while still clearing a 1% threshold, so a thresholded Pd reports no
+cliff anywhere in the matrix. Plotting Pd would have hidden the effect
+entirely; the threshold-near arm is where a detection-probability cliff is the
+right description.*
+
 **The predicted edges sweep by a factor of sixteen. The measured knees do not
-move.** And each lands on its own bank's span plus the ±113.6 kHz window
-`survey_scoring` documents as the range in which every relative-phase statistic
-is unique: 300 + 113.6 = 413.6, and 700 + 113.6 = 813.6. Swap the bank and the
-cliff moves to the new bank's span.
+move.** And each lands on its own bank's span plus that bank's own
+relative-phase shoulder — the range over which the phase statistics stay
+unique, which is **not** the same number for the two banks:
+{{s12_cb_span_A}} + {{s12_shoulder_A}} = **{{s12_knee_pred_A}}** against a
+measured 350–450, and {{s12_cb_span_E}} + {{s12_shoulder_E}} =
+**{{s12_knee_pred_E}}** against a measured 810–840. Swap the bank and the cliff
+moves to the new bank's span.
 
 The falsifier was fixed before the data was taken. `Fs =
 {{s12_cb_wide_fast_fs}} MS/s` with a measured corner at

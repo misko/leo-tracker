@@ -518,5 +518,31 @@
     "src": "figures/injection/cfo-bandwidth.json",
     "ptr": "/measured_edge_per_cell/8/predicted_digital_edge_hz",
     "fmt": "khz1"
+  },
+  "s12_shoulder_A": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_shoulder_hz/coarse-A",
+    "fmt": "khz1"
+  },
+  "s12_shoulder_E": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_shoulder_hz/coarse-E",
+    "fmt": "khz1"
+  },
+  "s12_knee_pred_A": {
+    "expr": "span + shoulder",
+    "fmt": "khz1",
+    "inputs": {
+      "span": "s12_cb_span_A",
+      "shoulder": "s12_shoulder_A"
+    }
+  },
+  "s12_knee_pred_E": {
+    "expr": "span + shoulder",
+    "fmt": "khz1",
+    "inputs": {
+      "span": "s12_cb_span_E",
+      "shoulder": "s12_shoulder_E"
+    }
   }
 }

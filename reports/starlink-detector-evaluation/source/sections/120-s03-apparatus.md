@@ -2,7 +2,8 @@
 
 One collector process opens both Plutos and runs one thread per radio, with a
 `threading.Barrier` at every tuning — eight tunings per sweep. Both radios
-therefore sit on the same tuning at the same instant. IQ is written straight to
+therefore sit on the same tuning **within one barrier release** — coordinated at
+the same tuning dwell, with first-sample alignment unmeasured. IQ is written straight to
 local NVMe, copied to the QNAP share in byte-for-byte verified batches, and
 `sweep.json` is written last so its presence is the commit marker.
 

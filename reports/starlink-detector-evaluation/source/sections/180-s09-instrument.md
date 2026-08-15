@@ -7,7 +7,7 @@ detector bank being independent, and are directly actionable.
 
 > **Superseded.** This section reports the observation. Injection against a
 > *known* imposed offset
-> ([section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search))
+> ([section 11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit))
 > shows every detector is flat straight through this band, and
 > [section 12](#12-what-the-cliff-actually-is) identifies the feature as the
 > folded far edge of a one-sided window, not a symmetric tolerance. The
@@ -30,11 +30,13 @@ Binned on that axis, `differential-32`'s detection rate collapses in the
 The pilot guard bands at those three rates are {{s09_guard_250}}, {{s09_guard_500}} and
 {{s09_guard_1000}} kHz — a **{{s09_guard_spread}}x range** — and the cliff does not move. That rules the
 guard band out. What is left is a detection cliff near {{s09_edge_350}}–{{s09_edge_400}} kHz of corrected offset — **since shown by
-injection not to be a detector tolerance at all, see
-[section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)**
-whose mechanism is open: the survey scorer's own bank spans ±{{s09_survey_bank_khz}} kHz, and the
-narrower constant elsewhere in the codebase belongs to the acquisition path,
-which this scoring path does not use.
+injection not to be a detector tolerance at all
+([11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit)),
+and since measured to be the deployed coarse bank's own search span
+([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs))**. The
+guess recorded here when the mechanism was open — that it belonged to the
+survey scorer's ±{{s09_survey_bank_khz}} kHz bank rather than to the narrower
+acquisition-path constant — had the right kind of cause and the wrong bank.
 
 The cliff is robust to disaggregation. All nine (rate, probe length) cells
 collapse in the same bin — {{s09_robust_250_80_before}}% to {{s09_robust_250_80_after}}% at {{s09_rate_250}} MS/s / {{s09_probe_80}} ms, down to {{s09_robust_1000_640_before}}% to
@@ -126,7 +128,7 @@ the tidy one.*
 
 | Finding | The number it rests on | Status |
 |---|---|---|
-| ~~A rate-independent ~{{s09_edge_350}} kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the {{s09_edge_350}}–{{s09_edge_400}} kHz bin at {{s09_rate_250}}, {{s09_rate_500}} and {{s09_rate_1000_int}} MS/s, in all nine (rate, probe) cells, while the guard moves {{s09_guard_spread}}x | **stands**; mechanism **now measured** — the coarse bank's own search span, not bandwidth ([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) |
+| ~~A rate-independent ~{{s09_edge_350}} kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit), [12](#12-what-the-cliff-actually-is))** | collapse in the {{s09_edge_350}}–{{s09_edge_400}} kHz bin at {{s09_rate_250}}, {{s09_rate_500}} and {{s09_rate_1000_int}} MS/s, in all nine (rate, probe) cells, while the guard moves {{s09_guard_spread}}x | **stands**; mechanism **now measured** — the coarse bank's own search span, not bandwidth ([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) |
 | ~~`lnb-c` needs a {{s09_lnbc_applied_khz}} configured centre correction~~ **superseded — {{s09_lnbc_applied_khz}} is itself {{s09_lnbc_too_high_khz}} too high and costs {{s09_lnbc_lost}} of its detections ([16c](#16c-miscentring-costs-detections-and-this-is-measured-not-modelled))** | its measured absolute centre is **{{s09_lnbc_measured_centre}}**; the direction of the original finding — `lnb-c` needs a large positive correction, and corrected it has the highest fire rate in the slice — **stands** | **corrected value** |
 | The {{s09_rate_125}} MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a {{s09_pilot_band_mhz}} MHz band in a {{s09_rate_125}} MHz capture; guard {{s09_guard_125}}, `pilot_band_fits` false; f {{s09_axis_low_f}} on {{s09_axis_low_cells}} cells against {{s09_axis_high_f}} | **stands** |
 | The eight detectors produce highly redundant verdicts on identical IQ | phi {{s09_phi_min}}–{{s09_phi_max}} over {{s09_observations}} observations | **stands** |
@@ -136,7 +138,9 @@ the tidy one.*
 | Cross-radio beats within-radio | not shown: no committed artefact isolates a radio-boundary effect on phi | **not established** |
 
 **Takeaway.** The instrument findings are the practical payoff of this corpus:
-correct the `lnb-c` bias or widen the offset search past {{s09_edge_350}} kHz, and stop
+apply epoch-aware **per-receiver absolute centres** while preserving each
+radio's measured differential, choose the coarse search span deliberately
+against the offset population it has to reach rather than inheriting it, and stop
 pooling the {{s09_rate_125}} MS/s arm with arms whose pilot band fits.
 
 ---

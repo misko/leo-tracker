@@ -71,8 +71,14 @@ by measurement.
 
 The most useful row is the last. At 160 ms / 5 MS/s **nothing resolves at all** —
 {{s15c_pairs_160}} of {{s15_pairs_total}} pairs separate. **As probe length grows, detector
-choice stops being an operational choice.** For a survey that can afford the
-dwell, this is the finding that matters: pick any of them.
+choice may be secondary to compute and implementation cost.** For a survey that
+can afford the dwell, that is the finding that matters.
+
+*Stated as no resolved difference rather than as equivalence, deliberately.
+Failing to resolve a difference is not evidence that none exists: an
+equivalence claim needs a stated engineering margin — |ΔSNR50| < 1 dB, say —
+with simultaneous intervals falling inside it, and this experiment did not set
+one.*
 
 ![SNR50 by arm, showing the ranking is condition-dependent](figures/injection/a3-ranking-across-arms.png)
 

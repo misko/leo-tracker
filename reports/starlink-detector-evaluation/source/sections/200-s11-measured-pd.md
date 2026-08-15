@@ -109,7 +109,7 @@ property of this rig's shared oscillator, not of the estimator.
 *Recovered occupancy against known truth, with the across-algorithm spread on
 the same axis.*
 
-### 11c. The {{s11_sky_cliff_lo_khz}}–{{s11_sky_cliff_hi_khz}} kHz cliff is not in the detectors, the banks or the search
+### 11c. The {{s11_sky_cliff_lo_khz}}–{{s11_sky_cliff_hi_khz}} kHz cliff is not an intrinsic detector or hardware limit
 
 Injecting at a **known** imposed offset removes the circularity of plotting
 against an offset the pipeline itself estimates. At {{s11_snr_high}} dB SNR all eight hold
@@ -126,11 +126,22 @@ simply be bought with signal:
 radio reproduces this independently: per-cell detection {{s11_165_per_cell_pct}}% at every offset out
 to {{s11_165_offset_max_khz}} kHz, with one exception.
 
-**So the on-sky cliff is not a detector tolerance and not a search limit.** It
-lives in something the cable does not contain: the sky, the LNBs, or the offset
-*estimation and bias correction*, which here was never estimated. The
-`~350 kHz tolerance` framing in
+**So the on-sky cliff is not an intrinsic tolerance of the detectors or of the
+hardware.** The `~{{s11_sky_cliff_lo_khz}} kHz tolerance` framing in
 [section 9](#9-what-survives-the-instrument) is withdrawn.
+
+**But note what this experiment could and could not separate, because an
+earlier draft of this section overreached.** It ran one bank — coarse-E — so a
+detector limit and that bank's own geometry are perfectly confounded in it. The
+50% crossing landing on coarse-E's ±{{s11_bank_span_khz}} kHz span is not
+incidental to that; it is the clue. What this rules out is an *intrinsic*
+{{s11_sky_cliff_lo_khz}} kHz limit, which is real and worth having: the
+detectors sail straight through the sky's cliff at a known offset.
+
+What it does **not** rule out is search geometry, and the earlier draft claimed
+it did. [Section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+settles it by running both banks against the same signal: change the bank and
+the knee moves with it.
 
 ![Detection against imposed offset](figures/injection/offset-cliff.png)
 

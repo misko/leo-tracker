@@ -3,7 +3,7 @@
 Twelve arms cross probe length {{{s04_probe_80}}, {{s04_probe_160}}, {{s04_probe_640}}} ms with sample rate
 {{{s04_rate_125}}, {{s04_rate_250}}, {{s04_rate_500_axis}}, {{s04_rate_1000_axis}}} MS/s, drawn uniformly per sweep. Both radios take the
 same arm on most sweeps by design; the rest put two different
-configurations on the same sky at the same instant.
+configurations on the same sky within one barrier release.
 
 **The randomisation came out flat.** {{s04_matched_arm_sweeps}} of {{s04_sweeps_captured}} captured sweeps put both
 radios on the same arm — {{s04_matched_arm_pct}}. Per-arm counts run {{s04_arm_count_min}}–{{s04_arm_count_max}}
@@ -52,9 +52,16 @@ receive chain no other arm had, and its coefficients were never recorded.**
 `collect_radio` writes `sampling_frequency` and `rf_bandwidth` and reads back
 neither; the collector records neither. The arm this section already calls
 handicapped by arithmetic turns out to be handicapped a second time, by a filter
-that cannot now be reconstructed. Treat its results as indicative at best, and
-do not read the arm axis as a clean sample-rate ladder at its bottom rung.
-Values in [`figures/rate-limits.json`](figures/rate-limits.json).
+that cannot now be reconstructed.
+
+**So: do not use the historical {{s04_rate_125}} MS/s sky arm for quantitative
+cross-arm sensitivity comparisons.** It is not merely bandwidth-starved; it also
+passed through an unrecorded DSP configuration that no other arm had. The
+controlled injection result showing what {{s04_rate_125}} MS/s costs
+([15c](#15c-and-it-is-condition-dependent)) still stands, but it validates the
+pilot-band argument under *today's* filter configuration on a bench radio — not
+the historical sky chain, which cannot be reproduced. Values in
+[`figures/rate-limits.json`](figures/rate-limits.json).
 
 ![The twelve arms as a grid, with sweep counts, sample budgets and the pilot-band verdict](figures/arm-matrix.png)
 

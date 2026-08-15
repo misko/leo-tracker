@@ -109,12 +109,20 @@ low in only **{{s13_d2_reads_low}} of {{s13_d2_cases}}** cases, which is to say 
 median bias of **{{s13_d2_median_bias}}** and a worst case of **{{s13_d2_worst}}**. The direction is
 systematic, not noise.
 
-So the floors caveat is withdrawn and replaced by its opposite: with the shared
-oscillator removed, the solver **over-estimates** `d`. Published `d` values on
-the sky corpus were produced under the shared-clock-free cross-radio geometry,
-which is the configuration that over-reads here, so they should be treated as
-ceilings rather than floors — and in either case as model outputs whose sign of
-bias depends on the rig.
+So the floors caveat is withdrawn: with the shared oscillator removed, the
+solver **over-estimates** `d` *in this configuration*.
+
+**It does not follow that the sky values are ceilings, and an earlier draft of
+this section said they were.** This rig is homogeneous by construction — one
+signal strength, one arm, one pair of receivers, one occupancy, one false-alarm
+rate. The sky corpus is none of those things, and
+[section 5b](#5b-what-the-model-assumes-and-what-this-corpus-already-contradicts) is an argument for why the
+homogeneous model does not transfer to it. Carrying a bias measured here across
+that gap is exactly the move that section warns against.
+
+What stands: in the independent-radio loopback the solver reads `d` high. **No
+direction of bias is established for the heterogeneous sky estimates**, which
+remain model outputs — neither upper nor lower bounds.
 
 ![Recovered d against directly measured d](figures/injection/fig_d2_d_bias.png)
 

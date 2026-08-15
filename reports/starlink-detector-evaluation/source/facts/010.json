@@ -202,5 +202,21 @@
     "src": "figures/injection/cfo-bandwidth.json",
     "ptr": "/measured_edge_per_cell/11/measured_analog_clip_offset_hz",
     "fmt": "khz1"
+  },
+  "exec_shoulder_A": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_shoulder_hz/coarse-A",
+    "fmt": "khz1"
+  },
+  "exec_shoulder_E": {
+    "src": "figures/injection/cfo-bandwidth.json",
+    "ptr": "/geometry/coarse_shoulder_hz/coarse-E",
+    "fmt": "khz1"
+  },
+  "exec_pairable_sweeps": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/n",
+    "fmt": "int",
+    "note": "sweeps holding both radios; the rest are solo captures from the collector outage"
   }
 }

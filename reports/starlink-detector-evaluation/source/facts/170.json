@@ -667,5 +667,14 @@
     "src": "figures/edge-agreement.json",
     "ptr": "/census/frozen_at_start/scored_sidecars",
     "fmt": "int"
+  },
+  "s08_chains_now": {
+    "expr": "units / sweeps",
+    "fmt": "f0",
+    "inputs": {
+      "units": "s08_units",
+      "sweeps": "s08_paired_sweeps"
+    },
+    "note": "receiver chains behind the figure; derived so a changed population cannot leave the caption stale"
   }
 }

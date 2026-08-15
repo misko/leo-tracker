@@ -45,6 +45,7 @@
     "exec_lost_lnba",
     "exec_lost_three_ports",
     "exec_observations",
+    "exec_pairable_sweeps",
     "exec_paired_sweeps",
     "exec_phi_max",
     "exec_phi_min",
@@ -56,6 +57,8 @@
     "exec_same_channel_phi_max",
     "exec_same_channel_phi_min",
     "exec_scrambled_spread",
+    "exec_shoulder_A",
+    "exec_shoulder_E",
     "htr_collection_paused_utc",
     "htr_corpus_entries",
     "htr_corpus_scored",
@@ -571,6 +574,7 @@
     "s08_cells_total_glrt",
     "s08_cells_union",
     "s08_census_scored",
+    "s08_chains_now",
     "s08_cross_raw_glrt_published",
     "s08_cross_raw_published",
     "s08_fire_lnba",
@@ -643,7 +647,6 @@
     "s08_pair_db_phi",
     "s08_pair_sweeps",
     "s08_paired_sweeps",
-    "s08_published_receivers",
     "s08_published_units",
     "s08_radio_free",
     "s08_radio_free_ci_hi",
@@ -995,6 +998,8 @@
     "s12_if_slope_max_ppm",
     "s12_if_slope_min_ppm",
     "s12_if_term_max_khz",
+    "s12_knee_pred_A",
+    "s12_knee_pred_E",
     "s12_live_window_hi",
     "s12_live_window_lo",
     "s12_lnb_lo_ghz",
@@ -1045,6 +1050,8 @@
     "s12_precliff_lnbb_share",
     "s12_precliff_lnbd_share",
     "s12_rf_low_ghz",
+    "s12_shoulder_A",
+    "s12_shoulder_E",
     "s12_sweeps",
     "s12_target_points",
     "s12_tuner_line_khz",
@@ -1461,7 +1468,7 @@
     "s900_recheck_sweeps_added",
     "s900_rl_utc"
   ],
-  "fact_count": 1481,
+  "fact_count": 1489,
   "facts": {
     "corpus_entries_imported": {
       "defined_in": "030.json",
@@ -1926,6 +1933,15 @@
       "src": "figures/algorithm-correlation.json",
       "value": 40256
     },
+    "exec_pairable_sweeps": {
+      "defined_in": "010.json",
+      "fact": "exec_pairable_sweeps",
+      "format": "int",
+      "note": "sweeps holding both radios; the rest are solo captures from the collector outage",
+      "ptr": "/plotted_counts/imported_pairs/n",
+      "src": "figures/geometry.json",
+      "value": 6161
+    },
     "exec_paired_sweeps": {
       "defined_in": "010.json",
       "fact": "exec_paired_sweeps",
@@ -2017,6 +2033,22 @@
       "ptr": "/joins/scrambled/spread",
       "src": "figures/negative-control.json",
       "value": 0.03603808547687215
+    },
+    "exec_shoulder_A": {
+      "defined_in": "010.json",
+      "fact": "exec_shoulder_A",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_shoulder_hz/coarse-A",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 116667.0
+    },
+    "exec_shoulder_E": {
+      "defined_in": "010.json",
+      "fact": "exec_shoulder_E",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_shoulder_hz/coarse-E",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 113636.0
     },
     "htr_collection_paused_utc": {
       "defined_in": "020.json",
@@ -6996,6 +7028,33 @@
       "src": "figures/edge-agreement.json",
       "value": 2547
     },
+    "s08_chains_now": {
+      "defined_in": "170.json",
+      "expr": "units / sweeps",
+      "fact": "s08_chains_now",
+      "format": "f0",
+      "inputs": {
+        "sweeps": {
+          "defined_in": "170.json",
+          "fact": "s08_paired_sweeps",
+          "format": "int",
+          "ptr": "/census/paired_sweeps",
+          "src": "figures/channel-edge-correlation.json",
+          "value": 1258
+        },
+        "units": {
+          "defined_in": "170.json",
+          "fact": "s08_units",
+          "format": "int",
+          "note": "one receiver chain's pass over one sweep, lnb-a restored; the sidecar records n_is_identical_in_every_cell for this count",
+          "ptr": "/units_complete",
+          "src": "figures/channel-edge-correlation.json",
+          "value": 5032
+        }
+      },
+      "note": "receiver chains behind the figure; derived so a changed population cannot leave the caption stale",
+      "value": 4.0
+    },
     "s08_cross_raw_glrt_published": {
       "defined_in": "170.json",
       "fact": "s08_cross_raw_glrt_published",
@@ -7883,33 +7942,6 @@
       "ptr": "/census/paired_sweeps",
       "src": "figures/channel-edge-correlation.json",
       "value": 1258
-    },
-    "s08_published_receivers": {
-      "defined_in": "170.json",
-      "expr": "units / sweeps",
-      "fact": "s08_published_receivers",
-      "format": "f0",
-      "inputs": {
-        "sweeps": {
-          "defined_in": "170.json",
-          "fact": "s08_paired_sweeps",
-          "format": "int",
-          "ptr": "/census/paired_sweeps",
-          "src": "figures/channel-edge-correlation.json",
-          "value": 1258
-        },
-        "units": {
-          "defined_in": "170.json",
-          "fact": "s08_published_units",
-          "format": "int",
-          "note": "the figure was drawn on the published three-receiver population",
-          "ptr": "/published_with_lnb_a_excluded_and_the_unstratified_null/units_complete",
-          "src": "figures/channel-edge-correlation.json",
-          "value": 3774
-        }
-      },
-      "note": "each live receiver contributes one unit per paired sweep",
-      "value": 3.0
     },
     "s08_published_units": {
       "defined_in": "170.json",
@@ -11543,6 +11575,56 @@
       "src": "figures/injection/tle-residual.json",
       "value": 26.113988234969977
     },
+    "s12_knee_pred_A": {
+      "defined_in": "210.json",
+      "expr": "span + shoulder",
+      "fact": "s12_knee_pred_A",
+      "format": "khz1",
+      "inputs": {
+        "shoulder": {
+          "defined_in": "210.json",
+          "fact": "s12_shoulder_A",
+          "format": "khz1",
+          "ptr": "/geometry/coarse_shoulder_hz/coarse-A",
+          "src": "figures/injection/cfo-bandwidth.json",
+          "value": 116667.0
+        },
+        "span": {
+          "defined_in": "210.json",
+          "fact": "s12_cb_span_A",
+          "format": "khz1",
+          "ptr": "/geometry/coarse_span_hz/coarse-A",
+          "src": "figures/injection/cfo-bandwidth.json",
+          "value": 300000.0
+        }
+      },
+      "value": 416667.0
+    },
+    "s12_knee_pred_E": {
+      "defined_in": "210.json",
+      "expr": "span + shoulder",
+      "fact": "s12_knee_pred_E",
+      "format": "khz1",
+      "inputs": {
+        "shoulder": {
+          "defined_in": "210.json",
+          "fact": "s12_shoulder_E",
+          "format": "khz1",
+          "ptr": "/geometry/coarse_shoulder_hz/coarse-E",
+          "src": "figures/injection/cfo-bandwidth.json",
+          "value": 113636.0
+        },
+        "span": {
+          "defined_in": "210.json",
+          "fact": "s12_cb_span_E",
+          "format": "khz1",
+          "ptr": "/geometry/coarse_span_hz/coarse-E",
+          "src": "figures/injection/cfo-bandwidth.json",
+          "value": 700000.0
+        }
+      },
+      "value": 813636.0
+    },
     "s12_live_window_hi": {
       "defined_in": "210.json",
       "fact": "s12_live_window_hi",
@@ -12133,6 +12215,22 @@
       "ptr": "/by_tuning/lnb-d|gen2/rows/0/rf_ghz",
       "src": "figures/injection/tle-residual.json",
       "value": 10.7096875
+    },
+    "s12_shoulder_A": {
+      "defined_in": "210.json",
+      "fact": "s12_shoulder_A",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_shoulder_hz/coarse-A",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 116667.0
+    },
+    "s12_shoulder_E": {
+      "defined_in": "210.json",
+      "fact": "s12_shoulder_E",
+      "format": "khz1",
+      "ptr": "/geometry/coarse_shoulder_hz/coarse-E",
+      "src": "figures/injection/cfo-bandwidth.json",
+      "value": 113636.0
     },
     "s12_sweeps": {
       "defined_in": "210.json",
@@ -17024,6 +17122,7 @@
     "s04_rej_19f2_2083",
     "s04_rej_5d4d_125",
     "s04_rej_5d4d_2083",
+    "s08_published_receivers",
     "s12_cb_wide_slow_kneeA",
     "s12_flat_offset_hz",
     "s12_flat_offset_khz",

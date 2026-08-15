@@ -33,7 +33,8 @@ That is the mechanism behind
 [section 6](#6-did-it-work-the-negative-controls). Near-duplicate detectors are
 **obliged** to return near-identical `f` whatever they are fed, including inputs
 where the model being validated is known to be false. The consistency check was
-never testing the model; it was testing whether eight copies of one statistic
+never testing the model; it was testing whether eight highly redundant decision
+rules over the same IQ
 agree with each other, and they do.
 
 ![Pairwise phi between the eight detectors on the same observations](figures/algorithm-correlation.png)

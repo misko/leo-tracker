@@ -4,12 +4,13 @@ Eight algorithms were built to decide whether a Starlink downlink channel is
 lit, by looking for the eight known pilot subcarriers at the channel's band
 edge. To rank them you need ground truth. Nothing is injected at this site, so
 there is none, and the substitute chosen was two independent radios watching the
-same channel at the same instant: if both fire more often than chance, something
+same channel within one barrier release: if both fire more often than chance, something
 was there, and a coincidence model turns the three counted rates into a sky
 occupancy `f` and a per-chain detection probability `d`.
 
 Two radios were driven from one process with a barrier at every tuning. {{exec_paired_sweeps}}
-paired sweeps were captured, shipped byte-verified, imported, and scored. That
+synchronised sweep **attempts** were captured, shipped byte-verified, imported
+and scored, of which {{exec_pairable_sweeps}} contain both radios and are pairable. That
 part works and is documented in
 [section 3](#3-the-apparatus-two-radios-one-instant).
 
@@ -67,7 +68,8 @@ they cannot, because the capture path writes one equal to the other. Across
 {{exec_cb_cells}} cells the measured analog corner sweeps {{exec_cb_clip_lo}} to
 {{exec_cb_clip_hi}} and the predicted digital edge sweeps thirteenfold, while
 **the measured knee does not move at all**: it sits at each search bank's own
-span plus the ±113.6 kHz window inside which the relative-phase statistics are
+span plus that bank's own relative-phase shoulder ({{exec_shoulder_A}} and
+{{exec_shoulder_E}} respectively) inside which the phase statistics stay
 unique. Change the bank and the cliff moves with it; change the bandwidth by a
 factor of sixteen and it does not. The received-power control shows the filter
 demonstrably cutting where the score does not follow. So the collapse is

@@ -122,12 +122,20 @@ directory because a timer rewrites it — resolves through `receiver_centers()` 
 | `lnb-d` | {{s16d_lnbd_applied}} | {{s16a_lnbd_gen2_centre}} | **{{s16d_lnbd_miscentred}}** |
 | `lnb-a` | {{s16d_lnba_applied}} | {{s16a_lnba_gen2_centre}} | **{{s16d_lnba_miscentred}}** |
 
-`lnb-c` and `lnb-a` sit essentially on top of a measured contrast above, so their
-losses are read off directly rather than extrapolated: about
-{{s16c_lnbc_gen2_lost}} and {{s16c_lnba_epochmove_lost}}. `lnb-b` and `lnb-d`
-fall between that first row and zero. What is measured is that three healthy
-receivers are each paying roughly a quarter of their yield as a tax nobody
-noticed, because they still detect.
+Two of these are **directly measured** and two are **not**, and the difference
+matters:
+
+| Port | Basis |
+|---|---|
+| `lnb-c` | **measured** — its miscentring sits on top of the {{s16c_lnbc_gen2_miscentring}} contrast above, loss ≈ {{s16c_lnbc_gen2_lost}} |
+| `lnb-a` | **measured** — sits on the {{s16c_lnba_epochmove_miscentring}} contrast, loss ≈ {{s16c_lnba_epochmove_lost}} |
+| `lnb-b` | *estimated* from the measured miscentring response; no contrast exists at its offset |
+| `lnb-d` | *estimated* likewise |
+
+`lnb-b` and `lnb-d` fall between the first contrast and zero, so their loss is
+read off a response curve rather than off a control. Calling all four "roughly a
+quarter" would present an interpolation as a measurement, which is the habit
+this report has been correcting throughout.
 
 The survey and corpus paths do not lose detections to this, because their coarse
 bank is fixed about raw zero and is never steered by `receiver_centers`. That

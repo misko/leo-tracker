@@ -31,12 +31,13 @@ Eight algorithms were built to decide whether a Starlink downlink channel is
 lit, by looking for the eight known pilot subcarriers at the channel's band
 edge. To rank them you need ground truth. Nothing is injected at this site, so
 there is none, and the substitute chosen was two independent radios watching the
-same channel at the same instant: if both fire more often than chance, something
+same channel within one barrier release: if both fire more often than chance, something
 was there, and a coincidence model turns the three counted rates into a sky
 occupancy `f` and a per-chain detection probability `d`.
 
 Two radios were driven from one process with a barrier at every tuning. 7,054
-paired sweeps were captured, shipped byte-verified, imported, and scored. That
+synchronised sweep **attempts** were captured, shipped byte-verified, imported
+and scored, of which 6,161 contain both radios and are pairable. That
 part works and is documented in
 [section 3](#3-the-apparatus-two-radios-one-instant).
 
@@ -94,7 +95,8 @@ they cannot, because the capture path writes one equal to the other. Across
 432 cells the measured analog corner sweeps −241.3 kHz to
 3805.6 kHz and the predicted digital edge sweeps thirteenfold, while
 **the measured knee does not move at all**: it sits at each search bank's own
-span plus the ±113.6 kHz window inside which the relative-phase statistics are
+span plus that bank's own relative-phase shoulder (116.7 kHz and
+113.6 kHz respectively) inside which the phase statistics stay
 unique. Change the bank and the cliff moves with it; change the bandwidth by a
 factor of sixteen and it does not. The received-power control shows the filter
 demonstrably cutting where the score does not follow. So the collapse is
@@ -348,7 +350,8 @@ site has is a second radio.
 
 One collector process opens both Plutos and runs one thread per radio, with a
 `threading.Barrier` at every tuning — eight tunings per sweep. Both radios
-therefore sit on the same tuning at the same instant. IQ is written straight to
+therefore sit on the same tuning **within one barrier release** — coordinated at
+the same tuning dwell, with first-sample alignment unmeasured. IQ is written straight to
 local NVMe, copied to the QNAP share in byte-for-byte verified batches, and
 `sweep.json` is written last so its presence is the commit marker.
 
@@ -417,7 +420,7 @@ experiment was built to compare.
 Twelve arms cross probe length {80, 160, 640} ms with sample rate
 {1.25, 2.5, 5.0, 10.0} MS/s, drawn uniformly per sweep. Both radios take the
 same arm on most sweeps by design; the rest put two different
-configurations on the same sky at the same instant.
+configurations on the same sky within one barrier release.
 
 **The randomisation came out flat.** 6,364 of 7,054 captured sweeps put both
 radios on the same arm — 90.2%. Per-arm counts run 508–575
@@ -466,9 +469,16 @@ receive chain no other arm had, and its coefficients were never recorded.**
 `collect_radio` writes `sampling_frequency` and `rf_bandwidth` and reads back
 neither; the collector records neither. The arm this section already calls
 handicapped by arithmetic turns out to be handicapped a second time, by a filter
-that cannot now be reconstructed. Treat its results as indicative at best, and
-do not read the arm axis as a clean sample-rate ladder at its bottom rung.
-Values in [`figures/rate-limits.json`](figures/rate-limits.json).
+that cannot now be reconstructed.
+
+**So: do not use the historical 1.25 MS/s sky arm for quantitative
+cross-arm sensitivity comparisons.** It is not merely bandwidth-starved; it also
+passed through an unrecorded DSP configuration that no other arm had. The
+controlled injection result showing what 1.25 MS/s costs
+([15c](#15c-and-it-is-condition-dependent)) still stands, but it validates the
+pilot-band argument under *today's* filter configuration on a bench radio — not
+the historical sky chain, which cannot be reproduced. Values in
+[`figures/rate-limits.json`](figures/rate-limits.json).
 
 ![The twelve arms as a grid, with sweep counts, sample budgets and the pilot-band verdict](figures/arm-matrix.png)
 
@@ -729,7 +739,8 @@ That is the mechanism behind
 [section 6](#6-did-it-work-the-negative-controls). Near-duplicate detectors are
 **obliged** to return near-identical `f` whatever they are fed, including inputs
 where the model being validated is known to be false. The consistency check was
-never testing the model; it was testing whether eight copies of one statistic
+never testing the model; it was testing whether eight highly redundant decision
+rules over the same IQ
 agree with each other, and they do.
 
 ![Pairwise phi between the eight detectors on the same observations](figures/algorithm-correlation.png)
@@ -811,15 +822,24 @@ essentially unchanged. The union dilutes rather than amplifies.
 ![Phi between all eight tunings, and the cross-channel term against channel separation](figures/channel-edge-correlation.png)
 
 ***Figure 9 — the only strong structure is a channel's own two edges.*** *phi
-between every pair of the eight tunings, on 3,774 units in every cell (1,258
-paired sweeps x 3 live receivers). Axis order was declared in advance — ch1
-lower, ch1 upper, ch2 lower, and so on — so a channel's own edges are adjacent;
-the four outlined diagonal blocks are a finding, not a layout. Fire / no-fire is
+between every pair of the eight tunings, on **5,032** units in every cell
+(1,258 paired sweeps x 4 receiver chains, `lnb-a`
+restored). Axis order was declared in advance — ch1 lower, ch1 upper, ch2 lower,
+and so on — so a channel's own edges are adjacent; the four outlined diagonal
+blocks are a finding, not a layout. Fire / no-fire is
 `cross_radio._any_method_fires`, each of the eight judged against its own
 (sample rate, probe length) threshold. Lower panel: the cross-channel term
-against channel-number distance, with the shuffled null's 99th percentile of
-abs(phi) shaded. Values in
+against channel-number distance, against the **stratified** permutation null's
+99th percentile of abs(phi) — stratified by time block, arm and receiver, which
+the earlier unstratified shuffle was not. Values in
 [`figures/channel-edge-correlation.json`](figures/channel-edge-correlation.json).*
+
+*The figure previously published here used 3,774 units and
+three receivers, `lnb-a` excluded, against that unstratified shuffle. Those
+values are kept in the sidecar under
+`published_with_lnb_a_excluded_and_the_unstratified_null` rather than deleted,
+because [section 9](#9-what-survives-the-instrument) reports figures that still
+carry that exclusion and a reader needs to be able to tell which is which.*
 
 ### 8b. Agreement varies with receiver configuration, but this design cannot say why
 
@@ -922,7 +942,7 @@ detector bank being independent, and are directly actionable.
 
 > **Superseded.** This section reports the observation. Injection against a
 > *known* imposed offset
-> ([section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search))
+> ([section 11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit))
 > shows every detector is flat straight through this band, and
 > [section 12](#12-what-the-cliff-actually-is) identifies the feature as the
 > folded far edge of a one-sided window, not a symmetric tolerance. The
@@ -945,11 +965,13 @@ Binned on that axis, `differential-32`'s detection rate collapses in the
 The pilot guard bands at those three rates are +312.5, +1562.5 and
 +4062.5 kHz — a **13x range** — and the cliff does not move. That rules the
 guard band out. What is left is a detection cliff near 350–400 kHz of corrected offset — **since shown by
-injection not to be a detector tolerance at all, see
-[section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)**
-whose mechanism is open: the survey scorer's own bank spans ±700 kHz, and the
-narrower constant elsewhere in the codebase belongs to the acquisition path,
-which this scoring path does not use.
+injection not to be a detector tolerance at all
+([11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit)),
+and since measured to be the deployed coarse bank's own search span
+([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs))**. The
+guess recorded here when the mechanism was open — that it belonged to the
+survey scorer's ±700 kHz bank rather than to the narrower
+acquisition-path constant — had the right kind of cause and the wrong bank.
 
 The cliff is robust to disaggregation. All nine (rate, probe length) cells
 collapse in the same bin — 30.2% to 4.3% at 2.5 MS/s / 80 ms, down to 9.7% to
@@ -1041,7 +1063,7 @@ the tidy one.*
 
 | Finding | The number it rests on | Status |
 |---|---|---|
-| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism **now measured** — the coarse bank's own search span, not bandwidth ([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) |
+| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism **now measured** — the coarse bank's own search span, not bandwidth ([16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)) |
 | ~~`lnb-c` needs a +604.2 kHz configured centre correction~~ **superseded — +604.2 kHz is itself 179.2 kHz too high and costs 25.5% of its detections ([16c](#16c-miscentring-costs-detections-and-this-is-measured-not-modelled))** | its measured absolute centre is **+424,990 Hz**; the direction of the original finding — `lnb-c` needs a large positive correction, and corrected it has the highest fire rate in the slice — **stands** | **corrected value** |
 | The 1.25 MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
 | The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.946 over 40,256 observations | **stands** |
@@ -1051,7 +1073,9 @@ the tidy one.*
 | Cross-radio beats within-radio | not shown: no committed artefact isolates a radio-boundary effect on phi | **not established** |
 
 **Takeaway.** The instrument findings are the practical payoff of this corpus:
-correct the `lnb-c` bias or widen the offset search past 350 kHz, and stop
+apply epoch-aware **per-receiver absolute centres** while preserving each
+radio's measured differential, choose the coarse search span deliberately
+against the offset population it has to reach rather than inheriting it, and stop
 pooling the 1.25 MS/s arm with arms whose pilot band fits.
 
 ---
@@ -1209,7 +1233,7 @@ property of this rig's shared oscillator, not of the estimator.
 *Recovered occupancy against known truth, with the across-algorithm spread on
 the same axis.*
 
-### 11c. The 350–400 kHz cliff is not in the detectors, the banks or the search
+### 11c. The 350–400 kHz cliff is not an intrinsic detector or hardware limit
 
 Injecting at a **known** imposed offset removes the circularity of plotting
 against an offset the pipeline itself estimates. At +4.7 dB SNR all eight hold
@@ -1226,11 +1250,22 @@ simply be bought with signal:
 radio reproduces this independently: per-cell detection 100% at every offset out
 to 800 kHz, with one exception.
 
-**So the on-sky cliff is not a detector tolerance and not a search limit.** It
-lives in something the cable does not contain: the sky, the LNBs, or the offset
-*estimation and bias correction*, which here was never estimated. The
-`~350 kHz tolerance` framing in
+**So the on-sky cliff is not an intrinsic tolerance of the detectors or of the
+hardware.** The `~350 kHz tolerance` framing in
 [section 9](#9-what-survives-the-instrument) is withdrawn.
+
+**But note what this experiment could and could not separate, because an
+earlier draft of this section overreached.** It ran one bank — coarse-E — so a
+detector limit and that bank's own geometry are perfectly confounded in it. The
+50% crossing landing on coarse-E's ±700 kHz span is not
+incidental to that; it is the clue. What this rules out is an *intrinsic*
+350 kHz limit, which is real and worth having: the
+detectors sail straight through the sky's cliff at a known offset.
+
+What it does **not** rule out is search geometry, and the earlier draft claimed
+it did. [Section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+settles it by running both banks against the same signal: change the bank and
+the knee moves with it.
 
 ![Detection against imposed offset](figures/injection/offset-cliff.png)
 
@@ -1283,10 +1318,20 @@ LNB, antenna or sky anywhere in the path.
 
 ## 12. What the cliff actually is
 
-[Section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
-established by injection that the 350–400 kHz collapse is not the detectors,
-the banks, the search span or the analogue filter. That left the sky, the LNBs,
-or the offset estimation. It is the third, and it is not what it looks like.
+[Section 11c](#11c-the-350400-khz-cliff-is-not-an-intrinsic-detector-or-hardware-limit)
+established by injection that the 350–400 kHz collapse
+is not an intrinsic limit of the detectors or of the hardware: at a *known*
+imposed offset they run straight through it. That experiment used one bank, so
+it could not separate a detector limit from that bank's own geometry — and its
+50% crossing landed on that bank's span, which in hindsight was the answer
+rather than a coincidence.
+
+This section asks what the sky feature is on the sky's own axis. The short
+version, which took two more experiments to reach: its **centre** is each
+receiver's oscillator error, and its **width** is the search bank's span. Both
+are measured below and in
+[section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs).
+Neither is the analogue filter, and neither is a property of the detectors.
 
 **The obvious suspicion was wrong.** Since the banks search *raw* offset about
 each receiver's LO while the cliff is plotted on a *bias-corrected* axis, the
@@ -1430,11 +1475,21 @@ axis is known by construction:
 | `coarse-A` (3×8, ±300.0 kHz) — **the deployed front end** | — | **350–400 kHz in 4 cells, 400–450 in the other 8** |
 | `full-frame-full` on `coarse-E` (13×8, ±700.0 kHz) | — | **810–840 kHz in 12 of 12** |
 
+*These are **score knees**, not Pd crossings, and the distinction is
+deliberate. At this drive the continuous statistic collapses by a factor of
+seventeen while still clearing a 1% threshold, so a thresholded Pd reports no
+cliff anywhere in the matrix. Plotting Pd would have hidden the effect
+entirely; the threshold-near arm is where a detection-probability cliff is the
+right description.*
+
 **The predicted edges sweep by a factor of sixteen. The measured knees do not
-move.** And each lands on its own bank's span plus the ±113.6 kHz window
-`survey_scoring` documents as the range in which every relative-phase statistic
-is unique: 300 + 113.6 = 413.6, and 700 + 113.6 = 813.6. Swap the bank and the
-cliff moves to the new bank's span.
+move.** And each lands on its own bank's span plus that bank's own
+relative-phase shoulder — the range over which the phase statistics stay
+unique, which is **not** the same number for the two banks:
+300.0 kHz + 116.7 kHz = **416.7 kHz** against a
+measured 350–450, and 700.0 kHz + 113.6 kHz =
+**813.6 kHz** against a measured 810–840. Swap the bank and the cliff
+moves to the new bank's span.
 
 The falsifier was fixed before the data was taken. `Fs =
 10000000 MS/s` with a measured corner at
@@ -1566,12 +1621,20 @@ low in only **10 of 48** cases, which is to say it reads *high* in 38, with a
 median bias of **+0.0372** and a worst case of **0.277**. The direction is
 systematic, not noise.
 
-So the floors caveat is withdrawn and replaced by its opposite: with the shared
-oscillator removed, the solver **over-estimates** `d`. Published `d` values on
-the sky corpus were produced under the shared-clock-free cross-radio geometry,
-which is the configuration that over-reads here, so they should be treated as
-ceilings rather than floors — and in either case as model outputs whose sign of
-bias depends on the rig.
+So the floors caveat is withdrawn: with the shared oscillator removed, the
+solver **over-estimates** `d` *in this configuration*.
+
+**It does not follow that the sky values are ceilings, and an earlier draft of
+this section said they were.** This rig is homogeneous by construction — one
+signal strength, one arm, one pair of receivers, one occupancy, one false-alarm
+rate. The sky corpus is none of those things, and
+[section 5b](#5b-what-the-model-assumes-and-what-this-corpus-already-contradicts) is an argument for why the
+homogeneous model does not transfer to it. Carrying a bias measured here across
+that gap is exactly the move that section warns against.
+
+What stands: in the independent-radio loopback the solver reads `d` high. **No
+direction of bias is established for the heterogeneous sky estimates**, which
+remain model outputs — neither upper nor lower bounds.
 
 ![Recovered d against directly measured d](figures/injection/fig_d2_d_bias.png)
 
@@ -1749,8 +1812,14 @@ by measurement.
 
 The most useful row is the last. At 160 ms / 5 MS/s **nothing resolves at all** —
 0 of 28 pairs separate. **As probe length grows, detector
-choice stops being an operational choice.** For a survey that can afford the
-dwell, this is the finding that matters: pick any of them.
+choice may be secondary to compute and implementation cost.** For a survey that
+can afford the dwell, that is the finding that matters.
+
+*Stated as no resolved difference rather than as equivalence, deliberately.
+Failing to resolve a difference is not evidence that none exists: an
+equivalence claim needs a stated engineering margin — |ΔSNR50| < 1 dB, say —
+with simultaneous intervals falling inside it, and this experiment did not set
+one.*
 
 ![SNR50 by arm, showing the ranking is condition-dependent](figures/injection/a3-ranking-across-arms.png)
 
@@ -1885,12 +1954,20 @@ directory because a timer rewrites it — resolves through `receiver_centers()` 
 | `lnb-d` | 0 | −143,566 | **−143,566** |
 | `lnb-a` | −907 | +375,663 | **+376,569** |
 
-`lnb-c` and `lnb-a` sit essentially on top of a measured contrast above, so their
-losses are read off directly rather than extrapolated: about
-25.5% and 97.2%. `lnb-b` and `lnb-d`
-fall between that first row and zero. What is measured is that three healthy
-receivers are each paying roughly a quarter of their yield as a tax nobody
-noticed, because they still detect.
+Two of these are **directly measured** and two are **not**, and the difference
+matters:
+
+| Port | Basis |
+|---|---|
+| `lnb-c` | **measured** — its miscentring sits on top of the −179.2 kHz contrast above, loss ≈ 25.5% |
+| `lnb-a` | **measured** — sits on the +375.7 kHz contrast, loss ≈ 97.2% |
+| `lnb-b` | *estimated* from the measured miscentring response; no contrast exists at its offset |
+| `lnb-d` | *estimated* likewise |
+
+`lnb-b` and `lnb-d` fall between the first contrast and zero, so their loss is
+read off a response curve rather than off a control. Calling all four "roughly a
+quarter" would present an interpolation as a measurement, which is the habit
+this report has been correcting throughout.
 
 The survey and corpus paths do not lose detections to this, because their coarse
 bank is fixed about raw zero and is never steered by `receiver_centers`. That

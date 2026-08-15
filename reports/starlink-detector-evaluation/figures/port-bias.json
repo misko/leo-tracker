@@ -1,69 +1,94 @@
 {
   "figure": "port-bias",
+  "finding": "lnb-a is shifted, not dead. With the measured gen2 centre +567402 Hz +/- 4000 Hz applied it peaks at 60.7% in the same 100-200 kHz corrected bin as lnb-b, lnb-c and lnb-d, against 1.1% in that bin on the raw axis. All four ports' signed live windows sit at -162.8..-146.3 kHz rather than at zero -- the unexplained common-mode offset of section 12.",
   "corpus": "/mnt/qnap01/mouse9911/leo/surveys/corpus/sync-*/",
   "snapshot": {
-    "measured_utc": "2026-08-14T14:55:19+00:00",
+    "measured_utc": "2026-08-14T16:01:22+00:00",
     "sweeps_on_share": 7054,
     "corpus_entries": 13215,
-    "scored_sidecars": 2339,
-    "scored_digest": "ec5505611f5f1fdf"
+    "scored_sidecars": 2547,
+    "scored_digest": "3e0d0ecdf2915ee1"
   },
   "census": {
     "sweeps_on_share": 7054,
     "corpus_entries": 13215,
-    "scored_sidecars": 2339,
-    "scored_sidecars_in_a_pair": 2292,
-    "paired_sweeps": 1146,
-    "candidate_points_read": 363004,
-    "previous_snapshot_for_comparison": {
-      "paired_sweeps": 176,
-      "scored_sidecars": 320,
-      "cells": 2464
-    }
+    "scored_sidecars": 2547,
+    "scored_sidecars_in_a_pair": 2516,
+    "paired_sweeps": 1258,
+    "candidate_points_read": 398435,
+    "snapshot_note": "the published run of this figure froze its own population (2,339 scored sidecars, digest ec5505611f5f1fdf) and that directory list was not kept. This pass uses the freeze the correlation figures use, so port-bias, Figure 9 and Figure 10 now rest on one identical population."
   },
   "method": "differential-32",
   "sample_rate_hz": 5000000.0,
   "false_alarm_rate": 0.01,
-  "excluded_receivers": [
-    "lnb-a"
-  ],
-  "dead_receiver_audit": {
+  "excluded_receivers": [],
+  "lnb_a": "INCLUDED",
+  "receiver_centres": {
     "lnb-a": {
-      "target_n": 60095,
-      "fire_pct": 15.52042599217905,
-      "null_n": 31030,
-      "null_median": 0.018011968845523245,
-      "null_p99": 0.08139843572356034
+      "centre_hz": 567402.0,
+      "uncertainty_hz": 4000.0,
+      "basis": "MEASURED",
+      "source": "hardware/epochs.json pluto-5d4d.lnb-a.gen2: survey path, coarse bank E (+/-700 kHz about raw zero), refined points where both ports fired, n_points 2585, n_sweeps 931",
+      "recorded_hz": 1170.0,
+      "epoch_from_utc": "2026-08-13T04:46:20Z",
+      "precision_only_ci_hz": [
+        567338,
+        567552
+      ]
     },
     "lnb-b": {
-      "target_n": 59604,
-      "fire_pct": 17.98369236963962,
-      "null_n": 31156,
-      "null_median": 0.01868908041563449,
-      "null_p99": 0.08540572598790837
+      "centre_hz": 0.0,
+      "uncertainty_hz": 0.0,
+      "basis": "RECORDED",
+      "source": "scores.json receiver_centers_hz",
+      "recorded_hz": 0.0
     },
     "lnb-c": {
-      "target_n": 59967,
-      "fire_pct": 16.173895642603433,
-      "null_n": 32318,
-      "null_median": 0.018228613057283825,
-      "null_p99": 0.08510955240193148
+      "centre_hz": 604159.8,
+      "uncertainty_hz": 0.0,
+      "basis": "RECORDED",
+      "source": "scores.json receiver_centers_hz",
+      "recorded_hz": 604159.8
     },
     "lnb-d": {
-      "target_n": 58828,
-      "fire_pct": 22.83266471748147,
-      "null_n": 30006,
-      "null_median": 0.018793943917763074,
-      "null_p99": 0.08834700904361899
+      "centre_hz": 0.0,
+      "uncertainty_hz": 0.0,
+      "basis": "RECORDED",
+      "source": "scores.json receiver_centers_hz",
+      "recorded_hz": 0.0
     }
   },
-  "dead_receiver_audit_note": "lnb-a is excluded because cross_radio.DEAD_RECEIVERS says it reads 'flat ~1.19 at every tuning since 04:44 UTC'. On differential-32 this corpus shows lnb-a firing and nulling like the live ports; the exclusion is followed here but is not reproduced by the data.",
-  "receiver_centre_khz": {
-    "lnb-b": 0.0,
-    "lnb-c": 604.1598,
-    "lnb-d": 0.0,
-    "lnb-a": 1.17
+  "dead_receiver_audit": {
+    "lnb-a": {
+      "target_n": 65948,
+      "fire_pct": 15.8154909929035,
+      "null_n": 34186,
+      "null_median": 0.018041783772149177,
+      "null_p99": 0.08354842643245944
+    },
+    "lnb-b": {
+      "target_n": 65420,
+      "fire_pct": 18.214613268113727,
+      "null_n": 34083,
+      "null_median": 0.018700565183388536,
+      "null_p99": 0.08558721118154988
+    },
+    "lnb-c": {
+      "target_n": 65814,
+      "fire_pct": 16.51320387759443,
+      "null_n": 35262,
+      "null_median": 0.01842803267066412,
+      "null_p99": 0.08527513905803034
+    },
+    "lnb-d": {
+      "target_n": 64565,
+      "fire_pct": 23.136374196546118,
+      "null_n": 33157,
+      "null_median": 0.01886821261782918,
+      "null_p99": 0.08853436876271066
+    }
   },
+  "dead_receiver_audit_note": "lnb-a was excluded because cross_radio.DEAD_RECEIVERS reads 'flat ~1.19 at every tuning since 04:44 UTC'. That instant is the LO move recorded in hardware/epochs.json, not a dead port: on differential-32 this corpus shows lnb-a firing and nulling like the live ports once its measured centre is applied.",
   "bin_edges_khz": [
     0.0,
     100.0,
@@ -75,75 +100,105 @@
     1000.0,
     1500.0
   ],
+  "signed_bin_edges_khz": [
+    -450.0,
+    -400.0,
+    -350.0,
+    -300.0,
+    -250.0,
+    -200.0,
+    -150.0,
+    -100.0,
+    -50.0,
+    0.0,
+    50.0,
+    100.0,
+    150.0,
+    200.0,
+    250.0,
+    300.0,
+    350.0,
+    400.0,
+    450.0,
+    500.0,
+    550.0,
+    600.0,
+    650.0,
+    700.0
+  ],
+  "live_window_khz": [
+    -350.0,
+    0.0
+  ],
   "min_bin_n_plotted": 25,
   "thresholds": {
-    "1250000Hz/80.0ms": 0.10885811212065716,
-    "1250000Hz/160.0ms": 0.09242078571237285,
-    "1250000Hz/640.0ms": 0.056460503559079084,
+    "1250000Hz/80.0ms": 0.10858084047008464,
+    "1250000Hz/160.0ms": 0.0900030037595876,
+    "1250000Hz/640.0ms": 0.057172240198084194,
     "2500000Hz/80.0ms": 0.10845687080912379,
-    "2500000Hz/160.0ms": 0.08392207178701999,
-    "2500000Hz/640.0ms": 0.04979588872336514,
-    "5000000Hz/80.0ms": 0.10377058826440116,
-    "5000000Hz/160.0ms": 0.07376516725067435,
-    "5000000Hz/640.0ms": 0.05045308714046816,
-    "10000000Hz/80.0ms": 0.10240674628732356,
-    "10000000Hz/160.0ms": 0.08365347685037482,
-    "10000000Hz/640.0ms": 0.045545555569027195
+    "2500000Hz/160.0ms": 0.08014986481687313,
+    "2500000Hz/640.0ms": 0.05200521232962518,
+    "5000000Hz/80.0ms": 0.10290209498900138,
+    "5000000Hz/160.0ms": 0.07229114332081008,
+    "5000000Hz/640.0ms": 0.049861359385764005,
+    "10000000Hz/80.0ms": 0.10397291509123367,
+    "10000000Hz/160.0ms": 0.08213065532357161,
+    "10000000Hz/640.0ms": 0.04580536430020398
   },
   "raw_axis": {
-    "lnb-b": [
+    "lnb-a": [
       {
         "low_khz": 0.0,
         "high_khz": 100.0,
         "mid_khz": 50.0,
-        "n": 3240,
-        "fired": 641,
-        "rate_pct": 19.78395061728395,
+        "n": 3114,
+        "fired": 19,
+        "rate_pct": 0.6101477199743096,
         "plotted": true
       },
       {
         "low_khz": 100.0,
         "high_khz": 200.0,
         "mid_khz": 150.0,
-        "n": 4791,
-        "fired": 2099,
-        "rate_pct": 43.8113128783135,
+        "n": 2632,
+        "fired": 29,
+        "rate_pct": 1.1018237082066868,
         "plotted": true
       },
       {
         "low_khz": 200.0,
         "high_khz": 300.0,
         "mid_khz": 250.0,
-        "n": 2864,
-        "fired": 842,
-        "rate_pct": 29.399441340782122,
+        "n": 2183,
+        "fired": 60,
+        "rate_pct": 2.7485112230874944,
         "plotted": true
       },
       {
         "low_khz": 300.0,
         "high_khz": 400.0,
         "mid_khz": 350.0,
-        "n": 2877,
-        "fired": 289,
-        "rate_pct": 10.045185957594716,
+        "n": 5219,
+        "fired": 1886,
+        "rate_pct": 36.137191032764896,
         "plotted": true
       },
       {
         "low_khz": 400.0,
         "high_khz": 500.0,
         "mid_khz": 450.0,
-        "n": 1001,
-        "fired": 9,
-        "rate_pct": 0.8991008991008991,
+        "n": 3142,
+        "fired": 1694,
+        "rate_pct": 53.91470401018459,
         "plotted": true
       },
       {
         "low_khz": 500.0,
         "high_khz": 700.0,
         "mid_khz": 600.0,
-        "n": 1089,
-        "fired": 6,
-        "rate_pct": 0.5509641873278237,
+        "n": 1182,
+        "fired": 158,
+        "rate_pct": 13.367174280879865,
         "plotted": true
       },
       {
@@ -151,8 +206,82 @@
         "high_khz": 1000.0,
         "mid_khz": 850.0,
         "n": 427,
+        "fired": 11,
+        "rate_pct": 2.576112412177986,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-b": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 3510,
+        "fired": 700,
+        "rate_pct": 19.943019943019944,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 5216,
+        "fired": 2285,
+        "rate_pct": 43.80751533742331,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 3165,
+        "fired": 932,
+        "rate_pct": 29.447077409162716,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 3140,
+        "fired": 313,
+        "rate_pct": 9.968152866242038,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 1059,
+        "fired": 11,
+        "rate_pct": 1.0387157695939566,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1195,
+        "fired": 6,
+        "rate_pct": 0.502092050209205,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 448,
         "fired": 5,
-        "rate_pct": 1.17096018735363,
+        "rate_pct": 1.1160714285714286,
         "plotted": true
       },
       {
@@ -170,63 +299,63 @@
         "low_khz": 0.0,
         "high_khz": 100.0,
         "mid_khz": 50.0,
-        "n": 2535,
-        "fired": 14,
-        "rate_pct": 0.5522682445759369,
+        "n": 2822,
+        "fired": 15,
+        "rate_pct": 0.5315379163713678,
         "plotted": true
       },
       {
         "low_khz": 100.0,
         "high_khz": 200.0,
         "mid_khz": 150.0,
-        "n": 2050,
-        "fired": 30,
-        "rate_pct": 1.4634146341463414,
+        "n": 2227,
+        "fired": 33,
+        "rate_pct": 1.481814099685676,
         "plotted": true
       },
       {
         "low_khz": 200.0,
         "high_khz": 300.0,
         "mid_khz": 250.0,
-        "n": 1719,
-        "fired": 28,
-        "rate_pct": 1.6288539848749273,
+        "n": 1903,
+        "fired": 36,
+        "rate_pct": 1.8917498686284813,
         "plotted": true
       },
       {
         "low_khz": 300.0,
         "high_khz": 400.0,
         "mid_khz": 350.0,
-        "n": 3687,
-        "fired": 913,
-        "rate_pct": 24.76267968538107,
+        "n": 4101,
+        "fired": 1076,
+        "rate_pct": 26.237503048037063,
         "plotted": true
       },
       {
         "low_khz": 400.0,
         "high_khz": 500.0,
         "mid_khz": 450.0,
-        "n": 3619,
-        "fired": 2208,
-        "rate_pct": 61.01132909643548,
+        "n": 3903,
+        "fired": 2397,
+        "rate_pct": 61.414296694850115,
         "plotted": true
       },
       {
         "low_khz": 500.0,
         "high_khz": 700.0,
         "mid_khz": 600.0,
-        "n": 1861,
-        "fired": 527,
-        "rate_pct": 28.31810854379366,
+        "n": 1991,
+        "fired": 566,
+        "rate_pct": 28.427925665494726,
         "plotted": true
       },
       {
         "low_khz": 700.0,
         "high_khz": 1000.0,
         "mid_khz": 850.0,
-        "n": 849,
-        "fired": 19,
-        "rate_pct": 2.237926972909305,
+        "n": 918,
+        "fired": 20,
+        "rate_pct": 2.178649237472767,
         "plotted": true
       },
       {
@@ -244,63 +373,63 @@
         "low_khz": 0.0,
         "high_khz": 100.0,
         "mid_khz": 50.0,
-        "n": 3157,
-        "fired": 1016,
-        "rate_pct": 32.182451694646815,
+        "n": 3412,
+        "fired": 1091,
+        "rate_pct": 31.97538100820633,
         "plotted": true
       },
       {
         "low_khz": 100.0,
         "high_khz": 200.0,
         "mid_khz": 150.0,
-        "n": 4817,
-        "fired": 2470,
-        "rate_pct": 51.276728254100064,
+        "n": 5265,
+        "fired": 2686,
+        "rate_pct": 51.016144349477685,
         "plotted": true
       },
       {
         "low_khz": 200.0,
         "high_khz": 300.0,
         "mid_khz": 250.0,
-        "n": 2636,
-        "fired": 916,
-        "rate_pct": 34.749620637329286,
+        "n": 2926,
+        "fired": 1052,
+        "rate_pct": 35.95352016404648,
         "plotted": true
       },
       {
         "low_khz": 300.0,
         "high_khz": 400.0,
         "mid_khz": 350.0,
-        "n": 2603,
-        "fired": 382,
-        "rate_pct": 14.675374567806378,
+        "n": 2888,
+        "fired": 442,
+        "rate_pct": 15.304709141274238,
         "plotted": true
       },
       {
         "low_khz": 400.0,
         "high_khz": 500.0,
         "mid_khz": 450.0,
-        "n": 724,
-        "fired": 12,
-        "rate_pct": 1.6574585635359116,
+        "n": 783,
+        "fired": 16,
+        "rate_pct": 2.0434227330779056,
         "plotted": true
       },
       {
         "low_khz": 500.0,
         "high_khz": 700.0,
         "mid_khz": 600.0,
-        "n": 1271,
-        "fired": 4,
-        "rate_pct": 0.3147128245476003,
+        "n": 1375,
+        "fired": 5,
+        "rate_pct": 0.36363636363636365,
         "plotted": true
       },
       {
         "low_khz": 700.0,
         "high_khz": 1000.0,
         "mid_khz": 850.0,
-        "n": 749,
+        "n": 810,
         "fired": 13,
-        "rate_pct": 1.7356475300400533,
+        "rate_pct": 1.6049382716049383,
         "plotted": true
       },
       {
@@ -315,68 +444,142 @@
     ]
   },
   "corrected_axis": {
-    "lnb-b": [
+    "lnb-a": [
       {
         "low_khz": 0.0,
         "high_khz": 100.0,
         "mid_khz": 50.0,
-        "n": 3240,
-        "fired": 641,
-        "rate_pct": 19.78395061728395,
+        "n": 1009,
+        "fired": 400,
+        "rate_pct": 39.64321110009911,
         "plotted": true
       },
       {
         "low_khz": 100.0,
         "high_khz": 200.0,
         "mid_khz": 150.0,
-        "n": 4791,
-        "fired": 2099,
-        "rate_pct": 43.8113128783135,
+        "n": 3160,
+        "fired": 1917,
+        "rate_pct": 60.664556962025316,
         "plotted": true
       },
       {
         "low_khz": 200.0,
         "high_khz": 300.0,
         "mid_khz": 250.0,
-        "n": 2864,
-        "fired": 842,
-        "rate_pct": 29.399441340782122,
+        "n": 3481,
+        "fired": 1437,
+        "rate_pct": 41.28124102269463,
         "plotted": true
       },
       {
         "low_khz": 300.0,
         "high_khz": 400.0,
         "mid_khz": 350.0,
-        "n": 2877,
-        "fired": 289,
-        "rate_pct": 10.045185957594716,
+        "n": 1113,
+        "fired": 25,
+        "rate_pct": 2.2461814914645104,
         "plotted": true
       },
       {
         "low_khz": 400.0,
         "high_khz": 500.0,
         "mid_khz": 450.0,
-        "n": 1001,
-        "fired": 9,
-        "rate_pct": 0.8991008991008991,
+        "n": 1287,
+        "fired": 12,
+        "rate_pct": 0.9324009324009324,
         "plotted": true
       },
       {
         "low_khz": 500.0,
         "high_khz": 700.0,
         "mid_khz": 600.0,
-        "n": 1089,
-        "fired": 6,
-        "rate_pct": 0.5509641873278237,
+        "n": 3628,
+        "fired": 36,
+        "rate_pct": 0.9922822491730982,
         "plotted": true
       },
       {
         "low_khz": 700.0,
         "high_khz": 1000.0,
         "mid_khz": 850.0,
-        "n": 427,
+        "n": 3230,
+        "fired": 20,
+        "rate_pct": 0.6191950464396285,
+        "plotted": true
+      },
+      {
+        "low_khz": 1000.0,
+        "high_khz": 1500.0,
+        "mid_khz": 1250.0,
+        "n": 991,
+        "fired": 10,
+        "rate_pct": 1.0090817356205852,
+        "plotted": true
+      }
+    ],
+    "lnb-b": [
+      {
+        "low_khz": 0.0,
+        "high_khz": 100.0,
+        "mid_khz": 50.0,
+        "n": 3510,
+        "fired": 700,
+        "rate_pct": 19.943019943019944,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 200.0,
+        "mid_khz": 150.0,
+        "n": 5216,
+        "fired": 2285,
+        "rate_pct": 43.80751533742331,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 300.0,
+        "mid_khz": 250.0,
+        "n": 3165,
+        "fired": 932,
+        "rate_pct": 29.447077409162716,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 400.0,
+        "mid_khz": 350.0,
+        "n": 3140,
+        "fired": 313,
+        "rate_pct": 9.968152866242038,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 500.0,
+        "mid_khz": 450.0,
+        "n": 1059,
+        "fired": 11,
+        "rate_pct": 1.0387157695939566,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 700.0,
+        "mid_khz": 600.0,
+        "n": 1195,
+        "fired": 6,
+        "rate_pct": 0.502092050209205,
+        "plotted": true
+      },
+      {
+        "low_khz": 700.0,
+        "high_khz": 1000.0,
+        "mid_khz": 850.0,
+        "n": 448,
         "fired": 5,
-        "rate_pct": 1.17096018735363,
+        "rate_pct": 1.1160714285714286,
         "plotted": true
       },
       {
@@ -394,72 +597,72 @@
         "low_khz": 0.0,
         "high_khz": 100.0,
         "mid_khz": 50.0,
-        "n": 1627,
-        "fired": 481,
-        "rate_pct": 29.563614013521818,
+        "n": 1767,
+        "fired": 521,
+        "rate_pct": 29.485002829654782,
         "plotted": true
       },
       {
         "low_khz": 100.0,
         "high_khz": 200.0,
         "mid_khz": 150.0,
-        "n": 3352,
-        "fired": 2208,
-        "rate_pct": 65.87112171837708,
+        "n": 3650,
+        "fired": 2397,
+        "rate_pct": 65.67123287671232,
         "plotted": true
       },
       {
         "low_khz": 200.0,
         "high_khz": 300.0,
         "mid_khz": 250.0,
-        "n": 1357,
-        "fired": 688,
-        "rate_pct": 50.700073691967575,
+        "n": 1573,
+        "fired": 812,
+        "rate_pct": 51.621106166560715,
         "plotted": true
       },
       {
         "low_khz": 300.0,
         "high_khz": 400.0,
         "mid_khz": 350.0,
-        "n": 1782,
-        "fired": 289,
-        "rate_pct": 16.217732884399553,
+        "n": 1967,
+        "fired": 334,
+        "rate_pct": 16.980172852058974,
         "plotted": true
       },
       {
         "low_khz": 400.0,
         "high_khz": 500.0,
         "mid_khz": 450.0,
-        "n": 1020,
-        "fired": 17,
-        "rate_pct": 1.6666666666666667,
+        "n": 1115,
+        "fired": 20,
+        "rate_pct": 1.7937219730941705,
         "plotted": true
       },
       {
         "low_khz": 500.0,
         "high_khz": 700.0,
         "mid_khz": 600.0,
-        "n": 2540,
-        "fired": 14,
-        "rate_pct": 0.5511811023622047,
+        "n": 2830,
+        "fired": 15,
+        "rate_pct": 0.5300353356890459,
         "plotted": true
       },
       {
         "low_khz": 700.0,
         "high_khz": 1000.0,
         "mid_khz": 850.0,
-        "n": 3363,
-        "fired": 24,
-        "rate_pct": 0.7136485280999108,
+        "n": 3638,
+        "fired": 26,
+        "rate_pct": 0.7146783947223749,
         "plotted": true
       },
       {
         "low_khz": 1000.0,
         "high_khz": 1500.0,
         "mid_khz": 1250.0,
-        "n": 1279,
+        "n": 1325,
         "fired": 18,
-        "rate_pct": 1.4073494917904612,
+        "rate_pct": 1.3584905660377358,
         "plotted": true
       }
     ],
@@ -468,63 +671,63 @@
         "low_khz": 0.0,
         "high_khz": 100.0,
         "mid_khz": 50.0,
-        "n": 3157,
-        "fired": 1016,
-        "rate_pct": 32.182451694646815,
+        "n": 3412,
+        "fired": 1091,
+        "rate_pct": 31.97538100820633,
         "plotted": true
       },
       {
         "low_khz": 100.0,
         "high_khz": 200.0,
         "mid_khz": 150.0,
-        "n": 4817,
-        "fired": 2470,
-        "rate_pct": 51.276728254100064,
+        "n": 5265,
+        "fired": 2686,
+        "rate_pct": 51.016144349477685,
         "plotted": true
       },
       {
         "low_khz": 200.0,
         "high_khz": 300.0,
         "mid_khz": 250.0,
-        "n": 2636,
-        "fired": 916,
-        "rate_pct": 34.749620637329286,
+        "n": 2926,
+        "fired": 1052,
+        "rate_pct": 35.95352016404648,
         "plotted": true
       },
       {
         "low_khz": 300.0,
         "high_khz": 400.0,
         "mid_khz": 350.0,
-        "n": 2603,
-        "fired": 382,
-        "rate_pct": 14.675374567806378,
+        "n": 2888,
+        "fired": 442,
+        "rate_pct": 15.304709141274238,
         "plotted": true
       },
       {
         "low_khz": 400.0,
         "high_khz": 500.0,
         "mid_khz": 450.0,
-        "n": 724,
-        "fired": 12,
-        "rate_pct": 1.6574585635359116,
+        "n": 783,
+        "fired": 16,
+        "rate_pct": 2.0434227330779056,
         "plotted": true
       },
       {
         "low_khz": 500.0,
         "high_khz": 700.0,
         "mid_khz": 600.0,
-        "n": 1271,
-        "fired": 4,
-        "rate_pct": 0.3147128245476003,
+        "n": 1375,
+        "fired": 5,
+        "rate_pct": 0.36363636363636365,
         "plotted": true
       },
       {
         "low_khz": 700.0,
         "high_khz": 1000.0,
         "mid_khz": 850.0,
-        "n": 749,
+        "n": 810,
         "fired": 13,
-        "rate_pct": 1.7356475300400533,
+        "rate_pct": 1.6049382716049383,
         "plotted": true
       },
       {
@@ -538,12 +741,2054 @@
       }
     ]
   },
-  "reference_reported": {
+  "signed_axis": {
+    "lnb-a": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 373,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 372,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 741,
+        "fired": 25,
+        "rate_pct": 3.3738191632928474,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 1604,
+        "fired": 537,
+        "rate_pct": 33.4788029925187,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 1810,
+        "fired": 900,
+        "rate_pct": 49.72375690607735,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 968,
+        "fired": 749,
+        "rate_pct": 77.37603305785125,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 1908,
+        "fired": 1160,
+        "rate_pct": 60.79664570230608,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 431,
+        "fired": 316,
+        "rate_pct": 73.31786542923435,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 212,
+        "fired": 79,
+        "rate_pct": 37.264150943396224,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 246,
+        "fired": 5,
+        "rate_pct": 2.032520325203252,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 120,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 225,
+        "fired": 8,
+        "rate_pct": 3.5555555555555554,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 59,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 67,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-b": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 208,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 205,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 602,
+        "fired": 12,
+        "rate_pct": 1.9933554817275747,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 1297,
+        "fired": 364,
+        "rate_pct": 28.064764841942946,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 1935,
+        "fired": 851,
+        "rate_pct": 43.979328165374675,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 1226,
+        "fired": 810,
+        "rate_pct": 66.06851549755302,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 2873,
+        "fired": 1463,
+        "rate_pct": 50.92238078663418,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 847,
+        "fired": 418,
+        "rate_pct": 49.35064935064935,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 519,
+        "fired": 113,
+        "rate_pct": 21.772639691714836,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 1755,
+        "fired": 169,
+        "rate_pct": 9.62962962962963,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 389,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 782,
+        "fired": 12,
+        "rate_pct": 1.5345268542199488,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 335,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 654,
+        "fired": 9,
+        "rate_pct": 1.3761467889908257,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 215,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 968,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 429,
+        "fired": 9,
+        "rate_pct": 2.097902097902098,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 192,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 305,
+        "fired": 5,
+        "rate_pct": 1.639344262295082,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 143,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 318,
+        "fired": 2,
+        "rate_pct": 0.6289308176100629,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 174,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 126,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      }
+    ],
+    "lnb-c": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 328,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 585,
+        "fired": 12,
+        "rate_pct": 2.051282051282051,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 1382,
+        "fired": 322,
+        "rate_pct": 23.299565846599133,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 980,
+        "fired": 383,
+        "rate_pct": 39.08163265306123,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 559,
+        "fired": 429,
+        "rate_pct": 76.74418604651163,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 980,
+        "fired": 844,
+        "rate_pct": 86.12244897959184,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 2356,
+        "fired": 1553,
+        "rate_pct": 65.91680814940577,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 462,
+        "fired": 360,
+        "rate_pct": 77.92207792207792,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 418,
+        "fired": 141,
+        "rate_pct": 33.73205741626794,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 232,
+        "fired": 3,
+        "rate_pct": 1.293103448275862,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 655,
+        "fired": 17,
+        "rate_pct": 2.595419847328244,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 141,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 173,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 34,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-d": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 171,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 168,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 492,
+        "fired": 31,
+        "rate_pct": 6.300813008130081,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 1374,
+        "fired": 535,
+        "rate_pct": 38.93740902474527,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 1866,
+        "fired": 907,
+        "rate_pct": 48.60664523043944,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 1235,
+        "fired": 909,
+        "rate_pct": 73.60323886639677,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 3140,
+        "fired": 1772,
+        "rate_pct": 56.43312101910828,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 875,
+        "fired": 543,
+        "rate_pct": 62.05714285714286,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 531,
+        "fired": 230,
+        "rate_pct": 43.314500941619585,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 1661,
+        "fired": 318,
+        "rate_pct": 19.145093317278747,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 345,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 599,
+        "fired": 5,
+        "rate_pct": 0.8347245409015025,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 291,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 495,
+        "fired": 11,
+        "rate_pct": 2.2222222222222223,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 210,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 897,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 312,
+        "fired": 10,
+        "rate_pct": 3.2051282051282053,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 122,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 228,
+        "fired": 12,
+        "rate_pct": 5.2631578947368425,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 116,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 290,
+        "fired": 2,
+        "rate_pct": 0.6896551724137931,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 267,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 257,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      }
+    ]
+  },
+  "signed_axis_all_rates": {
+    "lnb-a": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 1139,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 1128,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 1857,
+        "fired": 79,
+        "rate_pct": 4.254173397953688,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 4684,
+        "fired": 1469,
+        "rate_pct": 31.36208368915457,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 6019,
+        "fired": 2519,
+        "rate_pct": 41.850805781691314,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 3517,
+        "fired": 2128,
+        "rate_pct": 60.50611316462894,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 5470,
+        "fired": 2874,
+        "rate_pct": 52.541133455210236,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 1501,
+        "fired": 828,
+        "rate_pct": 55.16322451698868,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 825,
+        "fired": 163,
+        "rate_pct": 19.757575757575758,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 1497,
+        "fired": 33,
+        "rate_pct": 2.2044088176352705,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 755,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 1615,
+        "fired": 25,
+        "rate_pct": 1.5479876160990713,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 367,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 400,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-b": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 949,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 1030,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 2042,
+        "fired": 41,
+        "rate_pct": 2.0078354554358473,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 4016,
+        "fired": 1007,
+        "rate_pct": 25.074701195219124,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 4984,
+        "fired": 2343,
+        "rate_pct": 47.01043338683788,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 3342,
+        "fired": 2213,
+        "rate_pct": 66.21783363255535,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 8258,
+        "fired": 4006,
+        "rate_pct": 48.51053523855655,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 2957,
+        "fired": 1221,
+        "rate_pct": 41.29184984781873,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 1931,
+        "fired": 299,
+        "rate_pct": 15.484205075090626,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 7532,
+        "fired": 543,
+        "rate_pct": 7.209240573552841,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 1717,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 2815,
+        "fired": 44,
+        "rate_pct": 1.5630550621669628,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 1110,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 1801,
+        "fired": 21,
+        "rate_pct": 1.1660188784008885,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 738,
+        "fired": 1,
+        "rate_pct": 0.13550135501355012,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 3258,
+        "fired": 2,
+        "rate_pct": 0.061387354205033766,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 2535,
+        "fired": 51,
+        "rate_pct": 2.0118343195266273,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 1004,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 1589,
+        "fired": 23,
+        "rate_pct": 1.44745122718691,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 663,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 1498,
+        "fired": 14,
+        "rate_pct": 0.9345794392523364,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 798,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 874,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      }
+    ],
+    "lnb-c": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 1079,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 1732,
+        "fired": 29,
+        "rate_pct": 1.674364896073903,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 4090,
+        "fired": 749,
+        "rate_pct": 18.312958435207825,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 3683,
+        "fired": 1080,
+        "rate_pct": 29.32392071680695,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 2245,
+        "fired": 1133,
+        "rate_pct": 50.46770601336303,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 3117,
+        "fired": 2232,
+        "rate_pct": 71.60731472569779,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 6698,
+        "fired": 3908,
+        "rate_pct": 58.345774858166614,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 1586,
+        "fired": 972,
+        "rate_pct": 61.28625472887768,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 1746,
+        "fired": 319,
+        "rate_pct": 18.27033218785796,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 902,
+        "fired": 13,
+        "rate_pct": 1.441241685144124,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 2196,
+        "fired": 39,
+        "rate_pct": 1.7759562841530054,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 498,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 535,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 94,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 0,
+        "fired": 0,
+        "rate_pct": null,
+        "plotted": false
+      }
+    ],
+    "lnb-d": [
+      {
+        "low_khz": -450.0,
+        "high_khz": -400.0,
+        "mid_khz": -425.0,
+        "n": 755,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": -400.0,
+        "high_khz": -350.0,
+        "mid_khz": -375.0,
+        "n": 805,
+        "fired": 1,
+        "rate_pct": 0.12422360248447205,
+        "plotted": true
+      },
+      {
+        "low_khz": -350.0,
+        "high_khz": -300.0,
+        "mid_khz": -325.0,
+        "n": 1640,
+        "fired": 100,
+        "rate_pct": 6.097560975609756,
+        "plotted": true
+      },
+      {
+        "low_khz": -300.0,
+        "high_khz": -250.0,
+        "mid_khz": -275.0,
+        "n": 4201,
+        "fired": 1305,
+        "rate_pct": 31.064032373244466,
+        "plotted": true
+      },
+      {
+        "low_khz": -250.0,
+        "high_khz": -200.0,
+        "mid_khz": -225.0,
+        "n": 5036,
+        "fired": 2517,
+        "rate_pct": 49.980142970611595,
+        "plotted": true
+      },
+      {
+        "low_khz": -200.0,
+        "high_khz": -150.0,
+        "mid_khz": -175.0,
+        "n": 3395,
+        "fired": 2513,
+        "rate_pct": 74.02061855670104,
+        "plotted": true
+      },
+      {
+        "low_khz": -150.0,
+        "high_khz": -100.0,
+        "mid_khz": -125.0,
+        "n": 9089,
+        "fired": 4966,
+        "rate_pct": 54.6374738695126,
+        "plotted": true
+      },
+      {
+        "low_khz": -100.0,
+        "high_khz": -50.0,
+        "mid_khz": -75.0,
+        "n": 3098,
+        "fired": 1708,
+        "rate_pct": 55.13234344738541,
+        "plotted": true
+      },
+      {
+        "low_khz": -50.0,
+        "high_khz": 0.0,
+        "mid_khz": -25.0,
+        "n": 1887,
+        "fired": 605,
+        "rate_pct": 32.06147323794383,
+        "plotted": true
+      },
+      {
+        "low_khz": 0.0,
+        "high_khz": 50.0,
+        "mid_khz": 25.0,
+        "n": 7030,
+        "fired": 957,
+        "rate_pct": 13.613086770981507,
+        "plotted": true
+      },
+      {
+        "low_khz": 50.0,
+        "high_khz": 100.0,
+        "mid_khz": 75.0,
+        "n": 1549,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 100.0,
+        "high_khz": 150.0,
+        "mid_khz": 125.0,
+        "n": 2560,
+        "fired": 40,
+        "rate_pct": 1.5625,
+        "plotted": true
+      },
+      {
+        "low_khz": 150.0,
+        "high_khz": 200.0,
+        "mid_khz": 175.0,
+        "n": 1078,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 200.0,
+        "high_khz": 250.0,
+        "mid_khz": 225.0,
+        "n": 1766,
+        "fired": 25,
+        "rate_pct": 1.4156285390713477,
+        "plotted": true
+      },
+      {
+        "low_khz": 250.0,
+        "high_khz": 300.0,
+        "mid_khz": 275.0,
+        "n": 723,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 300.0,
+        "high_khz": 350.0,
+        "mid_khz": 325.0,
+        "n": 3241,
+        "fired": 5,
+        "rate_pct": 0.154273372415921,
+        "plotted": true
+      },
+      {
+        "low_khz": 350.0,
+        "high_khz": 400.0,
+        "mid_khz": 375.0,
+        "n": 2114,
+        "fired": 35,
+        "rate_pct": 1.6556291390728477,
+        "plotted": true
+      },
+      {
+        "low_khz": 400.0,
+        "high_khz": 450.0,
+        "mid_khz": 425.0,
+        "n": 868,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 450.0,
+        "high_khz": 500.0,
+        "mid_khz": 475.0,
+        "n": 1354,
+        "fired": 34,
+        "rate_pct": 2.511078286558346,
+        "plotted": true
+      },
+      {
+        "low_khz": 500.0,
+        "high_khz": 550.0,
+        "mid_khz": 525.0,
+        "n": 617,
+        "fired": 5,
+        "rate_pct": 0.8103727714748784,
+        "plotted": true
+      },
+      {
+        "low_khz": 550.0,
+        "high_khz": 600.0,
+        "mid_khz": 575.0,
+        "n": 1401,
+        "fired": 21,
+        "rate_pct": 1.4989293361884368,
+        "plotted": true
+      },
+      {
+        "low_khz": 600.0,
+        "high_khz": 650.0,
+        "mid_khz": 625.0,
+        "n": 934,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      },
+      {
+        "low_khz": 650.0,
+        "high_khz": 700.0,
+        "mid_khz": 675.0,
+        "n": 985,
+        "fired": 0,
+        "rate_pct": 0.0,
+        "plotted": true
+      }
+    ]
+  },
+  "signed_axis_lnb_a_on_the_stale_recorded_centre": [
+    {
+      "low_khz": -450.0,
+      "high_khz": -400.0,
+      "mid_khz": -425.0,
+      "n": 204,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": -400.0,
+      "high_khz": -350.0,
+      "mid_khz": -375.0,
+      "n": 524,
+      "fired": 9,
+      "rate_pct": 1.717557251908397,
+      "plotted": true
+    },
+    {
+      "low_khz": -350.0,
+      "high_khz": -300.0,
+      "mid_khz": -325.0,
+      "n": 909,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": -300.0,
+      "high_khz": -250.0,
+      "mid_khz": -275.0,
+      "n": 317,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": -250.0,
+      "high_khz": -200.0,
+      "mid_khz": -225.0,
+      "n": 766,
+      "fired": 11,
+      "rate_pct": 1.4360313315926894,
+      "plotted": true
+    },
+    {
+      "low_khz": -200.0,
+      "high_khz": -150.0,
+      "mid_khz": -175.0,
+      "n": 429,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": -150.0,
+      "high_khz": -100.0,
+      "mid_khz": -125.0,
+      "n": 967,
+      "fired": 17,
+      "rate_pct": 1.7580144777662874,
+      "plotted": true
+    },
+    {
+      "low_khz": -100.0,
+      "high_khz": -50.0,
+      "mid_khz": -75.0,
+      "n": 432,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": -50.0,
+      "high_khz": 0.0,
+      "mid_khz": -25.0,
+      "n": 1722,
+      "fired": 19,
+      "rate_pct": 1.1033681765389083,
+      "plotted": true
+    },
+    {
+      "low_khz": 0.0,
+      "high_khz": 50.0,
+      "mid_khz": 25.0,
+      "n": 501,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": 50.0,
+      "high_khz": 100.0,
+      "mid_khz": 75.0,
+      "n": 453,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": 100.0,
+      "high_khz": 150.0,
+      "mid_khz": 125.0,
+      "n": 873,
+      "fired": 12,
+      "rate_pct": 1.3745704467353952,
+      "plotted": true
+    },
+    {
+      "low_khz": 150.0,
+      "high_khz": 200.0,
+      "mid_khz": 175.0,
+      "n": 373,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": 200.0,
+      "high_khz": 250.0,
+      "mid_khz": 225.0,
+      "n": 742,
+      "fired": 18,
+      "rate_pct": 2.4258760107816713,
+      "plotted": true
+    },
+    {
+      "low_khz": 250.0,
+      "high_khz": 300.0,
+      "mid_khz": 275.0,
+      "n": 1547,
+      "fired": 492,
+      "rate_pct": 31.80349062702004,
+      "plotted": true
+    },
+    {
+      "low_khz": 300.0,
+      "high_khz": 350.0,
+      "mid_khz": 325.0,
+      "n": 1738,
+      "fired": 759,
+      "rate_pct": 43.67088607594937,
+      "plotted": true
+    },
+    {
+      "low_khz": 350.0,
+      "high_khz": 400.0,
+      "mid_khz": 375.0,
+      "n": 869,
+      "fired": 675,
+      "rate_pct": 77.67548906789413,
+      "plotted": true
+    },
+    {
+      "low_khz": 400.0,
+      "high_khz": 450.0,
+      "mid_khz": 425.0,
+      "n": 1012,
+      "fired": 774,
+      "rate_pct": 76.48221343873517,
+      "plotted": true
+    },
+    {
+      "low_khz": 450.0,
+      "high_khz": 500.0,
+      "mid_khz": 475.0,
+      "n": 1572,
+      "fired": 903,
+      "rate_pct": 57.44274809160305,
+      "plotted": true
+    },
+    {
+      "low_khz": 500.0,
+      "high_khz": 550.0,
+      "mid_khz": 525.0,
+      "n": 258,
+      "fired": 141,
+      "rate_pct": 54.651162790697676,
+      "plotted": true
+    },
+    {
+      "low_khz": 550.0,
+      "high_khz": 600.0,
+      "mid_khz": 575.0,
+      "n": 260,
+      "fired": 9,
+      "rate_pct": 3.4615384615384617,
+      "plotted": true
+    },
+    {
+      "low_khz": 600.0,
+      "high_khz": 650.0,
+      "mid_khz": 625.0,
+      "n": 116,
+      "fired": 0,
+      "rate_pct": 0.0,
+      "plotted": true
+    },
+    {
+      "low_khz": 650.0,
+      "high_khz": 700.0,
+      "mid_khz": 675.0,
+      "n": 246,
+      "fired": 8,
+      "rate_pct": 3.252032520325203,
+      "plotted": true
+    }
+  ],
+  "centroids_signed_5MSps": {
+    "lnb-a": {
+      "centroid_khz": -146.30865228161656,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 7674,
+      "detections": 3766
+    },
+    "lnb-b": {
+      "centroid_khz": -154.23860464184565,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 9299,
+      "detections": 4031
+    },
+    "lnb-c": {
+      "centroid_khz": -162.81697962572375,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 7137,
+      "detections": 4032
+    },
+    "lnb-d": {
+      "centroid_khz": -149.92702086715929,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 9513,
+      "detections": 4927
+    }
+  },
+  "centroids_signed_all_rates": {
+    "lnb-a": {
+      "centroid_khz": -155.2582980635929,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 23873,
+      "detections": 10060
+    },
+    "lnb-b": {
+      "centroid_khz": -159.86068869547992,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 27530,
+      "detections": 11130
+    },
+    "lnb-c": {
+      "centroid_khz": -163.34988050639808,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 23165,
+      "detections": 10393
+    },
+    "lnb-d": {
+      "centroid_khz": -153.4342523671933,
+      "bins": 7,
+      "window_khz": [
+        -350.0,
+        0.0
+      ],
+      "points": 28346,
+      "detections": 13714
+    }
+  },
+  "common_mode_offset": {
+    "statement": "all four ports' signed live windows are centred at -162.8..-146.3 kHz (5 MS/s), not at zero",
+    "survey_path_measurement_for_comparison": {
+      "source": "hardware/epochs.json, pluto-5d4d.lnb-a.gen2 action",
+      "lnb-a": -158.4,
+      "lnb-b": -151.8,
+      "lnb-c": -155.0,
+      "lnb-d": -144.1,
+      "agreement": "the same conclusion -- every port sits about 150 kHz below zero. The per-port values differ from the corpus-side centroids above by up to 9 kHz because they are a different population and a different statistic (survey coarse bank E, refined points where both ports fired) rather than differential-32 scored corpus points. Neither ordering reproduces the other's."
+    },
+    "paired_per_instant_residual_khz": 0.0,
+    "paired_per_instant_residual_ci_hz": [
+      -61,
+      153
+    ],
+    "residual_source": "hardware/epochs.json; not recomputed here because this extract carries no tuning-instant identity"
+  },
+  "reproduction": {
+    "note": "the three values the published figure reported, recomputed on the larger freeze with all four ports in the threshold population",
     "corrected_100_200_khz_at_5MSps": {
-      "lnb-c": 61.4,
-      "lnb-c_n": 347,
-      "lnb-b": 41.7,
-      "lnb-b_n": 458
+      "lnb-b": {
+        "published": 43.8113128783135,
+        "now": 43.80751533742331,
+        "delta": -0.003797540890190021,
+        "n_published": 4791,
+        "n_now": 5216
+      },
+      "lnb-c": {
+        "published": 65.87112171837708,
+        "now": 65.67123287671232,
+        "delta": -0.19988884166475884,
+        "n_published": 3352,
+        "n_now": 3650
+      },
+      "lnb-d": {
+        "published": 51.276728254100064,
+        "now": 51.016144349477685,
+        "delta": -0.26058390462237924,
+        "n_published": 4817,
+        "n_now": 5265
+      }
+    }
+  },
+  "corpus_says": {
+    "corrected_100_200_khz_at_5MSps": {
+      "lnb-a": {
+        "rate_pct": 60.664556962025316,
+        "n": 3160
+      },
+      "lnb-b": {
+        "rate_pct": 43.80751533742331,
+        "n": 5216
+      },
+      "lnb-c": {
+        "rate_pct": 65.67123287671232,
+        "n": 3650
+      },
+      "lnb-d": {
+        "rate_pct": 51.016144349477685,
+        "n": 5265
+      }
+    },
+    "raw_100_200_khz_at_5MSps": {
+      "lnb-a": {
+        "rate_pct": 1.1018237082066868,
+        "n": 2632
+      },
+      "lnb-b": {
+        "rate_pct": 43.80751533742331,
+        "n": 5216
+      },
+      "lnb-c": {
+        "rate_pct": 1.481814099685676,
+        "n": 2227
+      },
+      "lnb-d": {
+        "rate_pct": 51.016144349477685,
+        "n": 5265
+      }
     }
   },
   "strongest_port_once_corrected": {
@@ -555,201 +2800,23 @@
     "ranking": [
       {
         "port": "lnb-c",
-        "rate_pct": 65.87112171837708,
-        "n": 3352
+        "rate_pct": 65.67123287671232,
+        "n": 3650
+      },
+      {
+        "port": "lnb-a",
+        "rate_pct": 60.664556962025316,
+        "n": 3160
       },
       {
         "port": "lnb-d",
-        "rate_pct": 51.276728254100064,
-        "n": 4817
+        "rate_pct": 51.016144349477685,
+        "n": 5265
       },
       {
         "port": "lnb-b",
-        "rate_pct": 43.8113128783135,
-        "n": 4791
-      }
-    ],
-    "verdict": "lnb-c is the strongest port on the corrected axis"
-  },
-  "corpus_says": {
-    "corrected_100_200_khz_at_5MSps": {
-      "lnb-b": {
-        "rate_pct": 43.8113128783135,
-        "n": 4791
-      },
-      "lnb-c": {
-        "rate_pct": 65.87112171837708,
-        "n": 3352
-      },
-      "lnb-d": {
-        "rate_pct": 51.276728254100064,
-        "n": 4817
-      }
-    },
-    "raw_100_200_khz_at_5MSps": {
-      "lnb-b": {
-        "rate_pct": 43.8113128783135,
-        "n": 4791
-      },
-      "lnb-c": {
-        "rate_pct": 1.4634146341463414,
-        "n": 2050
-      },
-      "lnb-d": {
-        "rate_pct": 51.276728254100064,
-        "n": 4817
-      }
-    }
-  },
-  "all_rates_pooled_corrected": {
-    "lnb-b": [
-      {
-        "low_khz": 0.0,
-        "high_khz": 100.0,
-        "n": 12936,
-        "rate_pct": 14.440321583178726
-      },
-      {
-        "low_khz": 100.0,
-        "high_khz": 200.0,
-        "n": 14169,
-        "rate_pct": 40.15809160844096
-      },
-      {
-        "low_khz": 200.0,
-        "high_khz": 300.0,
-        "n": 7645,
-        "rate_pct": 29.744931327665142
-      },
-      {
-        "low_khz": 300.0,
-        "high_khz": 400.0,
-        "n": 10938,
-        "rate_pct": 7.094532821356738
-      },
-      {
-        "low_khz": 400.0,
-        "high_khz": 500.0,
-        "n": 4614,
-        "rate_pct": 0.8452535760728218
-      },
-      {
-        "low_khz": 500.0,
-        "high_khz": 700.0,
-        "n": 6835,
-        "rate_pct": 0.5852231163130943
-      },
-      {
-        "low_khz": 700.0,
-        "high_khz": 1000.0,
-        "n": 2467,
-        "rate_pct": 1.2971220105391164
-      },
-      {
-        "low_khz": 1000.0,
-        "high_khz": 1500.0,
-        "n": 0,
-        "rate_pct": null
-      }
-    ],
-    "lnb-c": [
-      {
-        "low_khz": 0.0,
-        "high_khz": 100.0,
-        "n": 5888,
-        "rate_pct": 20.601222826086957
-      },
-      {
-        "low_khz": 100.0,
-        "high_khz": 200.0,
-        "n": 9850,
-        "rate_pct": 56.233502538071065
-      },
-      {
-        "low_khz": 200.0,
-        "high_khz": 300.0,
-        "n": 5336,
-        "rate_pct": 36.03823088455772
-      },
-      {
-        "low_khz": 300.0,
-        "high_khz": 400.0,
-        "n": 5284,
-        "rate_pct": 12.698713096139288
-      },
-      {
-        "low_khz": 400.0,
-        "high_khz": 500.0,
-        "n": 3579,
-        "rate_pct": 1.3970382788488405
-      },
-      {
-        "low_khz": 500.0,
-        "high_khz": 700.0,
-        "n": 11712,
-        "rate_pct": 0.5806010928961749
-      },
-      {
-        "low_khz": 700.0,
-        "high_khz": 1000.0,
-        "n": 11153,
-        "rate_pct": 0.824890164081413
-      },
-      {
-        "low_khz": 1000.0,
-        "high_khz": 1500.0,
-        "n": 7165,
-        "rate_pct": 1.9958129797627355
-      }
-    ],
-    "lnb-d": [
-      {
-        "low_khz": 0.0,
-        "high_khz": 100.0,
-        "n": 12485,
-        "rate_pct": 23.884661593912696
-      },
-      {
-        "low_khz": 100.0,
-        "high_khz": 200.0,
-        "n": 14706,
-        "rate_pct": 46.41642866857065
-      },
-      {
-        "low_khz": 200.0,
-        "high_khz": 300.0,
-        "n": 7657,
-        "rate_pct": 32.58456314483479
-      },
-      {
-        "low_khz": 300.0,
-        "high_khz": 400.0,
-        "n": 10019,
-        "rate_pct": 9.851282563130052
-      },
-      {
-        "low_khz": 400.0,
-        "high_khz": 500.0,
-        "n": 3884,
-        "rate_pct": 1.235839340885685
-      },
-      {
-        "low_khz": 500.0,
-        "high_khz": 700.0,
-        "n": 6681,
-        "rate_pct": 0.6436162251160006
-      },
-      {
-        "low_khz": 700.0,
-        "high_khz": 1000.0,
-        "n": 3396,
-        "rate_pct": 1.5017667844522968
-      },
-      {
-        "low_khz": 1000.0,
-        "high_khz": 1500.0,
-        "n": 0,
-        "rate_pct": null
+        "rate_pct": 43.80751533742331,
+        "n": 5216
       }
     ]
   }

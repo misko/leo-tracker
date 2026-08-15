@@ -100,6 +100,20 @@ section can therefore differ from a neighbouring section by a percent or two.
 Nothing here turns on that, no figure mixes lists, and the range is 2,339–2,554
 throughout.
 
+**Which receivers each figure uses.** `lnb-a` was excluded from the original
+analysis in error (see
+[section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault)) and has
+been restored where restoring it was meaningful. The report therefore moves
+between three- and four-receiver populations, and this is the map:
+
+| Figure | Receivers | Why |
+|---|---|---|
+| `algorithm-correlation`, `channel-edge-correlation`, `edge-agreement`, `coincidence-model`, `f-strata`, `arm-matrix`, `geometry` | **all four** | fire-based; they never touch the frequency-offset axis, so the stale centre could not affect them |
+| `port-bias` | **all four** | regenerated with `lnb-a` on its **measured** +567,402 Hz centre |
+| `cfo-cliff` | three | offset-binned; built before `lnb-a`'s centre was measured, and its stale +1,170 Hz would have distorted the axis |
+| `edge-pilots` | one capture | a single spectrum, not a population |
+| `negative-control`, `fire-rate-problem` | three | inherited from the earlier freeze; restoring `lnb-a` moves every receiver pair by less than 0.004 |
+
 **One limitation that does matter, and it constrains how every absolute number
 here should be read.** Scoring runs in corpus order, so the scored set is a
 *chronological prefix* of the campaign, not a sample of it. The share spans
@@ -494,8 +508,8 @@ the check.
 | `full-frame-acquire` | 6.73% | 0.3788 | 0.7831 | 0.7376 |
 | **range over the eight** | **5.47–6.74%** | **0.3388–0.3788, spread 0.0400** | **0.783–0.821** | **0.733–0.768** |
 
-*18,176 joined matched-arm cells; `p` measured per detector on 15,072 live
-cross-edge null observations; `lnb-a` excluded from target and null. **Every d_A
+*36,384 joined matched-arm cells across four receiver pairs, `lnb-a` included;
+`p` measured per detector on the live cross-edge null observations. **Every d_A
 and d_B in this table is a model output, never checked against a known input.**
 The model's own consistency check is
 [section 6](#6-did-it-work-the-negative-controls), and it fails.*
@@ -633,9 +647,9 @@ This one did, and it came back negative — that is the contribution.
 ## 7. Why it failed: the detectors are near-duplicates
 
 The negative control is not a surprise once you look at the detectors
-themselves. Over **30,192** live target observations — every observation
-carrying all eight verdicts, none missing, `lnb-a` excluded — every pair of the
-eight makes the same fire / no-fire call at phi **0.847–0.945**.
+themselves. Over **40,256** live target observations with all four receivers
+included — every observation carrying all eight verdicts, none missing — every
+pair of the eight makes the same fire / no-fire call at phi **0.841–0.946**.
 
 | Pair | phi |
 |---|---:|
@@ -696,10 +710,11 @@ everything above.
 ### 8a. Channels are not independent, and the structure is not what it first looked like
 
 Take one receiver chain's pass over one sweep as the unit of observation — it
-visits all eight tunings (4 channels x 2 edges) exactly once. There are 3,774
-such units, identical in every cell of the matrix.
+visits all eight tunings (4 channels x 2 edges) exactly once. With `lnb-a`
+restored there are **5,032** such units, identical in every cell of the matrix.
 
-- A channel's **own two edges** agree at phi **0.441–0.466**, mean **0.453** —
+- A channel's **own two edges** agree at phi **0.411** across the four live
+  receivers —
   the only strong structure here, and robust: controlling time, acquisition arm
   and receiver together moves it to 0.417, 92% of raw.
 - Any **two different channels** agree at phi 0.118 raw — but **most of that is
@@ -715,7 +730,7 @@ permutation instead changes the answer:
 | nothing (the original) | 0.1182 | 0.1770 |
 | time (8 blocks) x receiver | 0.1107 | 0.1685 |
 | arm x receiver | 0.0679 | 0.0953 |
-| **time x arm x receiver** | **0.0662** | **0.0908** |
+| **time x arm x receiver** | **0.063** | **0.088** |
 
 The chronological trend costs only ~5%. **The acquisition arm costs ~43%** — a
 confound this report had not considered, though its own axis table records `f`
@@ -725,13 +740,13 @@ matrix induces a positive floor by aggregation alone.
 What remains is still real: the observed cross-channel mean exceeds all 1,000
 draws of a null that *keeps* trend, arm and receiver (p < 0.001, both
 combiners). But it is about **half** the published size, and the per-cell claim
-fails — under family-wise correction only 30 of 48 cells (union) and 32 of 48
-(`glrt-32`) clear their null, against the original assertion that every cell
-did. On the gentler uncorrected test 46 of 48 still reject at p < 0.05.
+fails — under family-wise correction only **32 of 48** cells (union) and **34 of
+48** (`glrt-32`) clear their null, against the original assertion that every cell
+did.
 
 **And it is not flat.** Corrected for arm, time and receiver, the cross-channel
-term *rises* with separation: 0.0522 / 0.0763 / 0.0879 (union) and 0.0671 /
-0.1029 / 0.1376 (`glrt-32`) at distance 1 / 2 / 3 — factors of 1.68 and 2.05,
+term *rises* with separation: 0.0484 / 0.0721 / 0.0883 (union) and 0.0652 /
+0.1015 / 0.1321 (`glrt-32`) at distance 1 / 2 / 3 — factors of 1.82 and 2.03,
 independently in all three receivers. A uniform additive common mode is
 separation-flat by construction, so **the sweep-wide common mode reading is
 withdrawn**. What produces a sweep-level term that prefers *distant* channels is
@@ -826,15 +841,18 @@ fire rule, the top rung's per-channel agreement is phi 0.448 / 0.466 / 0.459 /
 0.441 — the same four numbers as the outlined diagonal blocks in Figure 9, from
 a different script and a different unit of observation.
 
-![Four rungs of agreement, isolating the gap, the receiver, the radio boundary and the edge](figures/edge-agreement.png)
+![Six receiver pairs, with radio, LNB model and water marked, showing no ordering by any of them](figures/edge-agreement.png)
 
-***Figure 10 — agreement by configuration. The caption inside this image predates the analysis above and reads the third contrast as an LNB cost; the text is correct and the image is not.*** *Upper
-panel: the four rungs, with one open circle per algorithm, a bar for the
-bootstrap 95% CI over paired sweeps, and a heavy rule at the mean phi across the
-eight. The bracketed contrasts on the right are the three isolations tabled
-above. Lower panel: the same two extreme cases per channel, with the pooled
-values as dashed lines; every channel orders them the same way. Census frozen at
-2,547 scored sidecars, 1,258 paired sweeps, `lnb-a` excluded. Values in
+***Figure 10 — agreement varies across receiver pairs, and nothing orders it.***
+*Upper panel: all six receiver pairs on the same 1,258 paired sweeps and the same
+tuning instants, n = 10,064 each, with radio, LNB model and water drawn as
+filled-versus-open marks so a reader can see that no level sorts them — same-radio
+pairs land at ranks 1 and 4, same-model at 3, 4 and 6. The withdrawn four-rung
+ladder it used to carry is named on the figure. Lower panel: the same six under
+phi/phi_max, where the ordering changes completely, because phi is capped by the
+two chains' marginal fire rates (0.345 for `lnb-a` to 0.460 for `lnb-d`). Water is
+confounded with radio throughout — every wet port is on `pluto-19f2`. Census frozen
+at 2,547 scored sidecars, 1,258 paired sweeps, **`lnb-a` included**. Values in
 [`figures/edge-agreement.json`](figures/edge-agreement.json).*
 
 **Takeaway.** Whatever these detectors are responding to is a **per-receiver
@@ -931,10 +949,23 @@ Bias-corrected, it is the strongest port on site:
 identical by construction and only `lnb-c` moves. The 1.5x port difference
 survives the correction rather than being created by it.
 
-![Detection against raw and bias-corrected offset for the three live ports](figures/port-bias.png)
+![Detection against raw and bias-corrected offset for all four ports](figures/port-bias.png)
 
-***Figure 12 — `lnb-c` is shifted, not deaf.*** *5 MS/s, `differential-32`,
-1,146 paired sweeps, `lnb-a` excluded. Values in
+***Figure 12 — two ports are shifted, not deaf.*** *`differential-32`, 1,258
+paired sweeps, 398,435 points, **all four ports**. `lnb-a` carries its
+**measured** +567,402 Hz ± 4 kHz centre from
+[section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault), marked
+on the figure as measured rather than recorded; the third panel shows its live
+window moving from +250…+550 kHz onto −300…0 kHz with the stale centre drawn as
+a ghost. On the raw axis `lnb-a` reads **1.1%** (n = 2,632) in the 100–200 kHz
+bin where `lnb-b` and `lnb-d` peak — just as `lnb-c` reads 1.5% — and with its
+own centre removed it peaks at **60.7%** there against `lnb-c` 65.7, `lnb-d`
+51.0 and `lnb-b` 43.8. All four sit at −146 to −163 kHz rather than zero, which
+is the unexplained common-mode offset of
+[section 12](#12-what-the-cliff-actually-is). Those per-port centroids are
+computed on this figure's own population and statistic and differ by up to 9 kHz
+from the survey-path values in `hardware/epochs.json`; the conclusion — every
+port about 150 kHz below zero, none near it — is the same either way. Values in
 [`figures/port-bias.json`](figures/port-bias.json).*
 
 ***Audit note, recorded and unresolved.*** *`lnb-a` is excluded throughout
@@ -1496,10 +1527,10 @@ without re-running anything.
 | 6 | [`coincidence-model.png`](figures/coincidence-model.png) | [`coincidence-model.json`](figures/coincidence-model.json) | 2,544 | 18,176 joined matched-arm cells from 1,136 matched-arm sweeps |
 | 7 | [`negative-control.png`](figures/negative-control.png) | [`negative-control.json`](figures/negative-control.json) | 2,339 | 16,560 matched-arm cells in each of three joins; 1,035 matched-arm sweeps |
 | 8 | [`algorithm-correlation.png`](figures/algorithm-correlation.png) | [`algorithm-correlation.json`](figures/algorithm-correlation.json) | 2,547 | 30,192 live target observations; 1,258 paired sweeps |
-| 9 | [`channel-edge-correlation.png`](figures/channel-edge-correlation.png) | [`channel-edge-correlation.json`](figures/channel-edge-correlation.json) | 2,547 | 3,774 receiver-chain passes (1,258 pairs x 3 live receivers) |
-| 10 | [`edge-agreement.png`](figures/edge-agreement.png) | [`edge-agreement.json`](figures/edge-agreement.json) | 2,547 | 15,096 / 10,064 / 9,632 / 10,496 pairs across four rungs |
+| 9 | [`channel-edge-correlation.png`](figures/channel-edge-correlation.png) | [`channel-edge-correlation.json`](figures/channel-edge-correlation.json) | 2,547 | 5,032 receiver-chain passes, `lnb-a` included (1,258 pairs x 3 live receivers) |
+| 10 | [`edge-agreement.png`](figures/edge-agreement.png) | [`edge-agreement.json`](figures/edge-agreement.json) | 2,547 | six receiver pairs, n = 10,064 each, `lnb-a` included |
 | 11 | [`cfo-cliff.png`](figures/cfo-cliff.png) | [`cfo-cliff.json`](figures/cfo-cliff.json) | 2,339 | 178,399 live target points from 1,146 paired sweeps |
-| 12 | [`port-bias.png`](figures/port-bias.png) | [`port-bias.json`](figures/port-bias.json) | 2,339 | the same 1,146 paired sweeps, 5 MS/s only |
+| 12 | [`port-bias.png`](figures/port-bias.png) | [`port-bias.json`](figures/port-bias.json) | 2,547 | 1,258 paired sweeps, 398,435 points, all four ports with `lnb-a` on its **measured** +567,402 Hz centre |
 
 Figures 1–6 and 8–10 are new. Figures 7, 11 and 12 are carried unchanged from
 [the detailed record](../sync-scan-cross-radio-2026-08-14/REPORT.md) together

@@ -1390,9 +1390,9 @@ regime the sky corpus mostly occupies.
 
 ![Recovered f against the f that was set](figures/injection/fig_d1_recovered_f.png)
 
-*Figure retained from the earlier write-up and therefore showing the synthetic
-run; the table above is the hardware. Regenerating it from `results.json` is
-outstanding.*
+*Rebuilt from the hardware `results.json`. At 0.15 every one of the eight sits
+below the truth line; at 0.30 and 0.50 they straddle it. Whiskers are 5th–95th
+percentile over 600 cell resamples.*
 
 ### 13b. And the check certifies nothing, on any of them
 

@@ -1,0 +1,233 @@
+{
+ "palette": {
+  "aqua": "#1baf7a",
+  "blue": "#2a78d6",
+  "note": "reference palette slots 1-3, light mode, all-pairs validated; aqua carries direct labels",
+  "orange": "#eb6834"
+ },
+ "panel_a": {
+  "lnb-a|gen1": {
+   "consensus_hz": -138867.49982002837,
+   "currently_applied_hz": 5154.0,
+   "method_spread_hz": [
+    -149344.80885585796,
+    -128390.19078419878
+   ],
+   "n_populations": 2,
+   "populations_hz": {
+    "corpus": -128390.19078419878,
+    "live": -149344.80885585796
+   }
+  },
+  "lnb-a|gen2": {
+   "consensus_hz": 375662.55815146375,
+   "currently_applied_hz": 567402.0,
+   "method_spread_hz": [
+    375662.55815146375,
+    375662.55815146375
+   ],
+   "n_populations": 1,
+   "populations_hz": {
+    "sync_corpus": 375662.55815146375
+   }
+  },
+  "lnb-b|gen1": {
+   "consensus_hz": -146696.4078757157,
+   "currently_applied_hz": 0.0,
+   "method_spread_hz": [
+    -159852.0136964329,
+    -133540.80205499846
+   ],
+   "n_populations": 2,
+   "populations_hz": {
+    "corpus": -133540.80205499846,
+    "live": -159852.0136964329
+   }
+  },
+  "lnb-b|gen2": {
+   "consensus_hz": -149145.5668247906,
+   "currently_applied_hz": 0.0,
+   "method_spread_hz": [
+    -155439.1319437179,
+    -141969.11850068351
+   ],
+   "n_populations": 3,
+   "populations_hz": {
+    "corpus": -155439.1319437179,
+    "live": -150028.45002997044,
+    "sync_corpus": -141969.11850068351
+   }
+  },
+  "lnb-c|gen1": {
+   "consensus_hz": 420685.83658369945,
+   "currently_applied_hz": 434408.4,
+   "method_spread_hz": [
+    402446.51941994193,
+    438925.1537474569
+   ],
+   "n_populations": 2,
+   "populations_hz": {
+    "corpus": 402446.51941994193,
+    "live": 438925.1537474569
+   }
+  },
+  "lnb-c|gen2": {
+   "consensus_hz": 424989.9613512385,
+   "currently_applied_hz": 604159.8,
+   "method_spread_hz": [
+    416731.8985165166,
+    435332.4052813313
+   ],
+   "n_populations": 3,
+   "populations_hz": {
+    "corpus": 416731.8985165166,
+    "live": 435332.4052813313,
+    "sync_corpus": 422905.5802558677
+   }
+  },
+  "lnb-d|gen1": {
+   "consensus_hz": 14996.061080791897,
+   "currently_applied_hz": 0.0,
+   "method_spread_hz": [
+    12279.763626849148,
+    17712.358534734645
+   ],
+   "n_populations": 2,
+   "populations_hz": {
+    "corpus": 17712.358534734645,
+    "live": 12279.763626849148
+   }
+  },
+  "lnb-d|gen2": {
+   "consensus_hz": -143565.79806782978,
+   "currently_applied_hz": 0.0,
+   "method_spread_hz": [
+    -149101.11713021874,
+    -138197.2149993332
+   ],
+   "n_populations": 3,
+   "populations_hz": {
+    "corpus": -149101.11713021874,
+    "live": -143399.06207393738,
+    "sync_corpus": -138197.2149993332
+   }
+  }
+ },
+ "panel_b": {
+  "after_centroid_khz": 3.5429940598233376,
+  "after_fraction_negative": 0.45494464427523706,
+  "after_median_khz": 13.21392939965491,
+  "before_centroid_khz": -130.45968648727487,
+  "before_fraction_negative": 0.8500831124488971,
+  "before_median_khz": -124.21283143939111,
+  "excluded": "lnb-a|gen2, whose corpus detections are censored at the survey bank edge and are not a usable window",
+  "n_after": 21407,
+  "n_before": 22259
+ },
+ "recommendation": {
+  "pluto-19f2|gen1": {
+   "anchor": "lnb-d",
+   "anchor_consensus_hz": 14996.061080791897,
+   "cross_receiver_gate_hz": 15000,
+   "difference_equals_differential": true,
+   "differential_hz": 434874.4265038166,
+   "measured_centers_hz": [
+    435278.2,
+    403.7
+   ],
+   "receiver_labels": [
+    "lnb-c",
+    "lnb-d"
+   ],
+   "rx0_direct_estimate_hz": 420685.83658369945,
+   "rx0_residual_miscentring_hz": -14592.3,
+   "rx0_uncertainty_hz": [
+    402446.51941994193,
+    438925.1537474569
+   ],
+   "rx1_residual_miscentring_hz": 14592.3,
+   "rx1_uncertainty_hz": [
+    12279.763626849148,
+    17712.358534734645
+   ]
+  },
+  "pluto-19f2|gen2": {
+   "anchor": "lnb-d",
+   "anchor_consensus_hz": -143565.79806782978,
+   "cross_receiver_gate_hz": 15000,
+   "difference_equals_differential": true,
+   "differential_hz": 605521.1464540842,
+   "measured_centers_hz": [
+    443472.7,
+    -162048.5
+   ],
+   "receiver_labels": [
+    "lnb-c",
+    "lnb-d"
+   ],
+   "rx0_direct_estimate_hz": 424989.9613512385,
+   "rx0_residual_miscentring_hz": -18482.7,
+   "rx0_uncertainty_hz": [
+    416731.8985165166,
+    435332.4052813313
+   ],
+   "rx1_residual_miscentring_hz": 18482.7,
+   "rx1_uncertainty_hz": [
+    -149101.11713021874,
+    -138197.2149993332
+   ]
+  },
+  "pluto-5d4d|gen1": {
+   "anchor": "lnb-b",
+   "anchor_consensus_hz": -146696.4078757157,
+   "cross_receiver_gate_hz": 15000,
+   "difference_equals_differential": true,
+   "differential_hz": 5154.335222572598,
+   "measured_centers_hz": [
+    -140204.8,
+    -145359.1
+   ],
+   "receiver_labels": [
+    "lnb-a",
+    "lnb-b"
+   ],
+   "rx0_direct_estimate_hz": -138867.49982002837,
+   "rx0_residual_miscentring_hz": 1337.3,
+   "rx0_uncertainty_hz": [
+    -149344.80885585796,
+    -128390.19078419878
+   ],
+   "rx1_residual_miscentring_hz": -1337.3,
+   "rx1_uncertainty_hz": [
+    -159852.0136964329,
+    -133540.80205499846
+   ]
+  },
+  "pluto-5d4d|gen2": {
+   "anchor": "lnb-b",
+   "anchor_consensus_hz": -149145.5668247906,
+   "cross_receiver_gate_hz": 15000,
+   "difference_equals_differential": true,
+   "differential_hz": 567402.0,
+   "measured_centers_hz": [
+    396959.5,
+    -170442.5
+   ],
+   "receiver_labels": [
+    "lnb-a",
+    "lnb-b"
+   ],
+   "rx0_direct_estimate_hz": 375662.55815146375,
+   "rx0_residual_miscentring_hz": -21296.9,
+   "rx0_uncertainty_hz": [
+    375662.55815146375,
+    375662.55815146375
+   ],
+   "rx1_residual_miscentring_hz": 21296.9,
+   "rx1_uncertainty_hz": [
+    -155439.1319437179,
+    -141969.11850068351
+   ]
+  }
+ }
+}

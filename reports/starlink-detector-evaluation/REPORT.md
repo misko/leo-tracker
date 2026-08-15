@@ -11,7 +11,8 @@ matches neither of the rankings this report previously offered**
 
 **How to read this document.** It is written in the order the work happened.
 Sections 1–10 are the sky analysis and the contradictions it ran into; sections
-11–14 are controlled injection, which supersedes several of the earlier
+11–15 are controlled injection and section 16 returns to the sky with the
+instrument calibrated, and together they supersede several of the earlier
 conclusions and says so at each point. Where the two disagree, **the injection
 sections are current.** Section 9's surviving-findings table carries a status
 column for exactly this reason.
@@ -60,8 +61,10 @@ say whether receiver, radio, edge, water or timing is responsible; the earlier
 claim that the LNB was the entire cause is withdrawn in
 [section 8](#8-what-the-sky-looks-like). The instrument yields two associations
 worth acting on: a scoring-pipeline detection cliff near 350–400 kHz of corrected
-offset, and a +604.2 kHz configured centre correction on one port without which a
-working receiver reads as deaf ([section 9](#9-what-survives-the-instrument)).
+offset, and a large positive centre correction on one port without which a
+working receiver reads as deaf ([section 9](#9-what-survives-the-instrument)) —
+though the specific +604.2 kHz value is itself wrong by 178 kHz, as
+[section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs) measures.
 
 **Since this report was first written, ground truth arrived.** A cabled
 loopback on two bench radios injects the repository's own pilot waveform at a
@@ -76,6 +79,18 @@ partly works and the check does not, and nothing here validates the pooled model
 on the heterogeneous sky corpus; the 350–400 kHz cliff does not exist against a *known* offset,
 falling instead at the 700 kHz bank edge; and the thresholds are calibrated on
 truly empty input.
+
+**And the instrument itself is losing detections right now.**
+[Section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+measures each receiver's absolute carrier centre against two independent
+populations, finds four independent oscillator errors between −15.3 and
++43.6 ppm — normal hardware, never measured — and shows that correcting each one
+separately moves the pooled sky window from a centroid of −130.5 kHz onto
+**+3.5 kHz** in an out-of-sample test. Against the calibration in force today all
+four ports are miscentred: three by 144–178 kHz, which a controlled contrast
+prices at **25.5% of detections lost**, and `lnb-a` by 377 kHz, priced at
+**97.2%**. The daily differential calibration cannot measure any of this, and as
+written it would erase the fix.
 
 Every `d` in the sections below is a **model output**, never a measurement. It is
 inferred from a model whose own consistency check is the one shown above to be
@@ -874,7 +889,7 @@ detector bank being independent, and are directly actionable.
 
 > **Superseded.** This section reports the observation. Injection against a
 > *known* imposed offset
-> ([section 11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search))
+> ([section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search))
 > shows every detector is flat straight through this band, and
 > [section 12](#12-what-the-cliff-actually-is) identifies the feature as the
 > folded far edge of a one-sided window, not a symmetric tolerance. The
@@ -898,7 +913,7 @@ The pilot guard bands at those three rates are +312.5, +1,562.5 and
 +4,062.5 kHz — a **13x range** — and the cliff does not move. That rules the
 guard band out. What is left is a detection cliff near 350–400 kHz of corrected offset — **since shown by
 injection not to be a detector tolerance at all, see
-[section 11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)**
+[section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)**
 whose mechanism is open: the survey scorer's own bank spans ±700 kHz, and the
 ±350 kHz constant elsewhere in the codebase belongs to the acquisition path,
 which this scoring path does not use.
@@ -963,9 +978,10 @@ window moving from +250…+550 kHz onto −300…0 kHz with the stale centre dra
 a ghost. On the raw axis `lnb-a` reads **1.1%** (n = 2,632) in the 100–200 kHz
 bin where `lnb-b` and `lnb-d` peak — just as `lnb-c` reads 1.5% — and with its
 own centre removed it peaks at **60.7%** there against `lnb-c` 65.7, `lnb-d`
-51.0 and `lnb-b` 43.8. All four sit at −146 to −163 kHz rather than zero, which
-is the unexplained common-mode offset of
-[section 12](#12-what-the-cliff-actually-is). Those per-port centroids are
+51.0 and `lnb-b` 43.8. All four sit at −146 to −163 kHz rather than zero — the
+offset of [section 12](#12-what-the-cliff-actually-is), which
+[section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+resolves into four independent per-receiver oscillator errors. Those per-port centroids are
 computed on this figure's own population and statistic and differ by up to 9 kHz
 from the survey-path values in `hardware/epochs.json`; the conclusion — every
 port about 150 kHz below zero, none near it — is the same either way. Values in
@@ -984,8 +1000,8 @@ record.*
 
 | Finding | The number it rests on | Status |
 |---|---|---|
-| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
-| `lnb-c` needs a +604.2 kHz configured centre correction; corrected, it has the highest fire rate in the examined slice | `receiver_centers_hz` = +604,159.8, applied at scoring; 65.9% (n = 3,352) against `lnb-b` 43.8% (n = 4,791) | **stands** |
+| ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
+| ~~`lnb-c` needs a +604.2 kHz configured centre correction~~ **superseded — +604.2 kHz is itself 177.9 kHz too high and costs 25.5% of its detections ([16c](#16c-miscentring-costs-detections-and-this-is-measured-not-modelled))** | its measured absolute centre is **+424,990 Hz**; the direction of the original finding — `lnb-c` needs a large positive correction, and corrected it has the highest fire rate in the slice — **stands** | **corrected value** |
 | The 1.25 MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
 | The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.947 over 40,256 observations | **stands** |
 | A per-point 1% threshold yields 5.47–6.74% per cell after maximising over ~7 candidates, as expected | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
@@ -1226,7 +1242,7 @@ LNB, antenna or sky anywhere in the path.
 
 ## 12. What the cliff actually is
 
-[Section 11c](#11c-the-350-400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
+[Section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
 established by injection that the 350–400 kHz collapse is not the detectors,
 the banks, the search span or the analogue filter. That left the sky, the LNBs,
 or the offset estimation. It is the third, and it is not what it looks like.
@@ -1352,11 +1368,14 @@ mostly grid.
 
 ### What is still unexplained
 
-What sets the −150 kHz common-mode offset — a tuning-plan or assumed-beacon
-error, or a shared LO family error across both LNB models — cannot be separated
-by a differential calibration, and distinguishing them needs hardware. And what
-sets the ~±175 kHz half-width remains open, given that injection shows the
-detectors themselves flat out to ±700 kHz.
+The window centre is no longer among the open questions:
+[section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+measures all four receivers absolutely, finds four independent constants between
+−15.3 and +43.6 ppm, and shows that correcting each one separately moves the
+pooled window onto **+3.5 kHz** in a genuinely out-of-sample test. What remains
+open is the **~±175 kHz half-width**, given that injection shows the detectors
+themselves flat out to ±700 kHz — so the width belongs to the acquisition stage,
+not to the decision statistics.
 
 
 ## 13. The same experiment, on two radios, with the answer known
@@ -1494,8 +1513,9 @@ coincidences and should not be read as a violation.
 Both rigs are cabled loopbacks: no LNB, no antenna, no sky, and no genuine
 carrier offset, since each radio's transmit and receive share one reference. It
 tests the estimator and the detectors, which is what was in question — but the
-−150 kHz common-mode tuning error in
-[section 12](#12-what-the-cliff-actually-is), the water on the `lnb-c` and
+per-receiver −150 kHz LO errors of
+[sections 12](#12-what-the-cliff-actually-is) and
+[16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs), the water on the `lnb-c` and
 `lnb-d` bias tees, and the LNB chain generally are all outside what a cable can
 say anything about.
 
@@ -1568,8 +1588,16 @@ of a 50 kHz bin.
 ![All four ports before and after correction](figures/injection/lnba-centre.png)
 
 **And all four still sit at −144 to −158 kHz, not zero.** That residual is the
-common-mode offset of [section 12](#12-what-the-cliff-actually-is), shared by
-both radios, invisible to every differential measurement, and still unexplained.
+offset of [section 12](#12-what-the-cliff-actually-is) — invisible to every
+differential measurement, which is why it survived this correction.
+[Section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+measures it away, one receiver at a time, and prices what it has been costing.
+
+Note also that the differential step measured here, +562,248 Hz, and the move in
+`lnb-a`'s absolute centre measured in section 16, +514,530 Hz, differ by 48 kHz.
+Neither is wrong: they are marginal means over different detection sets, which
+[section 16b](#16b-the-correction-survives-being-tested-out-of-sample) shows sets
+a 20–40 kHz floor on any absolute per-receiver number.
 
 
 ## 15. Three experiments that revise the ranking
@@ -1603,7 +1631,7 @@ reading signal into small-sample noise. This report did that, and it was wrong t
 
 ### 15b. At equal false-alarm cost the ranking changes, and the head dissolves
 
-[Section 11a](#11a-measured-ranking-under-one-condition-20-ms-5-ms-s-cabled-loopback)
+[Section 11a](#11a-measured-ranking-under-one-condition--20-ms-5-mss-cabled-loopback)
 ranked the eight at 1% per *point*, which left their per-*cell* rates spread over
 6.2–9.8% — so they were not compared at equal operational cost. Redrawing
 thresholds on the ladder's own TX-off rungs puts all eight at exactly **5.0% per
@@ -1658,6 +1686,170 @@ across sample rates because the noise bandwidth changes — only the within-arm
 order is clean.*
 
 
+## 16. The −150 kHz, measured: four oscillators, and what it costs
+
+[Section 12](#12-what-the-cliff-actually-is) argued that the −150 kHz window
+centre is each LNB's own local-oscillator error rather than one shared tuning
+mistake, and [section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault)
+measured one of those errors the hard way, on `lnb-a`. Neither produced what the
+pipeline actually needs: a number per receiver. This section measures all eight
+— four ports either side of the LNB swap — checks them out of sample, and prices
+what leaving them unmeasured is costing right now.
+
+### 16a. Four independent constants, not one shared error
+
+Two populations can measure an absolute centre, and they are independent of each
+other. The **live narrow reports** — 3,182 records, 2026-08-10 to 08-13, read
+with the repository's own `_paired_differences` — come from a ±350 kHz search
+that *is* centred on each receiver. The **survey re-scoring** of the corpus uses
+a fixed ±700 kHz bank about raw zero and ignores `receiver_centers` entirely.
+Where the sync corpus also carries a port it is a third. The bracket below is the
+spread across those populations, which is far wider than any of their statistical
+intervals and is therefore the honest uncertainty.
+
+| Receiver | Epoch | Absolute centre | Spread across populations | n | ppm at 9.75 GHz |
+|---|---|---:|---|---:|---:|
+| `lnb-a` (5d4d rx0) | gen1 | **−138,867** | [−149,345, −128,390] | 17,137 | −14.2 |
+| `lnb-a` | gen2 | **+375,663** | *single population* | 1,304 | +38.5 |
+| `lnb-b` (5d4d rx1) | gen1 | **−146,696** | [−159,852, −133,541] | 13,718 | −15.0 |
+| `lnb-b` | gen2 | **−149,146** | [−155,439, −141,969] | 7,103 | −15.3 |
+| `lnb-c` (19f2 rx0) | gen1 | **+420,686** | [+402,447, +438,925] | 2,027 | +43.2 |
+| `lnb-c` | gen2 | **+424,990** | [+416,732, +435,332] | 6,173 | +43.6 |
+| `lnb-d` (19f2 rx1) | gen1 | **+14,996** | [+12,280, +17,712] | 14,602 | +1.5 |
+| `lnb-d` | gen2 | **−143,566** | [−149,101, −138,197] | 9,484 | −14.7 |
+
+Every row is measured except `lnb-a` gen2, where only one population can see it
+at all — the live search is blind there (78 candidates, 74% of them pinned at the
++350 kHz edge) and the corpus arm fires at 5.0%. Treat that one as ±40 kHz.
+
+**−15.3 to +43.6 ppm.** That is inside an ordinary consumer LNB specification.
+None of this is a fault; it is four oscillators behaving normally and a pipeline
+that never asked them where they were.
+
+The swap acts as its own control. `lnb-b`, on the radio nobody touched, moves
+**2.4 kHz** across the boundary. `lnb-a`, on that same untouched radio, moves
+**+514.5 kHz** — the fault of [section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault),
+now visible on an absolute axis. And of the two LNBs that were physically
+replaced, `lnb-d` moves **−158.6 kHz** while `lnb-c` moves only **+4.3 kHz**: a
+replacement part is a new draw from the same distribution, not necessarily a
+different one.
+
+![Absolute per-receiver centres, and the corrected sky window](figures/absolute-centres.png)
+
+### 16b. The correction survives being tested out of sample
+
+A centre fitted to a population and then measured on that same population proves
+nothing. Three tests of increasing strength:
+
+| Test | Centroid of the sky window | Fraction negative | n |
+|---|---:|---:|---:|
+| The axis in use today | **−130.5 kHz** | 85.0% | 22,259 |
+| Half-sample — centres from odd sweeps, measured on even | −4.8 … +9.9 kHz per port | — | — |
+| **Out of sample** — centres from the *live* reports, applied to the *survey* re-scoring | **+3.5 kHz** | 45.5% | 21,407 |
+
+The third row shares no detector, no arm and no fitted quantity with what it is
+scored on. The window moves onto zero, and the one-sided distribution that
+[section 12](#12-what-the-cliff-actually-is) found becomes symmetric. Per port
+the out-of-sample residuals span −33.7 to +17.0 kHz. The single exception is
+`lnb-a` gen2 at −92.5 kHz, whose corpus detections are censored at the bank edge;
+it needs a direct `lo_sweep` once scoring is idle.
+
+**But the differential and the absolute centre are not interchangeable, and the
+report should not pretend they are.** Differencing two absolute centres does not
+reproduce the measured `rx0 − rx1`: on `pluto-19f2` gen2 the differential is
++605,521 Hz [605,083, 605,930] over 1,095 pairs, while differencing the absolutes
+gives 578,731 — a 26.8 kHz gap. That gap is not an error in either method. On a
+*common* population — both receivers scored on the same dual-candidate checks —
+the differential is reproduced to 1 kHz (604,560 against 605,521). The gap
+appears only when marginal means from *different* detection sets are subtracted:
+`lnb-d` averages −164,437 Hz on dual checks but −143,399 Hz over all its own
+candidates, a 21 kHz population shift, and `lnb-c` supplies another 4.8 kHz.
+
+So a differential is exact at an instant, while a port's absolute centre is a
+mean over the sky that port happens to detect — and two ports do not detect the
+same sky. **The consequence is a floor of roughly 20–40 kHz on any absolute
+per-receiver number, which more data does not remove.** Search-window truncation
+was ruled out as the cause: inverting the truncated mean against an empirical
+detected-Doppler density (sd 60.5 kHz, p5/p95 −112/+93 kHz, taken from `lnb-d`
+gen1, whose search was centred on itself) leaves every uncensored estimate
+unchanged.
+
+### 16c. Miscentring costs detections, and this is measured, not modelled
+
+Twice, one port's applied search centre moved while its partner's did not. The
+partner is a time control, so the ratio of the two ports' candidate rates
+isolates the effect of miscentring from everything else that changed.
+
+| Contrast | Miscentring | Control | Normalised rate | Detections lost |
+|---|---:|---|---|---:|
+| `lnb-c` gen2, 9.4 kHz off → 179.2 kHz off | 170 kHz | `lnb-d` | 0.580 [0.539, 0.620] → 0.432 [0.356, 0.509] | **25.5%** |
+| `lnb-c` gen1, 13.7 kHz off → 420.7 kHz off | 407 kHz | `lnb-d` | 0.582 → 0.196 | **66.4%** |
+| `lnb-a` across its LO move | 376 kHz | `lnb-b` | 1.273 [1.248, 1.302] → 0.035 [0.020, 0.053] | **97.2%** |
+
+A hard ±350 kHz window would predict near-zero loss at 150 kHz, since the
+detected-Doppler density barely reaches ±200 kHz. It does not: the loss is a soft
+roll-off of the timing stage and the subband filter, which is precisely why it
+had to be measured rather than reasoned about.
+
+**Against the calibration in force today, all four ports are miscentred.** The
+live artifact resolves to `pluto-19f2` (+602,869.4, 0.0) and `pluto-5d4d`
+(−906.6, 0.0):
+
+| Port | Applied today | Measured | Miscentred by | Expected loss |
+|---|---:|---:|---:|---|
+| `lnb-c` | +602,869 | +424,990 | **−177,879** | ~25%, *at* a measured point |
+| `lnb-b` | 0 | −149,146 | **−149,146** | ~20–25%, between measured points |
+| `lnb-d` | 0 | −143,566 | **−143,566** | ~20–25%, between measured points |
+| `lnb-a` | −907 | +375,663 | **+376,569** | ~97%, *at* a measured point |
+
+Two of the four sit essentially on top of a measured contrast; the other two fall
+between the first row and zero. Averaging the four retained fractions with equal
+weight gives **about 0.57** — that average is an extrapolation, not a
+measurement, and is offered only to size the problem. What is measured is that
+three healthy receivers are each paying roughly a quarter of their yield as a
+tax nobody noticed, because they still detect.
+
+The survey and corpus paths are unaffected: they ignore `receiver_centers`
+outright. This cost lands entirely on the live dwell path and everything
+downstream of it.
+
+### 16d. What to write, and the trap waiting for whoever writes it
+
+`receiver_centers()` returns `measured_centers_hz` verbatim when present. The
+pair below is pinned so that `rx0 − rx1` equals the measured differential —
+`survey_scoring.cross_receiver_checks` gates agreement at
+`CROSS_RECEIVER_CFO_HZ = 15,000` Hz on exactly that difference — and then slid
+bodily so the unavoidable residual is halved between the two ports instead of
+dumped on one.
+
+| Radio | Epoch | `measured_centers_hz` | Residual per port |
+|---|---|---|---:|
+| `pluto-19f2` | **gen2 — apply this** | `[443472.7, -162048.5]` | ∓18.5 kHz |
+| `pluto-5d4d` | **gen2 — apply this** | `[396959.5, -170442.5]` | ∓21.3 kHz |
+| `pluto-19f2` | gen1 *(re-analysis of archived sweeps only)* | `[435278.2, 403.7]` | ∓14.6 kHz |
+| `pluto-5d4d` | gen1 *(re-analysis only)* | `[-140204.8, -145359.1]` | ∓1.3 kHz |
+
+Four things the daily timer cannot do, and one it will actively undo:
+
+1. **It never produces an absolute number.** `measure_mismatch` differences the
+   two ports and its docstring says the absolute "is not recoverable here and is
+   not needed". It is needed — a per-radio differential leaves both ports free to
+   sit 150 kHz off *together*, which is exactly what `lnb-b` and `lnb-d` do.
+2. **It cannot find an offset outside its own search**, for the self-sealing
+   reason given in [section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault).
+3. **It is currently returning an epoch-blind mixture.** The live artifact has
+   `pluto-19f2` `mismatch_hz` 602,869.4 with p10 433,030.7 and p90 607,376.5 — a
+   spread of 174,345.8 Hz, which is gen1's 434 kHz and gen2's 605 kHz averaged
+   together inside one 900-report window.
+4. **It will erase the fix.** `command_starlink_lnb_calibration` builds its
+   artifact from `measure_mismatch` alone and `write_calibration` replaces the
+   file wholesale; `measured_centers_hz` is read at line 168 of
+   `lnb_calibration.py` and written nowhere. Writing the values without first
+   teaching the command to carry them forward from `previous`, or masking
+   `leo-tracker-lnb-calibration.timer`, buys less than one day.
+
+
+
 ## Figures and provenance
 
 Every figure is computed from the read-only corpus at
@@ -1681,8 +1873,9 @@ without re-running anything.
 | 10 | [`edge-agreement.png`](figures/edge-agreement.png) | [`edge-agreement.json`](figures/edge-agreement.json) | 2,547 | six receiver pairs, n = 10,064 each, `lnb-a` included |
 | 11 | [`cfo-cliff.png`](figures/cfo-cliff.png) | [`cfo-cliff.json`](figures/cfo-cliff.json) | 2,339 | 178,399 live target points from 1,146 paired sweeps |
 | 12 | [`port-bias.png`](figures/port-bias.png) | [`port-bias.json`](figures/port-bias.json) | 2,547 | 1,258 paired sweeps, 398,435 points, all four ports with `lnb-a` on its **measured** +567,402 Hz centre |
+| 13 | [`absolute-centres.png`](figures/absolute-centres.png) | [`absolute-centres.json`](figures/absolute-centres.json) | **not stamped** | 878 narrow sky sweeps, 3,182 live narrow reports, the 2026-08-14 sync corpus; 22,259 detections before correction and 21,407 after |
 
-Figures 1–6 and 8–10 are new. Figures 7, 11 and 12 are carried unchanged from
+Figures 1–6, 8–10 and 13 are new. Figures 7, 11 and 12 are carried unchanged from
 [the detailed record](../sync-scan-cross-radio-2026-08-14/REPORT.md) together
 with their scripts and sidecars, which is why they carry an earlier freeze.
 
@@ -1690,7 +1883,7 @@ All twelve scripts, their sidecars and the extractors that feed them are in
 [`figures/`](figures/). Each figure runs in two steps — an extractor that
 streams the corpus into a compact local cache, because the capture host has 4 GB
 of RAM, then the figure script itself. The extractors are prefixed by the group
-they belong to: `opening-pipeline-*` feeds Figures 1 and 3,
+they belong to: `abscal-pipeline-*` feeds Figure 13, `opening-pipeline-*` feeds Figures 1 and 3,
 `firerate-pipeline-*` feeds Figures 2 and 6, `heatmaps-pipeline-*` feeds Figures
 8 to 10, and `carried-pipeline-*` feeds Figures 7, 11 and 12. Figures 4 and 5
 build their own cache on first run. The scripts import the repository's own
@@ -1702,7 +1895,10 @@ The census used by each figure is frozen by a snapshot step *before* the figure
 computes and re-measured afterwards; both readings, and the list of sidecars
 that landed in between, are recorded in each sidecar. Across every run behind
 this report the recheck showed **0 sweeps added and 0 sidecars removed** — only
-scoring advanced. Collection stayed paused throughout, the collector, drain and
+scoring advanced. **Figure 13 is the one exception**: it carries no census stamp,
+so its population is bounded by the date ranges named in its own sidecar rather
+than by a frozen count, and it should be re-run with a snapshot step before
+anyone relies on its `n` values as a closed set. Collection stayed paused throughout, the collector, drain and
 import services were neither stopped nor restarted, the radios were not touched,
 and all share and NVMe paths were read only.
 

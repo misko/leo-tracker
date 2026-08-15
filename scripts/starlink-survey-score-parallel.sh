@@ -134,8 +134,21 @@ pids=()
 # process group rather than merely declining to wait for it.
 cleanup() {
   local status=$?
+  # No re-entry: cleanup calls exit, which fires the EXIT trap, which is this
+  # function again.
+  trap - EXIT INT TERM
   if (( ${#pids[@]} )); then
     kill -TERM "${pids[@]}" 2>/dev/null || true
+    # Bounded, then SIGKILL. A worker blocked in NFS I/O is in uninterruptible
+    # sleep and will not answer TERM at all, and an unbounded `wait` there is
+    # why Ctrl-C appeared to do nothing and the operator had to kill -9.
+    local waited=0
+    while (( waited < 10 )); do
+      kill -0 "${pids[@]}" 2>/dev/null || break
+      sleep 1
+      waited=$(( waited + 1 ))
+    done
+    kill -KILL "${pids[@]}" 2>/dev/null || true
     wait "${pids[@]}" 2>/dev/null || true
   fi
   rm -rf "${shard_root}"
@@ -164,6 +177,8 @@ echo "schema:         ${schema}"
 # "scoring with 10 workers" and then goes quiet is indistinguishable from one
 # that has died.
 scanned=0
+_scan_start=$SECONDS
+_scan_beat=$SECONDS
 total_entries="$(ls -1 "${corpus_root}" 2>/dev/null | wc -l)"
 trace "listing the corpus"
 echo "scanning ${total_entries} corpus entries for what is already scored..."
@@ -172,8 +187,16 @@ trace "scanning ${total_entries} entries: one 512-byte read each, over the share
 pending=()
 for entry in "${corpus_root}"/*/; do
   scanned=$(( scanned + 1 ))
-  if (( scanned % 2000 == 0 )); then
-    echo "  scanned ${scanned}/${total_entries}, ${#pending[@]} to score so far"
+  # Heartbeat on TIME, not on count. Every N entries sounds equivalent and is
+  # not: the per-entry cost is a network round trip, so the same modulus is 11
+  # seconds apart on one host and minutes on another, and "how often should
+  # this print" stops having an answer. A deadline gives one.
+  if (( SECONDS - _scan_beat >= 15 )); then
+    _scan_beat=$SECONDS
+    printf '  scanned %s/%s (%s%%), %s to score so far, %ss elapsed\n' \
+      "${scanned}" "${total_entries}" \
+      "$(( scanned * 100 / (total_entries > 0 ? total_entries : 1) ))" \
+      "${#pending[@]}" "$(( SECONDS - _scan_start ))"
   fi
   [[ -f "${entry}survey.ci16" ]] || continue
   # Only the head of the sidecar, not all of it. These are ~1.2 MB each and

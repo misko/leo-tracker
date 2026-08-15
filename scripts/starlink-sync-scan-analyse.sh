@@ -253,8 +253,21 @@ pids=()
 # nothing left to name it by, so the trap takes the workers with it.
 cleanup() {
   local status=$?
+  # No re-entry: cleanup calls exit, which fires the EXIT trap, which is this
+  # function again.
+  trap - EXIT INT TERM
   if (( ${#pids[@]} )); then
     kill -TERM "${pids[@]}" 2>/dev/null || true
+    # Bounded, then SIGKILL. A worker blocked in NFS I/O is in uninterruptible
+    # sleep and will not answer TERM at all, and an unbounded `wait` there is
+    # why Ctrl-C appeared to do nothing and the operator had to kill -9.
+    local waited=0
+    while (( waited < 10 )); do
+      kill -0 "${pids[@]}" 2>/dev/null || break
+      sleep 1
+      waited=$(( waited + 1 ))
+    done
+    kill -KILL "${pids[@]}" 2>/dev/null || true
     wait "${pids[@]}" 2>/dev/null || true
   fi
   rm -rf "${shard_root}"

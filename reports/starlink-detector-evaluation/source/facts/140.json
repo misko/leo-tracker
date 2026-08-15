@@ -1,0 +1,371 @@
+{
+  "s05_anchor8_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/anchor-8/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_anchor8_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/anchor-8/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_anchor8_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/anchor-8/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_anchor8_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/anchor-8/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_glrt32_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-32/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_glrt32_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-32/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_glrt32_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-32/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_glrt32_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-32/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_glrt64_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-64/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_glrt64_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-64/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_glrt64_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-64/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_glrt64_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-64/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_diff16_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-16/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_diff16_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-16/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_diff16_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-16/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_diff16_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-16/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_diff32_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-32/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_diff32_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-32/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_diff32_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-32/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_diff32_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/differential-32/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_ffverify_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-verify/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_ffverify_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-verify/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_ffverify_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-verify/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_ffverify_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-verify/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_fffull_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-full/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_fffull_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-full/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_fffull_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-full/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_fffull_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-full/pooled/d_b",
+    "fmt": "f4"
+  },
+  "s05_ffacquire_p": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-acquire/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s05_ffacquire_f": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-acquire/pooled/f",
+    "fmt": "f4"
+  },
+  "s05_ffacquire_da": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-acquire/pooled/d_a",
+    "fmt": "f4"
+  },
+  "s05_ffacquire_db": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-acquire/pooled/d_b",
+    "fmt": "f4"
+  },
+
+  "s05_p_min_pct": {
+    "expr": "p * 100",
+    "inputs": {
+      "p": "s05_glrt32_p"
+    },
+    "fmt": "f2",
+    "note": "smallest measured per-cell null rate over the eight detectors; glrt-32 is the argument minimum in this sidecar. Scaled to a percentage here because the template writes the '%' once at the end of the range."
+  },
+  "s05_p_max_pct": {
+    "expr": "p * 100",
+    "inputs": {
+      "p": "s05_fffull_p"
+    },
+    "fmt": "f2",
+    "note": "largest measured per-cell null rate over the eight detectors; full-frame-full is the argument maximum in this sidecar."
+  },
+  "s05_f_min": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/pooled/f_min",
+    "fmt": "f4"
+  },
+  "s05_f_max": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/pooled/f_max",
+    "fmt": "f4"
+  },
+  "s05_f_spread": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/pooled/f_spread",
+    "fmt": "f4"
+  },
+  "s05_da_min": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-acquire/pooled/d_a",
+    "fmt": "f3",
+    "note": "smallest pooled d_A over the eight detectors; full-frame-acquire is the argument minimum in this sidecar"
+  },
+  "s05_da_max": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-32/pooled/d_a",
+    "fmt": "f3",
+    "note": "largest pooled d_A over the eight detectors; glrt-32 is the argument maximum in this sidecar"
+  },
+  "s05_db_min": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/full-frame-full/pooled/d_b",
+    "fmt": "f3",
+    "note": "smallest pooled d_B over the eight detectors; full-frame-full is the argument minimum in this sidecar"
+  },
+  "s05_db_max": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/per_method/glrt-32/pooled/d_b",
+    "fmt": "f3",
+    "note": "largest pooled d_B over the eight detectors; glrt-32 is the argument maximum in this sidecar"
+  },
+
+  "s05_matched_arm_cells": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census/matched_arm_cells",
+    "fmt": "int"
+  },
+  "s05_matched_arm_sweeps": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census/matched_arm_sweeps",
+    "fmt": "int"
+  },
+  "s05_paired_sweeps": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+
+  "s05_null_per_point": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/nominal_per_point",
+    "fmt": "pct1",
+    "note": "the per-point false-alarm rate the thresholds are set to; the same 0.01 appears as figures/cfo-cliff.json /false_alarm_rate and figures/edge-pilots.json /selection/false_alarm_rate"
+  },
+  "s05_null_per_point_survive": {
+    "expr": "1 - q",
+    "inputs": {
+      "q": "s05_null_per_point"
+    },
+    "fmt": "f2",
+    "note": "the per-point survival probability the cell-level arithmetic raises to the number of candidate points"
+  },
+  "s05_points_per_cell": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/mean_points_per_cell",
+    "fmt": "f1",
+    "note": "mean candidate points maximised over to decide one tuning, measured on the false-alarm rig"
+  },
+  "s05_predicted_per_cell": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/predicted_per_cell",
+    "fmt": "pct1",
+    "note": "1 - (1 - nominal_per_point) ** mean_points_per_cell, computed in the sidecar itself"
+  },
+
+  "s05_opp_argmin": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/opposite-edge/f_argmin",
+    "fmt": "raw"
+  },
+  "s05_opp_f_min": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/opposite-edge/f_min",
+    "fmt": "f4"
+  },
+  "s05_opp_f_spread": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/opposite-edge/f_spread",
+    "fmt": "f4"
+  },
+  "s05_opp_cells": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/opposite-edge/cells",
+    "fmt": "int"
+  },
+  "s05_same_argmin": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/same-edge/f_argmin",
+    "fmt": "raw"
+  },
+  "s05_same_f_min": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/same-edge/f_min",
+    "fmt": "f4"
+  },
+  "s05_same_f_spread": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/same-edge/f_spread",
+    "fmt": "f4"
+  },
+  "s05_same_cells": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/same-edge/cells",
+    "fmt": "int"
+  },
+  "s05_d_low": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/same-edge/d_min",
+    "fmt": "f2",
+    "note": "lowest d plotted on the right panel over both geometries; the same-edge extreme is the wider of the two, so it bounds the opposite-edge points too"
+  },
+  "s05_d_high": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/spread/same-edge/d_max",
+    "fmt": "f2",
+    "note": "highest d plotted on the right panel over both geometries; the same-edge extreme is the wider of the two, so it bounds the opposite-edge points too"
+  },
+
+  "s05_verify_anchor8_recomputed": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/anchor-8/recomputed_with_lnb_a_included/f",
+    "fmt": "f4"
+  },
+  "s05_verify_anchor8_published": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/anchor-8/published_with_lnb_a_excluded/f",
+    "fmt": "f3"
+  },
+  "s05_verify_glrt32_recomputed": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/glrt-32/recomputed_with_lnb_a_included/f",
+    "fmt": "f4"
+  },
+  "s05_verify_glrt32_published": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/glrt-32/published_with_lnb_a_excluded/f",
+    "fmt": "f3"
+  },
+  "s05_verify_fffull_recomputed": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/full-frame-full/recomputed_with_lnb_a_included/f",
+    "fmt": "f4"
+  },
+  "s05_verify_fffull_published": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/full-frame-full/published_with_lnb_a_excluded/f",
+    "fmt": "f3"
+  },
+  "s05_verify_fffull_delta": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/verification_against_the_published_run/full-frame-full/delta/f",
+    "fmt": "f4"
+  },
+  "s05_verify_max_gap": {
+    "expr": "0 - d",
+    "inputs": {
+      "d": "s05_verify_fffull_delta"
+    },
+    "fmt": "f4",
+    "note": "the largest of the three recomputed-minus-published gaps in this sidecar, carried as a positive tolerance; full-frame-full is the widest of the three"
+  },
+
+  "s05_arm_f_low": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/f_low",
+    "fmt": "f3",
+    "note": "arm axis of the authoritative full-corpus review: f at the lowest of the twelve arms"
+  },
+  "s05_arm_f_high": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/f_high",
+    "fmt": "f3",
+    "note": "arm axis of the authoritative full-corpus review: f at the highest of the twelve arms"
+  }
+}

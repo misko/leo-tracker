@@ -1,0 +1,221 @@
+{
+  "s14_epoch_before": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/epoch_split_utc/0",
+    "fmt": "raw",
+    "note": "the last instant before the pluto-19f2 LNB-swap window that hardware/epochs.json brackets"
+  },
+  "s14_epoch_after": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/epoch_split_utc/1",
+    "fmt": "raw"
+  },
+  "s14_diff_gen1": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/differentials/pluto-5d4d|gen1/median_hz",
+    "fmt": "signed_int",
+    "note": "rx0 - rx1 on pluto-5d4d before the boundary, live narrow reports via the repository's own _paired_differences"
+  },
+  "s14_diff_gen2": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/differentials/pluto-5d4d|gen2/median_hz",
+    "fmt": "signed_int",
+    "note": "rx0 - rx1 after the boundary; the survey path measured it, the live path cannot because lnb-a is outside its search"
+  },
+  "s14_n_dual_gen1": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/differentials/pluto-5d4d|gen1/n_dual",
+    "fmt": "int"
+  },
+  "s14_fire_before": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/arms/before/port_rate",
+    "fmt": "pct2"
+  },
+  "s14_fire_after": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/arms/after/port_rate",
+    "fmt": "pct2"
+  },
+  "s14_partner_before": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/arms/before/partner_rate",
+    "fmt": "pct2"
+  },
+  "s14_partner_after": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/arms/after/partner_rate",
+    "fmt": "pct2"
+  },
+  "s14_median_offset_before": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/absolute_by_method/lnb-a|gen1/live/median_hz",
+    "fmt": "khz1"
+  },
+  "s14_uncertainty_hz": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/differentials/pluto-5d4d|gen2/uncertainty_hz",
+    "fmt": "int"
+  },
+  "s14_uncertainty_khz": {
+    "expr": "hz / 1000",
+    "fmt": "f0",
+    "inputs": {
+      "hz": "s14_uncertainty_hz"
+    }
+  },
+  "s14_n_points_gen2": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/measurement/pluto-5d4d.refined_only/n",
+    "fmt": "int"
+  },
+  "s14_n_sweeps_gen2": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/measurement/pluto-5d4d.refined_only/clusters",
+    "fmt": "int"
+  },
+  "s14_recorded_centre": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/recorded_centres_hz/lnb-a",
+    "fmt": "signed_hz"
+  },
+  "s14_stale_by": {
+    "expr": "(measured - recorded) / 1000",
+    "fmt": "f0",
+    "inputs": {
+      "measured": "s14_diff_gen2",
+      "recorded": "s14_recorded_centre"
+    },
+    "note": "how far the recorded receiver centre sits from the measured one, in kHz"
+  },
+  "s14_19f2_stale_applied_hz": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen1/currently_applied_hz",
+    "fmt": "int"
+  },
+  "s14_19f2_stale_centre": {
+    "expr": "hz / 1000",
+    "fmt": "signed_f0",
+    "inputs": {
+      "hz": "s14_19f2_stale_applied_hz"
+    }
+  },
+  "s14_daily_calibration": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-5d4d/applied_centers_hz/0",
+    "fmt": "signed_f1",
+    "note": "what the daily lnb-calibration timer last wrote for pluto-5d4d rx0"
+  },
+  "s14_measured_centre_applied": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/differentials/pluto-5d4d|gen2/median_hz",
+    "fmt": "f1",
+    "note": "same value as s14_diff_gen2, written the way measured_centers_hz would carry it"
+  },
+  "s14_centroid_lnba": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-a/centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s14_centroid_lnbb": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-b/centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s14_centroid_lnbc": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-c/centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s14_centroid_lnbd": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-d/centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s14_centroid_shallowest": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-d/centroid_khz",
+    "fmt": "f0",
+    "note": "same value as s14_centroid_lnbd, quoted to the nearest kHz as one end of the range"
+  },
+  "s14_centroid_deepest": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-a/centroid_khz",
+    "fmt": "f0",
+    "note": "same value as s14_centroid_lnba, quoted to the nearest kHz as the other end of the range"
+  },
+  "s14_window_before_low": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/low_khz",
+    "fmt": "signed_f0"
+  },
+  "s14_window_before_high": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s14_window_after_low": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-a/low_khz",
+    "fmt": "signed_f0"
+  },
+  "s14_window_after_high": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-a/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s14_residual_khz": {
+    "src": "figures/port-bias.json",
+    "ptr": "/common_mode_offset/paired_per_instant_residual_khz",
+    "fmt": "f3",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s14_residual_ci": {
+    "src": "figures/port-bias.json",
+    "ptr": "/common_mode_offset/paired_per_instant_residual_ci_hz",
+    "fmt": "ci_signed_int"
+  },
+  "s14_bin_khz": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/bin_khz",
+    "fmt": "f0"
+  },
+  "s14_diff_step": {
+    "expr": "after - before",
+    "fmt": "signed_int",
+    "inputs": {
+      "before": "s14_diff_gen1",
+      "after": "s14_diff_gen2"
+    }
+  },
+  "s14_lnba_abs_gen1": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen1/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s14_lnba_abs_gen2": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "s14_abs_move": {
+    "expr": "after - before",
+    "fmt": "signed_int",
+    "inputs": {
+      "before": "s14_lnba_abs_gen1",
+      "after": "s14_lnba_abs_gen2"
+    }
+  },
+  "s14_step_gap": {
+    "expr": "(differential - absolute) / 1000",
+    "fmt": "f0",
+    "inputs": {
+      "differential": "s14_diff_step",
+      "absolute": "s14_abs_move"
+    }
+  }
+}

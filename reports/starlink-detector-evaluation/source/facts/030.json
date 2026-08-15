@@ -1,0 +1,121 @@
+{
+  "corpus_sweeps_on_share": {
+    "src": "figures/geometry.json",
+    "ptr": "/census_at_start/sweeps_on_share",
+    "fmt": "int",
+    "note": "collection is paused, so this total is final rather than a floor; geometry.json re-measured it at the end of its run and recorded zero drift"
+  },
+  "corpus_pairable_sweeps": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/n",
+    "fmt": "int",
+    "note": "sweeps captured by both radios, so a pair exists to import"
+  },
+  "corpus_single_radio_sweeps": {
+    "src": "figures/geometry.json",
+    "ptr": "/pairing_drops/unpaired_sweeps",
+    "fmt": "int",
+    "note": "the collector outage; adds to corpus_pairable_sweeps to give corpus_sweeps_on_share"
+  },
+  "corpus_entries_imported": {
+    "src": "figures/heatmaps-pipeline-snapshot.json",
+    "ptr": "/corpus_entries",
+    "fmt": "int"
+  },
+  "corpus_freeze_low": {
+    "src": "figures/negative-control.json",
+    "ptr": "/snapshot/scored_sidecars",
+    "fmt": "int",
+    "note": "the earliest freeze any figure in this report was computed on (cfo-cliff, f-strata, negative-control)"
+  },
+  "corpus_freeze_high": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/cache_meta/corpus_census/scored",
+    "fmt": "int",
+    "note": "the widest freeze any figure in this report was computed on (arm-matrix, geometry)"
+  },
+  "corpus_scored_pairs": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/n",
+    "fmt": "int",
+    "note": "geometry is built on the widest freeze, corpus_freeze_high, so this is the paired count 'at the widest freeze'"
+  },
+  "corpus_scored_pairs_same_edge": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/same_edge",
+    "fmt": "int"
+  },
+  "corpus_scored_pairs_opposite_edge": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/opposite_edge",
+    "fmt": "int"
+  },
+  "corpus_matched_arm_cells": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/published_with_lnb_a_excluded/population/matched_arm_cells",
+    "fmt": "int",
+    "note": "the population the published coincidence estimate rested on, with lnb-a excluded. The regenerated four-receiver figure in the same sidecar (/census/matched_arm_cells) stands at 36,384 over four receiver pairs; this census row describes the run the report published"
+  },
+  "corpus_live_target_observations": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/observations",
+    "fmt": "int",
+    "note": "all four receivers; the matrix was regenerated with lnb-a restored"
+  },
+  "corpus_null_observations": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/null_observations",
+    "fmt": "int",
+    "note": "fire-rate-problem is the figure behind the measured false-alarm rate and is one of the three-receiver figures inherited from the earlier freeze"
+  },
+  "corpus_lnba_observations_excluded": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/observations_added_by_restoring_lnb_a",
+    "fmt": "int",
+    "note": "exactly the lnb-a observations the published correlation matrix omitted: /observations (all four receivers) minus /published_with_lnb_a_excluded/observations"
+  },
+  "corpus_lnba_own_edge_phi": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/per_receiver/lnb-a/raw/same_channel_mean",
+    "fmt": "f3",
+    "note": "unresidualised, so it is the raw own-edge agreement the sentence names"
+  },
+  "corpus_lnba_cross_channel_phi": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/per_receiver/lnb-a/raw/cross_channel_mean",
+    "fmt": "f3"
+  },
+  "corpus_lnba_phi_ratio": {
+    "expr": "own_edge / cross_channel",
+    "inputs": {
+      "own_edge": "corpus_lnba_own_edge_phi",
+      "cross_channel": "corpus_lnba_cross_channel_phi"
+    },
+    "fmt": "f2",
+    "note": "the ratio the prose computes from the two phi values; recomputed on every build rather than typed"
+  },
+  "corpus_outage_from_utc": {
+    "src": "../sync-scan-cross-radio-2026-08-14/figures/outage-timeline.json",
+    "ptr": "/runs_plotted/0/to_utc",
+    "fmt": "raw",
+    "note": "the last sweep pluto-5d4d contributed before the collector outage. No formatter renders a timestamp, so the sidecar's own compact UTC form is what the report prints"
+  },
+  "corpus_outage_to_utc": {
+    "src": "../sync-scan-cross-radio-2026-08-14/figures/outage-timeline.json",
+    "ptr": "/recovery/first_paired_after_utc",
+    "fmt": "raw",
+    "note": "the first paired sweep after the outage; the pair of timestamps brackets the window in which pluto-5d4d produced nothing"
+  },
+  "corpus_last_scored": {
+    "src": "figures/heatmaps-pipeline-snapshot.json",
+    "ptr": "/last_scored",
+    "fmt": "raw",
+    "note": "scoring runs in corpus order, so the last scored sidecar is where the scored corpus stops"
+  },
+  "corpus_threshold_redraw_max_delta": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/robustness_thresholds_redrawn/max_abs_delta",
+    "fmt": "f4",
+    "note": "largest absolute movement of any of the six receiver pairs when lnb-a's cross-edge null arm is folded into the population the thresholds are drawn from"
+  }
+}

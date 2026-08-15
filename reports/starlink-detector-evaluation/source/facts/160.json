@@ -1,0 +1,117 @@
+{
+  "s07_observations": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/observations",
+    "fmt": "int",
+    "note": "live target observations carrying all eight verdicts, all four receivers included"
+  },
+  "s07_phi_min": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/min",
+    "fmt": "f3"
+  },
+  "s07_phi_max": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/max",
+    "fmt": "f3"
+  },
+  "s07_phi_mean": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/mean",
+    "fmt": "f3"
+  },
+  "s07_pairs": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/pairs",
+    "fmt": "int"
+  },
+  "s07_loosest_a": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/lowest_pair/0",
+    "fmt": "raw"
+  },
+  "s07_loosest_b": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/lowest_pair/1",
+    "fmt": "raw"
+  },
+  "s07_tightest_a": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/highest_pair/0",
+    "fmt": "raw"
+  },
+  "s07_tightest_b": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/highest_pair/1",
+    "fmt": "raw"
+  },
+  "s07_phi_glrt32_glrt64": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi/glrt-32/glrt-64",
+    "fmt": "f3"
+  },
+  "s07_phi_diff16_diff32": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi/differential-16/differential-32",
+    "fmt": "f3"
+  },
+  "s07_prev_observations": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/reported_in_retraction_report/observations",
+    "fmt": "int"
+  },
+  "s07_prev_phi_min": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/reported_in_retraction_report/phi_min",
+    "fmt": "f2"
+  },
+  "s07_prev_phi_max": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/reported_in_retraction_report/phi_max",
+    "fmt": "f2"
+  },
+  "s07_observation_ratio": {
+    "expr": "here / previously",
+    "inputs": {
+      "here": "s07_observations",
+      "previously": "s07_prev_observations"
+    },
+    "fmt": "f1",
+    "note": "how much larger this population is than the one the band was previously reported on"
+  },
+  "s07_observation_ratio_round": {
+    "expr": "here / previously",
+    "inputs": {
+      "here": "s07_observations",
+      "previously": "s07_prev_observations"
+    },
+    "fmt": "f0",
+    "note": "the same ratio, to no decimal, for the sentence that quotes it loosely"
+  },
+  "s07_detectors": {
+    "expr": "(1 + (1 + 8 * pairs) ** 0.5) / 2",
+    "inputs": {
+      "pairs": "s07_pairs"
+    },
+    "fmt": "f0",
+    "note": "the side of the correlation matrix, recovered from its own off-diagonal pair count: pairs = n(n-1)/2, so n = (1 + sqrt(1 + 8*pairs))/2"
+  },
+  "s07_orderings": {
+    "expr": "n * (n - 1) * (n - 2) * (n - 3) * (n - 4) * (n - 5) * (n - 6) * (n - 7)",
+    "inputs": {
+      "n": "s07_detectors"
+    },
+    "fmt": "int",
+    "note": "n! row orderings the seriation searched exhaustively; written out as a product because a derived fact is arithmetic only"
+  },
+  "s07_paired_sweeps": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s07_scored_sidecars_in_a_pair": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/census/scored_sidecars_in_a_pair",
+    "fmt": "int"
+  }
+}

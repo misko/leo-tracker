@@ -134,3 +134,24 @@ def test_uncited_facts_are_reported(tmp_path):
     made = book(tmp_path, facts, {"s.json": {"v": 1}})
     made.text("used")
     assert made.unused() == ["spare"]
+
+
+def test_the_published_report_still_matches_its_sources():
+    """REPORT.md is output, and this is what makes that true rather than aspirational.
+
+    The document is committed so it renders on the forge like any other file,
+    which also means it can be hand-edited -- and hand-editing numbers next to
+    data nobody re-read is exactly what put two dozen contradictions in it. A
+    sidecar regenerated with different values does the same thing from the other
+    side. Either way the rendered file and its sources stop agreeing, and this
+    fails instead of leaving it for a reader to notice.
+    """
+    import subprocess
+
+    done = subprocess.run(
+        [sys.executable, str(REPORT_ROOT / "source" / "build.py"), "check"],
+        capture_output=True, text=True, cwd=REPORT_ROOT)
+    assert done.returncode == 0, (
+        "REPORT.md has drifted from source/sections and source/facts.\n"
+        "Rebuild it with: python source/build.py build\n\n"
+        + done.stdout[-4000:] + done.stderr[-2000:])

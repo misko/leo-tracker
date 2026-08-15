@@ -1,0 +1,671 @@
+{
+  "s08_units": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/units_complete",
+    "fmt": "int",
+    "note": "one receiver chain's pass over one sweep, lnb-a restored; the sidecar records n_is_identical_in_every_cell for this count"
+  },
+  "s08_same_channel_raw": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/terms_raw/same_channel_mean",
+    "fmt": "f3"
+  },
+  "s08_same_channel_residualised": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/terms_residualised/same_channel_mean",
+    "fmt": "f3"
+  },
+  "s08_same_channel_surviving": {
+    "expr": "residualised / raw * 100",
+    "inputs": {
+      "residualised": "s08_same_channel_residualised",
+      "raw": "s08_same_channel_raw"
+    },
+    "fmt": "f0",
+    "note": "share of the raw same-channel term left after time x arm x receiver"
+  },
+  "s08_cross_raw_published": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/any-of-eight/raw_cross_channel_mean_phi",
+    "fmt": "f3",
+    "note": "raw cross-channel mean phi on the published (lnb-a excluded) population"
+  },
+  "s08_cross_raw_glrt_published": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/glrt-32/raw_cross_channel_mean_phi",
+    "fmt": "f3"
+  },
+  "s08_null_none_union": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/any-of-eight/raw_cross_channel_mean_phi",
+    "fmt": "f4"
+  },
+  "s08_null_none_glrt": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/glrt-32/raw_cross_channel_mean_phi",
+    "fmt": "f4"
+  },
+  "s08_removed_time_union": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/any-of-eight/removed_by_the_time_trend",
+    "fmt": "f4"
+  },
+  "s08_removed_time_glrt": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/glrt-32/removed_by_the_time_trend",
+    "fmt": "f4"
+  },
+  "s08_removed_arm_union": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/any-of-eight/removed_by_the_arm",
+    "fmt": "f4"
+  },
+  "s08_removed_arm_glrt": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/per_combiner/glrt-32/removed_by_the_arm",
+    "fmt": "f4"
+  },
+  "s08_null_time_union": {
+    "expr": "raw * (1 - removed)",
+    "inputs": {
+      "raw": "s08_null_none_union",
+      "removed": "s08_removed_time_union"
+    },
+    "fmt": "f4"
+  },
+  "s08_null_time_glrt": {
+    "expr": "raw * (1 - removed)",
+    "inputs": {
+      "raw": "s08_null_none_glrt",
+      "removed": "s08_removed_time_glrt"
+    },
+    "fmt": "f4"
+  },
+  "s08_null_arm_union": {
+    "expr": "raw * (1 - removed)",
+    "inputs": {
+      "raw": "s08_null_none_union",
+      "removed": "s08_removed_arm_union"
+    },
+    "fmt": "f4"
+  },
+  "s08_null_arm_glrt": {
+    "expr": "raw * (1 - removed)",
+    "inputs": {
+      "raw": "s08_null_none_glrt",
+      "removed": "s08_removed_arm_glrt"
+    },
+    "fmt": "f4"
+  },
+  "s08_null_full_union": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/cross_channel_mean_ladder/any-of-eight/time8 x arm x receiver/cross_channel_mean",
+    "fmt": "f3",
+    "note": "the fully stratified rung, measured with lnb-a restored"
+  },
+  "s08_null_full_glrt": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/cross_channel_mean_ladder/glrt-32/time8 x arm x receiver/cross_channel_mean",
+    "fmt": "f3"
+  },
+  "s08_time_share_min": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/time_trend_share_range/0",
+    "fmt": "f4",
+    "note": "smaller of the two combiners' shares; the sidecar's own reading quotes the range as 5-6%"
+  },
+  "s08_arm_share_min": {
+    "src": "figures/f-strata.json",
+    "ptr": "/arm_axis_is_the_largest_confound/arm_share_range/0",
+    "fmt": "f4",
+    "note": "smaller of the two combiners' shares; the sidecar's own reading quotes the range as 43-46%"
+  },
+  "s08_time_cost_pct": {
+    "expr": "share * 100",
+    "inputs": {
+      "share": "s08_time_share_min"
+    },
+    "fmt": "f0"
+  },
+  "s08_arm_cost_pct": {
+    "expr": "share * 100",
+    "inputs": {
+      "share": "s08_arm_share_min"
+    },
+    "fmt": "f0"
+  },
+  "s08_arm_axis_f_low": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/f_low",
+    "fmt": "f3",
+    "note": "the authoritative full-corpus arm axis: the lowest of its twelve arms"
+  },
+  "s08_arm_axis_f_high": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/f_high",
+    "fmt": "f3"
+  },
+  "s08_null_draws": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/stratified_permutation_null/draws",
+    "fmt": "int"
+  },
+  "s08_null_p_floor": {
+    "expr": "1 / draws",
+    "inputs": {
+      "draws": "s08_null_draws"
+    },
+    "fmt": "f4",
+    "note": "the smallest p a permutation null of this many draws can report"
+  },
+  "s08_cells_union": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/per_cell/cross_channel_cells_clearing_the_bar",
+    "fmt": "int"
+  },
+  "s08_cells_total": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/per_cell/cross_channel_cells",
+    "fmt": "int"
+  },
+  "s08_cells_glrt": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/glrt_32/per_cell/cross_channel_cells_clearing_the_bar",
+    "fmt": "int"
+  },
+  "s08_cells_total_glrt": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/glrt_32/per_cell/cross_channel_cells",
+    "fmt": "int"
+  },
+  "s08_sep1_union": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised/1/mean_phi",
+    "fmt": "f4"
+  },
+  "s08_sep1_glrt": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised_glrt_32/1/mean_phi",
+    "fmt": "f4"
+  },
+  "s08_sep2_union": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised/2/mean_phi",
+    "fmt": "f4"
+  },
+  "s08_sep2_glrt": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised_glrt_32/2/mean_phi",
+    "fmt": "f4"
+  },
+  "s08_sep3_union": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised/3/mean_phi",
+    "fmt": "f4"
+  },
+  "s08_sep3_glrt": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised_glrt_32/3/mean_phi",
+    "fmt": "f4"
+  },
+  "s08_sep_factor_union": {
+    "expr": "far / near",
+    "inputs": {
+      "far": "s08_sep3_union",
+      "near": "s08_sep1_union"
+    },
+    "fmt": "f2"
+  },
+  "s08_sep_factor_glrt": {
+    "expr": "far / near",
+    "inputs": {
+      "far": "s08_sep3_glrt",
+      "near": "s08_sep1_glrt"
+    },
+    "fmt": "f2"
+  },
+  "s08_published_units": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/published_with_lnb_a_excluded_and_the_unstratified_null/units_complete",
+    "fmt": "int",
+    "note": "the figure was drawn on the published three-receiver population"
+  },
+  "s08_paired_sweeps": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s08_published_receivers": {
+    "expr": "units / sweeps",
+    "inputs": {
+      "units": "s08_published_units",
+      "sweeps": "s08_paired_sweeps"
+    },
+    "fmt": "f0",
+    "note": "each live receiver contributes one unit per paired sweep"
+  },
+  "s08_pair_sweeps": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s08_sweeps_same_edge": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/census/paired_sweeps_by_geometry/same-edge",
+    "fmt": "int"
+  },
+  "s08_sweeps_opposite_edge": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/census/paired_sweeps_by_geometry/opposite-edge",
+    "fmt": "int"
+  },
+  "s08_rung2_n": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/n",
+    "fmt": "int",
+    "note": "the only rung of the withdrawn ladder the sidecar measures: lnb-c against lnb-d"
+  },
+  "s08_rung2_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/phi_methods_mean",
+    "fmt": "f3"
+  },
+  "s08_rung2_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/bootstrap/ci95/0",
+    "fmt": "f3"
+  },
+  "s08_rung2_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/bootstrap/ci95/1",
+    "fmt": "f3"
+  },
+  "s08_ladder_receiver_delta": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/withdrawn_four_rung_ladder/what_it_claimed/changing RECEIVER",
+    "fmt": "signed_f4",
+    "note": "recorded by the sidecar as what the withdrawn ladder claimed, not as a measured effect"
+  },
+  "s08_bootstrap_draws": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/bootstrap/draws",
+    "fmt": "int"
+  },
+  "s08_n_per_pair": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/headline_checks/n_per_pair",
+    "fmt": "int"
+  },
+  "s08_pair_ab_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/phi_methods_mean",
+    "fmt": "f4"
+  },
+  "s08_pair_ab_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/bootstrap/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_pair_ab_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/bootstrap/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_pair_db_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-d|lnb-b/phi_methods_mean",
+    "fmt": "f4"
+  },
+  "s08_pair_db_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-d|lnb-b/bootstrap/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_pair_db_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-d|lnb-b/bootstrap/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_pair_ca_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-a/phi_methods_mean",
+    "fmt": "f4"
+  },
+  "s08_pair_ca_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-a/bootstrap/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_pair_ca_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-a/bootstrap/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_pair_cd_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/phi_methods_mean",
+    "fmt": "f4"
+  },
+  "s08_pair_cd_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/bootstrap/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_pair_cd_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/bootstrap/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_pair_cb_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-b/phi_methods_mean",
+    "fmt": "f4"
+  },
+  "s08_pair_cb_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-b/bootstrap/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_pair_cb_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-b/bootstrap/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_pair_da_phi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-d|lnb-a/phi_methods_mean",
+    "fmt": "f4"
+  },
+  "s08_pair_da_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-d|lnb-a/bootstrap/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_pair_da_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-d|lnb-a/bootstrap/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_model_sub_c": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-c|lnb-a - lnb-c|lnb-b/observed",
+    "fmt": "signed_f4",
+    "note": "substituting the far-side LNB model with lnb-c as the near side"
+  },
+  "s08_model_sub_c_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-c|lnb-a - lnb-c|lnb-b/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s08_model_sub_c_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-c|lnb-a - lnb-c|lnb-b/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s08_model_sub_d_reversed": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-d|lnb-b - lnb-d|lnb-a/observed",
+    "fmt": "f4",
+    "note": "the sidecar stores this difference the other way round"
+  },
+  "s08_model_sub_d_reversed_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-d|lnb-b - lnb-d|lnb-a/ci95/0",
+    "fmt": "f4"
+  },
+  "s08_model_sub_d_reversed_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-d|lnb-b - lnb-d|lnb-a/ci95/1",
+    "fmt": "f4"
+  },
+  "s08_model_sub_d": {
+    "expr": "-observed",
+    "inputs": {
+      "observed": "s08_model_sub_d_reversed"
+    },
+    "fmt": "signed_f4",
+    "note": "same substitution with lnb-d as the near side, signed to match the lnb-c contrast"
+  },
+  "s08_model_sub_d_ci_lo": {
+    "expr": "-high",
+    "inputs": {
+      "high": "s08_model_sub_d_reversed_ci_hi"
+    },
+    "fmt": "signed_f4"
+  },
+  "s08_model_sub_d_ci_hi": {
+    "expr": "-low",
+    "inputs": {
+      "low": "s08_model_sub_d_reversed_ci_lo"
+    },
+    "fmt": "signed_f4"
+  },
+  "s08_spread_six": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/factor_marginals_NOT_A_DECOMPOSITION/spread_across_the_six_pairs",
+    "fmt": "f4"
+  },
+  "s08_fire_rate_min": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/any-method/fire_rate_a",
+    "fmt": "f3",
+    "note": "lnb-a, the lowest any-method fire rate of the four ports"
+  },
+  "s08_fire_rate_max": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/any-method/fire_rate_b",
+    "fmt": "f3",
+    "note": "lnb-d, the highest"
+  },
+  "s08_radio_free": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-c|lnb-a - lnb-c|lnb-d/observed",
+    "fmt": "signed_f4",
+    "note": "the radio boundary at fixed LNB model"
+  },
+  "s08_radio_free_ci_lo": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-c|lnb-a - lnb-c|lnb-d/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s08_radio_free_ci_hi": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairwise_differences/lnb-c|lnb-a - lnb-c|lnb-d/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s08_fire_lnba_anchor8": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/anchor-8/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_diff16": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/differential-16/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_diff32": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/differential-32/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_ffacquire": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/full-frame-acquire/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_fffull": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/full-frame-full/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_ffverify": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/full-frame-verify/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_glrt32": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/glrt-32/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba_glrt64": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/glrt-64/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnba": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s08_fire_lnba_anchor8",
+      "b": "s08_fire_lnba_diff16",
+      "c": "s08_fire_lnba_diff32",
+      "d": "s08_fire_lnba_ffacquire",
+      "e": "s08_fire_lnba_fffull",
+      "f": "s08_fire_lnba_ffverify",
+      "g": "s08_fire_lnba_glrt32",
+      "h": "s08_fire_lnba_glrt64"
+    },
+    "fmt": "f4",
+    "note": "mean fire rate of this port over the eight scored methods"
+  },
+  "s08_fire_lnbb_anchor8": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/anchor-8/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_diff16": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/differential-16/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_diff32": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/differential-32/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_ffacquire": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/full-frame-acquire/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_fffull": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/full-frame-full/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_ffverify": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/full-frame-verify/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_glrt32": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/glrt-32/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb_glrt64": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-a|lnb-b/fire_rates/glrt-64/fire_rate_b",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbb": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s08_fire_lnbb_anchor8",
+      "b": "s08_fire_lnbb_diff16",
+      "c": "s08_fire_lnbb_diff32",
+      "d": "s08_fire_lnbb_ffacquire",
+      "e": "s08_fire_lnbb_fffull",
+      "f": "s08_fire_lnbb_ffverify",
+      "g": "s08_fire_lnbb_glrt32",
+      "h": "s08_fire_lnbb_glrt64"
+    },
+    "fmt": "f4",
+    "note": "mean fire rate of this port over the eight scored methods"
+  },
+  "s08_fire_lnbc_anchor8": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/anchor-8/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_diff16": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/differential-16/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_diff32": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/differential-32/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_ffacquire": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/full-frame-acquire/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_fffull": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/full-frame-full/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_ffverify": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/full-frame-verify/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_glrt32": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/glrt-32/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc_glrt64": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/pairs/lnb-c|lnb-d/fire_rates/glrt-64/fire_rate_a",
+    "fmt": "f4"
+  },
+  "s08_fire_lnbc": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s08_fire_lnbc_anchor8",
+      "b": "s08_fire_lnbc_diff16",
+      "c": "s08_fire_lnbc_diff32",
+      "d": "s08_fire_lnbc_ffacquire",
+      "e": "s08_fire_lnbc_fffull",
+      "f": "s08_fire_lnbc_ffverify",
+      "g": "s08_fire_lnbc_glrt32",
+      "h": "s08_fire_lnbc_glrt64"
+    },
+    "fmt": "f4",
+    "note": "mean fire rate of this port over the eight scored methods"
+  },
+  "s08_rank_same_radio_a": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/rank_positions_of_each_factor_level/radio/same radio/0",
+    "fmt": "int"
+  },
+  "s08_rank_same_radio_b": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/rank_positions_of_each_factor_level/radio/same radio/1",
+    "fmt": "int"
+  },
+  "s08_rank_same_model_a": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/rank_positions_of_each_factor_level/model/same model/0",
+    "fmt": "int"
+  },
+  "s08_rank_same_model_b": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/rank_positions_of_each_factor_level/model/same model/1",
+    "fmt": "int"
+  },
+  "s08_rank_same_model_c": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/rank_positions_of_each_factor_level/model/same model/2",
+    "fmt": "int"
+  },
+  "s08_census_scored": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/census/frozen_at_start/scored_sidecars",
+    "fmt": "int"
+  }
+}

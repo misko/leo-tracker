@@ -1,3 +1,11 @@
+<!-- GENERATED FILE -- do not edit.
+
+    Sections live in source/sections/*.md and every number is a reference into a
+    committed sidecar, resolved by source/build.py.  Edit the templates or the
+    facts, then re-run:  python source/build.py build
+    To check this file still matches its sources:  python source/build.py check
+-->
+
 # Evaluating Starlink edge-pilot detectors with two radios
 
 Date: 2026-08-14 UTC
@@ -16,7 +24,6 @@ instrument calibrated, and together they supersede several of the earlier
 conclusions and says so at each point. Where the two disagree, **the injection
 sections are current.** Section 9's surviving-findings table carries a status
 column for exactly this reason.
-
 ## Executive summary
 
 Eight algorithms were built to decide whether a Starlink downlink channel is
@@ -37,22 +44,20 @@ coincidence model was that the eight algorithms agree on `f`. Run the identical
 estimator on two joins where the model is **definitionally false** — radio B
 taken two instants later, and radio A joined to a different sweep entirely — and
 the eight agree at least as tightly: spread 0.036 on the scrambled join against
-0.042 on the real one, each at or below its own sampling noise. Under a
-sweep-cluster bootstrap the control-minus-real differences span zero (−0.0062,
-CI −0.0219…+0.0167), so the controls are not demonstrably *tighter* — they are
-indistinguishable, which is all the argument needs. Under the model's own
-separation rule no control separates from the real join under any resampling
-unit. The check has no failure mode
+0.042 on the real one, each at or below its own sampling noise. The controls
+are not demonstrably *tighter* — they are indistinguishable, which is all the
+argument needs. Under the model's own separation rule no control separates from
+the real join. The check has no failure mode
 ([section 6](#6-did-it-work-the-negative-controls)).
 
 The reason is measurable. Over 40,256 observations every pair of the eight
-detectors makes the same fire / no-fire call at phi 0.841–0.947. They are one
+detectors makes the same fire / no-fire call at phi 0.841–0.946. They are one
 statistic counted eight times, and near-duplicates are obliged to return
 near-identical `f` whatever they are fed
 ([section 7](#7-why-it-failed-the-detectors-are-near-duplicates)).
 
 What survives is observational rather than causal. A channel's own two edges
-agree at phi 0.44–0.47, far above any two different channels at 0.07–0.09 once
+agree at phi 0.39–0.42, far above any two different channels at 0.02–0.10 once
 the acquisition arm is controlled — and that weaker cross-channel term *rises*
 with channel separation rather than staying flat, which no uniform common mode
 produces and which this report does not explain. Agreement between two chains
@@ -96,7 +101,6 @@ Every `d` in the sections below is a **model output**, never a measurement. It i
 inferred from a model whose own consistency check is the one shown above to be
 incapable of failing. That caveat is repeated wherever a `d` appears, because it
 is load-bearing every time.
-
 ## How to read this report
 
 Each numbered section is one idea, one figure, one takeaway, and is meant to be
@@ -106,16 +110,16 @@ result, every disagreement between snapshots, the full claim ledger — is
 and is not superseded by this document. This is the summary.
 
 **One census note, stated once and then not revisited.** Radio collection was
-paused by the operator at 2026-08-14T14:49Z, so sweep and pair counts are fixed
-and do not move. Scoring has no timer and ran throughout, so the count of scored
-sidecars does move. Every figure freezes its own list of scored sidecars before
-computing and uses only that list; the four new figure groups froze at 2,462,
-2,544, 2,547 and 2,554 scored sidecars (for the two joining groups, 2,514 and
-2,516 of those sit inside a pair), and the three figures carried over from the
-detailed record froze earlier still, at 2,339. A population size quoted in one
-section can therefore differ from a neighbouring section by a percent or two.
-Nothing here turns on that, no figure mixes lists, and the range is 2,339–2,554
-throughout.
+paused by the operator at 20260814T144922Z, so sweep and pair counts are fixed
+and do not move. Scoring has no timer and ran throughout, so the count of
+scored sidecars does move. Every figure freezes its own list of scored
+sidecars before computing and uses only that list; the four new figure groups
+froze at 2,462, 2,544, 2,547 and 2,554 scored sidecars (for the two joining
+groups, 2,514 and 2,516 of those sit inside a pair), and the three figures
+carried over from the detailed record froze earlier still, at 2,339. A
+population size quoted in one section can therefore differ from a neighbouring
+section by a percent or two. Nothing here turns on that, no figure mixes
+lists, and the range is 2,339–2,554 throughout.
 
 **Which receivers each figure uses.** `lnb-a` was excluded from the original
 analysis in error (see
@@ -129,35 +133,24 @@ between three- and four-receiver populations, and this is the map:
 | `port-bias` | **all four** | regenerated with `lnb-a` on its **measured** +567,402 Hz centre |
 | `cfo-cliff` | three | offset-binned; built before `lnb-a`'s centre was measured, and its stale +1,170 Hz would have distorted the axis |
 | `edge-pilots` | one capture | a single spectrum, not a population |
-| `negative-control`, `fire-rate-problem` | three | inherited from the earlier freeze; restoring `lnb-a` moves every receiver pair by less than 0.004 |
+| `negative-control`, `fire-rate-problem` | three | inherited from the earlier freeze |
 
 **One limitation that does matter, and it constrains how every absolute number
 here should be read.** Scoring runs in corpus order, so the scored set is a
 *chronological prefix* of the campaign, not a sample of it. The share spans
-00:03:15Z to 14:49:22Z; scoring has reached 03:54:56Z. Of the 2,948 entries at
-or before that instant, 2,840 are scored; of the 10,267 after it, **none are**.
-Every figure in this report therefore describes the first quarter of the
-observing window.
+20260814T000315Z to 20260814T144922Z; of the 13,215 corpus entries only 2,547
+carry scores, and the last of them is `sync-20260814T032155Z-pluto-5d4d` —
+**nothing after that instant is scored at all**. Every figure in this report
+therefore describes the opening stretch of the observing window.
 
-That window is not stationary. Split into equal quartiles, the fire rate climbs
-steadily through it:
-
-| Window (UTC) | n | `anchor-8` | `full-frame-full` | `glrt-32` | any method |
-|---|---:|---:|---:|---:|---:|
-| 00:03–01:07 | 8,016 | 0.2586 | 0.2823 | 0.2516 | 0.3519 |
-| 01:07–02:00 | 8,016 | 0.3326 | 0.3500 | 0.3280 | 0.4228 |
-| 02:00–02:44 | 8,016 | 0.3230 | 0.3462 | 0.3225 | 0.4178 |
-| 02:44–03:24 | 8,016 | 0.3527 | 0.3721 | 0.3542 | 0.4452 |
-
-The swing across 3.3 hours is 0.094 — roughly **four times the 0.024 spread
-between the eight detectors** that section 2 is about. So: every *absolute* rate
-in this report is a property of 00:03–03:55 UTC and should not be read as a
-property of the sky in general. Every *comparison* — between algorithms, between
-geometries, between joins — is paired inside that window and is unaffected,
-which is why the results in sections 6, 7 and 8 stand regardless. It also
-explains why the census numbers above drift monotonically rather than randomly:
-each later batch is later sky, and later sky was busier.
-
+That window is not stationary: the fire rate climbs through it. So: every
+*absolute* rate in this report is a property of that opening stretch and
+should not be read as a property of the sky in general. Every *comparison* —
+between algorithms, between geometries, between joins — is paired inside that
+window and is unaffected, which is why the results in sections 6, 7 and 8
+stand regardless. It also explains why the census numbers above drift
+monotonically rather than randomly: each later batch is later sky, and later
+sky was busier.
 ## The corpus
 
 | Quantity | Measured | Moves? |
@@ -172,7 +165,7 @@ each later batch is later sky, and later sky was busier.
 | Matched-arm cells behind the coincidence estimate | 18,176 | |
 | Live target observations behind the correlation matrix | 40,256 | |
 | Live cross-edge null observations behind the measured false-alarm rate | 15,072 | |
-| `lnb-a` observations excluded as a dead port — **an error, see below** | 15,104 | |
+| `lnb-a` observations excluded from the correlation matrix as a dead port — **an error, see below** | 10,064 | |
 
 Four receivers exist; three are live. `lnb-c` and `lnb-d` are the two inputs of
 `pluto-19f2`; `lnb-b` and `lnb-a` are the two inputs of `pluto-5d4d`. All four are live in this corpus. `lnb-a` was excluded throughout on the grounds
@@ -180,15 +173,16 @@ that it "returns a flat ~1.19 peak-to-median at every tuning since 2026-08-13
 04:44 UTC". **That exclusion is wrong for this corpus, and the figures inherit
 it.** Re-measured on the same freeze with the repository's own fire logic,
 `lnb-a` shows own-edge agreement phi 0.417 against 0.091 across channels (ratio
-4.60, indistinguishable from `lnb-c`); a target/null fire ratio of 4.90, *equal*
-to `lnb-c`'s; `differential-32` score separation of 7.1x against `lnb-b`'s 7.4x;
-and a coarse peak-to-median of median 1.104, max 2.007, sd 0.078 — not flat, and
-not distinguishable from `lnb-b`. The cited 04:44 UTC failure falls inside
-`pluto-5d4d`'s 03:24:04Z–05:07:56Z outage, a window in which that radio produced
-no data at all, and the scored corpus stops at 03:21:55Z regardless. Within this
-corpus `lnb-a` was a working receiver. Restoring it changes no headline number —
-redrawing thresholds with its null included moves every receiver pair by less
-than 0.004 — but it supplies the same-model cross-radio contrast that section 8b
+4.60, indistinguishable from `lnb-c`); a target/null fire ratio *equal* to
+`lnb-c`'s; `differential-32` score separation close to `lnb-b`'s; and a coarse
+peak-to-median that is not flat, and not distinguishable from `lnb-b`. The
+cited 04:44 UTC failure falls inside `pluto-5d4d`'s
+20260814T032404Z–20260814T050756Z outage, a window in which
+that radio produced no data at all, and the scored corpus stops at
+`sync-20260814T032155Z-pluto-5d4d` regardless. Within this corpus `lnb-a` was a
+working receiver. Restoring it changes no headline number — redrawing
+thresholds with its null included moves every receiver pair by at most
+0.0035 — but it supplies the same-model cross-radio contrast that section 8b
 needs, and its absence is why that section previously reached a conclusion it
 could not support.
 
@@ -197,7 +191,6 @@ cheapest available improvement to every number in this report, and it is the
 first item in [section 10](#10-what-real-ground-truth-would-take).
 
 ---
-
 ## 1. Why edge pilots, and why nothing here is visible
 
 Each Starlink downlink channel is 240 MHz wide and carries eight known pilot
@@ -262,7 +255,6 @@ right, which is exactly why ground truth has to be manufactured — the subject 
 the next two sections.
 
 ---
-
 ## 2. The hard part: nothing was injected
 
 No signal of known amplitude was ever put into either front end at this site.
@@ -274,9 +266,9 @@ Across the eight detectors, how often a detector fires on sky tracks how often
 it fires on a **measured** cross-edge target-code null: least squares over the eight points
 gives slope 1.99, r = 0.84, **r-squared = 0.70**. Roughly two-thirds of the
 between-detector spread in fire rate is just the null rate. That fit is eight
-points and it moves with the corpus: recomputed independently at three census
-sizes spanning one hour of scoring it ranges r-squared 0.64–0.70, so read it as
-"about two-thirds", not as 70.0%. `full-frame-full`
+points and it moves with the corpus: recomputed independently at two census
+sizes spanning one hour of scoring it ranges r-squared 0.69–0.70, so read it as
+"about two-thirds", not as 70.5%. `full-frame-full`
 fires most on sky (33.30%) and also most on the null (6.74%); `glrt-32` fires
 least on both (30.89% and 5.47%). Firing 8% more often may mean 8% more
 sensitive or 8% looser, and the count cannot say which.
@@ -330,7 +322,6 @@ detector. Ground truth has to come from somewhere else, and the only thing this
 site has is a second radio.
 
 ---
-
 ## 3. The apparatus: two radios, one instant
 
 One collector process opens both Plutos and runs one thread per radio, with a
@@ -398,30 +389,29 @@ the rendezvous, not the radios, and cannot distinguish the two geometries the
 experiment was built to compare.
 
 ---
-
 ## 4. The dataset: twelve arms, and two geometries for free
 
 Twelve arms cross probe length {80, 160, 640} ms with sample rate
 {1.25, 2.5, 5.0, 10.0} MS/s, drawn uniformly per sweep. Both radios take the
-same arm with design probability 0.9; the remaining tenth put two different
+same arm on most sweeps by design; the rest put two different
 configurations on the same sky at the same instant.
 
 **The randomisation came out flat.** 6,364 of 7,054 captured sweeps put both
-radios on the same arm — 90.2% against a design 0.9. Per-arm counts run 508–575
+radios on the same arm — 90.2%. Per-arm counts run 508–575
 against a uniform expectation of 530.3; chi-square 6.99 on 11 degrees of
 freedom, Monte-Carlo p = **0.80** over 20,000 draws. No arm was starved.
 
 | arm | probe (ms) | rate (MS/s) | sweeps, both radios | solo captures | samples/tuning | IQ bytes per radio | pilot guard (kHz) | pilot band fits | imported pairs | scored pairs |
 |---|---:|---:|---:|---:|---:|---:|---:|:--:|---:|---:|
-| 80ms-1.25MSps | 80 | 1.25 | 540 | 106 | 100,000 | 6,400,000 | -312.5 | NO | 469 | 103 |
+| 80ms-1.25MSps | 80 | 1.25 | 540 | 106 | 100,000 | 6,400,000 | −312.5 | NO | 469 | 103 |
 | 80ms-2.50MSps | 80 | 2.5 | 536 | 133 | 200,000 | 12,800,000 | +312.5 | yes | 465 | 87 |
 | 80ms-5.00MSps | 80 | 5 | 523 | 105 | 400,000 | 25,600,000 | +1562.5 | yes | 447 | 109 |
 | 80ms-10.00MSps | 80 | 10 | 517 | 103 | 800,000 | 51,200,000 | +4062.5 | yes | 451 | 88 |
-| 160ms-1.25MSps | 160 | 1.25 | 528 | 109 | 200,000 | 12,800,000 | -312.5 | NO | 460 | 96 |
+| 160ms-1.25MSps | 160 | 1.25 | 528 | 109 | 200,000 | 12,800,000 | −312.5 | NO | 460 | 96 |
 | 160ms-2.50MSps | 160 | 2.5 | 527 | 118 | 400,000 | 25,600,000 | +312.5 | yes | 475 | 96 |
 | 160ms-5.00MSps | 160 | 5 | 575 | 116 | 800,000 | 51,200,000 | +1562.5 | yes | 509 | 106 |
 | 160ms-10.00MSps | 160 | 10 | 542 | 121 | 1,600,000 | 102,400,000 | +4062.5 | yes | 477 | 95 |
-| 640ms-1.25MSps | 640 | 1.25 | 541 | 121 | 800,000 | 51,200,000 | -312.5 | NO | 460 | 97 |
+| 640ms-1.25MSps | 640 | 1.25 | 541 | 121 | 800,000 | 51,200,000 | −312.5 | NO | 460 | 97 |
 | 640ms-2.50MSps | 640 | 2.5 | 508 | 124 | 1,600,000 | 102,400,000 | +312.5 | yes | 453 | 73 |
 | 640ms-5.00MSps | 640 | 5 | 517 | 107 | 3,200,000 | 204,800,000 | +1562.5 | yes | 447 | 96 |
 | 640ms-10.00MSps | 640 | 10 | 510 | 117 | 6,400,000 | 409,600,000 | +4062.5 | yes | 437 | 94 |
@@ -486,7 +476,6 @@ corpus has on simultaneity — the recorded skew, from
 [section 3](#3-the-apparatus-two-radios-one-instant), is not one.
 
 ---
-
 ## 5. Ground truth by coincidence: the model
 
 Two chains that share only the sky are the substitute for injection. Let a sky
@@ -515,15 +504,15 @@ the check.
 
 | Detector | measured `p` | `f` | d_A | d_B |
 |---|---:|---:|---:|---:|
-| `anchor-8` | 6.30% | 0.3388 | 0.8135 | 0.7609 |
-| `glrt-32` | 5.47% | 0.3391 | 0.8208 | 0.7681 |
-| `glrt-64` | 6.10% | 0.3470 | 0.8185 | 0.7616 |
-| `differential-16` | 6.35% | 0.3659 | 0.8037 | 0.7428 |
-| `differential-32` | 6.30% | 0.3733 | 0.8009 | 0.7402 |
-| `full-frame-verify` | 6.69% | 0.3745 | 0.7938 | 0.7363 |
-| `full-frame-full` | 6.74% | 0.3781 | 0.7888 | 0.7334 |
-| `full-frame-acquire` | 6.73% | 0.3788 | 0.7831 | 0.7376 |
-| **range over the eight** | **5.47–6.74%** | **0.3388–0.3788, spread 0.0400** | **0.783–0.821** | **0.733–0.768** |
+| `anchor-8` | 6.33% | 0.3313 | 0.8373 | 0.7127 |
+| `glrt-32` | 5.50% | 0.3322 | 0.8427 | 0.7195 |
+| `glrt-64` | 6.07% | 0.3417 | 0.8378 | 0.7131 |
+| `differential-16` | 6.30% | 0.3626 | 0.8132 | 0.7004 |
+| `differential-32` | 6.26% | 0.3701 | 0.8109 | 0.6950 |
+| `full-frame-verify` | 6.69% | 0.3692 | 0.8075 | 0.6896 |
+| `full-frame-full` | 6.75% | 0.3722 | 0.8023 | 0.6892 |
+| `full-frame-acquire` | 6.73% | 0.3706 | 0.8016 | 0.6911 |
+| **range over the eight** | **5.50–6.75%** | **0.3313–0.3722, spread 0.0408** | **0.802–0.843** | **0.689–0.720** |
 
 *36,384 joined matched-arm cells across four receiver pairs, `lnb-a` included;
 `p` measured per detector on the live cross-edge null observations. **Every d_A
@@ -533,9 +522,9 @@ The model's own consistency check is
 
 Two things are worth reading off that table before going further.
 
-**The null rate is measured per cell, and the units matter.** A per-*point* 1%
-threshold, maximised over roughly seven candidate points to decide one tuning,
-predicts 1 − 0.99^7 = 6.8% per cell. The measured 5.47–6.74% is therefore what
+**The null rate is measured per cell, and the units matter.** A per-*point* 1.0%
+threshold, maximised over roughly 6.8 candidate points to decide one tuning,
+predicts 1 − 0.99^6.8 = 6.6% per cell. The measured 5.50–6.75% is therefore what
 correct calibration looks like, not a broken threshold — framing it as "6%, not
 the nominal 1%" implied a defect that is not there. What does matter is that
 every `d` above depends on this denominator, and that assuming the per-point
@@ -547,18 +536,18 @@ receiver structure; and the calibration is **in-sample**, since the same null
 population sets the threshold and then measures the rate.
 
 **The one sky parameter does not come out as one number.** Pooled, the eight
-return `f` 0.3388–0.3788, a spread of 0.0400. That is the model's own check,
+return `f` 0.3313–0.3722, a spread of 0.0408. That is the model's own check,
 already unmet. And the extremes move with geometry rather than sitting on one
-misbehaving algorithm: on opposite-edge cells the minimum is `glrt-32` at 0.3442
-(spread 0.0429 over 9,568 cells); on same-edge cells the minimum is `anchor-8`
-at 0.3301 (spread 0.0408 over 8,608 cells). Near-identical spread, different
+misbehaving algorithm: on opposite-edge cells the minimum is `glrt-32` at 0.3375
+(spread 0.0423 over 19,136 cells); on same-edge cells the minimum is `anchor-8`
+at 0.3195 (spread 0.0458 over 17,248 cells). Near-identical spread, different
 argument minimum. The invariance failure is a property of the estimate, not of
 one algorithm.
 
 The solver reproduces the authoritative full-corpus run closely on the
-opposite-edge cells: `anchor-8` f 0.3467 against 0.346 reported, `glrt-32`
-0.3442 against 0.344, `full-frame-full` 0.3871 against 0.388 — every `f` within
-0.001.
+opposite-edge cells: `anchor-8` f 0.3420 against 0.346 reported, `glrt-32`
+0.3375 against 0.344, `full-frame-full` 0.3799 against 0.388 — every `f` within
+0.0081.
 
 ![The coincidence model as a schematic, and the f, dA and dB it returns per detector](figures/coincidence-model.png)
 
@@ -566,10 +555,10 @@ opposite-edge cells: `anchor-8` f 0.3467 against 0.346 reported, `glrt-32`
 there.*** *Left panel is a schematic — no data — of the model and of what is
 counted, measured and solved. Right panel is the solution per detector, split by
 geometry (filled = opposite-edge, open = same-edge): sky occupancy `f` in the
-narrow band on the left, and d_A / d_B at 0.73–0.82 on the right. Every point on
-the right half of that panel is a model output. n = 18,176 joined matched-arm
-cells (9,568 opposite-edge, 8,608 same-edge) from 1,136 matched-arm sweeps of
-1,257 paired. Values in
+narrow band on the left, and d_A / d_B at 0.68–0.85 on the right. Every point on
+the right half of that panel is a model output. n = 36,384 joined matched-arm
+cells (19,136 opposite-edge, 17,248 same-edge) from 1,137 matched-arm sweeps of
+1,258 paired. Values in
 [`figures/coincidence-model.json`](figures/coincidence-model.json).*
 
 **Takeaway.** The model is solvable and returns physically plausible numbers.
@@ -586,10 +575,10 @@ pair across every included cell**. That requires:
 
 | Assumption | Status in this corpus |
 |---|---|
-| Both chains share one false-alarm rate | contradicted — `p` runs 5.47–6.74% across methods and varies by receiver |
+| Both chains share one false-alarm rate | contradicted — `p` runs 5.50–6.75% across methods and varies by receiver |
 | False alarms independent across chains, so joint null firing is `p^2` | untested; common interference or shared receiver structure would break it |
-| `d` constant across acquisition arms | contradicted — `f` moves 0.015 to 0.401–0.510 across the twelve arms |
-| `d` constant across receivers, channels and time | contradicted on all three — see 8b, 8a, and the 0.094 fire-rate swing across the window |
+| `d` constant across acquisition arms | contradicted — `f` moves 0.120 to 0.525 across the twelve arms |
+| `d` constant across receivers, channels and time | contradicted on all three — see 8b, 8a, and the fire-rate swing across the window |
 | Detections conditionally independent given occupancy | untestable here; latent signal-strength variation alone would break it |
 
 Pooling heterogeneous strata can generate covariance and distort `f`, `d_A` and
@@ -600,8 +589,6 @@ a hierarchical treatment of latent signal strength.
 
 None of this weakens section 6 — it is a second, independent reason not to read
 the `d` values as measurements.
-
-
 ## 6. Did it work? The negative controls
 
 This is the test that decides the report, and it is cheap: build joins where the
@@ -660,7 +647,6 @@ model output from this model. Most detector comparisons never run this control.
 This one did, and it came back negative — that is the contribution.
 
 ---
-
 ## 7. Why it failed: the detectors are near-duplicates
 
 The negative control is not a surprise once you look at the detectors
@@ -671,12 +657,12 @@ pair of the eight makes the same fire / no-fire call at phi **0.841–0.946**.
 | Pair | phi |
 |---|---:|
 | Loosest pair anywhere in the matrix: `anchor-8` / `differential-16` | 0.841 |
-| Tightest pair anywhere: `full-frame-full` / `full-frame-verify` | 0.945 |
-| `glrt-32` / `glrt-64` | 0.936 |
-| `differential-16` / `differential-32` | 0.917 |
-| Mean over all 28 pairs | 0.888 |
+| Tightest pair anywhere: `full-frame-full` / `full-frame-verify` | 0.946 |
+| `glrt-32` / `glrt-64` | 0.935 |
+| `differential-16` / `differential-32` | 0.915 |
+| Mean over all 28 pairs | 0.885 |
 | Band previously reported, on 2,160 observations | 0.82–0.94 |
-| Band here, on 40,256 observations (14.0x) | **0.841–0.947** |
+| Band here, on 40,256 observations (18.6x) | **0.841–0.946** |
 
 Note what this does *not* say. Detectors with statistically independent errors
 are still positively correlated whenever both have skill, because they observe
@@ -686,11 +672,11 @@ counted eight times" overstates it. What the band establishes is that the eight
 produce **highly redundant binary verdicts on identical IQ** and cannot be
 treated as eight independent witnesses for validating `f`. Separating shared
 truth from shared error needs correlations on the null arm, conditional on arm,
-receiver and time block, or against injected truth. At 14x the observations the
+receiver and time block, or against injected truth. At 19x the observations the
 band is **wider at the bottom** than previously reported, so this is not a
 small-sample artefact being sanded down — it firms up. Grouping by family barely
 matters: the same-family blocks hold the tightest pairs, but no pair anywhere in
-the matrix falls below 0.85.
+the matrix falls below 0.841.
 
 That is the mechanism behind
 [section 6](#6-did-it-work-the-negative-controls). Near-duplicate detectors are
@@ -717,7 +703,6 @@ about the sky. Either add a genuinely different statistic, or report one
 detector and its null.
 
 ---
-
 ## 8. What the sky looks like
 
 Two independent readings of the same corpus. Neither depends on the coincidence
@@ -752,7 +737,7 @@ permutation instead changes the answer:
 
 The chronological trend costs only ~5%. **The acquisition arm costs ~43%** — a
 confound this report had not considered, though its own axis table records `f`
-moving from 0.015 to 0.401–0.510 across arms. Pooling twelve arms into one 8x8
+moving from 0.120 to 0.525 across arms. Pooling twelve arms into one 8x8
 matrix induces a positive floor by aggregation alone.
 
 What remains is still real: the observed cross-channel mean exceeds all 400
@@ -764,16 +749,16 @@ did.
 
 **And it is not flat.** Corrected for arm, time and receiver, the cross-channel
 term *rises* with separation: 0.0484 / 0.0721 / 0.0883 (union) and 0.0652 /
-0.1015 / 0.1321 (`glrt-32`) at distance 1 / 2 / 3 — factors of 1.82 and 2.03,
+0.1015 / 0.1321 (`glrt-32`) at distance 1 / 2 / 3 — factors of 1.83 and 2.03,
 independently in all three receivers. A uniform additive common mode is
 separation-flat by construction, so **the sweep-wide common mode reading is
 withdrawn**. What produces a sweep-level term that prefers *distant* channels is
 not explained here. Caveat: distance 3 rests on only the four ch1xch4 cells.
 
 Using one predeclared detector rather than the any-of-eight union does not
-weaken this — `glrt-32` alone *raises* both terms (0.658 and 0.177 against 0.453
-and 0.118) at a lower fire rate, with the same-to-cross ratio essentially
-unchanged. The union dilutes rather than amplifies.
+weaken this — `glrt-32` alone *raises* both terms (its cross-channel term is
+0.177 against 0.118) at a lower fire rate, with the same-to-cross ratio
+essentially unchanged. The union dilutes rather than amplifies.
 
 ![Phi between all eight tunings, and the cross-channel term against channel separation](figures/channel-edge-correlation.png)
 
@@ -798,18 +783,18 @@ as descriptions, with what each step actually changes stated honestly:
 
 | Rung | What is different | n pairs | sweeps | mean phi across the eight | bootstrap 95% CI |
 |---|---|---:|---:|---:|---|
-| Same receiver, both edges of one channel | one dwell apart in its own scan order: **a time gap, one LNB, one clock** | 15,096 | 1,258 | **0.605** | 0.590–0.620 |
+| Same receiver, both edges of one channel | one dwell apart in its own scan order: **a time gap, one LNB, one clock** | — | 1,258 | — | — |
 | Two receivers, one radio, same tuning | **three things at once**: different LNB, *and* same-edge instead of opposite-edge, *and* the gap removed | 10,064 | 1,258 | **0.518** | 0.502–0.535 |
-| Two radios, **same** edge, same tuning | **plus the radio boundary**: two clocks, two buses | 9,632 | 602 | **0.523** | 0.497–0.546 |
-| Two radios, **opposite** edges | **plus the edge**: both edges of one channel at one instant | 10,496 | 656 | **0.523** | 0.500–0.546 |
+| Two radios, **same** edge, same tuning | **plus the radio boundary**: two clocks, two buses | — | 602 | — | — |
+| Two radios, **opposite** edges | **plus the edge**: both edges of one channel at one instant | — | 656 | — | — |
 
 The contrasts between adjacent rungs are the result:
 
 | Contrast | What it isolates | delta phi | 95% CI | Crosses zero? |
 |---|---|---:|---|:--:|
-| opposite-edge minus same-edge, two radios | **the edge alone**, at fixed hardware and zero time gap | **−0.0000** | −0.035 … +0.037 | yes |
-| two radios same-edge minus two receivers one radio | **the radio boundary**, at a fixed edge | **+0.0046** | −0.021 … +0.030 | yes |
-| two receivers one radio minus same receiver both edges | ~~changing the LNB~~ — **nothing singly** | −0.0868 | −0.101 … −0.070 | no |
+| opposite-edge minus same-edge, two radios | **the edge alone**, at fixed hardware and zero time gap | — | — | yes |
+| two radios same-edge minus two receivers one radio | **the radio boundary**, at a fixed edge | — | — | yes |
+| two receivers one radio minus same receiver both edges | ~~changing the LNB~~ — **nothing singly** | −0.0868 | — | no |
 
 *Bootstrap over paired sweeps, 400 draws — not over cells, because a sweep's
 eight tunings and two receiver pairs are not independent draws.*
@@ -855,9 +840,9 @@ assignments across simultaneous L/L, U/U, L/U and U/L observations, with
 first-sample timing measured and dry ports on both radios.
 
 The two readings in this section cross-check each other. Under the any-method
-fire rule, the top rung's per-channel agreement is phi 0.448 / 0.466 / 0.459 /
-0.441 — the same four numbers as the outlined diagonal blocks in Figure 9, from
-a different script and a different unit of observation.
+fire rule, the top rung's per-channel agreement reproduces the outlined
+diagonal blocks in Figure 9, from a different script and a different unit
+of observation.
 
 ![Six receiver pairs, with radio, LNB model and water marked, showing no ordering by any of them](figures/edge-agreement.png)
 
@@ -879,7 +864,6 @@ different direction, and it is why what survives from this corpus is
 instrumental.
 
 ---
-
 ## 9. What survives: the instrument
 
 Two findings that do not depend on the coincidence model, do not depend on the
@@ -909,13 +893,13 @@ Binned on that axis, `differential-32`'s detection rate collapses in the
 178,399 live target points plotted from 363,004 candidate points read, over
 1,146 paired sweeps.*
 
-The pilot guard bands at those three rates are +312.5, +1,562.5 and
-+4,062.5 kHz — a **13x range** — and the cliff does not move. That rules the
+The pilot guard bands at those three rates are +312.5, +1562.5 and
++4062.5 kHz — a **13x range** — and the cliff does not move. That rules the
 guard band out. What is left is a detection cliff near 350–400 kHz of corrected offset — **since shown by
 injection not to be a detector tolerance at all, see
 [section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)**
 whose mechanism is open: the survey scorer's own bank spans ±700 kHz, and the
-±350 kHz constant elsewhere in the codebase belongs to the acquisition path,
+narrower constant elsewhere in the codebase belongs to the acquisition path,
 which this scoring path does not use.
 
 The cliff is robust to disaggregation. All nine (rate, probe length) cells
@@ -943,17 +927,17 @@ Two limits belong with it, neither visible in the figure:
 *`differential-32`, fired against its own (sample rate, probe length)
 cross-edge-null 1% threshold and binned on the pipeline's bias-corrected offset.
 The three guards span 13x, and two of them are never reached at all — the
-largest corrected offset anywhere in the corpus is 1,417.4 kHz, well inside
+largest corrected offset anywhere in the corpus is 1417.4 kHz, well inside
 both. Lower panel is n per bin. Values in
 [`figures/cfo-cliff.json`](figures/cfo-cliff.json).*
 
 ### 9b. One port carries a large LO offset and is the best receiver on site
 
-`lnb-c` has `receiver_centers_hz` = **+604,159.8 Hz**, applied at scoring time.
+`lnb-c` has `receiver_centers_hz` = **+604159.8 Hz**, applied at scoring time.
 That is well past the ~350 kHz tolerance above, which is enough to make a
-healthy port look dead. On the raw axis at 5 MS/s it reads 1.5% (n = 2,050) in
+healthy port look dead. On the raw axis at 5 MS/s it reads 1.5% (n = 2,227) in
 the 100–200 kHz bin where the other two ports peak, because its entire response
-has moved out to 400–500 kHz (61.0%, n = 3,619).
+has moved out to 400–500 kHz (61.4%, n = 3,903).
 
 Bias-corrected, it is the strongest port on site:
 
@@ -990,9 +974,9 @@ port about 150 kHz below zero, none near it — is the same either way. Values i
 ***Audit note, recorded and unresolved.*** *`lnb-a` is excluded throughout
 because `cross_radio.DEAD_RECEIVERS` records it as flat ~1.19 at every tuning
 since 2026-08-13 04:44 UTC. Scored on `differential-32`, this corpus does not
-reproduce that: `lnb-a` fires on 15.52% of its 60,095 target points against
-`lnb-b`'s 17.98% of 59,604, and its cross-edge null is not silence — median
-0.0180 and p99 0.0814, against `lnb-b`'s 0.0187 and 0.0854. The exclusion is
+reproduce that: `lnb-a` fires on 15.82% of its 65,948 target points against
+`lnb-b`'s 18.21% of 65,420, and its cross-edge null is not silence — median
+0.0180 and p99 0.0835, against `lnb-b`'s 0.0187 and 0.0856. The exclusion is
 applied everywhere in this report regardless; the disagreement belongs in the
 record.*
 
@@ -1001,20 +985,19 @@ record.*
 | Finding | The number it rests on | Status |
 |---|---|---|
 | ~~A rate-independent ~350 kHz offset tolerance~~ **superseded — an observation, not a tolerance ([11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search), [12](#12-what-the-cliff-actually-is))** | collapse in the 350–400 kHz bin at 2.5, 5.0 and 10 MS/s, in all nine (rate, probe) cells, while the guard moves 13x | **stands**; mechanism open |
-| ~~`lnb-c` needs a +604.2 kHz configured centre correction~~ **superseded — +604.2 kHz is itself 177.9 kHz too high and costs 25.5% of its detections ([16c](#16c-miscentring-costs-detections-and-this-is-measured-not-modelled))** | its measured absolute centre is **+424,990 Hz**; the direction of the original finding — `lnb-c` needs a large positive correction, and corrected it has the highest fire rate in the slice — **stands** | **corrected value** |
+| ~~`lnb-c` needs a +604.2 kHz configured centre correction~~ **superseded — +604.2 kHz is itself 179.2 kHz too high and costs 25.5% of its detections ([16c](#16c-miscentring-costs-detections-and-this-is-measured-not-modelled))** | its measured absolute centre is **+424,990 Hz**; the direction of the original finding — `lnb-c` needs a large positive correction, and corrected it has the highest fire rate in the slice — **stands** | **corrected value** |
 | The 1.25 MS/s arm cannot capture the full unaliased pilot allocation and is the weakest arm; extra dwell cannot restore missing bandwidth | a 1.875 MHz band in a 1.25 MHz capture; guard −312.5 kHz, `pilot_band_fits` false; f 0.120 on 1,504 cells against 0.525 | **stands** |
-| The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.947 over 40,256 observations | **stands** |
+| The eight detectors produce highly redundant verdicts on identical IQ | phi 0.841–0.946 over 40,256 observations | **stands** |
 | A per-point 1% threshold yields 5.47–6.74% per cell after maximising over ~7 candidates, as expected | 5.47–6.74% across the eight, on 15,072 null observations | **stands** |
 | Recorded skew is a lower bound and is blind to geometry | barrier-release stamp; 0.0437 against 0.0446 ms across geometries whose true offsets differ ~5x | **stands** |
-| ~~`lnb-a` is excluded as a dead port~~ **withdrawn — its LO moved 567 kHz out of the search grid ([14](#14-the-dead-port-and-the-stale-calibration-are-one-fault))** | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.52% of 60,095 against `lnb-b`'s 17.98% of 59,604) | applied, **unexplained** |
-| Cross-radio beats within-radio | not shown: the radio boundary costs phi +0.0046, CI −0.021…+0.030 | **not established** |
+| ~~`lnb-a` is excluded as a dead port~~ **withdrawn — its LO moved 567 kHz out of the search grid ([14](#14-the-dead-port-and-the-stale-calibration-are-one-fault))** | `DEAD_RECEIVERS`; not reproduced on `differential-32` (15.82% of 65,948 against `lnb-b`'s 18.21% of 65,420) | applied, **unexplained** |
+| Cross-radio beats within-radio | not shown: no committed artefact isolates a radio-boundary effect on phi | **not established** |
 
 **Takeaway.** The instrument findings are the practical payoff of this corpus:
 correct the `lnb-c` bias or widen the offset search past 350 kHz, and stop
 pooling the 1.25 MS/s arm with arms whose pilot band fits.
 
 ---
-
 ## 10. What real ground truth would take
 
 The single sentence: **every limitation above traces back to having no known
@@ -1034,7 +1017,7 @@ Short of that, in order of cost:
 | Derive the skew bound the coincidence model actually needs | analysis only | 0.054 ms and the README's 0.2–0.5 s operator target cannot both be the requirement |
 | Measure the `gen2` LO offsets with `lo_sweep` | one sweep | turns +604.2 kHz from one number into a measurement with an error bar |
 | Widen the offset search past 350 kHz and re-score one arm | one arm | if the cliff moves, the search span explains it; if not, that explanation is wrong |
-| Add a genuinely different statistic to the bank | development | at phi 0.841–0.947 the eight are one detector; agreement among them is not information |
+| Add a genuinely different statistic to the bank | development | at phi 0.841–0.946 the eight are one detector; agreement among them is not information |
 | **Inject a known signal** | hardware | replaces every model-output `d` in this report with a measurement |
 
 **The cheapest item is first, and it is very cheap.** 7,054 sweeps were
@@ -1056,12 +1039,11 @@ detectors — by fire count, by excess over the measured null, or by model outpu
 `d` — should be reported as a result.
 
 ---
-
 ## 11. Ground truth at last: measured detection probability
 
 Every number before this section is inferred. This one is measured.
 
-Two bench radios carry a closed loopback — `TX2` into a splitter and 30 dB of
+Two bench radios carry a closed loopback — `TX2` into a splitter and fixed
 attenuation, into `RX1` and `RX2`, with no antenna. Transmitting the
 repository's own `pilots.edge_pilot_frame` puts the exact signal the eight
 detectors hunt onto a channel whose occupancy, amplitude and carrier offset are
@@ -1096,8 +1078,8 @@ points: **neither ranking in this report carries information about which
 detector was more sensitive under this condition.**
 
 Read the measured order as a **partial** one. The spread is only 1.65 dB; 21 of
-28 pairs resolve at 95% under a paired bootstrap, but that is 28 comparisons
-from 200 draws with no family-wise correction, and rank uncertainty is not
+28 pairs resolve under a paired bootstrap, but that is 28 comparisons from one
+bootstrap ensemble with no family-wise correction, and rank uncertainty is not
 propagated into the Spearman figures. What survives that caution is: `glrt-32`
 and the three full-frame variants form the leading group, `differential-16` is
 materially worst, and several internal orderings — including `glrt-32` against
@@ -1136,7 +1118,7 @@ With occupancy set by hand to `f_true` = 0.2775 at an SNR where Pd ~ 0.6:
 - The eight point estimates span **0.283–0.331** — and every one of them lies
   **above** the true 0.2775. They do not bracket it. Mean bias is **+0.0302**,
   and all eight read high in 81.8% of resamples. The plotted intervals are
-  5th–95th percentiles, central 90%, not 95%.
+  central bootstrap percentile intervals.
 - **Null** false alarms are approximately independent: on known-empty cells,
   P(AB) − P(A)P(B) <= 0.007. That is *not* conditional independence, which the
   model also requires on **occupied** cells, where P(AB | T=1) must equal
@@ -1183,7 +1165,7 @@ simply be bought with signal:
 743–746 kHz is the coarse-E bank's own ±700 kHz span. Received power is flat to
 +0.08 dB across the transition, so it is not the analogue filter. The second
 radio reproduces this independently: per-cell detection 100% at every offset out
-to 800 kHz, with one exception in 320 combinations.
+to 800 kHz, with one exception.
 
 **So the on-sky cliff is not a detector tolerance and not a search limit.** It
 lives in something the cable does not contain: the sky, the LNBs, or the offset
@@ -1203,7 +1185,7 @@ Measured on truly empty input, independently on both radios:
 | | radio `.183` | radio `.165` | nominal |
 |---|---|---|---|
 | per point | 0.59–1.14% | 0.57–1.42% | 1% |
-| per cell | 4.0–7.7% | 3.9–9.7% | 6.6–6.8% predicted by 1 − 0.99^k |
+| per cell | 4.0–7.7% | 3.9–9.7% | 6.5–6.6% predicted by 1 − 0.99^k |
 
 Both bracket the on-sky 5.47–6.74%. **The sky null rate is fully explained by
 candidate multiplicity; no residual sky energy is required to account for it.**
@@ -1211,9 +1193,10 @@ This is the measurement behind the correction in
 [section 2](#2-the-hard-part-nothing-was-injected).
 
 One caveat the two radios do not fully agree on: `.165` finds the sky null
-hotter than a cable null in the **tail only** — medians 1.131 against 1.139, but
-p99 1.258 against 1.181 — while `.183` finds the empty-channel band brackets sky
-outright. The tail is what a threshold is made of, so this is worth resolving.
+hotter than a cable null in the **tail only** — its median 1.131 sits below the
+cable null's, its p99 1.258 above — while `.183` finds the empty-channel band
+brackets sky outright. The tail is what a threshold is made of, so this is
+worth resolving.
 
 **A defect that should be fixed.** The repository contains two cross-edge nulls
 and only one is sound:
@@ -1231,15 +1214,13 @@ and full-frame families, with `differential-*` and `anchor-8` near-unbiased.
 ### What this section does not establish
 
 The loopback shares one oscillator between transmit and receive, so the injected
-signal arrives at ~0.07 Hz offset and the detectors never had to search
+signal arrives at a negligible offset and the detectors never had to search
 frequency — which is why 11c had to impose offset explicitly, and why nothing
 here speaks to LO drift or to the water on the `lnb-c`/`lnb-d` bias tees. `RX1`
-and `RX2` share an LO and carry 7.4% common-mode noise power; it produced no
+and `RX2` share an LO and carry common-mode noise power; it produced no
 correlated false alarms, but two radios on sky are not quite this pair. One
 probe length, one sample rate, and a single occupancy and SNR for 11b. And no
 LNB, antenna or sky anywhere in the path.
-
-
 ## 12. What the cliff actually is
 
 [Section 11c](#11c-the-350400-khz-cliff-is-not-in-the-detectors-the-banks-or-the-search)
@@ -1259,14 +1240,14 @@ full depth regardless:
 |---|---:|---|---|
 | `lnb-b` | 0.0 Hz | 15.8% → 2.1% (**7.5×**) | identical by construction |
 | `lnb-d` | 0.0 Hz | 19.6% → 2.9% (**6.9×**) | identical by construction |
-| `lnb-c` | +604,159.8 Hz | 15.4% → 41.1% — **no cliff**, rises to 76% at 475–500 kHz | 22.2% → 1.6% (**14×**) |
+| `lnb-c` | +604159.8 Hz | 15.4% → 41.1% — **no cliff**, rises to 70% at 400–450 kHz | 22.2% → 1.6% (**14×**) |
 
 The cliff sits at the same *corrected* offset for all three ports and at
 different *raw* offsets. Correcting is what makes them agree, and `lnb-b` and
 `lnb-d` — the two the correction cannot touch — carry 76% of the pre-cliff bin.
 Independent confirmation that the `pluto-19f2` correction is sound: re-deriving
 it from the corpus with `lnb_calibration`'s own rx0−rx1 estimator gives
-+603,312.6 Hz against the recorded +604,159.8, agreeing to **847 Hz**.
++603503.8 Hz against the recorded +604159.8, agreeing to **656 Hz**.
 
 ### The window is one-sided, and it is not centred on zero
 
@@ -1280,12 +1261,10 @@ tooth — the live region is a band, not a symmetric tolerance:
 | `lnb-c` | −350 … 0 kHz |
 | `lnb-d` | −300 … +50 kHz |
 
-**0 fires in 25,370 refined points at corrected ≥ 350 kHz, and 0 fires in
-35,655 refined points outside signed [−350, +50] kHz.** So the "collapse between
+**No bin outside those windows is live at all.** So the "collapse between
 350 and 400 kHz" is the folded far edge of a **~300 kHz window centred near
 −150 kHz** — not a symmetric ±350 kHz tolerance, and not a Doppler population:
-the centre is stable hour by hour through the whole corpus (`lnb-b` −131 / −146
-/ −146 / −144 kHz across quartiles).
+the centre is stable hour by hour through the whole corpus.
 
 That −150 kHz is precisely the quantity the calibration cannot see.
 `lnb_calibration` measures **rx0 − rx1 only**, and its own docstring states that
@@ -1299,9 +1278,7 @@ detection's measured carrier offset against TLE-predicted Doppler breaks the
 circularity of an axis the pipeline estimates for itself. The sync corpus cannot
 carry that test — every `sync-*` capture records `utc: null` and `rf_center_hz:
 null` — so it was run on the 878 narrow sky sweeps that do carry a probe UTC and
-a tuning carrier, 88,606 target points. Those sweeps agree with the sync corpus
-on the same receivers to within 2–4 kHz, and the geometry reproduces the
-repository's own `survey_truth` prior to a median 0.025 Hz.
+a tuning carrier, 88,606 target points.
 
 TLE Doppler over catalogued satellites in view is **symmetric about zero** —
 mean −0.9 kHz, p5/p95 ±169 kHz above 40° elevation — so residual ≈ measured
@@ -1329,7 +1306,7 @@ reference error large enough to *be* the −150 kHz would contribute −153 kHz.
 is not there. The constant term carries everything.
 
 **So the −150 kHz is each LNB's own local-oscillator error, per receiver, plus a
-small geometry term of 20–30 kHz.** That is a different and less convenient
+small geometry term.** That is a different and less convenient
 finding than a single tuning-plan mistake: there is no one number to correct.
 Each receiver needs its own measured centre — which is exactly what
 [section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault) had to do
@@ -1349,10 +1326,10 @@ marked. The two zero-centre ports show the cliff identically on both axes.*
 ### Two defects this exposed
 
 **`lnb-a`'s calibration is stale by 567 kHz.** The same rx0−rx1 estimator gives
-`pluto-5d4d` = **+568,436 Hz** against a recorded `receiver_centers_hz` of
+`pluto-5d4d` = **+568,249 Hz** against a recorded `receiver_centers_hz` of
 +1,170 Hz. Its "corrected" axis is therefore effectively uncorrected, which is
 why its live window sits at +250…+550 kHz — the same window displaced by the
-calibration error. `lnb-a` is otherwise plainly live, firing 48–80% inside its
+calibration error. `lnb-a` is otherwise plainly live, firing 44.3% inside its
 own window, which independently confirms
 [the exclusion was wrong](#the-corpus); but **its centre must be re-measured
 before it can be pooled into any offset-binned figure.** The receiver-agreement
@@ -1361,9 +1338,9 @@ they are unaffected.
 
 **The cliff's height is inflated by grid teeth.** The 300–350 kHz bin contains
 the coarse-A tooth at exactly 300.0 kHz and the 350–400 bin the coarse-E tooth
-at 350.0. Pooled over `lnb-b`, `lnb-c` and `lnb-d`, 79% of the pre-cliff bin is
-tooth points firing at 23.2%, while refined points in the same bin fire at
-**2.8%**. The cliff exists and is sharp; the plateau it appears to fall from is
+at 350.0. Pooled over `lnb-b`, `lnb-c` and `lnb-d`, most of the pre-cliff bin is
+tooth points, firing at a higher rate than the refined points in the same bin.
+The cliff exists and is sharp; the plateau it appears to fall from is
 mostly grid.
 
 ### What is still unexplained
@@ -1376,12 +1353,10 @@ pooled window onto **+3.5 kHz** in a genuinely out-of-sample test. What remains
 open is the **~±175 kHz half-width**, given that injection shows the detectors
 themselves flat out to ±700 kHz — so the width belongs to the acquisition stage,
 not to the decision statistics.
-
-
 ## 13. The same experiment, on two radios, with the answer known
 
 [Section 11](#11-ground-truth-at-last-measured-detection-probability) used one
-radio, where `RX1` and `RX2` share an oscillator and carry 7.4% common-mode
+radio, where `RX1` and `RX2` share an oscillator and carry common-mode
 noise — the *dependent* configuration this report argues elsewhere is unusable.
 This section removes that objection. Two separate radios, each with its own
 loopback, own oscillator, own clock and no RF path to the other, are driven from
@@ -1461,7 +1436,8 @@ honest unit, since cells within a sweep share time, hardware and arm — over
 
 And the shrinkage curve accounts for the entire original gap: median spread runs
 0.090 at n = 128, 0.065 at 500, 0.051 at 2,000, 0.044 at 16,560. **0.040 at
-n = 16,560 and 0.05 at n = 500 are the same number at two sample sizes.**
+n = 16,560 and the injected spreads at n = 500 are the same number at two
+sample sizes.**
 
 So both directions of the original claim are dead. The sky's 0.0422 is
 unremarkable for its own n, sitting at percentile 30. The hardware spreads
@@ -1485,8 +1461,8 @@ the published `d` values are floors rather than estimates.
 
 On two independent radios the bias does not vanish — **it reverses.** It reads
 low in only **10 of 48** cases, which is to say it reads *high* in 38, with a
-median bias of **+0.0372** and a worst case of **0.277**. Against chance that is
-p ≈ 1e-4, so the direction is systematic, not noise.
+median bias of **+0.0372** and a worst case of **0.277**. The direction is
+systematic, not noise.
 
 So the floors caveat is withdrawn and replaced by its opposite: with the shared
 oscillator removed, the solver **over-estimates** `d`. Published `d` values on
@@ -1501,10 +1477,11 @@ bias depends on the rig.
 
 The model assumes false alarms are independent across chains and uses `p²` for
 joint null firing, which has never been checked against a measured joint null.
-With both radios silent, the odds ratio between the two chains' firing is
-**1.03** and **0.84** at the two better-sampled rates — consistent with
-independence. The lowest-rate point falls to 0.50 but rests on very few
-coincidences and should not be read as a violation.
+With both radios silent over 900 instants, the measured joint rate tracks the
+product of the marginals: **48 of 48** algorithm-by-threshold cases are
+consistent with independence, the smallest Fisher exact p-value among them being
+0.065. The lowest-rate points rest on very few coincidences and should not be
+read as a violation.
 
 ![Measured joint null against the p-squared assumption](figures/injection/fig_d5_joint_null.png)
 
@@ -1518,13 +1495,11 @@ per-receiver −150 kHz LO errors of
 [16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs), the water on the `lnb-c` and
 `lnb-d` bias tees, and the LNB chain generally are all outside what a cable can
 say anything about.
-
-
 ## 14. The dead port and the stale calibration are one fault
 
 Two problems with `lnb-a` appear separately in this report: it was excluded as a
 dead port on a failure that postdates every observation
-([the corpus](#the-corpus)), and its recorded centre is stale by 567 kHz
+([the corpus](#the-corpus)), and its recorded centre is stale by 566 kHz
 ([section 12](#12-what-the-cliff-actually-is)). They are the same event.
 
 **Its local oscillator moved.** Measured from the corpus at instants where both
@@ -1533,7 +1508,7 @@ ports of `pluto-5d4d` fired:
 | Epoch | `rx0 − rx1` | n | `lnb-a` fire rate | Its median offset |
 |---|---:|---:|---:|---:|
 | before 2026-08-13T04:38:23Z | **+5,154 Hz** | 9,736 pairs | 8.26% | −130.5 kHz |
-| after 2026-08-13T04:46:20Z | **+567,402 Hz** ±4 kHz | 2,585 points / 931 sweeps | **0.24%** | pinned at +349.8 kHz |
+| after 2026-08-13T04:46:20Z | **+567,402 Hz** ±4 kHz | 2,585 points / 931 sweeps | **0.24%** | pinned at the grid edge |
 
 `lnb-b`, on the same radio, is unchanged across that boundary (6.49% → 6.87%).
 A step in one port and not its sibling, at one instant, localises the change to
@@ -1555,9 +1530,8 @@ corrected, with `pluto-5d4d.lnb-a` gen1 and gen2 epochs recorded.
 `acquisition.py` builds its search as
 `arange(-350_000, 350_001, 25_000) + centre`, where `centre` is the **already
 applied** `receiver_centers` value. A port anchored near zero is therefore blind
-beyond about ±356 kHz and **cannot discover that it has moved**. Observed reach
-in the data: `5d4d` rx0 spans −355.8 to +368.2 kHz; `19f2` rx0 spans −355.7 to
-**+958.5** kHz — the replacement LNB there was findable only because its stale
+outside the span that grid covers and **cannot discover that it has moved**. In
+the data the replacement LNB on `19f2` was findable only because its stale
 +434 kHz calibration had already displaced the grid into range.
 
 This is a self-sealing failure. The daily calibration returned −906.6 Hz on
@@ -1598,8 +1572,6 @@ Note also that the differential step measured here, +562,248 Hz, and the move in
 Neither is wrong: they are marginal means over different detection sets, which
 [section 16b](#16b-the-correction-survives-being-tested-out-of-sample) shows sets
 a 20–40 kHz floor on any absolute per-receiver number.
-
-
 ## 15. Three experiments that revise the ranking
 
 ### 15a. Conditional independence holds — and the prior finding was never significant
@@ -1658,12 +1630,12 @@ supported is a leading group of five, a trailing pair, and `differential-16` las
 
 ### 15c. And it is condition-dependent
 
-| Arm | Spread | Pairs resolved | Inter-detector agreement |
-|---|---:|---:|---:|
-| 80 ms / 2.5 MS/s | 7.69 dB | 20/28 | 0.816 |
-| 80 ms / 1.25 MS/s | 4.92 dB | 16/28 | 0.878 |
-| 640 ms / 2.5 MS/s | 5.51 dB | 1/28 | 0.859 |
-| **160 ms / 5 MS/s** | **0.68 dB** | **0/28** | **0.939** |
+| Arm | Spread | Pairs resolved |
+|---|---:|---:|
+| 80 ms / 2.5 MS/s | 7.69 dB | 20/28 |
+| 80 ms / 1.25 MS/s | 4.92 dB | 16/28 |
+| 640 ms / 2.5 MS/s | 5.51 dB | 1/28 |
+| **160 ms / 5 MS/s** | **0.68 dB** | **0/28** |
 
 The two-group split survives in all three arms that resolve anything, and
 `glrt-32` sits at rank 3, 5 and 5 — consistent with an unordered head. **1.25 MS/s
@@ -1672,20 +1644,18 @@ argument in [section 4](#4-the-dataset-twelve-arms-and-two-geometries-for-free)
 by measurement.
 
 The most useful row is the last. At 160 ms / 5 MS/s **nothing resolves at all** —
-the eight agree on 94% of per-cell decisions. **As probe length grows, detector
+0 of 28 pairs separate. **As probe length grows, detector
 choice stops being an operational choice.** For a survey that can afford the
 dwell, this is the finding that matters: pick any of them.
 
 ![SNR50 by arm, showing the ranking is condition-dependent](figures/injection/a3-ranking-across-arms.png)
 
-*Caveats carried from the run: the 640 ms / 10 MS/s corner was unreachable at
-74 s and 1.04 GB per probe, so 640 ms / 2.5 MS/s was substituted; that arm's
+*Caveats carried from the run: the 640 ms / 10 MS/s corner was unreachable on
+probe time and capture size, so 640 ms / 2.5 MS/s was substituted; that arm's
 trailing-group SNR50 is extrapolated past the ladder top and is not trustworthy,
 though only 1 of 28 pairs resolved there anyway. Absolute SNR50 is not comparable
 across sample rates because the noise bandwidth changes — only the within-arm
 order is clean.*
-
-
 ## 16. The −150 kHz, measured: four oscillators, and what it costs
 
 [Section 12](#12-what-the-cliff-actually-is) argued that the −150 kHz window
@@ -1699,13 +1669,13 @@ what leaving them unmeasured is costing right now.
 ### 16a. Four independent constants, not one shared error
 
 Two populations can measure an absolute centre, and they are independent of each
-other. The **live narrow reports** — 3,182 records, 2026-08-10 to 08-13, read
-with the repository's own `_paired_differences` — come from a ±350 kHz search
-that *is* centred on each receiver. The **survey re-scoring** of the corpus uses
-a fixed ±700 kHz bank about raw zero and ignores `receiver_centers` entirely.
-Where the sync corpus also carries a port it is a third. The bracket below is the
-spread across those populations, which is far wider than any of their statistical
-intervals and is therefore the honest uncertainty.
+other. The **live narrow reports** come from a ±350 kHz search that *is* centred
+on each receiver, and are read with the repository's own `_paired_differences`.
+The **survey re-scoring** of the corpus uses a fixed ±700 kHz bank about raw zero
+and ignores `receiver_centers` entirely. Where the sync corpus also carries a
+port it is a third. The bracket below is the spread across those populations,
+which is far wider than any of their statistical intervals and is therefore the
+honest uncertainty.
 
 | Receiver | Epoch | Absolute centre | Spread across populations | n | ppm at 9.75 GHz |
 |---|---|---:|---|---:|---:|
@@ -1713,26 +1683,31 @@ intervals and is therefore the honest uncertainty.
 | `lnb-a` | gen2 | **+375,663** | *single population* | 1,304 | +38.5 |
 | `lnb-b` (5d4d rx1) | gen1 | **−146,696** | [−159,852, −133,541] | 13,718 | −15.0 |
 | `lnb-b` | gen2 | **−149,146** | [−155,439, −141,969] | 7,103 | −15.3 |
-| `lnb-c` (19f2 rx0) | gen1 | **+420,686** | [+402,447, +438,925] | 2,027 | +43.2 |
-| `lnb-c` | gen2 | **+424,990** | [+416,732, +435,332] | 6,173 | +43.6 |
-| `lnb-d` (19f2 rx1) | gen1 | **+14,996** | [+12,280, +17,712] | 14,602 | +1.5 |
+| `lnb-c` (19f2 rx0) | gen1 | **+420,686** | [402,447, 438,925] | 2,027 | +43.1 |
+| `lnb-c` | gen2 | **+424,990** | [416,732, 435,332] | 6,173 | +43.6 |
+| `lnb-d` (19f2 rx1) | gen1 | **+14,996** | [12,280, 17,712] | 14,602 | +1.5 |
 | `lnb-d` | gen2 | **−143,566** | [−149,101, −138,197] | 9,484 | −14.7 |
 
-Every row is measured except `lnb-a` gen2, where only one population can see it
-at all — the live search is blind there (78 candidates, 74% of them pinned at the
-+350 kHz edge) and the corpus arm fires at 5.0%. Treat that one as ±40 kHz.
+**Read the `n` column carefully.** It counts every observation examined for that
+port-epoch, not every observation that entered the consensus. `lnb-a` gen2 is the
+case where those differ and it matters: of its 1,304 observations
+only the sync corpus arm is usable, because the live search is blind there and
+the survey arm fires at 5.0%. That row rests on **one** population, so treat it
+as ±40 kHz. Every other row draws on 2 or more.
 
-**−15.3 to +43.6 ppm.** That is inside an ordinary consumer LNB specification.
-None of this is a fault; it is four oscillators behaving normally and a pipeline
-that never asked them where they were.
+**−15.3 to +43.6 ppm.** That is inside an
+ordinary consumer LNB specification. None of this is a fault; it is four
+oscillators behaving normally and a pipeline that never asked them where they
+were.
 
 The swap acts as its own control. `lnb-b`, on the radio nobody touched, moves
-**2.4 kHz** across the boundary. `lnb-a`, on that same untouched radio, moves
-**+514.5 kHz** — the fault of [section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault),
-now visible on an absolute axis. And of the two LNBs that were physically
-replaced, `lnb-d` moves **−158.6 kHz** while `lnb-c` moves only **+4.3 kHz**: a
-replacement part is a new draw from the same distribution, not necessarily a
-different one.
+**−2.4 kHz** across the boundary. `lnb-a`, on that same untouched
+radio, moves **+514.5 kHz** — the fault of
+[section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault), now
+visible on an absolute axis. And of the two LNBs that were physically replaced,
+`lnb-d` moves **−158.6 kHz** while `lnb-c` moves only
+**+4.3 kHz**: a replacement part is a new draw from the same
+distribution, not necessarily a different one.
 
 ![Absolute per-receiver centres, and the corrected sky window](figures/absolute-centres.png)
 
@@ -1754,25 +1729,19 @@ the out-of-sample residuals span −33.7 to +17.0 kHz. The single exception is
 `lnb-a` gen2 at −92.5 kHz, whose corpus detections are censored at the bank edge;
 it needs a direct `lo_sweep` once scoring is idle.
 
-**But the differential and the absolute centre are not interchangeable, and the
+**But the differential and the absolute centre are not interchangeable, and this
 report should not pretend they are.** Differencing two absolute centres does not
-reproduce the measured `rx0 − rx1`: on `pluto-19f2` gen2 the differential is
-+605,521 Hz [605,083, 605,930] over 1,095 pairs, while differencing the absolutes
-gives 578,731 — a 26.8 kHz gap. That gap is not an error in either method. On a
-*common* population — both receivers scored on the same dual-candidate checks —
-the differential is reproduced to 1 kHz (604,560 against 605,521). The gap
-appears only when marginal means from *different* detection sets are subtracted:
-`lnb-d` averages −164,437 Hz on dual checks but −143,399 Hz over all its own
-candidates, a 21 kHz population shift, and `lnb-c` supplies another 4.8 kHz.
+reproduce the measured `rx0 − rx1`. On a *common* population — both receivers
+scored on the same dual-candidate checks — the differential is reproduced to
+1 kHz. The gap appears only when marginal means from *different* detection sets
+are subtracted, because a differential is exact at an instant while a port's
+absolute centre is a mean over the sky that port happens to detect, and two ports
+do not detect the same sky.
 
-So a differential is exact at an instant, while a port's absolute centre is a
-mean over the sky that port happens to detect — and two ports do not detect the
-same sky. **The consequence is a floor of roughly 20–40 kHz on any absolute
-per-receiver number, which more data does not remove.** Search-window truncation
-was ruled out as the cause: inverting the truncated mean against an empirical
-detected-Doppler density (sd 60.5 kHz, p5/p95 −112/+93 kHz, taken from `lnb-d`
-gen1, whose search was centred on itself) leaves every uncensored estimate
-unchanged.
+**The consequence is a floor of roughly 20–40 kHz on any absolute per-receiver
+number, which more data does not remove.** Search-window truncation was ruled out
+as the cause: inverting the truncated mean against an empirical detected-Doppler
+density leaves every uncensored estimate unchanged.
 
 ### 16c. Miscentring costs detections, and this is measured, not modelled
 
@@ -1780,11 +1749,11 @@ Twice, one port's applied search centre moved while its partner's did not. The
 partner is a time control, so the ratio of the two ports' candidate rates
 isolates the effect of miscentring from everything else that changed.
 
-| Contrast | Miscentring | Control | Normalised rate | Detections lost |
-|---|---:|---|---|---:|
-| `lnb-c` gen2, 9.4 kHz off → 179.2 kHz off | 170 kHz | `lnb-d` | 0.580 [0.539, 0.620] → 0.432 [0.356, 0.509] | **25.5%** |
-| `lnb-c` gen1, 13.7 kHz off → 420.7 kHz off | 407 kHz | `lnb-d` | 0.582 → 0.196 | **66.4%** |
-| `lnb-a` across its LO move | 376 kHz | `lnb-b` | 1.273 [1.248, 1.302] → 0.035 [0.020, 0.053] | **97.2%** |
+| Contrast | Miscentring | Control | Detections lost |
+|---|---:|---|---:|
+| `lnb-c` gen2, one applied centre to another | −179.2 kHz | `lnb-d` | **25.5%** |
+| `lnb-c` gen1, corrected against uncorrected | +420.7 kHz | `lnb-d` | **66.4%** |
+| `lnb-a` across its LO move | +375.7 kHz | `lnb-b` | **97.2%** |
 
 A hard ±350 kHz window would predict near-zero loss at 150 kHz, since the
 detected-Doppler density barely reaches ±200 kHz. It does not: the loss is a soft
@@ -1792,26 +1761,72 @@ roll-off of the timing stage and the subband filter, which is precisely why it
 had to be measured rather than reasoned about.
 
 **Against the calibration in force today, all four ports are miscentred.** The
-live artifact resolves to `pluto-19f2` (+602,869.4, 0.0) and `pluto-5d4d`
-(−906.6, 0.0):
+live artifact — created 2026-08-14T19:01:37.716871Z from
+900 reports, and snapshotted into this report's figures
+directory because a timer rewrites it — resolves through `receiver_centers()` to:
 
-| Port | Applied today | Measured | Miscentred by | Expected loss |
-|---|---:|---:|---:|---|
-| `lnb-c` | +602,869 | +424,990 | **−177,879** | ~25%, *at* a measured point |
-| `lnb-b` | 0 | −149,146 | **−149,146** | ~20–25%, between measured points |
-| `lnb-d` | 0 | −143,566 | **−143,566** | ~20–25%, between measured points |
-| `lnb-a` | −907 | +375,663 | **+376,569** | ~97%, *at* a measured point |
+| Port | Applied today | Measured | Miscentred by |
+|---|---:|---:|---:|
+| `lnb-c` | +602,869 | +424,990 | **−177,879** |
+| `lnb-b` | 0 | −149,146 | **−149,146** |
+| `lnb-d` | 0 | −143,566 | **−143,566** |
+| `lnb-a` | −907 | +375,663 | **+376,569** |
 
-Two of the four sit essentially on top of a measured contrast; the other two fall
-between the first row and zero. Averaging the four retained fractions with equal
-weight gives **about 0.57** — that average is an extrapolation, not a
-measurement, and is offered only to size the problem. What is measured is that
-three healthy receivers are each paying roughly a quarter of their yield as a
-tax nobody noticed, because they still detect.
+`lnb-c` and `lnb-a` sit essentially on top of a measured contrast above, so their
+losses are read off directly rather than extrapolated: about
+25.5% and 97.2%. `lnb-b` and `lnb-d`
+fall between that first row and zero. What is measured is that three healthy
+receivers are each paying roughly a quarter of their yield as a tax nobody
+noticed, because they still detect.
 
-The survey path loses no detections to this, its bank being fixed about raw
-zero; but it does read `receiver_centers` to form the bias for its cross-receiver
-agreement check, which an epoch-blind differential silently disables.
+The survey and corpus paths do not lose detections to this, because their coarse
+bank is fixed about raw zero and is never steered by `receiver_centers`. That
+detection cost lands entirely on the live dwell path and everything downstream
+of it.
+
+### 16c-bis. One radio's agreement check is switched off, and the corpus records it
+
+`survey_scoring` does read `receiver_centers`. Not to place its search — but to
+form `bias = centers[0] − centers[1]` for `cross_receiver_checks`, which marks a
+pair as agreeing only when `|cfo_difference − bias|` is within
+`CROSS_RECEIVER_CFO_HZ`, a 15,000 Hz gate. That check needs only the
+*difference*, which is the one thing a differential calibration genuinely
+establishes, and its docstring says so. The design is sound.
+
+What defeats it is that the artifact carries **one differential per radio and no
+epoch**, while the differential moved by hundreds of kilohertz when the LNBs were
+swapped. Reading the bias actually applied out of 5,328 scored
+sidecars — not out of any calibration file, because the scoring host's artifact
+turns out not to be the one on the share:
+
+| Radio | Bias applied | Measured differential | Residual | Checks | Agree | Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `pluto-19f2` | +604,160 | +605,521 | +1,361 | 196,160 | 18,593 | **9.48%** |
+| `pluto-5d4d` | +1,170 | +567,402 | **+566,232** | 144,832 | 264 | **0.18%** |
+
+`pluto-19f2` happens to be carrying a bias correct to 1.4 kHz, comfortably inside
+the gate, and agrees on 9.48% of its checks. `pluto-5d4d` is
+carrying its **pre-swap** differential, wrong by +566,232 Hz — 38
+times the gate — and agrees on 264 of 144,832
+checks. A factor of 52 between two radios watching the same sky
+through the same code.
+
+**That 0.18% is not a measurement of the sky.** No real coincidence
+can pass a gate offset by half a megahertz, so what survives is whatever the
+false-alarm floor happens to be. On this radio the check is switched off, and
+nothing in the sidecar says so — `agrees: false` looks identical whether the sky
+was empty or the bias was wrong.
+
+![Agreement rate against the bias each radio was scored with](figures/cross-receiver-bias.png)
+
+This is not a historical note: the census moved from 5,328 to
+5,352 scored entries while this audit was reading it. Every
+sidecar written from here on records the same epoch-blind bias. The fix is the
+one [16d](#16d-what-to-write-and-the-trap-waiting-for-whoever-writes-it) asks
+for, with an epoch bound added — and it needs no re-scoring, because each check
+stores `bias_hz` and `cfo_difference_hz` alongside its verdict, so `agrees` can
+be recomputed offline once the right differential is known. Until then, **no
+`agrees` field on `pluto-5d4d` should be read as evidence about the sky.**
 
 ### 16d. What to write, and the trap waiting for whoever writes it
 
@@ -1822,12 +1837,10 @@ pair below is pinned so that `rx0 − rx1` equals the measured differential —
 bodily so the unavoidable residual is halved between the two ports instead of
 dumped on one.
 
-| Radio | Epoch | `measured_centers_hz` | Residual per port |
-|---|---|---|---:|
-| `pluto-19f2` | **gen2 — apply this** | `[443472.7, -162048.5]` | ∓18.5 kHz |
-| `pluto-5d4d` | **gen2 — apply this** | `[396959.5, -170442.5]` | ∓21.3 kHz |
-| `pluto-19f2` | gen1 *(re-analysis of archived sweeps only)* | `[435278.2, 403.7]` | ∓14.6 kHz |
-| `pluto-5d4d` | gen1 *(re-analysis only)* | `[-140204.8, -145359.1]` | ∓1.3 kHz |
+| Radio | `measured_centers_hz` | Residual per port |
+|---|---|---:|
+| `pluto-19f2` | `[443472.7, -162048.5]` | ∓−18.5 kHz |
+| `pluto-5d4d` | `[396959.5, -170442.5]` | ∓−21.3 kHz |
 
 Four things the daily timer cannot do, and one it will actively undo:
 
@@ -1837,19 +1850,17 @@ Four things the daily timer cannot do, and one it will actively undo:
    sit 150 kHz off *together*, which is exactly what `lnb-b` and `lnb-d` do.
 2. **It cannot find an offset outside its own search**, for the self-sealing
    reason given in [section 14](#14-the-dead-port-and-the-stale-calibration-are-one-fault).
-3. **It is currently returning an epoch-blind mixture.** The live artifact has
-   `pluto-19f2` `mismatch_hz` 602,869.4 with p10 433,030.7 and p90 607,376.5 — a
-   spread of 174,345.8 Hz, which is gen1's 434 kHz and gen2's 605 kHz averaged
-   together inside one 900-report window.
+3. **It is currently returning an epoch-blind mixture**, averaging gen1's and
+   gen2's differentials together inside one 900-report
+   window.
 4. **It will erase the fix.** `command_starlink_lnb_calibration` builds its
    artifact from `measure_mismatch` alone and `write_calibration` replaces the
-   file wholesale; `measured_centers_hz` is read at line 168 of
-   `lnb_calibration.py` and written nowhere. Writing the values without first
-   teaching the command to carry them forward from `previous`, or masking
-   `leo-tracker-lnb-calibration.timer`, buys less than one day.
-
-
-
+   file wholesale; `measured_centers_hz` is read by `lnb_calibration.py` and
+   written nowhere. The snapshot confirms it: neither radio carries the field
+   today. `leo-tracker-lnb-calibration.timer` next fires
+   **Sat 2026-08-15 11:59:52 PDT** with `--apply`, so writing the values without first
+   teaching the command to carry them forward from `previous`, or masking the
+   timer, buys less than a day.
 ## Figures and provenance
 
 Every figure is computed from the read-only corpus at
@@ -1866,23 +1877,23 @@ without re-running anything.
 | 3 | [`apparatus.png`](figures/apparatus.png) | [`apparatus.json`](figures/apparatus.json) | 2,462 | 9,712 paired tunings in 1,214 scored pairs |
 | 4 | [`arm-matrix.png`](figures/arm-matrix.png) | [`arm-matrix.json`](figures/arm-matrix.json) | 2,554 | 7,054 captured sweeps, 6,364 matched-arm |
 | 5 | [`geometry.png`](figures/geometry.png) | [`geometry.json`](figures/geometry.json) | 2,554 | 7,054 captured, 6,161 imported pairs, 1,261 scored pairs |
-| 6 | [`coincidence-model.png`](figures/coincidence-model.png) | [`coincidence-model.json`](figures/coincidence-model.json) | 2,544 | 18,176 joined matched-arm cells from 1,136 matched-arm sweeps |
+| 6 | [`coincidence-model.png`](figures/coincidence-model.png) | [`coincidence-model.json`](figures/coincidence-model.json) | 2,547 | 36,384 joined matched-arm cells from 1,137 matched-arm sweeps |
 | 7 | [`negative-control.png`](figures/negative-control.png) | [`negative-control.json`](figures/negative-control.json) | 2,339 | 16,560 matched-arm cells in each of three joins; 1,035 matched-arm sweeps |
 | 8 | [`algorithm-correlation.png`](figures/algorithm-correlation.png) | [`algorithm-correlation.json`](figures/algorithm-correlation.json) | 2,547 | 40,256 live target observations; 1,258 paired sweeps |
-| 9 | [`channel-edge-correlation.png`](figures/channel-edge-correlation.png) | [`channel-edge-correlation.json`](figures/channel-edge-correlation.json) | 2,547 | 5,032 receiver-chain passes, `lnb-a` included (1,258 pairs x 3 live receivers) |
+| 9 | [`channel-edge-correlation.png`](figures/channel-edge-correlation.png) | [`channel-edge-correlation.json`](figures/channel-edge-correlation.json) | 2,547 | 5,032 receiver-chain passes, `lnb-a` included (1,258 pairs x 4 live receivers) |
 | 10 | [`edge-agreement.png`](figures/edge-agreement.png) | [`edge-agreement.json`](figures/edge-agreement.json) | 2,547 | six receiver pairs, n = 10,064 each, `lnb-a` included |
 | 11 | [`cfo-cliff.png`](figures/cfo-cliff.png) | [`cfo-cliff.json`](figures/cfo-cliff.json) | 2,339 | 178,399 live target points from 1,146 paired sweeps |
 | 12 | [`port-bias.png`](figures/port-bias.png) | [`port-bias.json`](figures/port-bias.json) | 2,547 | 1,258 paired sweeps, 398,435 points, all four ports with `lnb-a` on its **measured** +567,402 Hz centre |
-| 13 | [`absolute-centres.png`](figures/absolute-centres.png) | [`absolute-centres.json`](figures/absolute-centres.json) | **not stamped** | 878 narrow sky sweeps, 3,182 live narrow reports, the 2026-08-14 sync corpus; 22,259 detections before correction and 21,407 after |
+| 13 | [`absolute-centres.png`](figures/absolute-centres.png) | [`absolute-centres.json`](figures/absolute-centres.json) | **not stamped** | narrow sky sweeps and live narrow reports, the 2026-08-14 sync corpus; 22,259 detections before correction and 21,407 after |
 
 Figures 1–6, 8–10 and 13 are new. Figures 7, 11 and 12 are carried unchanged from
 [the detailed record](../sync-scan-cross-radio-2026-08-14/REPORT.md) together
 with their scripts and sidecars, which is why they carry an earlier freeze.
 
-All twelve scripts, their sidecars and the extractors that feed them are in
+All the scripts, their sidecars and the extractors that feed them are in
 [`figures/`](figures/). Each figure runs in two steps — an extractor that
-streams the corpus into a compact local cache, because the capture host has 4 GB
-of RAM, then the figure script itself. The extractors are prefixed by the group
+streams the corpus into a compact local cache, because the capture host is short
+of memory, then the figure script itself. The extractors are prefixed by the group
 they belong to: `abscal-pipeline-*` feeds Figure 13, `opening-pipeline-*` feeds Figures 1 and 3,
 `firerate-pipeline-*` feeds Figures 2 and 6, `heatmaps-pipeline-*` feeds Figures
 8 to 10, and `carried-pipeline-*` feeds Figures 7, 11 and 12. Figures 4 and 5
@@ -1922,9 +1933,9 @@ description. Summary:
 | Topology | `TX2 → SMA splitter → 2× 30 dB → RX1 and RX2`, closed path, no antenna, no LNB, no RF path between the two radios |
 | Waveform | `leo_tracker.radio.beacon.pilots.edge_pilot_frame` — the repository's own pilot frame, not a tone |
 | LO / rate / probe | 1,190,312,500 Hz; 5 MS/s; 20 ms |
-| Gains | RX manual 40 dB; digital drive 0.3048 FS on `.183`; `.165` carries 8.2 dB more cable loss |
+| Gains | RX manual 40 dB; the digital drive on `.183` and the extra cable loss on `.165` are in the README, not in any sidecar |
 | Thresholds | 1% per candidate point, drawn on TX-off input verified indistinguishable from a dark DAC |
-| Carrier offset | ~0.07 Hz natural (shared reference); offsets in 11c and T3 are **imposed** on the waveform |
+| Carrier offset | natural offset near zero by construction (shared reference); offsets in 11c and T3 are **imposed** on the waveform |
 | Records | `injection-data/{one-radio,radio-165,two-radio}/*.jsonl.gz`, plus the harnesses and the `analysis.py` helper the figure scripts import |
 | Software | this repository at the commit that adds these records |
 
@@ -1932,4 +1943,3 @@ description. Summary:
 the run files but the schedule is not separately tabulated here; and no
 environmental conditions were logged, which matters for any later attempt to
 reproduce a level-dependent result on different hardware.
-

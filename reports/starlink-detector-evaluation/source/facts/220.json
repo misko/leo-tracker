@@ -1,0 +1,289 @@
+{
+  "s13_f_set_a": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/0/f_true",
+    "fmt": "f2"
+  },
+  "s13_f_set_b": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/1/f_true",
+    "fmt": "f2"
+  },
+  "s13_f_set_c": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/2/f_true",
+    "fmt": "f2"
+  },
+  "s13_f_realised_a": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/0/f_realised",
+    "fmt": "f3"
+  },
+  "s13_f_realised_b": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/1/f_realised",
+    "fmt": "f3"
+  },
+  "s13_f_realised_c": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/2/f_realised",
+    "fmt": "f3"
+  },
+  "s13_cells_per_level": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/0/cells",
+    "fmt": "int"
+  },
+  "s13_draws": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/draws",
+    "fmt": "int",
+    "note": "cell resamples behind the 5th-95th percentile whiskers of D1"
+  },
+  "s13_recovered_lo_a": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/0/joins/real/f_min",
+    "fmt": "f3"
+  },
+  "s13_recovered_hi_a": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/0/joins/real/f_max",
+    "fmt": "f3"
+  },
+  "s13_recovered_lo_b": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/1/joins/real/f_min",
+    "fmt": "f3"
+  },
+  "s13_recovered_hi_b": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/1/joins/real/f_max",
+    "fmt": "f3"
+  },
+  "s13_recovered_lo_c": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/2/joins/real/f_min",
+    "fmt": "f3"
+  },
+  "s13_recovered_hi_c": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/2/joins/real/f_max",
+    "fmt": "f3"
+  },
+  "s13_spread_a": {
+    "src": "figures/injection/fig_d3_spread.json",
+    "ptr": "/levels/0/spread",
+    "fmt": "f4"
+  },
+  "s13_spread_b": {
+    "src": "figures/injection/fig_d3_spread.json",
+    "ptr": "/levels/1/spread",
+    "fmt": "f4"
+  },
+  "s13_spread_c": {
+    "src": "figures/injection/fig_d3_spread.json",
+    "ptr": "/levels/2/spread",
+    "fmt": "f4"
+  },
+  "s13_verdict_a": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/0/verdict",
+    "fmt": "raw"
+  },
+  "s13_verdict_b": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/1/verdict",
+    "fmt": "raw"
+  },
+  "s13_verdict_c": {
+    "src": "figures/injection/fig_d4_controls.json",
+    "ptr": "/levels/2/verdict",
+    "fmt": "raw"
+  },
+  "s13_sky_reference_spread": {
+    "src": "figures/injection/fig_d3_spread.json",
+    "ptr": "/references/1/value",
+    "fmt": "f3",
+    "note": "the sky-corpus f-spread this section originally compared the injected levels against"
+  },
+  "s13_injected_cells": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/cells_per_level",
+    "fmt": "int"
+  },
+  "s13_sky_cells": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/cells",
+    "fmt": "int"
+  },
+  "s13_nmatch_draws": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n500_sweep/draws",
+    "fmt": "int"
+  },
+  "s13_sky_n500_median": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n500_sweep/p50",
+    "fmt": "f4"
+  },
+  "s13_sky_n500_p05": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n500_sweep/p05",
+    "fmt": "f4"
+  },
+  "s13_sky_n500_p95": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n500_sweep/p95",
+    "fmt": "f4"
+  },
+  "s13_inj_spread_a": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/as_archived/0/spread",
+    "fmt": "f4"
+  },
+  "s13_inj_spread_b": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/as_archived/1/spread",
+    "fmt": "f4"
+  },
+  "s13_inj_spread_c": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/as_archived/2/spread",
+    "fmt": "f4"
+  },
+  "s13_inj_pct_a": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/as_archived/0/percentile_in_sky_n500",
+    "fmt": "f0"
+  },
+  "s13_inj_pct_b": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/as_archived/1/percentile_in_sky_n500",
+    "fmt": "f0"
+  },
+  "s13_inj_pct_c": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/injected/as_archived/2/percentile_in_sky_n500",
+    "fmt": "f0"
+  },
+  "s13_sky_full_observed": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/observed_full_spread",
+    "fmt": "f4"
+  },
+  "s13_sky_full_percentile": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/observed_percentile_in_own_n",
+    "fmt": "f0"
+  },
+  "s13_curve_128_n": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/0/n",
+    "fmt": "int"
+  },
+  "s13_curve_128_p50": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/0/p50",
+    "fmt": "f3"
+  },
+  "s13_curve_500_n": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/2/n",
+    "fmt": "int"
+  },
+  "s13_curve_500_p50": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/2/p50",
+    "fmt": "f3"
+  },
+  "s13_curve_2000_n": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/4/n",
+    "fmt": "int"
+  },
+  "s13_curve_2000_p50": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/4/p50",
+    "fmt": "f3"
+  },
+  "s13_curve_full_n": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/7/n",
+    "fmt": "int"
+  },
+  "s13_curve_full_p50": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/7/p50",
+    "fmt": "f3"
+  },
+  "s13_envelope_low": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/7/p50",
+    "fmt": "f2",
+    "note": "same median-spread-at-n curve as s13_curve_full_p50, quoted to two places as the low end of the envelope"
+  },
+  "s13_envelope_high": {
+    "src": "figures/injection/nmatch_spread.json",
+    "ptr": "/sky/n_curve/2/p50",
+    "fmt": "f2",
+    "note": "same median-spread-at-n curve as s13_curve_500_p50, quoted to two places as the high end of the envelope"
+  },
+  "s13_d2_prior_low": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/prior_low",
+    "fmt": "int"
+  },
+  "s13_d2_prior_cases": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/prior_cases",
+    "fmt": "int"
+  },
+  "s13_d2_reads_low": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/reads_low",
+    "fmt": "int"
+  },
+  "s13_d2_cases": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/cases",
+    "fmt": "int"
+  },
+  "s13_d2_reads_high": {
+    "expr": "cases - low",
+    "fmt": "int",
+    "inputs": {
+      "cases": "s13_d2_cases",
+      "low": "s13_d2_reads_low"
+    }
+  },
+  "s13_d2_median_bias": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/median_bias",
+    "fmt": "signed_f4"
+  },
+  "s13_d2_worst": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/worst_bias",
+    "fmt": "f3"
+  },
+  "s13d_cases": {
+    "src": "figures/injection/fig_d5_joint_null.json",
+    "ptr": "/cases",
+    "fmt": "int"
+  },
+  "s13d_consistent": {
+    "src": "figures/injection/fig_d5_joint_null.json",
+    "ptr": "/consistent",
+    "fmt": "int"
+  },
+  "s13d_min_fisher_p": {
+    "src": "figures/injection/fig_d5_joint_null.json",
+    "ptr": "/min_fisher_p",
+    "fmt": "f3"
+  },
+  "s13d_silent_instants": {
+    "src": "figures/injection/fig_d5_joint_null.json",
+    "ptr": "/n",
+    "fmt": "int"
+  }
+}

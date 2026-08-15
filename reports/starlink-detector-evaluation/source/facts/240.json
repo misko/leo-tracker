@@ -1,0 +1,935 @@
+{
+  "s15a_far_rate": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/per_cell_false_alarm",
+    "fmt": "pct1",
+    "note": "the common per-cell false-alarm rate both radios' thresholds are drawn to in this experiment"
+  },
+  "s15a_far_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s15a_far_rate"
+    },
+    "fmt": "f0",
+    "note": "scaled here rather than with pct1 because the template writes the % itself, and the prose writes 5% rather than 5.0%"
+  },
+  "s15a_occupied_cells": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/occupied_cells",
+    "fmt": "int"
+  },
+  "s15a_pa_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-verify/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-full/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-acquire/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-32/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-64/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/anchor-8/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-32/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pa_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-16/p_a",
+    "fmt": "f2"
+  },
+  "s15a_pb_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-verify/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-full/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-acquire/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-32/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-64/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/anchor-8/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-32/p_b",
+    "fmt": "f2"
+  },
+  "s15a_pb_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-16/p_b",
+    "fmt": "f2"
+  },
+  "s15a_mean_pd_a": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s15a_pa_ffv",
+      "b": "s15a_pa_fff",
+      "c": "s15a_pa_ffa",
+      "d": "s15a_pa_g32",
+      "e": "s15a_pa_g64",
+      "f": "s15a_pa_a8",
+      "g": "s15a_pa_d32",
+      "h": "s15a_pa_d16"
+    },
+    "fmt": "f2",
+    "note": "mean single-radio detection probability on radio A over the eight detectors; the prose quotes it as the operating point of the experiment"
+  },
+  "s15a_mean_pd_b": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s15a_pb_ffv",
+      "b": "s15a_pb_fff",
+      "c": "s15a_pb_ffa",
+      "d": "s15a_pb_g32",
+      "e": "s15a_pb_g64",
+      "f": "s15a_pb_a8",
+      "g": "s15a_pb_d32",
+      "h": "s15a_pb_d16"
+    },
+    "fmt": "f2",
+    "note": "mean single-radio detection probability on radio B over the eight detectors"
+  },
+  "s15a_excess_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-verify/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-full/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-acquire/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-32/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-64/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/anchor-8/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-32/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_excess_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-16/excess",
+    "fmt": "signed_f4",
+    "note": "P(AB) minus d_A*d_B on occupied cells, two independent radios"
+  },
+  "s15a_mean_excess": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s15a_excess_ffv",
+      "b": "s15a_excess_fff",
+      "c": "s15a_excess_ffa",
+      "d": "s15a_excess_g32",
+      "e": "s15a_excess_g64",
+      "f": "s15a_excess_a8",
+      "g": "s15a_excess_d32",
+      "h": "s15a_excess_d16"
+    },
+    "fmt": "signed_f4",
+    "note": "mean occupied-cell excess over the eight detectors"
+  },
+  "s15a_ci_lo_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/anchor-8/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s15a_ci_hi_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/anchor-8/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s15a_prior_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/anchor-8/excess",
+    "fmt": "signed_f4",
+    "note": "the single-radio excess this report previously attributed to the shared oscillator, recomputed from the archived records"
+  },
+  "s15a_ci_lo_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-16/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s15a_ci_hi_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-16/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s15a_prior_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-16/excess",
+    "fmt": "signed_f4",
+    "note": "the single-radio excess this report previously attributed to the shared oscillator, recomputed from the archived records"
+  },
+  "s15a_ci_lo_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-32/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s15a_ci_hi_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/differential-32/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s15a_prior_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-32/excess",
+    "fmt": "signed_f4",
+    "note": "the single-radio excess this report previously attributed to the shared oscillator, recomputed from the archived records"
+  },
+  "s15a_ci_lo_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-32/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s15a_ci_hi_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/glrt-32/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s15a_prior_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-32/excess",
+    "fmt": "signed_f4",
+    "note": "the single-radio excess this report previously attributed to the shared oscillator, recomputed from the archived records"
+  },
+  "s15a_ci_lo_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-verify/ci95/0",
+    "fmt": "signed_f4"
+  },
+  "s15a_ci_hi_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_occupied/full-frame-verify/ci95/1",
+    "fmt": "signed_f4"
+  },
+  "s15a_prior_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-verify/excess",
+    "fmt": "signed_f4",
+    "note": "the single-radio excess this report previously attributed to the shared oscillator, recomputed from the archived records"
+  },
+  "s15a_empty_excess_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/full-frame-verify/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/full-frame-full/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/full-frame-acquire/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/glrt-32/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/glrt-64/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/anchor-8/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/differential-32/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_excess_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/two_radio_empty/differential-16/excess",
+    "fmt": "signed_f4"
+  },
+  "s15a_empty_mean_excess": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s15a_empty_excess_ffv",
+      "b": "s15a_empty_excess_fff",
+      "c": "s15a_empty_excess_ffa",
+      "d": "s15a_empty_excess_g32",
+      "e": "s15a_empty_excess_g64",
+      "f": "s15a_empty_excess_a8",
+      "g": "s15a_empty_excess_d32",
+      "h": "s15a_empty_excess_d16"
+    },
+    "fmt": "signed_f4",
+    "note": "mean empty-cell excess over the eight detectors: the negative control for the occupied-cell test"
+  },
+  "s15a_significant_bonferroni": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/permutation_significant_bonferroni",
+    "fmt": "int",
+    "note": "detectors whose occupied-cell excess survives a permutation test with a Bonferroni correction across the eight; the Fisher and stratified-permutation counts are the same 0 (smallest Fisher p is 0.30, and 0.30 * 8 > 1)"
+  },
+  "s15a_prior_cells_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-verify/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-full/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-acquire/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-32/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-64/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/anchor-8/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-32/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-16/cells",
+    "fmt": "int"
+  },
+  "s15a_prior_cells": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/anchor-8/cells",
+    "fmt": "int",
+    "note": "cells behind the single-radio prior; identical for all eight detectors"
+  },
+  "s15a_detectors": {
+    "expr": "(a + b + c + d + e + f + g + h) / a",
+    "inputs": {
+      "a": "s15a_prior_cells_ffv",
+      "b": "s15a_prior_cells_fff",
+      "c": "s15a_prior_cells_ffa",
+      "d": "s15a_prior_cells_g32",
+      "e": "s15a_prior_cells_g64",
+      "f": "s15a_prior_cells_a8",
+      "g": "s15a_prior_cells_d32",
+      "h": "s15a_prior_cells_d16"
+    },
+    "fmt": "int",
+    "note": "the size of the detector family, counted out of the sidecar rather than assumed: every one_radio_prior entry carries the same 111 cells, so their total over one of them is the number of entries"
+  },
+  "s15a_prior_se_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-verify/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-full/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-acquire/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-32/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-64/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/anchor-8/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-32/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-16/se",
+    "fmt": "f3"
+  },
+  "s15a_prior_se_mean": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8",
+    "inputs": {
+      "a": "s15a_prior_se_ffv",
+      "b": "s15a_prior_se_fff",
+      "c": "s15a_prior_se_ffa",
+      "d": "s15a_prior_se_g32",
+      "e": "s15a_prior_se_g64",
+      "f": "s15a_prior_se_a8",
+      "g": "s15a_prior_se_d32",
+      "h": "s15a_prior_se_d16"
+    },
+    "fmt": "f3",
+    "note": "mean standard error of the single-radio excess over the eight detectors; every one of the eight rounds to the same 0.022"
+  },
+  "s15a_prior_covers_ffv": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-verify/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_fff": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-full/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_ffa": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/full-frame-acquire/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_g32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-32/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_g64": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/glrt-64/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_a8": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/anchor-8/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_d32": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-32/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covers_d16": {
+    "src": "figures/injection/a1-occupied-cell-independence.json",
+    "ptr": "/one_radio_prior/differential-16/covers_zero",
+    "fmt": "raw"
+  },
+  "s15a_prior_covering": {
+    "expr": "a + b + c + d + e + f + g + h",
+    "inputs": {
+      "a": "s15a_prior_covers_ffv",
+      "b": "s15a_prior_covers_fff",
+      "c": "s15a_prior_covers_ffa",
+      "d": "s15a_prior_covers_g32",
+      "e": "s15a_prior_covers_g64",
+      "f": "s15a_prior_covers_a8",
+      "g": "s15a_prior_covers_d32",
+      "h": "s15a_prior_covers_d16"
+    },
+    "fmt": "int",
+    "note": "how many of the eight single-radio 95% intervals already covered zero, summed over the sidecar's own covers_zero flags"
+  },
+  "s15b_far_point_rate": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/nominal_per_point",
+    "fmt": "pct1",
+    "note": "the per-candidate-point false-alarm rate every threshold in section 11 is drawn to"
+  },
+  "s15b_far_point_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s15b_far_point_rate"
+    },
+    "fmt": "f0",
+    "note": "scaled here rather than with pct1 because the template writes the % itself"
+  },
+  "s15b_cell_far_old_min_rate": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/per_cell_false_alarm_old/glrt-32",
+    "fmt": "pct1",
+    "note": "lowest of the eight per-cell rates the 1%-per-point thresholds actually produced"
+  },
+  "s15b_cell_far_old_max_rate": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/per_cell_false_alarm_old/full-frame-full",
+    "fmt": "pct1",
+    "note": "highest of the eight per-cell rates the 1%-per-point thresholds actually produced"
+  },
+  "s15b_cell_far_old_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s15b_cell_far_old_min_rate"
+    },
+    "fmt": "f1"
+  },
+  "s15b_cell_far_old_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s15b_cell_far_old_max_rate"
+    },
+    "fmt": "f1"
+  },
+  "s15b_far_cell_new": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/per_cell_false_alarm_new/anchor-8",
+    "fmt": "pct1",
+    "note": "the common per-cell rate all eight are redrawn to; identical for every detector in the sidecar"
+  },
+  "s15b_far_cell_new_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s15b_far_cell_new"
+    },
+    "fmt": "f0",
+    "note": "the same rate written without a decimal, for the table label"
+  },
+  "s15b_a2old_ffv": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/full-frame-verify",
+    "fmt": "f4"
+  },
+  "s15b_published_ffv": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/full-frame-verify",
+    "fmt": "f4"
+  },
+  "s15b_a2old_fff": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/full-frame-full",
+    "fmt": "f4"
+  },
+  "s15b_published_fff": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/full-frame-full",
+    "fmt": "f4"
+  },
+  "s15b_a2old_ffa": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/full-frame-acquire",
+    "fmt": "f4"
+  },
+  "s15b_published_ffa": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/full-frame-acquire",
+    "fmt": "f4"
+  },
+  "s15b_a2old_g32": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/glrt-32",
+    "fmt": "f4"
+  },
+  "s15b_published_g32": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/glrt-32",
+    "fmt": "f4"
+  },
+  "s15b_a2old_g64": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/glrt-64",
+    "fmt": "f4"
+  },
+  "s15b_published_g64": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/glrt-64",
+    "fmt": "f4"
+  },
+  "s15b_a2old_a8": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/anchor-8",
+    "fmt": "f4"
+  },
+  "s15b_published_a8": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/anchor-8",
+    "fmt": "f4"
+  },
+  "s15b_a2old_d32": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/differential-32",
+    "fmt": "f4"
+  },
+  "s15b_published_d32": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/differential-32",
+    "fmt": "f4"
+  },
+  "s15b_a2old_d16": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/differential-16",
+    "fmt": "f4"
+  },
+  "s15b_published_d16": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/differential-16",
+    "fmt": "f4"
+  },
+  "s15b_snr50_reproduction": {
+    "expr": "((a1 - b1) ** 2 + (a2 - b2) ** 2 + (a3 - b3) ** 2 + (a4 - b4) ** 2 + (a5 - b5) ** 2 + (a6 - b6) ** 2 + (a7 - b7) ** 2 + (a8 - b8) ** 2) ** 0.5",
+    "inputs": {
+      "a1": "s15b_a2old_ffv",
+      "b1": "s15b_published_ffv",
+      "a2": "s15b_a2old_fff",
+      "b2": "s15b_published_fff",
+      "a3": "s15b_a2old_ffa",
+      "b3": "s15b_published_ffa",
+      "a4": "s15b_a2old_g32",
+      "b4": "s15b_published_g32",
+      "a5": "s15b_a2old_g64",
+      "b5": "s15b_published_g64",
+      "a6": "s15b_a2old_a8",
+      "b6": "s15b_published_a8",
+      "a7": "s15b_a2old_d32",
+      "b7": "s15b_published_d32",
+      "a8": "s15b_a2old_d16",
+      "b8": "s15b_published_d16"
+    },
+    "fmt": "f4",
+    "note": "Euclidean norm of the eight SNR50 differences between this re-analysis and the ranking figure section 11a published; an upper bound on the largest single discrepancy, so 0.0000 dB means every detector reproduced"
+  },
+  "s15b_snr50_new_ffv": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/full-frame-verify",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_fff": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/full-frame-full",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_ffa": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/full-frame-acquire",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_g32": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/glrt-32",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_g64": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/glrt-64",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_a8": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/anchor-8",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_d32": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/differential-32",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_snr50_new_d16": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_new_db/differential-16",
+    "fmt": "f2",
+    "note": "SNR50 with the threshold redrawn to a common 5% per cell"
+  },
+  "s15b_pairs_marginal_old": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/pairs_resolved_marginal_old",
+    "fmt": "int",
+    "note": "pairs resolved marginally at the 1%-per-point thresholds"
+  },
+  "s15b_pairs_familywise_old": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/pairs_resolved_family_wise_old",
+    "fmt": "int",
+    "note": "pairs still resolved at the 1%-per-point thresholds once a max-t family-wise band is applied"
+  },
+  "s15b_pairs_familywise_new": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/pairs_resolved_family_wise_new",
+    "fmt": "int",
+    "note": "pairs resolved under the family-wise band at the redrawn 5%-per-cell thresholds"
+  },
+  "s15_pairs_total": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/pairs_total",
+    "fmt": "int",
+    "note": "every pair of the eight detectors: 28"
+  },
+  "s15b_leading_spread": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/leading_group_spread_db",
+    "fmt": "f2",
+    "note": "SNR50 range across the five detectors of the leading group"
+  },
+  "s15c_snr50_125_ffv": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/full-frame-verify",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_fff": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/full-frame-full",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_ffa": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/full-frame-acquire",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_g32": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/glrt-32",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_g64": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/glrt-64",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_a8": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/anchor-8",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_d32": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/differential-32",
+    "fmt": "f2"
+  },
+  "s15c_snr50_125_d16": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-1.25MSs/differential-16",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_ffv": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/full-frame-verify",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_fff": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/full-frame-full",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_ffa": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/full-frame-acquire",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_g32": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/glrt-32",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_g64": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/glrt-64",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_a8": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/anchor-8",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_d32": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/differential-32",
+    "fmt": "f2"
+  },
+  "s15c_snr50_25_d16": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/80ms-2.5MSs/differential-16",
+    "fmt": "f2"
+  },
+  "s15c_snr50_640_a8": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/640ms-2.5MSs/anchor-8",
+    "fmt": "f2"
+  },
+  "s15c_snr50_640_g32": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/640ms-2.5MSs/glrt-32",
+    "fmt": "f2"
+  },
+  "s15c_snr50_160_d32": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/160ms-5MSs/differential-32",
+    "fmt": "f2"
+  },
+  "s15c_snr50_160_g64": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/snr50_by_arm/160ms-5MSs/glrt-64",
+    "fmt": "f2"
+  },
+  "s15c_spread_25": {
+    "expr": "shallow - deep",
+    "inputs": {
+      "shallow": "s15c_snr50_25_a8",
+      "deep": "s15c_snr50_25_ffv"
+    },
+    "fmt": "f2",
+    "note": "SNR50 range across the eight in this arm: least sensitive (anchor-8) less most sensitive (full-frame-verify)"
+  },
+  "s15c_spread_125": {
+    "expr": "shallow - deep",
+    "inputs": {
+      "shallow": "s15c_snr50_125_d16",
+      "deep": "s15c_snr50_125_ffa"
+    },
+    "fmt": "f2",
+    "note": "SNR50 range across the eight in this arm: differential-16 less full-frame-acquire"
+  },
+  "s15c_spread_640": {
+    "expr": "shallow - deep",
+    "inputs": {
+      "shallow": "s15c_snr50_640_a8",
+      "deep": "s15c_snr50_640_g32"
+    },
+    "fmt": "f2",
+    "note": "SNR50 range across the eight in this arm: anchor-8 less glrt-32"
+  },
+  "s15c_spread_160": {
+    "expr": "shallow - deep",
+    "inputs": {
+      "shallow": "s15c_snr50_160_d32",
+      "deep": "s15c_snr50_160_g64"
+    },
+    "fmt": "f2",
+    "note": "SNR50 range across the eight in this arm: differential-32 less glrt-64"
+  },
+  "s15c_pairs_25": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/pairs_resolved_family_wise/80ms-2.5MSs",
+    "fmt": "int"
+  },
+  "s15c_pairs_125": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/pairs_resolved_family_wise/80ms-1.25MSs",
+    "fmt": "int"
+  },
+  "s15c_pairs_640": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/pairs_resolved_family_wise/640ms-2.5MSs",
+    "fmt": "int"
+  },
+  "s15c_pairs_160": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/pairs_resolved_family_wise/160ms-5MSs",
+    "fmt": "int"
+  },
+  "s15c_glrt32_rank_baseline": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/glrt32_rank_in_resolving_arms/baseline",
+    "fmt": "int"
+  },
+  "s15c_glrt32_rank_125": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/glrt32_rank_in_resolving_arms/80ms-1.25MSs",
+    "fmt": "int"
+  },
+  "s15c_glrt32_rank_25": {
+    "src": "figures/injection/a3-ranking-across-arms.json",
+    "ptr": "/glrt32_rank_in_resolving_arms/80ms-2.5MSs",
+    "fmt": "int"
+  },
+  "s15c_rate_cost": {
+    "expr": "(a + b + c + d + e + f + g + h) / 8 - (A + B + C + D + E + F + G + H) / 8",
+    "inputs": {
+      "a": "s15c_snr50_125_ffv",
+      "b": "s15c_snr50_125_fff",
+      "c": "s15c_snr50_125_ffa",
+      "d": "s15c_snr50_125_g32",
+      "e": "s15c_snr50_125_g64",
+      "f": "s15c_snr50_125_a8",
+      "g": "s15c_snr50_125_d32",
+      "h": "s15c_snr50_125_d16",
+      "A": "s15c_snr50_25_ffv",
+      "B": "s15c_snr50_25_fff",
+      "C": "s15c_snr50_25_ffa",
+      "D": "s15c_snr50_25_g32",
+      "E": "s15c_snr50_25_g64",
+      "F": "s15c_snr50_25_a8",
+      "G": "s15c_snr50_25_d32",
+      "H": "s15c_snr50_25_d16"
+    },
+    "fmt": "f1",
+    "note": "mean SNR50 over the eight detectors at 1.25 MS/s less the same mean at 2.5 MS/s, both at an 80 ms probe: what halving the captured band costs"
+  }
+}

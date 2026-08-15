@@ -1,0 +1,186 @@
+{
+  "exec_paired_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/totals/sweeps_captured",
+    "fmt": "int"
+  },
+  "exec_scrambled_spread": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/spread",
+    "fmt": "f3"
+  },
+  "exec_real_spread": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/spread",
+    "fmt": "f3"
+  },
+  "exec_observations": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/observations",
+    "fmt": "int"
+  },
+  "exec_phi_min": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/min",
+    "fmt": "f3"
+  },
+  "exec_phi_max": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/max",
+    "fmt": "f3",
+    "note": "the sidecar's own off-diagonal ceiling on all 28 pairs; the published prose said 0.947, which is lnb-a's single-port ceiling, not the pooled one"
+  },
+  "exec_same_channel_phi_min": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised/0/min_phi",
+    "fmt": "f2",
+    "note": "residualised on time8 x arm x receiver -- the 'acquisition arm controlled' statistic the sentence names"
+  },
+  "exec_same_channel_phi_max": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/channel_separation_residualised/0/max_phi",
+    "fmt": "f2"
+  },
+  "exec_cross_channel_phi_min": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/terms_residualised/cross_channel_min",
+    "fmt": "f2",
+    "note": "smallest phi over all 24 cross-channel tuning pairs, same residualisation as the same-channel band"
+  },
+  "exec_cross_channel_phi_max": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/terms_residualised/cross_channel_max",
+    "fmt": "f2"
+  },
+  "exec_cliff_low_khz": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/2.5 MS~1s/low_khz",
+    "fmt": "f0",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "exec_cliff_high_khz": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/2.5 MS~1s/high_khz",
+    "fmt": "f0",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "exec_lnbc_applied_figure": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/currently_applied_hz",
+    "fmt": "signed_khz1",
+    "note": "the configured receiver_centers_hz value section 9b reported for lnb-c"
+  },
+  "exec_lnbc_applied_live": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-19f2/applied_centers_hz/0",
+    "fmt": "signed_int"
+  },
+  "exec_lnbc_measured": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "exec_lnbc_miscentred_khz": {
+    "expr": "(applied - measured) / 1000",
+    "inputs": {
+      "applied": "exec_lnbc_applied_live",
+      "measured": "exec_lnbc_measured"
+    },
+    "fmt": "f0",
+    "note": "how far the applied centre sits above the measured one, in kHz; the largest of the three healthy ports"
+  },
+  "exec_lnbd_applied_live": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-19f2/applied_centers_hz/1",
+    "fmt": "signed_int"
+  },
+  "exec_lnbd_measured": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-d|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "exec_lnbd_miscentred_khz": {
+    "expr": "(applied - measured) / 1000",
+    "inputs": {
+      "applied": "exec_lnbd_applied_live",
+      "measured": "exec_lnbd_measured"
+    },
+    "fmt": "f0",
+    "note": "the smallest of the three healthy ports' miscentrings, in kHz"
+  },
+  "exec_lnba_applied_live": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/radios/pluto-5d4d/applied_centers_hz/0",
+    "fmt": "signed_int"
+  },
+  "exec_lnba_measured": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-a|gen2/consensus_hz",
+    "fmt": "signed_int"
+  },
+  "exec_lnba_miscentred_khz": {
+    "expr": "(measured - applied) / 1000",
+    "inputs": {
+      "applied": "exec_lnba_applied_live",
+      "measured": "exec_lnba_measured"
+    },
+    "fmt": "f0"
+  },
+  "exec_lost_three_ports": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen2/detection_lost_fraction",
+    "fmt": "pct1"
+  },
+  "exec_lost_lnba": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-a|epoch-move/detection_lost_fraction",
+    "fmt": "pct1"
+  },
+  "exec_rho_measured_vs_model": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/spearman/measured_vs_model_d",
+    "fmt": "f3"
+  },
+  "exec_rho_measured_vs_fire": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/spearman/measured_vs_fire_count",
+    "fmt": "signed_f3"
+  },
+  "exec_bank_edge_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/coarse_search_spans_hz/E",
+    "fmt": "hz"
+  },
+  "exec_bank_edge_khz": {
+    "expr": "edge / 1000",
+    "inputs": {
+      "edge": "exec_bank_edge_hz"
+    },
+    "fmt": "f0",
+    "note": "the candidate seed bank the injection runs used, in kHz; the template writes the unit"
+  },
+  "exec_ppm_min": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen2/consensus_hz",
+    "fmt": "ppm1",
+    "note": "lowest of the eight measured port-epoch centres expressed as ppm at 9.75 GHz"
+  },
+  "exec_ppm_max": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/consensus_hz",
+    "fmt": "ppm1",
+    "note": "highest of the eight measured port-epoch centres expressed as ppm at 9.75 GHz"
+  },
+  "exec_before_centroid": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/before_centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "exec_after_centroid": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/after_centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  }
+}

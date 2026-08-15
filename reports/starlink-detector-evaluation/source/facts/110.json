@@ -1,0 +1,325 @@
+{
+  "s02_slope": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/fit/slope",
+    "fmt": "f2",
+    "note": "least squares of raw fire rate on the measured cross-edge target-code null rate, over the eight algorithms"
+  },
+  "s02_pearson_r": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/fit/pearson_r",
+    "fmt": "f2"
+  },
+  "s02_r_squared": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/fit/r_squared",
+    "fmt": "f2"
+  },
+  "s02_r_squared_pct": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/fit/r_squared",
+    "fmt": "pct1",
+    "note": "the same coefficient as a percentage; the published text printed 70.0%, which is the rounded 0.70 read back rather than the fitted value"
+  },
+  "s02_r_squared_census_low": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/fit/stability/census_range/0",
+    "fmt": "f2",
+    "note": "the lower of the two frozen censuses the fit was recomputed on: 2,339 scored sidecars at 2026-08-14T14:55:19Z"
+  },
+  "s02_r_squared_census_high": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/fit/stability/census_range/1",
+    "fmt": "f2",
+    "note": "the upper of the two: 2,544 scored sidecars at 2026-08-14T16:00:31Z, the census this figure is drawn on"
+  },
+  "s02_ffull_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-full/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_ffull_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-full/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_ffull_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-full/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_ffull_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/full-frame-full",
+    "fmt": "int"
+  },
+  "s02_ffull_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/full-frame-full",
+    "fmt": "int"
+  },
+  "s02_ffull_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/full-frame-full",
+    "fmt": "int"
+  },
+  "s02_facq_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-acquire/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_facq_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-acquire/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_facq_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-acquire/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_facq_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/full-frame-acquire",
+    "fmt": "int"
+  },
+  "s02_facq_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/full-frame-acquire",
+    "fmt": "int"
+  },
+  "s02_facq_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/full-frame-acquire",
+    "fmt": "int"
+  },
+  "s02_fver_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-verify/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_fver_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-verify/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_fver_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/full-frame-verify/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_fver_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/full-frame-verify",
+    "fmt": "int"
+  },
+  "s02_fver_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/full-frame-verify",
+    "fmt": "int"
+  },
+  "s02_fver_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/full-frame-verify",
+    "fmt": "int"
+  },
+  "s02_diff32_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/differential-32/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_diff32_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/differential-32/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_diff32_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/differential-32/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_diff32_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/differential-32",
+    "fmt": "int"
+  },
+  "s02_diff32_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/differential-32",
+    "fmt": "int"
+  },
+  "s02_diff32_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/differential-32",
+    "fmt": "int"
+  },
+  "s02_diff16_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/differential-16/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_diff16_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/differential-16/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_diff16_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/differential-16/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_diff16_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/differential-16",
+    "fmt": "int"
+  },
+  "s02_diff16_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/differential-16",
+    "fmt": "int"
+  },
+  "s02_diff16_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/differential-16",
+    "fmt": "int"
+  },
+  "s02_glrt64_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/glrt-64/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_glrt64_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/glrt-64/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_glrt64_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/glrt-64/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_glrt64_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/glrt-64",
+    "fmt": "int"
+  },
+  "s02_glrt64_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/glrt-64",
+    "fmt": "int"
+  },
+  "s02_glrt64_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/glrt-64",
+    "fmt": "int"
+  },
+  "s02_anchor8_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/anchor-8/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_anchor8_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/anchor-8/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_anchor8_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/anchor-8/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_anchor8_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/anchor-8",
+    "fmt": "int"
+  },
+  "s02_anchor8_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/anchor-8",
+    "fmt": "int"
+  },
+  "s02_anchor8_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/anchor-8",
+    "fmt": "int"
+  },
+  "s02_glrt32_fire": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/glrt-32/fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_glrt32_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/glrt-32/false_alarm_rate_p",
+    "fmt": "pct2"
+  },
+  "s02_glrt32_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/per_method/glrt-32/excess_fire_rate",
+    "fmt": "pct2"
+  },
+  "s02_glrt32_rank_count": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/fire_rate/glrt-32",
+    "fmt": "int"
+  },
+  "s02_glrt32_rank_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/excess_fire_rate/glrt-32",
+    "fmt": "int"
+  },
+  "s02_glrt32_rank_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/ranks/d_mean/glrt-32",
+    "fmt": "int"
+  },
+  "s02_fire_spread_pct": {
+    "expr": "(top - bottom) / bottom * 100",
+    "inputs": {
+      "top": "s02_ffull_fire",
+      "bottom": "s02_glrt32_fire"
+    },
+    "fmt": "f0",
+    "note": "how much more often the most-firing detector fires than the least-firing one, relative; the template writes the sign"
+  },
+  "s02_target_observations": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/live_target_observations",
+    "fmt": "int"
+  },
+  "s02_null_observations": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/null_observations",
+    "fmt": "int"
+  },
+  "s02_matched_arm_cells": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/matched_arm_cells",
+    "fmt": "int"
+  },
+  "s02_rho_count_excess": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/spearman/fire_rate_vs_excess",
+    "fmt": "signed_f3"
+  },
+  "s02_rho_count_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/spearman/fire_rate_vs_d_mean",
+    "fmt": "signed_f3"
+  },
+  "s02_rho_excess_d": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/spearman/excess_vs_d_mean",
+    "fmt": "signed_f3"
+  },
+  "s02_scored_in_pair": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/scored_sidecars_in_a_pair",
+    "fmt": "int"
+  },
+  "s02_paired_sweeps": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  }
+}

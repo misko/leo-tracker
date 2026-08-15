@@ -1,0 +1,730 @@
+{
+  "s11_nominal_per_point": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/nominal_per_point",
+    "fmt": "f2",
+    "note": "the per-candidate-point false-alarm rate every threshold in section 11 is drawn to"
+  },
+  "s11_far_per_point_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_nominal_per_point"
+    },
+    "fmt": "f0",
+    "note": "scaled here rather than with pct1 because the template writes the % itself"
+  },
+
+  "s11_cell_far_old_rate_min": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/per_cell_false_alarm_old/glrt-32",
+    "fmt": "pct1",
+    "note": "lowest of the eight per-cell rates the 1%-per-point thresholds actually produced"
+  },
+  "s11_cell_far_old_rate_max": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/per_cell_false_alarm_old/full-frame-full",
+    "fmt": "pct1",
+    "note": "highest of the eight per-cell rates the 1%-per-point thresholds actually produced"
+  },
+  "s11_cell_far_old_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_cell_far_old_rate_min"
+    },
+    "fmt": "f1"
+  },
+  "s11_cell_far_old_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_cell_far_old_rate_max"
+    },
+    "fmt": "f1"
+  },
+  "s11_far_per_cell_new": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/per_cell_false_alarm_new/anchor-8",
+    "fmt": "pct1",
+    "note": "the common per-cell rate all eight are redrawn to in 15b; identical for every detector"
+  },
+  "s11_far_per_cell_new_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_far_per_cell_new"
+    },
+    "fmt": "f0"
+  },
+  "s11_pairs_resolved_old": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/pairs_resolved_marginal_old",
+    "fmt": "int",
+    "note": "pairs resolved marginally at the 1%-per-point thresholds"
+  },
+  "s11_pairs_resolved_familywise_old": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/pairs_resolved_family_wise_old",
+    "fmt": "int",
+    "note": "pairs still resolved once a family-wise correction is applied at the 1%-per-point thresholds. NOTE: the sidecar also carries pairs_resolved_marginal_new = 18 and pairs_resolved_family_wise_new = 17 for the redrawn 5%-per-cell thresholds; the prose attributes the 21 -> 13 collapse to the redrawing"
+  },
+  "s11_pairs_total": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/pairs_total",
+    "fmt": "int"
+  },
+
+  "s11_snr50_glrt32": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/glrt-32",
+    "fmt": "f2"
+  },
+  "s11_snr50_ffverify": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/full-frame-verify",
+    "fmt": "f2"
+  },
+  "s11_snr50_ffacquire": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/full-frame-acquire",
+    "fmt": "f2"
+  },
+  "s11_snr50_fffull": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/full-frame-full",
+    "fmt": "f2"
+  },
+  "s11_snr50_glrt64": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/glrt-64",
+    "fmt": "f2"
+  },
+  "s11_snr50_anchor8": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/anchor-8",
+    "fmt": "f2"
+  },
+  "s11_snr50_diff32": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/differential-32",
+    "fmt": "f2"
+  },
+  "s11_snr50_diff16": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_db/differential-16",
+    "fmt": "f2"
+  },
+
+  "s11_a2snr50_glrt32": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/glrt-32",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_ffverify": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/full-frame-verify",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_ffacquire": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/full-frame-acquire",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_fffull": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/full-frame-full",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_glrt64": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/glrt-64",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_anchor8": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/anchor-8",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_diff32": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/differential-32",
+    "fmt": "f4"
+  },
+  "s11_a2snr50_diff16": {
+    "src": "figures/injection/a2-common-false-alarm-ranking.json",
+    "ptr": "/snr50_old_db/differential-16",
+    "fmt": "f4"
+  },
+  "s11_snr50_reproduction": {
+    "expr": "((a1 - b1) ** 2 + (a2 - b2) ** 2 + (a3 - b3) ** 2 + (a4 - b4) ** 2 + (a5 - b5) ** 2 + (a6 - b6) ** 2 + (a7 - b7) ** 2 + (a8 - b8) ** 2) ** 0.5",
+    "inputs": {
+      "a1": "s11_a2snr50_glrt32",
+      "b1": "s11_snr50_glrt32",
+      "a2": "s11_a2snr50_ffverify",
+      "b2": "s11_snr50_ffverify",
+      "a3": "s11_a2snr50_ffacquire",
+      "b3": "s11_snr50_ffacquire",
+      "a4": "s11_a2snr50_fffull",
+      "b4": "s11_snr50_fffull",
+      "a5": "s11_a2snr50_glrt64",
+      "b5": "s11_snr50_glrt64",
+      "a6": "s11_a2snr50_anchor8",
+      "b6": "s11_snr50_anchor8",
+      "a7": "s11_a2snr50_diff32",
+      "b7": "s11_snr50_diff32",
+      "a8": "s11_a2snr50_diff16",
+      "b8": "s11_snr50_diff16"
+    },
+    "fmt": "f4",
+    "note": "Euclidean norm of the eight SNR50 differences between the 15b re-analysis and the ranking figure; an upper bound on the largest single discrepancy, so 0.0000 dB means every detector reproduced"
+  },
+
+  "s11_probe_ms": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/configuration/probe_ms",
+    "fmt": "f0"
+  },
+  "s11_sample_rate_hz": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/configuration/sample_rate_hz",
+    "fmt": "int"
+  },
+  "s11_sample_rate_msps": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s11_sample_rate_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_cells_per_rung": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E2_roc/cells_per_rung",
+    "fmt": "int"
+  },
+  "s11_ladder_rungs": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E2_roc/rungs",
+    "fmt": "int",
+    "note": "every rung of the gain ladder, including the one with the transmitter off"
+  },
+  "s11_transmitting_rungs": {
+    "expr": "rungs - 1",
+    "inputs": {
+      "rungs": "s11_ladder_rungs"
+    },
+    "fmt": "int",
+    "note": "the rungs that carry signal: the ladder's 19 rungs less the single TX-off rung (detection-vs-snr.json /rungs/0, transmitting false, 480 cells rather than 160)"
+  },
+  "s11_spearman_model_d": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/spearman/measured_vs_model_d",
+    "fmt": "f3"
+  },
+  "s11_spearman_fire_count": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/spearman/measured_vs_fire_count",
+    "fmt": "signed_f3"
+  },
+  "s11_snr50_spread": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/snr50_spread_db",
+    "fmt": "f2"
+  },
+  "s11_pairs_resolved": {
+    "src": "figures/injection/detector-ranking.json",
+    "ptr": "/pairs_resolved_at_95pc",
+    "fmt": "int"
+  },
+
+  "s11_cell_far_rate_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/per_cell_rate_range/0",
+    "fmt": "pct1"
+  },
+  "s11_cell_far_rate_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/per_cell_rate_range/1",
+    "fmt": "pct1"
+  },
+  "s11_cell_far_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_cell_far_rate_min"
+    },
+    "fmt": "f1"
+  },
+  "s11_cell_far_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_cell_far_rate_max"
+    },
+    "fmt": "f1"
+  },
+
+  "s11_arm_probe_min_ms": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/probe_ms",
+    "fmt": "f0",
+    "note": "shortest probe on the sky corpus arm grid"
+  },
+  "s11_arm_probe_max_ms": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/probe_ms",
+    "fmt": "f0",
+    "note": "longest probe on the sky corpus arm grid"
+  },
+  "s11_arm_rate_low_msps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/rate_msps",
+    "fmt": "f1",
+    "note": "the corpus arm grid also carries a 1.25 MS/s rate below this one"
+  },
+  "s11_arm_rate_high_msps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/rate_msps",
+    "fmt": "f0",
+    "note": "highest sample rate on the sky corpus arm grid"
+  },
+
+  "s11_f_true": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/f_true",
+    "fmt": "f4"
+  },
+  "s11_pd_operating": {
+    "src": "figures/injection/fig_calibration.json",
+    "ptr": "/operating_point/r183/pd_mean",
+    "fmt": "f1",
+    "note": "mean Pd at the -71 dB operating point the occupancy run was taken at"
+  },
+  "s11_f_recovered_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/f_recovered/full-frame-verify",
+    "fmt": "f3",
+    "note": "lowest of the eight point estimates"
+  },
+  "s11_f_recovered_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/f_recovered/differential-16",
+    "fmt": "f3",
+    "note": "highest of the eight point estimates"
+  },
+  "s11_mean_bias": {
+    "src": "figures/injection/coincidence-spread.json",
+    "ptr": "/mean_bias",
+    "fmt": "signed_f4"
+  },
+  "s11_all_high_share": {
+    "src": "figures/injection/coincidence-spread.json",
+    "ptr": "/share_of_draws_all_eight_high",
+    "fmt": "pct1"
+  },
+  "s11_empty_excess_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/independence_excess_on_empty_cells/glrt-32",
+    "fmt": "f3",
+    "note": "the largest of the eight empty-cell excesses, so the bound the sentence states"
+  },
+  "s11_occ_excess_anchor8": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/independence_excess_on_occupied_cells/anchor-8",
+    "fmt": "signed_f3"
+  },
+  "s11_occ_excess_diff16": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/independence_excess_on_occupied_cells/differential-16",
+    "fmt": "signed_f3"
+  },
+  "s11_occ_excess_diff32": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/independence_excess_on_occupied_cells/differential-32",
+    "fmt": "signed_f3"
+  },
+  "s11_f_spread_loopback": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/f_spread_measured",
+    "fmt": "f3"
+  },
+  "s11_f_spread_sky": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/report_sky_f_spread",
+    "fmt": "f3"
+  },
+  "s11_spread_exceeds_sky": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E5_coincidence/probability_loopback_spread_exceeds_sky",
+    "fmt": "pct1"
+  },
+  "s11_d1_level_low": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/0/f_true",
+    "fmt": "f2"
+  },
+  "s11_d1_level_mid": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/1/f_true",
+    "fmt": "f2"
+  },
+  "s11_d1_level_high": {
+    "src": "figures/injection/fig_d1_recovered_f.json",
+    "ptr": "/levels/2/f_true",
+    "fmt": "f2"
+  },
+  "s11_d_low_cases": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/prior_low",
+    "fmt": "int"
+  },
+  "s11_d_prior_cases": {
+    "src": "figures/injection/fig_d2_d_bias.json",
+    "ptr": "/summary/prior_cases",
+    "fmt": "int"
+  },
+
+  "s11_snr_high": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/0/snr_db",
+    "fmt": "signed_f1"
+  },
+  "s11_pd_high_offset": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/0/table/25/methods/anchor-8/rate",
+    "fmt": "f2",
+    "note": "all eight detectors hold this rate at every offset up to and including this one"
+  },
+  "s11_offset_high_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/0/table/25/offset_hz",
+    "fmt": "hz"
+  },
+  "s11_offset_high_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_offset_high_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_offset_flat_lo_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/table/0/offset_hz",
+    "fmt": "hz"
+  },
+  "s11_offset_flat_lo_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_offset_flat_lo_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_offset_flat_hi_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/table/9/offset_hz",
+    "fmt": "hz"
+  },
+  "s11_offset_flat_hi_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_offset_flat_hi_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_offset_fall_hi_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/table/10/offset_hz",
+    "fmt": "hz"
+  },
+  "s11_offset_fall_hi_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_offset_fall_hi_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_sky_cliff_lo_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/sky_cliff_hz/0",
+    "fmt": "hz"
+  },
+  "s11_sky_cliff_lo_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_sky_cliff_lo_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_sky_cliff_hi_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/sky_cliff_hz/1",
+    "fmt": "hz"
+  },
+  "s11_sky_cliff_hi_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_sky_cliff_hi_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_pd_knee_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E4_offset/passes/1/pd_at_350_400khz/glrt-64/1",
+    "fmt": "f2",
+    "note": "lowest of the sixteen per-detector Pd values measured in the two cliff bins at the knee"
+  },
+  "s11_pd_knee_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E4_offset/passes/1/pd_at_350_400khz/anchor-8/1",
+    "fmt": "f2",
+    "note": "highest of the sixteen per-detector Pd values measured in the two cliff bins at the knee"
+  },
+  "s11_collapse_min_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/collapse_hz_at_pd_50/glrt-64",
+    "fmt": "hz",
+    "note": "earliest of the eight 50% crossings at the detection knee"
+  },
+  "s11_collapse_min_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_collapse_min_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_collapse_max_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/collapse_hz_at_pd_50/differential-16",
+    "fmt": "hz",
+    "note": "latest of the eight 50% crossings at the detection knee"
+  },
+  "s11_collapse_max_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_collapse_max_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_bank_span_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/coarse_search_spans_hz/E",
+    "fmt": "hz"
+  },
+  "s11_bank_span_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_bank_span_hz"
+    },
+    "fmt": "f0"
+  },
+  "s11_received_flatness": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/table/10/received_relative_db",
+    "fmt": "signed_f2",
+    "note": "received power at the far side of the transition, relative to zero offset"
+  },
+  "s11_165_per_cell_rate": {
+    "src": "figures/injection/cfo-cliff-165.json",
+    "ptr": "/curves/-20.0/anchor-8/per_cell_detection/19",
+    "fmt": "pct1"
+  },
+  "s11_165_per_cell_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_165_per_cell_rate"
+    },
+    "fmt": "f0"
+  },
+  "s11_165_offset_max_hz": {
+    "src": "figures/injection/cfo-cliff-165.json",
+    "ptr": "/curves/-20.0/anchor-8/offset_hz/19",
+    "fmt": "hz"
+  },
+  "s11_165_offset_max_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s11_165_offset_max_hz"
+    },
+    "fmt": "f0"
+  },
+
+  "s11_183_point_rate_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/per_point_rate_range/0",
+    "fmt": "pct2"
+  },
+  "s11_183_point_rate_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/per_point_rate_range/1",
+    "fmt": "pct2"
+  },
+  "s11_183_point_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_183_point_rate_min"
+    },
+    "fmt": "f2"
+  },
+  "s11_183_point_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_183_point_rate_max"
+    },
+    "fmt": "f2"
+  },
+  "s11_165_point_rate_min": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/rates_deployed_thresholds_target_arm/glrt-64/per_point_rate",
+    "fmt": "pct2",
+    "note": "lowest of the eight per-point rates on radio .165"
+  },
+  "s11_165_point_rate_max": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/rates_deployed_thresholds_target_arm/full-frame-acquire/per_point_rate",
+    "fmt": "pct2",
+    "note": "highest of the eight per-point rates on radio .165"
+  },
+  "s11_165_point_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_165_point_rate_min"
+    },
+    "fmt": "f2"
+  },
+  "s11_165_point_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_165_point_rate_max"
+    },
+    "fmt": "f2"
+  },
+  "s11_165_cell_rate_min": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/rates_deployed_thresholds_target_arm/glrt-64/per_cell_rate",
+    "fmt": "pct1",
+    "note": "lowest of the eight per-cell rates on radio .165; glrt-32 ties it"
+  },
+  "s11_165_cell_rate_max": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/rates_deployed_thresholds_target_arm/full-frame-acquire/per_cell_rate",
+    "fmt": "pct1",
+    "note": "highest of the eight per-cell rates on radio .165"
+  },
+  "s11_165_cell_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_165_cell_rate_min"
+    },
+    "fmt": "f1"
+  },
+  "s11_165_cell_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_165_cell_rate_max"
+    },
+    "fmt": "f1"
+  },
+  "s11_points_per_cell_183": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/points_per_cell",
+    "fmt": "f3"
+  },
+  "s11_points_per_cell_165": {
+    "src": "figures/injection/false-alarm-165.json",
+    "ptr": "/mean_points_per_cell",
+    "fmt": "f3"
+  },
+  "s11_predicted_cell_183": {
+    "expr": "(1 - (1 - rate) ** k) * 100",
+    "inputs": {
+      "rate": "s11_nominal_per_point",
+      "k": "s11_points_per_cell_183"
+    },
+    "fmt": "f1",
+    "note": "the 1 - 0.99^k the cell quotes, evaluated on radio .183's own points-per-cell mean"
+  },
+  "s11_predicted_cell_165": {
+    "expr": "(1 - (1 - rate) ** k) * 100",
+    "inputs": {
+      "rate": "s11_nominal_per_point",
+      "k": "s11_points_per_cell_165"
+    },
+    "fmt": "f1",
+    "note": "the same expression on radio .165's points-per-cell mean; reproduces the committed false-alarm-165.json /predicted_per_cell exactly"
+  },
+  "s11_sky_cell_rate_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/sky_per_cell_range/0",
+    "fmt": "pct2"
+  },
+  "s11_sky_cell_rate_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/sky_per_cell_range/1",
+    "fmt": "pct2"
+  },
+  "s11_sky_cell_min": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_sky_cell_rate_min"
+    },
+    "fmt": "f2"
+  },
+  "s11_sky_cell_max": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_sky_cell_rate_max"
+    },
+    "fmt": "f2"
+  },
+  "s11_sky_null_p50_165": {
+    "src": "injection-data/radio-165/sky_coarse_null-165.json",
+    "ptr": "/coarse/cross-edge-null~1E/p50",
+    "fmt": "f3",
+    "note": "median of the sky cross-edge null on radio .165, coarse bank E"
+  },
+  "s11_sky_null_p99_165": {
+    "src": "injection-data/radio-165/sky_coarse_null-165.json",
+    "ptr": "/coarse/cross-edge-null~1E/p99",
+    "fmt": "f3",
+    "note": "p99 of the sky cross-edge null on radio .165, coarse bank E"
+  },
+
+  "s11_null_arm_ratio_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/null_arm_threshold_ratio/0",
+    "fmt": "f2",
+    "note": "cross_radio.null_thresholds against the empty-channel truth, lowest of the eight"
+  },
+  "s11_null_arm_ratio_max": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/null_arm_threshold_ratio/1",
+    "fmt": "f2",
+    "note": "cross_radio.null_thresholds against the empty-channel truth, highest of the eight"
+  },
+  "s11_conditioned_ratio_min": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/conditioned_cross_edge_threshold_ratio/0",
+    "fmt": "f2",
+    "note": "survey_comparison.conditioned_comparison against the empty-channel truth, lowest of the eight"
+  },
+  "s11_conditioned_cell_min_rate": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/per_cell_at_conditioned_cross_edge_threshold/glrt-32",
+    "fmt": "pct1",
+    "note": "lowest of the five detectors the conditioned threshold breaks"
+  },
+  "s11_conditioned_cell_max_rate": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/E3_false_alarm/per_cell_at_conditioned_cross_edge_threshold/full-frame-full",
+    "fmt": "pct1",
+    "note": "highest of the five detectors the conditioned threshold breaks"
+  },
+  "s11_conditioned_cell_min_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_conditioned_cell_min_rate"
+    },
+    "fmt": "f0"
+  },
+  "s11_conditioned_cell_max_pct": {
+    "expr": "rate * 100",
+    "inputs": {
+      "rate": "s11_conditioned_cell_max_rate"
+    },
+    "fmt": "f0"
+  }
+}

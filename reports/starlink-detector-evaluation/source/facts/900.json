@@ -1,0 +1,290 @@
+{
+  "s900_f1_frozen": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/census_frozen/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f1_ranked": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/target_observations_ranked",
+    "fmt": "int"
+  },
+  "s900_f2_frozen": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f2_target": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/live_target_observations",
+    "fmt": "int"
+  },
+  "s900_f2_null": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/null_observations",
+    "fmt": "int"
+  },
+  "s900_f2_pairs": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s900_f3_frozen": {
+    "src": "figures/apparatus.json",
+    "ptr": "/census_frozen/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f3_tunings": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/tunings",
+    "fmt": "int"
+  },
+  "s900_f3_pairs": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/pairs",
+    "fmt": "int"
+  },
+  "s900_f4_frozen": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/cache_meta/corpus_census/scored",
+    "fmt": "int",
+    "note": "the cache's own freeze, which applies the SCORES_SCHEMA gate; census_at_start counts a scores.json being present and reads higher"
+  },
+  "s900_f4_captured": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/totals/sweeps_captured",
+    "fmt": "int"
+  },
+  "s900_f4_matched": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/totals/matched_arm_sweeps",
+    "fmt": "int"
+  },
+  "s900_f5_frozen": {
+    "src": "figures/geometry.json",
+    "ptr": "/cache_meta/corpus_census/scored",
+    "fmt": "int",
+    "note": "Figures 4 and 5 share one cache, so they share one freeze"
+  },
+  "s900_f5_captured": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/captured_sweeps/n",
+    "fmt": "int"
+  },
+  "s900_f5_imported": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/n",
+    "fmt": "int"
+  },
+  "s900_f5_scored": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/n",
+    "fmt": "int"
+  },
+  "s900_f6_frozen": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f6_cells": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census/matched_arm_cells",
+    "fmt": "int"
+  },
+  "s900_f6_sweeps": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census/matched_arm_sweeps",
+    "fmt": "int"
+  },
+  "s900_f7_frozen": {
+    "src": "figures/negative-control.json",
+    "ptr": "/snapshot/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f7_cells": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/cells",
+    "fmt": "int",
+    "note": "the shifted and scrambled joins carry the same cell count, which is what 'in each of three joins' asserts"
+  },
+  "s900_f7_sweeps": {
+    "src": "figures/negative-control.json",
+    "ptr": "/pairs_matched_arm",
+    "fmt": "int"
+  },
+  "s900_f8_frozen": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/census/frozen_at_start/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f8_observations": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/observations",
+    "fmt": "int"
+  },
+  "s900_f8_pairs": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s900_f9_frozen": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/census/frozen_at_start/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f9_units": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/units_seen",
+    "fmt": "int"
+  },
+  "s900_f9_pairs": {
+    "src": "figures/channel-edge-correlation.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s900_f9_receivers": {
+    "expr": "units / pairs",
+    "fmt": "int",
+    "inputs": {
+      "units": "s900_f9_units",
+      "pairs": "s900_f9_pairs"
+    },
+    "note": "one receiver chain's pass over one paired sweep is the unit, so units/pairs is the number of live receivers behind the figure; the sidecar's census.receivers_live lists the same four"
+  },
+  "s900_f10_frozen": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/census/frozen_at_start/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f10_n": {
+    "src": "figures/edge-agreement.json",
+    "ptr": "/headline_checks/n_per_pair",
+    "fmt": "int"
+  },
+  "s900_f11_frozen": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/snapshot/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f11_points": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/census/live_target_points_plotted",
+    "fmt": "int"
+  },
+  "s900_f11_pairs": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s900_f12_frozen": {
+    "src": "figures/port-bias.json",
+    "ptr": "/snapshot/scored_sidecars",
+    "fmt": "int"
+  },
+  "s900_f12_pairs": {
+    "src": "figures/port-bias.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s900_f12_points": {
+    "src": "figures/port-bias.json",
+    "ptr": "/census/candidate_points_read",
+    "fmt": "int"
+  },
+  "s900_f12_lnba_centre": {
+    "src": "figures/port-bias.json",
+    "ptr": "/receiver_centres/lnb-a/centre_hz",
+    "fmt": "signed_hz"
+  },
+  "s900_f13_before": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/n_before",
+    "fmt": "int"
+  },
+  "s900_f13_after": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/n_after",
+    "fmt": "int"
+  },
+  "s900_firerate_sweeps_added": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census_recheck_at_end_of_run/sweeps_added",
+    "fmt": "int"
+  },
+  "s900_firerate_sidecars_removed": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census_recheck_at_end_of_run/scored_removed",
+    "fmt": "int"
+  },
+  "s900_coincidence_sweeps_added": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census_recheck_at_end_of_run/sweeps_added",
+    "fmt": "int"
+  },
+  "s900_coincidence_sidecars_removed": {
+    "src": "figures/coincidence-model.json",
+    "ptr": "/census_recheck_at_end_of_run/scored_removed",
+    "fmt": "int"
+  },
+  "s900_recheck_sweeps_added": {
+    "expr": "firerate + coincidence",
+    "fmt": "int",
+    "inputs": {
+      "firerate": "s900_firerate_sweeps_added",
+      "coincidence": "s900_coincidence_sweeps_added"
+    },
+    "note": "summed over the two runs whose recheck records the delta as a scalar; the opening pair records it as an empty list of names, which is the same claim in another shape"
+  },
+  "s900_recheck_sidecars_removed": {
+    "expr": "firerate + coincidence",
+    "fmt": "int",
+    "inputs": {
+      "firerate": "s900_firerate_sidecars_removed",
+      "coincidence": "s900_coincidence_sidecars_removed"
+    },
+    "note": "summed over the two runs whose recheck records the delta as a scalar; the opening pair records it as an empty list of names, which is the same claim in another shape"
+  },
+  "s900_inj_lo": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/configuration/lo_hz",
+    "fmt": "hz"
+  },
+  "s900_inj_rate_hz": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/configuration/sample_rate_hz",
+    "fmt": "int"
+  },
+  "s900_inj_rate": {
+    "expr": "hz / 1000000",
+    "fmt": "f0",
+    "inputs": {
+      "hz": "s900_inj_rate_hz"
+    },
+    "note": "the sidecar stores Hz; the template writes the MS/s unit"
+  },
+  "s900_inj_probe": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/configuration/probe_ms",
+    "fmt": "f0",
+    "note": "sidecar already stores ms; the template writes the unit"
+  },
+  "s900_inj_rx_gain": {
+    "src": "injection-data/one-radio/summary.json",
+    "ptr": "/configuration/rx_gain_db",
+    "fmt": "f0",
+    "note": "rx_gain_mode in the same block reads 'manual'"
+  },
+  "s900_inj_far_fraction": {
+    "src": "injection-data/one-radio/thresholds.json",
+    "ptr": "/false_alarm_rate",
+    "fmt": "f2"
+  },
+  "s900_inj_far": {
+    "expr": "fraction * 100",
+    "fmt": "f0",
+    "inputs": {
+      "fraction": "s900_inj_far_fraction"
+    },
+    "note": "pct1 would print 1.0%; the report writes a whole percent, so the scaling is explicit here"
+  }
+}

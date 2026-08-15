@@ -1,0 +1,86 @@
+{
+  "htr_collection_paused_utc": {
+    "src": "../sync-scan-cross-radio-2026-08-14/figures/outage-timeline.json",
+    "ptr": "/census/last_sweep_utc",
+    "fmt": "raw",
+    "note": "the last sweep the collector committed; the outage-timeline census records that collection is PAUSED and that these totals are final, so this instant is the pause. No formatter renders a timestamp, so the sidecar's own compact UTC form is what the report prints."
+  },
+  "htr_share_first_utc": {
+    "src": "../sync-scan-cross-radio-2026-08-14/figures/outage-timeline.json",
+    "ptr": "/census/first_sweep_utc",
+    "fmt": "raw"
+  },
+  "htr_share_last_utc": {
+    "src": "../sync-scan-cross-radio-2026-08-14/figures/outage-timeline.json",
+    "ptr": "/census/last_sweep_utc",
+    "fmt": "raw"
+  },
+  "htr_freeze_apparatus": {
+    "src": "figures/apparatus.json",
+    "ptr": "/census_frozen/scored_sidecars",
+    "fmt": "int",
+    "note": "the freeze behind apparatus and edge-pilots"
+  },
+  "htr_freeze_firerate": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/scored_sidecars",
+    "fmt": "int",
+    "note": "the freeze behind fire-rate-problem"
+  },
+  "htr_freeze_joins": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/census/frozen_at_start/scored_sidecars",
+    "fmt": "int",
+    "note": "the freeze shared by algorithm-correlation, channel-edge-correlation, edge-agreement, coincidence-model and port-bias"
+  },
+  "htr_freeze_armmatrix": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/cache_meta/corpus_census/scored",
+    "fmt": "int",
+    "note": "the freeze behind arm-matrix and geometry"
+  },
+  "htr_paired_firerate": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/scored_sidecars_in_a_pair",
+    "fmt": "int"
+  },
+  "htr_paired_joins": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/census/scored_sidecars_in_a_pair",
+    "fmt": "int"
+  },
+  "htr_freeze_carried": {
+    "src": "figures/negative-control.json",
+    "ptr": "/snapshot/scored_sidecars",
+    "fmt": "int",
+    "note": "the earlier freeze the carried-over figures (cfo-cliff, f-strata, negative-control) were computed on"
+  },
+  "htr_lnba_measured_centre": {
+    "src": "figures/port-bias.json",
+    "ptr": "/receiver_centres/lnb-a/centre_hz",
+    "fmt": "signed_hz",
+    "note": "basis MEASURED; port-bias was regenerated on this centre"
+  },
+  "htr_lnba_recorded_centre": {
+    "src": "figures/port-bias.json",
+    "ptr": "/receiver_centres/lnb-a/recorded_hz",
+    "fmt": "signed_hz",
+    "note": "the stale centre the corpus sidecars actually recorded for lnb-a"
+  },
+  "htr_corpus_entries": {
+    "src": "figures/heatmaps-pipeline-snapshot.json",
+    "ptr": "/corpus_entries",
+    "fmt": "int"
+  },
+  "htr_corpus_scored": {
+    "src": "figures/heatmaps-pipeline-snapshot.json",
+    "ptr": "/scored_sidecars",
+    "fmt": "int"
+  },
+  "htr_last_scored": {
+    "src": "figures/heatmaps-pipeline-snapshot.json",
+    "ptr": "/last_scored",
+    "fmt": "raw",
+    "note": "scoring runs in corpus order, so the last scored sidecar in the snapshot is the instant the scored prefix reaches"
+  }
+}

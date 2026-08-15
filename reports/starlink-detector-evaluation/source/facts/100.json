@@ -1,0 +1,292 @@
+{
+  "s01_channel_bandwidth_hz": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/channel_bandwidth_hz",
+    "fmt": "hz"
+  },
+  "s01_channel_bandwidth_mhz": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s01_channel_bandwidth_hz"
+    },
+    "fmt": "f0",
+    "note": "sidecar stores Hz; the template writes the unit"
+  },
+  "s01_pilot_band_hz": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/repository_constants/PILOT_BANDWIDTH_HZ",
+    "fmt": "hz",
+    "note": "the repository constant the table's Source column names; the capture record carries the same value at /capture/pilot_band_hz"
+  },
+  "s01_pilot_band_mhz": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s01_pilot_band_hz"
+    },
+    "fmt": "f3",
+    "note": "sidecar stores Hz; the template writes the unit"
+  },
+  "s01_pilot_first": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/repository_constants/STARLINK_EDGE_PILOT_SUBCARRIERS/lower/0",
+    "fmt": "int"
+  },
+  "s01_pilot_last": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/repository_constants/STARLINK_EDGE_PILOT_SUBCARRIERS/lower/7",
+    "fmt": "int"
+  },
+  "s01_pilots_per_edge": {
+    "expr": "last - first + 1",
+    "inputs": {
+      "first": "s01_pilot_first",
+      "last": "s01_pilot_last"
+    },
+    "fmt": "int",
+    "note": "the edge pilot block is a contiguous run of subcarrier indices, so its length is the span between the first and last index the constant lists"
+  },
+  "s01_subcarrier_spacing_hz": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/repository_constants/STARLINK_SUBCARRIER_SPACING_HZ",
+    "fmt": "hz"
+  },
+  "s01_subcarrier_spacing_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s01_subcarrier_spacing_hz"
+    },
+    "fmt": "f3",
+    "note": "sidecar stores Hz; the template writes the unit"
+  },
+  "s01_ofdm_symbol_s": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/repository_constants/OFDM_SYMBOL_DURATION_S",
+    "fmt": "raw"
+  },
+  "s01_symbol_us": {
+    "expr": "s * 1000000",
+    "inputs": {
+      "s": "s01_ofdm_symbol_s"
+    },
+    "fmt": "f1",
+    "note": "sidecar stores seconds; the template writes the unit"
+  },
+  "s01_useful_interval_us": {
+    "expr": "1000000 / spacing",
+    "inputs": {
+      "spacing": "s01_subcarrier_spacing_hz"
+    },
+    "fmt": "f5",
+    "note": "no sidecar stores the useful interval. The sentence's own claim is that it is the reciprocal of the subcarrier spacing by construction, so it is computed that way from the committed constant; f5 reproduces the published 4.26667 exactly."
+  },
+  "s01_cyclic_prefix_us": {
+    "expr": "symbol - useful",
+    "inputs": {
+      "symbol": "s01_symbol_us",
+      "useful": "s01_useful_interval_us"
+    },
+    "fmt": "f5",
+    "note": "no sidecar stores the cyclic prefix either; it is the committed symbol duration less the useful interval above; f5 reproduces the published 0.13333 exactly."
+  },
+  "s01_target_observations": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/target_observations_ranked",
+    "fmt": "int"
+  },
+  "s01_probe_ms": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/probe_ms",
+    "fmt": "f0"
+  },
+  "s01_sample_rate_hz": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/sample_rate_hz",
+    "fmt": "hz"
+  },
+  "s01_sample_rate_msps": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s01_sample_rate_hz"
+    },
+    "fmt": "f0",
+    "note": "sidecar stores Hz; the template writes the unit"
+  },
+  "s01_sample_rate_msps_f2": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s01_sample_rate_hz"
+    },
+    "fmt": "f2",
+    "note": "the caption quotes the same rate to two decimals"
+  },
+  "s01_band_lift_measured": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/band_lift_db/measured",
+    "fmt": "signed_f4"
+  },
+  "s01_band_lift_measured_f2": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/band_lift_db/measured",
+    "fmt": "signed_f2",
+    "note": "the caption quotes the same lift to two decimals"
+  },
+  "s01_band_lift_sigma": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/band_lift_sigma_db",
+    "fmt": "f4"
+  },
+  "s01_band_bins": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/band_bins",
+    "fmt": "int"
+  },
+  "s01_band_lift_reference_f2": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/band_lift_db/reference",
+    "fmt": "signed_f2"
+  },
+  "s01_band_lift_reference_f3": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/band_lift_db/reference",
+    "fmt": "signed_f3",
+    "note": "the table quotes the same reference lift to three decimals"
+  },
+  "s01_reference_minus_measured": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/reference_minus_measured_db",
+    "fmt": "f0",
+    "note": "the sidecar carries this difference and, beside it, reference_minus_measured_db_is_not_an_snr: each trace is referenced to its own shoulder, the noiseless frame has no noise floor, and the difference is a visualisation contrast rather than a measured signal shortfall. The sentence citing it is the published one, unchanged."
+  },
+  "s01_next_shoulder_f2": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/passband_curvature/1/db_rel_shoulder",
+    "fmt": "signed_f2",
+    "note": "the 2.05-3.00 MHz band, the next shoulder out from the 1.05-2.00 MHz reference shoulder"
+  },
+  "s01_next_shoulder_f3": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/passband_curvature/1/db_rel_shoulder",
+    "fmt": "signed_f3",
+    "note": "the table quotes the same shoulder to three decimals"
+  },
+  "s01_comb_window_hz": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/comb_contrast/measured/window_hz",
+    "fmt": "hz"
+  },
+  "s01_comb_window_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s01_comb_window_hz"
+    },
+    "fmt": "f1",
+    "note": "sidecar stores Hz; the template writes the unit"
+  },
+  "s01_comb_reference_f2": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/comb_contrast/reference/contrast_db",
+    "fmt": "signed_f2"
+  },
+  "s01_comb_reference_abs_f2": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/comb_contrast/reference/contrast_db",
+    "fmt": "f2",
+    "note": "the second mention in the sentence is unsigned: 'a 0.39 dB one'"
+  },
+  "s01_comb_reference_f3": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/comb_contrast/reference/contrast_db",
+    "fmt": "signed_f3"
+  },
+  "s01_comb_measured_f2": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/comb_contrast/measured/contrast_db",
+    "fmt": "signed_f2"
+  },
+  "s01_comb_measured_f3": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/comb_contrast/measured/contrast_db",
+    "fmt": "signed_f3"
+  },
+  "s01_capture_id": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/capture",
+    "fmt": "raw"
+  },
+  "s01_receiver_label": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/receiver_label",
+    "fmt": "raw"
+  },
+  "s01_edge": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/edge",
+    "fmt": "raw"
+  },
+  "s01_iq_index": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/iq_index",
+    "fmt": "int",
+    "note": "the tuning slot the caption names"
+  },
+  "s01_channel": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/channel",
+    "fmt": "int"
+  },
+  "s01_samples": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/samples",
+    "fmt": "int"
+  },
+  "s01_nfft": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/nfft",
+    "fmt": "raw",
+    "note": "a transform length, not a count of things: printed without a thousands separator, as the published text has it"
+  },
+  "s01_segments": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/segments",
+    "fmt": "int"
+  },
+  "s01_resolution_hz": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/capture/resolution_hz",
+    "fmt": "f1"
+  },
+  "s01_chosen_rank": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/chosen_rank",
+    "fmt": "int"
+  },
+  "s01_chosen_value": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/chosen_value",
+    "fmt": "f3",
+    "note": "coarse['E'] peak-to-median, the deployed survey bank; the sidecar also records selection_statistic_is_not_band_lift"
+  },
+  "s01_null_threshold": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/arm_coarse_E_null_threshold",
+    "fmt": "f3"
+  },
+  "s01_null_n": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/arm_coarse_E_null_n",
+    "fmt": "int"
+  },
+  "s01_false_alarm_fraction": {
+    "src": "figures/edge-pilots.json",
+    "ptr": "/selection/false_alarm_rate",
+    "fmt": "pct1"
+  },
+  "s01_false_alarm_pct": {
+    "expr": "fraction * 100",
+    "inputs": {
+      "fraction": "s01_false_alarm_fraction"
+    },
+    "fmt": "f0",
+    "note": "the caption writes the bar as a whole percent; the template writes the sign"
+  }
+}

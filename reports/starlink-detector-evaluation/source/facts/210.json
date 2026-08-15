@@ -1,0 +1,469 @@
+{
+  "s12_edge_300": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/6",
+    "fmt": "f0",
+    "note": "the bias-corrected offset axis the cliff figure bins on; every 'nnn-nnn kHz bin' in this section is one of these edges"
+  },
+  "s12_edge_350": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/7",
+    "fmt": "f0"
+  },
+  "s12_edge_400": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/8",
+    "fmt": "f0"
+  },
+
+  "s12_lnbb_recorded_centre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/receiver_centers_hz/lnb-b",
+    "fmt": "f1",
+    "note": "already in Hz; f1 keeps the tenth of a hertz the artifact records, and shows the zero as a measured zero"
+  },
+  "s12_lnbd_recorded_centre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/receiver_centers_hz/lnb-d",
+    "fmt": "f1"
+  },
+  "s12_lnbc_recorded_centre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/receiver_centers_hz/lnb-c",
+    "fmt": "signed_f1",
+    "note": "already in Hz; signed_f1 keeps the tenth of a hertz the artifact records"
+  },
+
+  "s12_lnbb_raw_pre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-b/6/pct",
+    "fmt": "f1",
+    "note": "the 300-350 kHz bin on the raw axis; the sidecar already stores a percentage"
+  },
+  "s12_lnbb_raw_post": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-b/7/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbb_raw_ratio": {
+    "expr": "pre / post",
+    "inputs": {
+      "pre": "s12_lnbb_raw_pre",
+      "post": "s12_lnbb_raw_post"
+    },
+    "fmt": "f1"
+  },
+  "s12_lnbd_raw_pre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-d/6/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbd_raw_post": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-d/7/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbd_raw_ratio": {
+    "expr": "pre / post",
+    "inputs": {
+      "pre": "s12_lnbd_raw_pre",
+      "post": "s12_lnbd_raw_post"
+    },
+    "fmt": "f1"
+  },
+  "s12_lnbc_raw_pre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-c/6/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbc_raw_post": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-c/7/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbc_raw_peak": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-c/8/pct",
+    "fmt": "f0",
+    "note": "the highest bin of lnb-c's raw-axis curve: where the other two ports collapse, this one is still rising"
+  },
+  "s12_lnbc_raw_peak_lo": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-c/8/low",
+    "fmt": "f0"
+  },
+  "s12_lnbc_raw_peak_hi": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/raw_abs/lnb-c/8/high",
+    "fmt": "f0"
+  },
+  "s12_lnbc_cor_pre": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/cor_abs/lnb-c/6/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbc_cor_post": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/curves/cor_abs/lnb-c/7/pct",
+    "fmt": "f1"
+  },
+  "s12_lnbc_cor_ratio": {
+    "expr": "pre / post",
+    "inputs": {
+      "pre": "s12_lnbc_cor_pre",
+      "post": "s12_lnbc_cor_post"
+    },
+    "fmt": "f0"
+  },
+
+  "s12_precliff_lnbb_share": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_port_composition/5 MS~1s/6/ports/lnb-b/share_pct",
+    "fmt": "f1",
+    "note": "share of the 300-350 kHz pre-cliff bin at 5 MS/s, the rate the cliff figure leads on"
+  },
+  "s12_precliff_lnbd_share": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_port_composition/5 MS~1s/6/ports/lnb-d/share_pct",
+    "fmt": "f1"
+  },
+  "s12_precliff_bd_share": {
+    "expr": "b + d",
+    "inputs": {
+      "b": "s12_precliff_lnbb_share",
+      "d": "s12_precliff_lnbd_share"
+    },
+    "fmt": "f0",
+    "note": "the two zero-centre ports' combined share of the pre-cliff bin"
+  },
+
+  "s12_pluto19f2_rederived": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/measurement/pluto-19f2.all_points/point",
+    "fmt": "signed_f1",
+    "note": "lnb_calibration's own rx0-rx1 estimator re-run on the corpus, all candidate points"
+  },
+  "s12_pluto19f2_agreement": {
+    "expr": "recorded - rederived",
+    "inputs": {
+      "recorded": "s12_lnbc_recorded_centre",
+      "rederived": "s12_pluto19f2_rederived"
+    },
+    "fmt": "hz"
+  },
+
+  "s12_lnbb_window_lo": {
+    "src": "figures/port-bias.json",
+    "ptr": "/signed_axis/lnb-b/3/low_khz",
+    "fmt": "signed_f0",
+    "note": "lowest signed bin at or above a 10% fire rate on this port's curve"
+  },
+  "s12_lnbb_window_hi": {
+    "src": "figures/port-bias.json",
+    "ptr": "/signed_axis/lnb-b/8/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s12_lnbc_window_lo": {
+    "src": "figures/port-bias.json",
+    "ptr": "/signed_axis/lnb-c/2/low_khz",
+    "fmt": "signed_f0"
+  },
+  "s12_lnbc_window_hi": {
+    "src": "figures/port-bias.json",
+    "ptr": "/signed_axis/lnb-c/8/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s12_lnbd_window_lo": {
+    "src": "figures/port-bias.json",
+    "ptr": "/signed_axis/lnb-d/3/low_khz",
+    "fmt": "signed_f0"
+  },
+  "s12_lnbd_window_hi": {
+    "src": "figures/port-bias.json",
+    "ptr": "/signed_axis/lnb-d/9/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s12_window_width_khz": {
+    "expr": "hi - lo",
+    "inputs": {
+      "hi": "s12_lnbb_window_hi",
+      "lo": "s12_lnbb_window_lo"
+    },
+    "fmt": "f0"
+  },
+
+  "s12_coarse_e_span_hz": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/coarse_configs/E/offset_span_hz",
+    "fmt": "int"
+  },
+  "s12_bank_span_khz": {
+    "expr": "hz / 2000",
+    "inputs": {
+      "hz": "s12_coarse_e_span_hz"
+    },
+    "fmt": "f0",
+    "note": "the coarse-E bank searches +/- half its offset span"
+  },
+  "s12_coarse_a_span_hz": {
+    "src": "figures/injection/raw-vs-corrected.json",
+    "ptr": "/coarse_configs/A/offset_span_hz",
+    "fmt": "int"
+  },
+  "s12_coarse_a_tooth_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s12_coarse_a_span_hz"
+    },
+    "fmt": "f1",
+    "note": "the outermost tooth of the deployed coarse-A grid sits at its own span"
+  },
+  "s12_coarse_e_tooth_khz": {
+    "expr": "hz / 2000",
+    "inputs": {
+      "hz": "s12_coarse_e_span_hz"
+    },
+    "fmt": "f1"
+  },
+
+  "s12_live_window_lo": {
+    "src": "figures/port-bias.json",
+    "ptr": "/live_window_khz/0",
+    "fmt": "signed_f0"
+  },
+  "s12_live_window_hi": {
+    "src": "figures/port-bias.json",
+    "ptr": "/live_window_khz/1",
+    "fmt": "signed_f0"
+  },
+  "s12_window_halfwidth_khz": {
+    "expr": "(hi - lo) / 2",
+    "inputs": {
+      "hi": "s12_live_window_hi",
+      "lo": "s12_live_window_lo"
+    },
+    "fmt": "f0"
+  },
+
+  "s12_sweeps": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/population/sweeps",
+    "fmt": "int"
+  },
+  "s12_target_points": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/population/target_points",
+    "fmt": "int"
+  },
+  "s12_doppler_mean_khz": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/diagnostics/in_view_doppler_elev_ge_40/mean_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s12_doppler_p95_khz": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/diagnostics/in_view_doppler_elev_ge_40/p95_khz",
+    "fmt": "f0"
+  },
+
+  "s12_lnbb_before": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_port/lnb-b|gen1/residual_vs_maxel/mean_khz",
+    "fmt": "signed_f1",
+    "note": "residual against the highest-elevation candidate's predicted Doppler; the quantity the tle-residual figure marks as each receiver-epoch's centre"
+  },
+  "s12_lnbb_after": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_port/lnb-b|gen2/residual_vs_maxel/mean_khz",
+    "fmt": "signed_f1"
+  },
+  "s12_lnbd_before": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_port/lnb-d|gen1/residual_vs_maxel/mean_khz",
+    "fmt": "signed_f1"
+  },
+  "s12_lnbd_after": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_port/lnb-d|gen2/residual_vs_maxel/mean_khz",
+    "fmt": "signed_f1"
+  },
+  "s12_lnbc_before": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_port/lnb-c|gen1/residual_vs_maxel/mean_khz",
+    "fmt": "signed_f1"
+  },
+  "s12_lnbc_after": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_port/lnb-c|gen2/residual_vs_maxel/mean_khz",
+    "fmt": "signed_f1"
+  },
+  "s12_gap_before": {
+    "expr": "d - b",
+    "inputs": {
+      "d": "s12_lnbd_before",
+      "b": "s12_lnbb_before"
+    },
+    "fmt": "f0",
+    "note": "how far apart the two radios sat before the swap"
+  },
+  "s12_lnbd_move": {
+    "expr": "after - before",
+    "inputs": {
+      "after": "s12_lnbd_after",
+      "before": "s12_lnbd_before"
+    },
+    "fmt": "signed_f1"
+  },
+  "s12_lnbb_move": {
+    "expr": "after - before",
+    "inputs": {
+      "after": "s12_lnbb_after",
+      "before": "s12_lnbb_before"
+    },
+    "fmt": "signed_f0"
+  },
+
+  "s12_if_low_mhz": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_tuning/lnb-d|gen2/rows/0/if_mhz",
+    "fmt": "f1",
+    "note": "the eight tunings are the same plan on every receiver-epoch; read off one of them"
+  },
+  "s12_if_high_mhz": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_tuning/lnb-d|gen2/rows/7/if_mhz",
+    "fmt": "f1"
+  },
+  "s12_if_lever": {
+    "expr": "hi / lo",
+    "inputs": {
+      "hi": "s12_if_high_mhz",
+      "lo": "s12_if_low_mhz"
+    },
+    "fmt": "f2"
+  },
+  "s12_rf_low_ghz": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_tuning/lnb-d|gen2/rows/0/rf_ghz",
+    "fmt": "f4"
+  },
+  "s12_lnb_lo_ghz": {
+    "expr": "rf - mhz / 1000",
+    "inputs": {
+      "rf": "s12_rf_low_ghz",
+      "mhz": "s12_if_low_mhz"
+    },
+    "fmt": "f2",
+    "note": "RF minus IF at the lowest tuning: the fixed LNB local oscillator"
+  },
+  "s12_if_slope_min_ppm": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_tuning/lnb-a|gen1/if_slope_ppm",
+    "fmt": "signed_f0",
+    "note": "most negative IF-proportional term across the receiver-epoch fits"
+  },
+  "s12_if_slope_max_ppm": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_tuning/lnb-d|gen2/if_slope_ppm",
+    "fmt": "signed_f0",
+    "note": "most positive IF-proportional term across the receiver-epoch fits"
+  },
+  "s12_if_term_max_khz": {
+    "src": "figures/injection/tle-residual.json",
+    "ptr": "/by_tuning/lnb-d|gen2/if_term_over_span_khz",
+    "fmt": "f0",
+    "note": "what that largest IF-proportional term is worth across the whole 2x span"
+  },
+  "s12_tuner_line_khz": {
+    "expr": "centre * (hi / lo - 1)",
+    "inputs": {
+      "centre": "s12_lnbd_after",
+      "hi": "s12_if_high_mhz",
+      "lo": "s12_if_low_mhz"
+    },
+    "fmt": "signed_f0",
+    "note": "a Pluto-side fractional error big enough to BE a measured -150 kHz centre would be proportional to the IF, so it would add this much more across the span"
+  },
+
+  "s12_lnba_recorded_centre": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/recorded_centres_hz/lnb-a",
+    "fmt": "signed_int"
+  },
+  "s12_lnba_rederived": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/measurement/pluto-5d4d.all_points/point",
+    "fmt": "signed_int",
+    "note": "the same rx0-rx1 estimator, same all-points population as the pluto-19f2 re-derivation above"
+  },
+  "s12_lnba_stale_khz": {
+    "expr": "(rederived - recorded) / 1000",
+    "inputs": {
+      "rederived": "s12_lnba_rederived",
+      "recorded": "s12_lnba_recorded_centre"
+    },
+    "fmt": "f0"
+  },
+  "s12_lnba_window_lo": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/low_khz",
+    "fmt": "signed_f0",
+    "note": "lnb-a's live window on the stale recorded centre, before its measured centre is applied"
+  },
+  "s12_lnba_window_hi": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s12_lnba_window_n": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/n",
+    "fmt": "int"
+  },
+  "s12_lnba_window_fired": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/fired",
+    "fmt": "int"
+  },
+  "s12_lnba_window_rate": {
+    "expr": "fired / n",
+    "inputs": {
+      "fired": "s12_lnba_window_fired",
+      "n": "s12_lnba_window_n"
+    },
+    "fmt": "pct1"
+  },
+
+  "s12_ppm_min": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-b|gen2/consensus_hz",
+    "fmt": "ppm1",
+    "note": "lowest of the four gen2 absolute centres section 16 measures"
+  },
+  "s12_ppm_max": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/consensus_hz",
+    "fmt": "ppm1",
+    "note": "highest of the four"
+  },
+  "s12_after_centroid_khz": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_b/after_centroid_khz",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s12_flat_offset_hz": {
+    "src": "figures/injection/offset-cliff.json",
+    "ptr": "/passes/1/table/9/offset_hz",
+    "fmt": "hz"
+  },
+  "s12_flat_offset_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s12_flat_offset_hz"
+    },
+    "fmt": "f0",
+    "note": "the furthest imposed offset at which injection still holds every detector flat, at the detection knee"
+  }
+}

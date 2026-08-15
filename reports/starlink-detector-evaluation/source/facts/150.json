@@ -1,0 +1,167 @@
+{
+  "s06_shift_instants": {
+    "src": "figures/negative-control.json",
+    "ptr": "/shift_instants",
+    "fmt": "int",
+    "note": "how far radio B is advanced within the sweep to build the shifted control"
+  },
+  "s06_scramble_median_s": {
+    "src": "figures/negative-control.json",
+    "ptr": "/scramble_separation/median_s",
+    "fmt": "int"
+  },
+  "s06_scramble_min_s": {
+    "src": "figures/negative-control.json",
+    "ptr": "/scramble_separation/min_s",
+    "fmt": "int"
+  },
+  "s06_scramble_max_s": {
+    "src": "figures/negative-control.json",
+    "ptr": "/scramble_separation/max_s",
+    "fmt": "int"
+  },
+  "s06_real_cells": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/cells",
+    "fmt": "int"
+  },
+  "s06_real_f_min": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/f_min",
+    "fmt": "f3"
+  },
+  "s06_real_f_max": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/f_max",
+    "fmt": "f3"
+  },
+  "s06_real_f_mean": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/f_mean",
+    "fmt": "f3"
+  },
+  "s06_real_spread": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/spread",
+    "fmt": "f3"
+  },
+  "s06_real_boot_p05": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/bootstrap_spread/p05",
+    "fmt": "f3"
+  },
+  "s06_real_boot_p95": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/bootstrap_spread/p95",
+    "fmt": "f3"
+  },
+  "s06_real_spread_ratio": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/spread_over_bootstrap_p50",
+    "fmt": "f2"
+  },
+  "s06_shifted_cells": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/cells",
+    "fmt": "int"
+  },
+  "s06_shifted_f_min": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/f_min",
+    "fmt": "f3"
+  },
+  "s06_shifted_f_max": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/f_max",
+    "fmt": "f3"
+  },
+  "s06_shifted_f_mean": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/f_mean",
+    "fmt": "f3"
+  },
+  "s06_shifted_spread": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/spread",
+    "fmt": "f3"
+  },
+  "s06_shifted_boot_p05": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/bootstrap_spread/p05",
+    "fmt": "f3"
+  },
+  "s06_shifted_boot_p95": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/bootstrap_spread/p95",
+    "fmt": "f3"
+  },
+  "s06_shifted_spread_ratio": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/shifted/spread_over_bootstrap_p50",
+    "fmt": "f2"
+  },
+  "s06_scrambled_cells": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/cells",
+    "fmt": "int"
+  },
+  "s06_scrambled_f_min": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/f_min",
+    "fmt": "f3"
+  },
+  "s06_scrambled_f_max": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/f_max",
+    "fmt": "f3"
+  },
+  "s06_scrambled_f_mean": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/f_mean",
+    "fmt": "f3"
+  },
+  "s06_scrambled_spread": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/spread",
+    "fmt": "f3"
+  },
+  "s06_scrambled_boot_p05": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/bootstrap_spread/p05",
+    "fmt": "f3"
+  },
+  "s06_scrambled_boot_p95": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/bootstrap_spread/p95",
+    "fmt": "f3"
+  },
+  "s06_scrambled_spread_ratio": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/scrambled/spread_over_bootstrap_p50",
+    "fmt": "f2"
+  },
+  "s06_f_move_ratio": {
+    "expr": "scrambled / real",
+    "inputs": {
+      "scrambled": "s06_scrambled_f_mean",
+      "real": "s06_real_f_mean"
+    },
+    "fmt": "f2",
+    "note": "how far the estimate itself travels across the three joins: the scrambled join's mean f over the real join's"
+  },
+  "s06_boot_draws": {
+    "src": "figures/negative-control.json",
+    "ptr": "/joins/real/bootstrap_spread/draws",
+    "fmt": "int"
+  },
+  "s06_pairs_matched_arm": {
+    "src": "figures/negative-control.json",
+    "ptr": "/pairs_matched_arm",
+    "fmt": "int"
+  },
+  "s06_entries": {
+    "src": "figures/negative-control.json",
+    "ptr": "/entries",
+    "fmt": "int"
+  }
+}

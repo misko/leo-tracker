@@ -1,0 +1,182 @@
+{
+  "s03_tunings": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/tunings",
+    "fmt": "int"
+  },
+  "s03_pairs": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/pairs",
+    "fmt": "int"
+  },
+  "s03_median_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/median_ms",
+    "fmt": "f4",
+    "note": "sidecar stores milliseconds; the template writes the unit"
+  },
+  "s03_p90_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/p90_ms",
+    "fmt": "f4"
+  },
+  "s03_p99_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/p99_ms",
+    "fmt": "f4"
+  },
+  "s03_max_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/max_ms",
+    "fmt": "f4"
+  },
+  "s03_design_bound_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/design_max_ms",
+    "fmt": "f3"
+  },
+  "s03_beyond": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/beyond",
+    "fmt": "int"
+  },
+  "s03_beyond_pct2": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/beyond_fraction",
+    "fmt": "pct2"
+  },
+  "s03_beyond_pct1": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/beyond_fraction",
+    "fmt": "pct1"
+  },
+  "s03_sweeps_beyond": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/sweeps_beyond",
+    "fmt": "int"
+  },
+  "s03_same_edge_n": {
+    "src": "figures/apparatus.json",
+    "ptr": "/by_geometry/same-edge/n",
+    "fmt": "int"
+  },
+  "s03_same_edge_median_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/by_geometry/same-edge/median_ms",
+    "fmt": "f4"
+  },
+  "s03_opposite_edge_n": {
+    "src": "figures/apparatus.json",
+    "ptr": "/by_geometry/opposite-edge/n",
+    "fmt": "int"
+  },
+  "s03_opposite_edge_median_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/by_geometry/opposite-edge/median_ms",
+    "fmt": "f4"
+  },
+  "s03_geometry_ratio": {
+    "expr": "opposite / same",
+    "inputs": {
+      "opposite": "s03_opposite_edge_median_ms",
+      "same": "s03_same_edge_median_ms"
+    },
+    "fmt": "f2",
+    "note": "how far apart the two geometries are on the recorded barrier-release skew"
+  },
+  "s03_readme_same_order_low_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/readme/same_order_ms/0",
+    "fmt": "f1"
+  },
+  "s03_readme_same_order_high_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/readme/same_order_ms/1",
+    "fmt": "f1"
+  },
+  "s03_readme_opposite_order_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/readme/opposite_order_ms",
+    "fmt": "f0"
+  },
+  "s03_readme_ratio": {
+    "expr": "opposite / same_high",
+    "inputs": {
+      "opposite": "s03_readme_opposite_order_ms",
+      "same_high": "s03_readme_same_order_high_ms"
+    },
+    "fmt": "f0",
+    "note": "the README's own separation between the two geometries, taken at the top of its same-order range"
+  },
+  "s03_skew_mismatches": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_mismatches_manifest_vs_share",
+    "fmt": "int"
+  },
+  "s03_refused_sweeps": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/sweep_skew_event/REFUSED: cannot tell which event the skew in a 'leo-tracker.interim-synchronised-scan~1v1' record was taken at: it names no skew.event and is not one of ['leo-tracker.synchronised-scan-sweep~1v2', 'leo-tracker.synchronised-scan-sweep~1v1']",
+    "fmt": "int",
+    "note": "the count keyed by the refusal message sweep_skew_event() raised; every paired sweep in the corpus is in it"
+  },
+  "s03_manifests_with_basis": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/skew_basis_in_manifests/measured at barrier release, a LOWER BOUND on the true sample-start offset; see leo-scans~1README.md",
+    "fmt": "int"
+  },
+  "s03_auth_beyond": {
+    "src": "figures/apparatus.json",
+    "ptr": "/authoritative_run/beyond",
+    "fmt": "int"
+  },
+  "s03_auth_tunings": {
+    "src": "figures/apparatus.json",
+    "ptr": "/authoritative_run/tunings",
+    "fmt": "int"
+  },
+  "s03_auth_beyond_pct1": {
+    "expr": "beyond / tunings",
+    "inputs": {
+      "beyond": "s03_auth_beyond",
+      "tunings": "s03_auth_tunings"
+    },
+    "fmt": "pct1"
+  },
+  "s03_auth_median_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/authoritative_run/median_ms",
+    "fmt": "f4"
+  },
+  "s03_auth_max_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/authoritative_run/max_ms",
+    "fmt": "f4"
+  },
+  "s03_extra_tunings": {
+    "src": "figures/apparatus.json",
+    "ptr": "/agreement_with_authoritative/extra_tunings",
+    "fmt": "int"
+  },
+  "s03_instants_per_sweep": {
+    "src": "figures/geometry.json",
+    "ptr": "/geometry_derivation_audit/instants_per_sweep/0",
+    "fmt": "int",
+    "note": "the only instants-per-sweep value present in the corpus, used here to turn extra tunings into extra pairs"
+  },
+  "s03_pairs_added": {
+    "expr": "extra / per_sweep",
+    "inputs": {
+      "extra": "s03_extra_tunings",
+      "per_sweep": "s03_instants_per_sweep"
+    },
+    "fmt": "int"
+  },
+  "s03_worst_vs_bound": {
+    "expr": "worst / bound",
+    "inputs": {
+      "worst": "s03_max_ms",
+      "bound": "s03_design_bound_ms"
+    },
+    "fmt": "f0"
+  }
+}

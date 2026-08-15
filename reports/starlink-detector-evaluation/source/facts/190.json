@@ -1,0 +1,49 @@
+{
+  "s10_design_max_ms": {
+    "src": "figures/apparatus.json",
+    "ptr": "/measured/design_max_ms",
+    "fmt": "f3",
+    "note": "the design bound the barrier-release skew is measured against"
+  },
+  "s10_lnbc_applied_khz": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/currently_applied_hz",
+    "fmt": "signed_khz1",
+    "note": "the one number lnb-c's centre rests on today: recorded, never measured"
+  },
+  "s10_cliff_edge": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/7",
+    "fmt": "f0",
+    "note": "the lower edge of the bin the detection rate collapses in"
+  },
+  "s10_phi_min": {"src": "figures/algorithm-correlation.json", "ptr": "/phi_off_diagonal/min", "fmt": "f3"},
+  "s10_phi_max": {"src": "figures/algorithm-correlation.json", "ptr": "/phi_off_diagonal/max", "fmt": "f3"},
+
+  "s10_captured": {"src": "figures/geometry.json", "ptr": "/plotted_counts/captured_sweeps/n", "fmt": "int"},
+  "s10_unpaired": {"src": "figures/geometry.json", "ptr": "/pairing_drops/unpaired_sweeps", "fmt": "int"},
+  "s10_pairable": {"src": "figures/geometry.json", "ptr": "/plotted_counts/imported_pairs/n", "fmt": "int"},
+  "s10_scored": {"src": "figures/geometry.json", "ptr": "/plotted_counts/scored_pairs/n", "fmt": "int"},
+
+  "s10_captured_same": {"src": "figures/geometry.json", "ptr": "/plotted_counts/captured_sweeps/same_edge", "fmt": "int"},
+  "s10_captured_opposite": {"src": "figures/geometry.json", "ptr": "/plotted_counts/captured_sweeps/opposite_edge", "fmt": "int"},
+  "s10_pairable_same": {"src": "figures/geometry.json", "ptr": "/plotted_counts/imported_pairs/same_edge", "fmt": "int"},
+  "s10_pairable_opposite": {"src": "figures/geometry.json", "ptr": "/plotted_counts/imported_pairs/opposite_edge", "fmt": "int"},
+  "s10_lost_same": {
+    "expr": "captured - pairable",
+    "inputs": {"captured": "s10_captured_same", "pairable": "s10_pairable_same"},
+    "fmt": "int",
+    "note": "same-edge sweeps the collector fault cost; the two losses sum to the unpaired count"
+  },
+  "s10_lost_opposite": {
+    "expr": "captured - pairable",
+    "inputs": {"captured": "s10_captured_opposite", "pairable": "s10_pairable_opposite"},
+    "fmt": "int"
+  },
+  "s10_data_multiple": {
+    "expr": "pairable / scored",
+    "inputs": {"pairable": "s10_pairable", "scored": "s10_scored"},
+    "fmt": "f0",
+    "note": "how much more pairable data is on the share than has been scored"
+  }
+}

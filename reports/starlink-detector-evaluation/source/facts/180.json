@@ -1,0 +1,803 @@
+{
+  "s09_edge_0": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/0",
+    "fmt": "f0",
+    "note": "the bias-corrected offset axis this figure bins on; every 'nnn-nnn kHz bin' in the section is one of these edges"
+  },
+  "s09_edge_50": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/1",
+    "fmt": "f0"
+  },
+  "s09_edge_100": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/2",
+    "fmt": "f0"
+  },
+  "s09_edge_150": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/3",
+    "fmt": "f0"
+  },
+  "s09_edge_200": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/4",
+    "fmt": "f0"
+  },
+  "s09_edge_250": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/5",
+    "fmt": "f0"
+  },
+  "s09_edge_300": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/6",
+    "fmt": "f0"
+  },
+  "s09_edge_350": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/7",
+    "fmt": "f0"
+  },
+  "s09_edge_400": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/8",
+    "fmt": "f0"
+  },
+  "s09_edge_500": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/9",
+    "fmt": "f0"
+  },
+  "s09_edge_600": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/bin_edges_khz/10",
+    "fmt": "f0"
+  },
+  "s09_rate_250": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/1",
+    "fmt": "f1"
+  },
+  "s09_rate_500": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/2",
+    "fmt": "f1"
+  },
+  "s09_rate_500_int": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/2",
+    "fmt": "f0",
+    "note": "the same rate the arm axis lists as 5.0, written without its decimal"
+  },
+  "s09_rate_1000": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/3",
+    "fmt": "f1"
+  },
+  "s09_rate_1000_int": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/3",
+    "fmt": "f0",
+    "note": "the same rate the arm axis lists as 10.0, written without its decimal"
+  },
+  "s09_rate_125": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/0",
+    "fmt": "f2"
+  },
+  "s09_probe_80": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/rows_probe_ms/0",
+    "fmt": "f0"
+  },
+  "s09_probe_640": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/rows_probe_ms/2",
+    "fmt": "f0"
+  },
+  "s09_points_plotted": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/census/live_target_points_plotted",
+    "fmt": "int"
+  },
+  "s09_points_read": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/census/candidate_points_read",
+    "fmt": "int"
+  },
+  "s09_paired_sweeps": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s09_bin_n_min": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/7/n",
+    "fmt": "int",
+    "note": "smallest n over the nine bins the table shows: the 2.5 MS/s cliff bin"
+  },
+  "s09_bin_n_max": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/2/n",
+    "fmt": "int",
+    "note": "largest n over the nine bins the table shows: 5 MS/s, 100-150 kHz"
+  },
+  "s09_r250_b0": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/0/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b1": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/1/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b2": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/2/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b3": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/3/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b4": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/4/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b5": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/5/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b6": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/6/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b7": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/7/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r250_b8": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/2.5 MS~1s/8/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b0": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/0/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b1": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/1/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b2": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/2/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b3": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/3/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b4": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/4/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b5": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/5/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b6": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/6/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b7": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/7/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r500_b8": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/5 MS~1s/8/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b0": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/0/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b1": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/1/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b2": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/2/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b3": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/3/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b4": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/4/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b5": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/5/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b6": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/6/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b7": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/7/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_r1000_b8": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/series/10 MS~1s/8/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_guard_250": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/guard_khz/2.5 MS~1s",
+    "fmt": "signed_f1",
+    "note": "sidecar already stores kHz; the template writes the unit"
+  },
+  "s09_guard_500": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/guard_khz/5 MS~1s",
+    "fmt": "signed_f1"
+  },
+  "s09_guard_1000": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/guard_khz/10 MS~1s",
+    "fmt": "signed_f1"
+  },
+  "s09_guard_spread": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/guard_spread",
+    "fmt": "f0"
+  },
+  "s09_survey_bank_hz": {
+    "src": "figures/injection/cfo-cliff-165.json",
+    "ptr": "/bank_span_hz/coarse-E (candidate 13x8)",
+    "fmt": "int",
+    "note": "the survey scorer's own coarse bank, fixed about raw zero"
+  },
+  "s09_survey_bank_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s09_survey_bank_hz"
+    },
+    "fmt": "f0"
+  },
+  "s09_robust_250_80_before": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_robustness_by_probe_ms/2.5 MS~1s ~1 80 ms/before_300_350/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_robust_250_80_after": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_robustness_by_probe_ms/2.5 MS~1s ~1 80 ms/after_350_400/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_robust_1000_640_before": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_robustness_by_probe_ms/10 MS~1s ~1 640 ms/before_300_350/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_robust_1000_640_after": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_robustness_by_probe_ms/10 MS~1s ~1 640 ms/after_350_400/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_cliff250_n": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/2.5 MS~1s/n",
+    "fmt": "int"
+  },
+  "s09_cliff250_lnbc": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/2.5 MS~1s/ports/lnb-c/n",
+    "fmt": "int"
+  },
+  "s09_cliff250_share": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/2.5 MS~1s/dominant_share_pct",
+    "fmt": "f0"
+  },
+  "s09_cliff_review_share": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/reference_cliff_composition/lnb_c_pct",
+    "fmt": "f0"
+  },
+  "s09_cliff500_lnbb": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/5 MS~1s/ports/lnb-b/n",
+    "fmt": "int"
+  },
+  "s09_cliff500_lnbc": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/5 MS~1s/ports/lnb-c/n",
+    "fmt": "int"
+  },
+  "s09_cliff500_lnbd": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/5 MS~1s/ports/lnb-d/n",
+    "fmt": "int"
+  },
+  "s09_cliff1000_lnbb": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/10 MS~1s/ports/lnb-b/n",
+    "fmt": "int"
+  },
+  "s09_cliff1000_lnbc": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/10 MS~1s/ports/lnb-c/n",
+    "fmt": "int"
+  },
+  "s09_cliff1000_lnbd": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/cliff_bin_composition/10 MS~1s/ports/lnb-d/n",
+    "fmt": "int"
+  },
+  "s09_raw250_b5": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/raw_axis_through_the_guard/2.5 MS~1s/bins/5/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_raw250_b6": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/raw_axis_through_the_guard/2.5 MS~1s/bins/6/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_raw250_b7": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/raw_axis_through_the_guard/2.5 MS~1s/bins/7/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_raw250_b8": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/raw_axis_through_the_guard/2.5 MS~1s/bins/8/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_raw250_b9": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/raw_axis_through_the_guard/2.5 MS~1s/bins/9/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_false_alarm_fraction": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/false_alarm_rate",
+    "fmt": "f2"
+  },
+  "s09_false_alarm_pct": {
+    "expr": "p * 100",
+    "inputs": {
+      "p": "s09_false_alarm_fraction"
+    },
+    "fmt": "f0",
+    "note": "the per-point cross-edge-null threshold, as a percentage"
+  },
+  "s09_max_corrected_khz": {
+    "src": "figures/cfo-cliff.json",
+    "ptr": "/max_corrected_offset_khz/10000000.0",
+    "fmt": "f1",
+    "note": "sidecar already stores kHz; the largest corrected offset anywhere in the corpus"
+  },
+  "s09_lnbc_recorded_centre": {
+    "src": "figures/port-bias.json",
+    "ptr": "/receiver_centres/lnb-c/recorded_hz",
+    "fmt": "signed_f1",
+    "note": "already in Hz; signed_f1 keeps the tenth of a hertz the artifact records"
+  },
+  "s09_pb_edge_100": {
+    "src": "figures/port-bias.json",
+    "ptr": "/bin_edges_khz/1",
+    "fmt": "f0"
+  },
+  "s09_pb_edge_200": {
+    "src": "figures/port-bias.json",
+    "ptr": "/bin_edges_khz/2",
+    "fmt": "f0"
+  },
+  "s09_pb_edge_400": {
+    "src": "figures/port-bias.json",
+    "ptr": "/bin_edges_khz/4",
+    "fmt": "f0"
+  },
+  "s09_pb_edge_500": {
+    "src": "figures/port-bias.json",
+    "ptr": "/bin_edges_khz/5",
+    "fmt": "f0"
+  },
+  "s09_lnbc_raw_rate": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/raw_100_200_khz_at_5MSps/lnb-c/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_lnbc_raw_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/raw_100_200_khz_at_5MSps/lnb-c/n",
+    "fmt": "int"
+  },
+  "s09_lnbc_raw_peak_rate": {
+    "src": "figures/port-bias.json",
+    "ptr": "/raw_axis/lnb-c/4/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_lnbc_raw_peak_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/raw_axis/lnb-c/4/n",
+    "fmt": "int"
+  },
+  "s09_pub_lnbc_rate": {
+    "src": "figures/port-bias.json",
+    "ptr": "/reproduction/corrected_100_200_khz_at_5MSps/lnb-c/published",
+    "fmt": "f1"
+  },
+  "s09_pub_lnbc_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/reproduction/corrected_100_200_khz_at_5MSps/lnb-c/n_published",
+    "fmt": "int"
+  },
+  "s09_pub_lnbd_rate": {
+    "src": "figures/port-bias.json",
+    "ptr": "/reproduction/corrected_100_200_khz_at_5MSps/lnb-d/published",
+    "fmt": "f1"
+  },
+  "s09_pub_lnbd_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/reproduction/corrected_100_200_khz_at_5MSps/lnb-d/n_published",
+    "fmt": "int"
+  },
+  "s09_pub_lnbb_rate": {
+    "src": "figures/port-bias.json",
+    "ptr": "/reproduction/corrected_100_200_khz_at_5MSps/lnb-b/published",
+    "fmt": "f1"
+  },
+  "s09_pub_lnbb_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/reproduction/corrected_100_200_khz_at_5MSps/lnb-b/n_published",
+    "fmt": "int"
+  },
+  "s09_port_ratio": {
+    "expr": "strongest / weakest",
+    "inputs": {
+      "strongest": "s09_pub_lnbc_rate",
+      "weakest": "s09_pub_lnbb_rate"
+    },
+    "fmt": "f1",
+    "note": "the spread across ports in the corrected 100-200 kHz bin, strongest over weakest"
+  },
+  "s09_pb_paired_sweeps": {
+    "src": "figures/port-bias.json",
+    "ptr": "/census/paired_sweeps",
+    "fmt": "int"
+  },
+  "s09_pb_points": {
+    "src": "figures/port-bias.json",
+    "ptr": "/census/candidate_points_read",
+    "fmt": "int"
+  },
+  "s09_lnba_centre": {
+    "src": "figures/port-bias.json",
+    "ptr": "/receiver_centres/lnb-a/centre_hz",
+    "fmt": "signed_int"
+  },
+  "s09_lnba_uncertainty_hz": {
+    "src": "figures/port-bias.json",
+    "ptr": "/receiver_centres/lnb-a/uncertainty_hz",
+    "fmt": "int"
+  },
+  "s09_lnba_uncertainty_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s09_lnba_uncertainty_hz"
+    },
+    "fmt": "f0"
+  },
+  "s09_lnba_move_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s09_lnba_centre"
+    },
+    "fmt": "f0",
+    "note": "how far lnb-a's local oscillator moved out of the search grid"
+  },
+  "s09_ghost_low": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/low_khz",
+    "fmt": "signed_f0",
+    "note": "the live window lnb-a occupied on the stale recorded centre, drawn as a ghost on the third panel"
+  },
+  "s09_ghost_high": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/before/lnb-a/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s09_after_low": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-a/low_khz",
+    "fmt": "signed_f0"
+  },
+  "s09_after_high": {
+    "src": "figures/injection/lnba-centre.json",
+    "ptr": "/windows/after/lnb-a/high_khz",
+    "fmt": "signed_f0"
+  },
+  "s09_lnba_raw_rate": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/raw_100_200_khz_at_5MSps/lnb-a/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_lnba_raw_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/raw_100_200_khz_at_5MSps/lnb-a/n",
+    "fmt": "int"
+  },
+  "s09_now_lnba": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/corrected_100_200_khz_at_5MSps/lnb-a/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_now_lnbc": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/corrected_100_200_khz_at_5MSps/lnb-c/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_now_lnbd": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/corrected_100_200_khz_at_5MSps/lnb-d/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_now_lnbb": {
+    "src": "figures/port-bias.json",
+    "ptr": "/corpus_says/corrected_100_200_khz_at_5MSps/lnb-b/rate_pct",
+    "fmt": "f1"
+  },
+  "s09_centroid_lnba": {
+    "src": "figures/port-bias.json",
+    "ptr": "/centroids_signed_5MSps/lnb-a/centroid_khz",
+    "fmt": "signed_f0",
+    "note": "sidecar already stores kHz; the least negative of the four signed live-window centroids"
+  },
+  "s09_centroid_lnbc": {
+    "src": "figures/port-bias.json",
+    "ptr": "/centroids_signed_5MSps/lnb-c/centroid_khz",
+    "fmt": "signed_f0",
+    "note": "the most negative of the four"
+  },
+  "s09_centroid_allrates_lnbd": {
+    "src": "figures/port-bias.json",
+    "ptr": "/centroids_signed_all_rates/lnb-d/centroid_khz",
+    "fmt": "signed_f0"
+  },
+  "s09_survey_lnbd": {
+    "src": "figures/port-bias.json",
+    "ptr": "/common_mode_offset/survey_path_measurement_for_comparison/lnb-d",
+    "fmt": "signed_f0"
+  },
+  "s09_centroid_survey_gap": {
+    "expr": "survey - centroid",
+    "inputs": {
+      "survey": "s09_survey_lnbd",
+      "centroid": "s09_centroid_allrates_lnbd"
+    },
+    "fmt": "f0",
+    "note": "the widest of the four per-port gaps between this figure's centroids and the survey-path values in hardware/epochs.json; lnb-d is the port where they part company most"
+  },
+  "s09_lnba_fire_pct": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-a/fire_pct",
+    "fmt": "f2"
+  },
+  "s09_lnba_target_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-a/target_n",
+    "fmt": "int"
+  },
+  "s09_lnbb_fire_pct": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-b/fire_pct",
+    "fmt": "f2"
+  },
+  "s09_lnbb_target_n": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-b/target_n",
+    "fmt": "int"
+  },
+  "s09_lnba_null_median": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-a/null_median",
+    "fmt": "f4"
+  },
+  "s09_lnba_null_p99": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-a/null_p99",
+    "fmt": "f4"
+  },
+  "s09_lnbb_null_median": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-b/null_median",
+    "fmt": "f4"
+  },
+  "s09_lnbb_null_p99": {
+    "src": "figures/port-bias.json",
+    "ptr": "/dead_receiver_audit/lnb-b/null_p99",
+    "fmt": "f4"
+  },
+  "s09_lnbc_applied_khz": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/currently_applied_hz",
+    "fmt": "signed_khz1"
+  },
+  "s09_lnbc_miscentring_hz": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen2/miscentring_hz",
+    "fmt": "signed_int"
+  },
+  "s09_lnbc_too_high_khz": {
+    "expr": "-m",
+    "inputs": {
+      "m": "s09_lnbc_miscentring_hz"
+    },
+    "fmt": "khz1",
+    "note": "the applied centre sits above the measured one, so the miscentring is negative in the sidecar and positive in the sentence"
+  },
+  "s09_lnbc_lost": {
+    "src": "figures/abscal-pipeline-abscal.json",
+    "ptr": "/detection_cost/lnb-c|gen2/detection_lost_fraction",
+    "fmt": "pct1"
+  },
+  "s09_lnbc_measured_centre": {
+    "src": "figures/absolute-centres.json",
+    "ptr": "/panel_a/lnb-c|gen2/consensus_hz",
+    "fmt": "signed_hz"
+  },
+  "s09_pilot_band_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/pilot_band_hz",
+    "fmt": "int"
+  },
+  "s09_pilot_band_mhz": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s09_pilot_band_hz"
+    },
+    "fmt": "f3"
+  },
+  "s09_guard_125": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/cache_meta/guard_hz/1.25",
+    "fmt": "khz1"
+  },
+  "s09_axis_low_f": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/lowest/f",
+    "fmt": "f3"
+  },
+  "s09_axis_low_cells": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/lowest/n_cells",
+    "fmt": "int"
+  },
+  "s09_axis_high_f": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/highest/f",
+    "fmt": "f3"
+  },
+  "s09_phi_min": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/min",
+    "fmt": "f3"
+  },
+  "s09_phi_max": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/phi_off_diagonal/max",
+    "fmt": "f3"
+  },
+  "s09_observations": {
+    "src": "figures/algorithm-correlation.json",
+    "ptr": "/observations",
+    "fmt": "int"
+  },
+  "s09_nominal_per_point": {
+    "src": "figures/injection/false-alarm-empty-channel.json",
+    "ptr": "/summary/nominal_per_point",
+    "fmt": "f2"
+  },
+  "s09_nominal_per_point_pct": {
+    "expr": "p * 100",
+    "inputs": {
+      "p": "s09_nominal_per_point"
+    },
+    "fmt": "f0"
+  },
+  "s09_percell_low_fraction": {
+    "src": "figures/injection/false-alarm-empty-channel.json",
+    "ptr": "/summary/sky_per_cell_range/0",
+    "fmt": "f4"
+  },
+  "s09_percell_high_fraction": {
+    "src": "figures/injection/false-alarm-empty-channel.json",
+    "ptr": "/summary/sky_per_cell_range/1",
+    "fmt": "f4"
+  },
+  "s09_percell_low": {
+    "expr": "p * 100",
+    "inputs": {
+      "p": "s09_percell_low_fraction"
+    },
+    "fmt": "f2",
+    "note": "as a percentage, so the template can write one % across the range"
+  },
+  "s09_percell_high": {
+    "expr": "p * 100",
+    "inputs": {
+      "p": "s09_percell_high_fraction"
+    },
+    "fmt": "f2"
+  },
+  "s09_points_per_cell": {
+    "src": "figures/injection/false-alarm-empty-channel.json",
+    "ptr": "/population/points_per_cell_mean",
+    "fmt": "f0"
+  },
+  "s09_null_observations": {
+    "src": "figures/fire-rate-problem.json",
+    "ptr": "/census/null_observations",
+    "fmt": "int"
+  },
+  "s09_skew_same": {
+    "src": "figures/apparatus.json",
+    "ptr": "/by_geometry/same-edge/median_ms",
+    "fmt": "f4"
+  },
+  "s09_skew_opposite": {
+    "src": "figures/apparatus.json",
+    "ptr": "/by_geometry/opposite-edge/median_ms",
+    "fmt": "f4"
+  },
+  "s09_readme_same_order_high": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/readme/same_order_ms/1",
+    "fmt": "f1"
+  },
+  "s09_readme_opposite_order": {
+    "src": "figures/apparatus.json",
+    "ptr": "/skew_stamp_provenance/readme/opposite_order_ms",
+    "fmt": "f1"
+  },
+  "s09_skew_geometry_factor": {
+    "expr": "opposite / same",
+    "inputs": {
+      "opposite": "s09_readme_opposite_order",
+      "same": "s09_readme_same_order_high"
+    },
+    "fmt": "f0",
+    "note": "the README's own sample-start offsets: ~4 ms on opposite-order sweeps against ~0.2-0.8 ms on same-order ones"
+  }
+}

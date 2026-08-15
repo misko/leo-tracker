@@ -1,0 +1,1236 @@
+{
+  "s04_probe_80": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/rows_probe_ms/0",
+    "fmt": "f0"
+  },
+  "s04_probe_160": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/rows_probe_ms/1",
+    "fmt": "f0"
+  },
+  "s04_probe_640": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/rows_probe_ms/2",
+    "fmt": "f0"
+  },
+  "s04_rate_125": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/0",
+    "fmt": "f2"
+  },
+  "s04_rate_250": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/1",
+    "fmt": "f1"
+  },
+  "s04_rate_500_axis": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/2",
+    "fmt": "f1"
+  },
+  "s04_rate_1000_axis": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/3",
+    "fmt": "f1"
+  },
+  "s04_rate_1000": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/columns_rate_msps/3",
+    "fmt": "f0",
+    "note": "the same rate the axis lists as 10.0, written without its decimal"
+  },
+  "s04_matched_arm_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/totals/matched_arm_sweeps",
+    "fmt": "int"
+  },
+  "s04_sweeps_captured": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/totals/sweeps_captured",
+    "fmt": "int"
+  },
+  "s04_matched_arm_pct": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/totals/matched_arm_fraction",
+    "fmt": "pct1"
+  },
+  "s04_arm_count_min": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/observed_min",
+    "fmt": "int"
+  },
+  "s04_arm_count_max": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/observed_max",
+    "fmt": "int"
+  },
+  "s04_expected_per_arm": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/expected_per_arm",
+    "fmt": "f1"
+  },
+  "s04_chi_square": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/chi_square",
+    "fmt": "f2"
+  },
+  "s04_chi_df": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/df",
+    "fmt": "int"
+  },
+  "s04_chi_p_mc": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/p_value_mc",
+    "fmt": "f2"
+  },
+  "s04_chi_mc_draws": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/mc_draws",
+    "fmt": "int"
+  },
+  "s04_arm0_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm0_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm0_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/rate_msps",
+    "fmt": "f2"
+  },
+  "s04_arm0_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm0_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm0_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm0_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm0_solo_a",
+      "b": "s04_arm0_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm0_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm0_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm0_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm0_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm0_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm0_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm0_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/0/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm1_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm1_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm1_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/rate_msps",
+    "fmt": "f1"
+  },
+  "s04_arm1_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm1_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm1_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm1_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm1_solo_a",
+      "b": "s04_arm1_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm1_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm1_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm1_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm1_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm1_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm1_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm1_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/1/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm2_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm2_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm2_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/rate_msps",
+    "fmt": "f0"
+  },
+  "s04_arm2_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm2_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm2_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm2_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm2_solo_a",
+      "b": "s04_arm2_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm2_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm2_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm2_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm2_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm2_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm2_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm2_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/2/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm3_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm3_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm3_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/rate_msps",
+    "fmt": "f0"
+  },
+  "s04_arm3_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm3_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm3_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm3_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm3_solo_a",
+      "b": "s04_arm3_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm3_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm3_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm3_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm3_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm3_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm3_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm3_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/3/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm4_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm4_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm4_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/rate_msps",
+    "fmt": "f2"
+  },
+  "s04_arm4_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm4_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm4_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm4_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm4_solo_a",
+      "b": "s04_arm4_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm4_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm4_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm4_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm4_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm4_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm4_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm4_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/4/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm5_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm5_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm5_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/rate_msps",
+    "fmt": "f1"
+  },
+  "s04_arm5_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm5_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm5_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm5_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm5_solo_a",
+      "b": "s04_arm5_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm5_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm5_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm5_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm5_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm5_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm5_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm5_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/5/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm6_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm6_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm6_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/rate_msps",
+    "fmt": "f0"
+  },
+  "s04_arm6_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm6_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm6_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm6_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm6_solo_a",
+      "b": "s04_arm6_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm6_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm6_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm6_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm6_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm6_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm6_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm6_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/6/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm7_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm7_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm7_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/rate_msps",
+    "fmt": "f0"
+  },
+  "s04_arm7_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm7_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm7_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm7_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm7_solo_a",
+      "b": "s04_arm7_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm7_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm7_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm7_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm7_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm7_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm7_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm7_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/7/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm8_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm8_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm8_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/rate_msps",
+    "fmt": "f2"
+  },
+  "s04_arm8_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm8_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm8_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm8_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm8_solo_a",
+      "b": "s04_arm8_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm8_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm8_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm8_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm8_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm8_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm8_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm8_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/8/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm9_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm9_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm9_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/rate_msps",
+    "fmt": "f1"
+  },
+  "s04_arm9_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm9_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm9_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm9_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm9_solo_a",
+      "b": "s04_arm9_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm9_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm9_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm9_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm9_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm9_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm9_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm9_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/9/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm10_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm10_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm10_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/rate_msps",
+    "fmt": "f0"
+  },
+  "s04_arm10_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm10_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm10_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm10_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm10_solo_a",
+      "b": "s04_arm10_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm10_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm10_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm10_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm10_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm10_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm10_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm10_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/10/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_arm11_name": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/arm_name",
+    "fmt": "raw"
+  },
+  "s04_arm11_probe": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/probe_ms",
+    "fmt": "f0"
+  },
+  "s04_arm11_rate": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/rate_msps",
+    "fmt": "f0"
+  },
+  "s04_arm11_sweeps": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/matched_sweeps",
+    "fmt": "int",
+    "note": "sweeps whose two radios both drew this arm"
+  },
+  "s04_arm11_solo_a": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/solo_captures_a",
+    "fmt": "int"
+  },
+  "s04_arm11_solo_b": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/solo_captures_b",
+    "fmt": "int"
+  },
+  "s04_arm11_solo": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s04_arm11_solo_a",
+      "b": "s04_arm11_solo_b"
+    },
+    "fmt": "int",
+    "note": "captures of this arm by one radio alone, either side added"
+  },
+  "s04_arm11_samples": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/samples_per_tuning",
+    "fmt": "int"
+  },
+  "s04_arm11_bytes": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/iq_bytes_per_radio",
+    "fmt": "int"
+  },
+  "s04_arm11_guard_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/pilot_guard_hz",
+    "fmt": "signed_hz"
+  },
+  "s04_arm11_guard_khz": {
+    "expr": "hz / 1000",
+    "inputs": {
+      "hz": "s04_arm11_guard_hz"
+    },
+    "fmt": "signed_f1",
+    "note": "sidecar stores Hz; the column header carries the unit"
+  },
+  "s04_arm11_imported": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/imported_pairs",
+    "fmt": "int"
+  },
+  "s04_arm11_scored": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/arms/11/scored_pairs",
+    "fmt": "int"
+  },
+  "s04_pilot_band_hz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/pilot_band_hz",
+    "fmt": "hz"
+  },
+  "s04_pilot_band_mhz": {
+    "expr": "hz / 1000000",
+    "inputs": {
+      "hz": "s04_pilot_band_hz"
+    },
+    "fmt": "f3",
+    "note": "the band the detectors correlate against, in MHz"
+  },
+  "s04_pilot_half_khz": {
+    "expr": "hz / 2000",
+    "inputs": {
+      "hz": "s04_pilot_band_hz"
+    },
+    "fmt": "f1",
+    "note": "half that band, in kHz: the term pilot_guard_hz subtracts from rate/2"
+  },
+  "s04_guard_125_khz": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/cache_meta/guard_hz/1.25",
+    "fmt": "khz1"
+  },
+  "s04_axis_low_f": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/lowest/f",
+    "fmt": "f3"
+  },
+  "s04_axis_low_cells": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/lowest/n_cells",
+    "fmt": "int"
+  },
+  "s04_axis_low_solved": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/lowest/algorithms_solved",
+    "fmt": "int"
+  },
+  "s04_axis_high_solved": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/highest/algorithms_solved",
+    "fmt": "int",
+    "note": "the full complement of detectors: the arm at the top of the axis solves all of them, which is what the 'of 8' in the prose counts against"
+  },
+  "s04_axis_high_f": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/highest/f",
+    "fmt": "f3"
+  },
+  "s04_axis_f_low": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/f_low",
+    "fmt": "f2"
+  },
+  "s04_axis_f_high": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/f_high",
+    "fmt": "f3"
+  },
+  "s04_axis_cells": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/authoritative_review_arm_axis/cells",
+    "fmt": "int"
+  },
+  "s04_colour_vmax": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/plotted_grid/colour_vmax",
+    "fmt": "f1"
+  },
+  "s04_sd_binomial": {
+    "src": "figures/arm-matrix.json",
+    "ptr": "/uniformity_check/sd_binomial",
+    "fmt": "f1"
+  },
+  "s04_colour_sigma": {
+    "expr": "(vmax - expected) / sd",
+    "inputs": {
+      "vmax": "s04_colour_vmax",
+      "expected": "s04_expected_per_arm",
+      "sd": "s04_sd_binomial"
+    },
+    "fmt": "f0",
+    "note": "how many binomial sigma the colour scale spans either side of the uniform expectation"
+  },
+  "s04_captured_n": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/captured_sweeps/n",
+    "fmt": "int"
+  },
+  "s04_captured_same": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/captured_sweeps/same_edge",
+    "fmt": "int"
+  },
+  "s04_captured_opposite": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/captured_sweeps/opposite_edge",
+    "fmt": "int"
+  },
+  "s04_captured_same_pct": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/captured_sweeps/same_edge_pct",
+    "fmt": "f2",
+    "note": "sidecar already stores a percentage; the template writes the sign"
+  },
+  "s04_imported_n": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/n",
+    "fmt": "int"
+  },
+  "s04_imported_same": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/same_edge",
+    "fmt": "int"
+  },
+  "s04_imported_opposite": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/opposite_edge",
+    "fmt": "int"
+  },
+  "s04_imported_same_pct": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/imported_pairs/same_edge_pct",
+    "fmt": "f2",
+    "note": "sidecar already stores a percentage; the template writes the sign"
+  },
+  "s04_scored_n": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/n",
+    "fmt": "int"
+  },
+  "s04_scored_same": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/same_edge",
+    "fmt": "int"
+  },
+  "s04_scored_opposite": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/opposite_edge",
+    "fmt": "int"
+  },
+  "s04_scored_same_pct": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/scored_pairs/same_edge_pct",
+    "fmt": "f2",
+    "note": "sidecar already stores a percentage; the template writes the sign"
+  },
+  "s04_cells_total": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/cells_scored/total",
+    "fmt": "int"
+  },
+  "s04_cells_same": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/cells_scored/same_edge",
+    "fmt": "int"
+  },
+  "s04_cells_opposite": {
+    "src": "figures/geometry.json",
+    "ptr": "/plotted_counts/cells_scored/opposite_edge",
+    "fmt": "int"
+  },
+  "s04_edge_p_mc": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/fairness_check_same_edge/p_value_two_sided_mc",
+    "fmt": "f2"
+  },
+  "s04_edge_expected_share": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/fairness_check_same_edge/expected_share",
+    "fmt": "pct1"
+  },
+  "s04_edge_expected_pct": {
+    "expr": "share * 100",
+    "inputs": {
+      "share": "s04_edge_expected_share"
+    },
+    "fmt": "f0",
+    "note": "the fair-coin share the Monte-Carlo test is against, as a percentage"
+  },
+  "s04_edge_mc_draws": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/fairness_check_same_edge/mc_draws",
+    "fmt": "int"
+  },
+  "s04_radio_a_lower": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/radio_a_L",
+    "fmt": "int"
+  },
+  "s04_radio_a_upper": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/radio_a_U",
+    "fmt": "int"
+  },
+  "s04_radio_b_lower": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/radio_b_L",
+    "fmt": "int"
+  },
+  "s04_radio_b_upper": {
+    "src": "figures/geometry.json",
+    "ptr": "/edge_order_draw/radio_b_U",
+    "fmt": "int"
+  },
+  "s04_geometry_pairs_checked": {
+    "src": "figures/geometry.json",
+    "ptr": "/geometry_derivation_audit/pairs_checked",
+    "fmt": "int"
+  },
+  "s04_geometry_disagreements": {
+    "src": "figures/geometry.json",
+    "ptr": "/geometry_derivation_audit/declared_vs_derived_disagreements",
+    "fmt": "int"
+  },
+  "s04_geometry_agreeing": {
+    "expr": "checked - disagreements",
+    "inputs": {
+      "checked": "s04_geometry_pairs_checked",
+      "disagreements": "s04_geometry_disagreements"
+    },
+    "fmt": "int",
+    "note": "pairs whose geometry derived from the recorded sample order matches the declared edge_order letter"
+  },
+  "s04_instants_per_sweep": {
+    "src": "figures/geometry.json",
+    "ptr": "/geometry_derivation_audit/instants_per_sweep/0",
+    "fmt": "int"
+  },
+  "s04_live_receiver_pairs": {
+    "src": "figures/geometry.json",
+    "ptr": "/geometry_derivation_audit/live_receiver_pairs_per_pair/0",
+    "fmt": "int"
+  },
+  "s04_auth_pairs": {
+    "src": "figures/geometry.json",
+    "ptr": "/authoritative_review_line/pairs",
+    "fmt": "int"
+  },
+  "s04_auth_same": {
+    "src": "figures/geometry.json",
+    "ptr": "/authoritative_review_line/same_edge",
+    "fmt": "int"
+  },
+  "s04_auth_opposite": {
+    "src": "figures/geometry.json",
+    "ptr": "/authoritative_review_line/opposite_edge",
+    "fmt": "int"
+  },
+  "s04_auth_pairs_added": {
+    "src": "figures/geometry.json",
+    "ptr": "/authoritative_comparison/pairs_added",
+    "fmt": "int"
+  },
+  "s04_auth_same_pct_then": {
+    "src": "figures/geometry.json",
+    "ptr": "/authoritative_comparison/then_same_edge_pct",
+    "fmt": "f2"
+  },
+  "s04_auth_same_pct_now": {
+    "src": "figures/geometry.json",
+    "ptr": "/authoritative_comparison/now_same_edge_pct",
+    "fmt": "f2"
+  }
+}

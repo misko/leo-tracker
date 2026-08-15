@@ -13,7 +13,6 @@
     "fmt": "f0",
     "note": "scaled here rather than with pct1 because the template writes the % itself"
   },
-
   "s11_cell_far_old_rate_min": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/per_cell_false_alarm_old/glrt-32",
@@ -70,7 +69,6 @@
     "ptr": "/pairs_total",
     "fmt": "int"
   },
-
   "s11_snr50_glrt32": {
     "src": "figures/injection/detector-ranking.json",
     "ptr": "/snr50_db/glrt-32",
@@ -111,46 +109,53 @@
     "ptr": "/snr50_db/differential-16",
     "fmt": "f2"
   },
-
   "s11_a2snr50_glrt32": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/glrt-32",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_ffverify": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/full-frame-verify",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_ffacquire": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/full-frame-acquire",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_fffull": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/full-frame-full",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_glrt64": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/glrt-64",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_anchor8": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/anchor-8",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_diff32": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/differential-32",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_a2snr50_diff16": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/differential-16",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s11_snr50_reproduction": {
     "expr": "((a1 - b1) ** 2 + (a2 - b2) ** 2 + (a3 - b3) ** 2 + (a4 - b4) ** 2 + (a5 - b5) ** 2 + (a6 - b6) ** 2 + (a7 - b7) ** 2 + (a8 - b8) ** 2) ** 0.5",
@@ -175,7 +180,6 @@
     "fmt": "f4",
     "note": "Euclidean norm of the eight SNR50 differences between the 15b re-analysis and the ranking figure; an upper bound on the largest single discrepancy, so 0.0000 dB means every detector reproduced"
   },
-
   "s11_probe_ms": {
     "src": "injection-data/one-radio/summary.json",
     "ptr": "/configuration/probe_ms",
@@ -232,7 +236,6 @@
     "ptr": "/pairs_resolved_at_95pc",
     "fmt": "int"
   },
-
   "s11_cell_far_rate_min": {
     "src": "injection-data/one-radio/summary.json",
     "ptr": "/E3_false_alarm/per_cell_rate_range/0",
@@ -257,7 +260,6 @@
     },
     "fmt": "f1"
   },
-
   "s11_arm_probe_min_ms": {
     "src": "figures/arm-matrix.json",
     "ptr": "/arms/0/probe_ms",
@@ -282,7 +284,6 @@
     "fmt": "f0",
     "note": "highest sample rate on the sky corpus arm grid"
   },
-
   "s11_f_true": {
     "src": "injection-data/one-radio/summary.json",
     "ptr": "/E5_coincidence/f_true",
@@ -377,7 +378,6 @@
     "ptr": "/summary/prior_cases",
     "fmt": "int"
   },
-
   "s11_snr_high": {
     "src": "figures/injection/offset-cliff.json",
     "ptr": "/passes/0/snr_db",
@@ -541,7 +541,6 @@
     },
     "fmt": "f0"
   },
-
   "s11_183_point_rate_min": {
     "src": "injection-data/one-radio/summary.json",
     "ptr": "/E3_false_alarm/per_point_rate_range/0",
@@ -682,7 +681,6 @@
     "fmt": "f3",
     "note": "p99 of the sky cross-edge null on radio .165, coarse bank E"
   },
-
   "s11_null_arm_ratio_min": {
     "src": "injection-data/one-radio/summary.json",
     "ptr": "/E3_false_alarm/null_arm_threshold_ratio/0",

@@ -6362,6 +6362,7 @@
       "defined_in": "140.json",
       "fact": "s05_verify_anchor8_published",
       "format": "f3",
+      "note": "reads the PUBLISHED run deliberately: this row verifies the current pipeline reproduces what was published before lnb-a was restored, so the old population is the point",
       "ptr": "/verification_against_the_published_run/anchor-8/published_with_lnb_a_excluded/f",
       "src": "figures/coincidence-model.json",
       "value": 0.346
@@ -6386,6 +6387,7 @@
       "defined_in": "140.json",
       "fact": "s05_verify_fffull_published",
       "format": "f3",
+      "note": "reads the PUBLISHED run deliberately: this row verifies the current pipeline reproduces what was published before lnb-a was restored, so the old population is the point",
       "ptr": "/verification_against_the_published_run/full-frame-full/published_with_lnb_a_excluded/f",
       "src": "figures/coincidence-model.json",
       "value": 0.388
@@ -6402,6 +6404,7 @@
       "defined_in": "140.json",
       "fact": "s05_verify_glrt32_published",
       "format": "f3",
+      "note": "reads the PUBLISHED run deliberately: this row verifies the current pipeline reproduces what was published before lnb-a was restored, so the old population is the point",
       "ptr": "/verification_against_the_published_run/glrt-32/published_with_lnb_a_excluded/f",
       "src": "figures/coincidence-model.json",
       "value": 0.344
@@ -10038,6 +10041,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_anchor8",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/anchor-8",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -17.614855279102187
@@ -10046,6 +10050,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_diff16",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/differential-16",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -17.04182382939002
@@ -10054,6 +10059,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_diff32",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/differential-32",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -17.501565365425126
@@ -10062,6 +10068,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_ffacquire",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/full-frame-acquire",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.504134020689484
@@ -10070,6 +10077,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_fffull",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/full-frame-full",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.29311394474056
@@ -10078,6 +10086,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_ffverify",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/full-frame-verify",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.57176747075651
@@ -10086,6 +10095,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_glrt32",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/glrt-32",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.689777557837612
@@ -10094,6 +10104,7 @@
       "defined_in": "200.json",
       "fact": "s11_a2snr50_glrt64",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/glrt-64",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.222035100580882
@@ -11075,6 +11086,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_glrt32",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/glrt-32",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.689777557837612
@@ -11083,6 +11095,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_ffverify",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/full-frame-verify",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.57176747075651
@@ -11091,6 +11104,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_ffacquire",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/full-frame-acquire",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.504134020689484
@@ -11099,6 +11113,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_fffull",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/full-frame-full",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.29311394474056
@@ -11107,6 +11122,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_glrt64",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/glrt-64",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.222035100580882
@@ -11115,6 +11131,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_anchor8",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/anchor-8",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -17.614855279102187
@@ -11123,6 +11140,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_diff32",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/differential-32",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -17.501565365425126
@@ -11131,6 +11149,7 @@
           "defined_in": "200.json",
           "fact": "s11_a2snr50_diff16",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/differential-16",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -17.04182382939002
@@ -14422,6 +14441,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_a8",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/anchor-8",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -17.614855279102187
@@ -14430,6 +14450,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_d16",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/differential-16",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -17.04182382939002
@@ -14438,6 +14459,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_d32",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/differential-32",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -17.501565365425126
@@ -14446,6 +14468,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_ffa",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/full-frame-acquire",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.504134020689484
@@ -14454,6 +14477,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_fff",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/full-frame-full",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.29311394474056
@@ -14462,6 +14486,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_ffv",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/full-frame-verify",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.57176747075651
@@ -14470,6 +14495,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_g32",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/glrt-32",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.689777557837612
@@ -14478,6 +14504,7 @@
       "defined_in": "240.json",
       "fact": "s15b_a2old_g64",
       "format": "f4",
+      "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
       "ptr": "/snr50_old_db/glrt-64",
       "src": "figures/injection/a2-common-false-alarm-ranking.json",
       "value": -18.222035100580882
@@ -14774,6 +14801,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_ffv",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/full-frame-verify",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.57176747075651
@@ -14782,6 +14810,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_fff",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/full-frame-full",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.29311394474056
@@ -14790,6 +14819,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_ffa",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/full-frame-acquire",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.504134020689484
@@ -14798,6 +14828,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_g32",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/glrt-32",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.689777557837612
@@ -14806,6 +14837,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_g64",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/glrt-64",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -18.222035100580882
@@ -14814,6 +14846,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_a8",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/anchor-8",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -17.614855279102187
@@ -14822,6 +14855,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_d32",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/differential-32",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -17.501565365425126
@@ -14830,6 +14864,7 @@
           "defined_in": "240.json",
           "fact": "s15b_a2old_d16",
           "format": "f4",
+          "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed",
           "ptr": "/snr50_old_db/differential-16",
           "src": "figures/injection/a2-common-false-alarm-ranking.json",
           "value": -17.04182382939002

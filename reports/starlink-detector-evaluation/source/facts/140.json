@@ -159,7 +159,6 @@
     "ptr": "/per_method/full-frame-acquire/pooled/d_b",
     "fmt": "f4"
   },
-
   "s05_p_min_pct": {
     "expr": "p * 100",
     "inputs": {
@@ -215,7 +214,6 @@
     "fmt": "f3",
     "note": "largest pooled d_B over the eight detectors; glrt-32 is the argument maximum in this sidecar"
   },
-
   "s05_matched_arm_cells": {
     "src": "figures/coincidence-model.json",
     "ptr": "/census/matched_arm_cells",
@@ -231,7 +229,6 @@
     "ptr": "/census/paired_sweeps",
     "fmt": "int"
   },
-
   "s05_null_per_point": {
     "src": "figures/injection/false-alarm-165.json",
     "ptr": "/nominal_per_point",
@@ -258,7 +255,6 @@
     "fmt": "pct1",
     "note": "1 - (1 - nominal_per_point) ** mean_points_per_cell, computed in the sidecar itself"
   },
-
   "s05_opp_argmin": {
     "src": "figures/coincidence-model.json",
     "ptr": "/spread/opposite-edge/f_argmin",
@@ -311,7 +307,6 @@
     "fmt": "f2",
     "note": "highest d plotted on the right panel over both geometries; the same-edge extreme is the wider of the two, so it bounds the opposite-edge points too"
   },
-
   "s05_verify_anchor8_recomputed": {
     "src": "figures/coincidence-model.json",
     "ptr": "/verification_against_the_published_run/anchor-8/recomputed_with_lnb_a_included/f",
@@ -320,7 +315,8 @@
   "s05_verify_anchor8_published": {
     "src": "figures/coincidence-model.json",
     "ptr": "/verification_against_the_published_run/anchor-8/published_with_lnb_a_excluded/f",
-    "fmt": "f3"
+    "fmt": "f3",
+    "note": "reads the PUBLISHED run deliberately: this row verifies the current pipeline reproduces what was published before lnb-a was restored, so the old population is the point"
   },
   "s05_verify_glrt32_recomputed": {
     "src": "figures/coincidence-model.json",
@@ -330,7 +326,8 @@
   "s05_verify_glrt32_published": {
     "src": "figures/coincidence-model.json",
     "ptr": "/verification_against_the_published_run/glrt-32/published_with_lnb_a_excluded/f",
-    "fmt": "f3"
+    "fmt": "f3",
+    "note": "reads the PUBLISHED run deliberately: this row verifies the current pipeline reproduces what was published before lnb-a was restored, so the old population is the point"
   },
   "s05_verify_fffull_recomputed": {
     "src": "figures/coincidence-model.json",
@@ -340,7 +337,8 @@
   "s05_verify_fffull_published": {
     "src": "figures/coincidence-model.json",
     "ptr": "/verification_against_the_published_run/full-frame-full/published_with_lnb_a_excluded/f",
-    "fmt": "f3"
+    "fmt": "f3",
+    "note": "reads the PUBLISHED run deliberately: this row verifies the current pipeline reproduces what was published before lnb-a was restored, so the old population is the point"
   },
   "s05_verify_fffull_delta": {
     "src": "figures/coincidence-model.json",
@@ -355,7 +353,6 @@
     "fmt": "f4",
     "note": "the largest of the three recomputed-minus-published gaps in this sidecar, carried as a positive tolerance; full-frame-full is the widest of the three"
   },
-
   "s05_arm_f_low": {
     "src": "figures/arm-matrix.json",
     "ptr": "/authoritative_review_arm_axis/f_low",

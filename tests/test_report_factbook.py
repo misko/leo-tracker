@@ -155,3 +155,33 @@ def test_the_published_report_still_matches_its_sources():
         "REPORT.md has drifted from source/sections and source/facts.\n"
         "Rebuild it with: python source/build.py build\n\n"
         + done.stdout[-4000:] + done.stderr[-2000:])
+
+
+def test_a_fact_reading_a_superseded_key_must_say_so():
+    """The failure this catches resolved fine and was still wrong.
+
+    Several sidecars deliberately keep what was published before a population
+    changed, so the report can show the old number beside the new one. That is
+    legitimate and the report does it in a dozen places. What is not legitimate
+    is reaching into one by accident: a figure caption described 3,774 units and
+    three receivers while the figure beside it plotted 5,032 and four, because
+    the caption's facts pointed at the preserved-published block. Every
+    reference resolved, so the build was happy and the drift gate saw nothing.
+
+    Requiring a note turns citing a superseded value into a decision. It does
+    not stop anyone doing it.
+    """
+    book = FactBook.load(REPORT_ROOT)
+    undeclared = sorted(name for name, note in book.historical().items() if not note)
+    assert not undeclared, (
+        "these facts read a preserved-historical sidecar key without saying so:\n  "
+        + "\n  ".join(undeclared)
+        + "\nAdd a `note` saying why the superseded value is the one wanted.")
+
+
+def test_the_historical_marker_actually_matches_something(tmp_path):
+    # A guard whose pattern matched nothing would pass forever in silence.
+    facts = {"old": {"src": "s.json", "ptr": "/published_with_x/v", "fmt": "f0"},
+             "new": {"src": "s.json", "ptr": "/v", "fmt": "f0"}}
+    made = book(tmp_path, facts, {"s.json": {"v": 1, "published_with_x": {"v": 2}}})
+    assert set(made.historical()) == {"old"}

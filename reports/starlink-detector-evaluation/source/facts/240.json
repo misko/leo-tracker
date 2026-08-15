@@ -560,7 +560,8 @@
   "s15b_a2old_ffv": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/full-frame-verify",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_ffv": {
     "src": "figures/injection/detector-ranking.json",
@@ -570,7 +571,8 @@
   "s15b_a2old_fff": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/full-frame-full",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_fff": {
     "src": "figures/injection/detector-ranking.json",
@@ -580,7 +582,8 @@
   "s15b_a2old_ffa": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/full-frame-acquire",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_ffa": {
     "src": "figures/injection/detector-ranking.json",
@@ -590,7 +593,8 @@
   "s15b_a2old_g32": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/glrt-32",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_g32": {
     "src": "figures/injection/detector-ranking.json",
@@ -600,7 +604,8 @@
   "s15b_a2old_g64": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/glrt-64",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_g64": {
     "src": "figures/injection/detector-ranking.json",
@@ -610,7 +615,8 @@
   "s15b_a2old_a8": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/anchor-8",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_a8": {
     "src": "figures/injection/detector-ranking.json",
@@ -620,7 +626,8 @@
   "s15b_a2old_d32": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/differential-32",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_d32": {
     "src": "figures/injection/detector-ranking.json",
@@ -630,7 +637,8 @@
   "s15b_a2old_d16": {
     "src": "figures/injection/a2-common-false-alarm-ranking.json",
     "ptr": "/snr50_old_db/differential-16",
-    "fmt": "f4"
+    "fmt": "f4",
+    "note": "the SUPERSEDED 1%-per-point ranking, shown beside the equal-per-cell one so a reader can see what changed"
   },
   "s15b_published_d16": {
     "src": "figures/injection/detector-ranking.json",

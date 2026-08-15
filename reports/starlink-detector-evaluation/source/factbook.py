@@ -331,6 +331,31 @@ class FactBook:
             record["note"] = spec["note"]
         return record
 
+    #: Sidecar key fragments that mark a value as superseded rather than current.
+    #: Several sidecars deliberately preserve what was published before a
+    #: population changed, so that a report can show the old number beside the
+    #: new one. Citing those is legitimate and the report does it in several
+    #: places -- but citing one *by accident*, as though it were current, is how
+    #: a figure caption ended up describing three receivers and 3,774 units
+    #: while the figure beside it plotted four receivers and 5,032. The
+    #: reference resolved, so nothing complained.
+    HISTORICAL_KEYS = ("published_with", "superseded", "deprecated",
+                       "_old", "legacy", "previous")
+
+    def historical(self) -> dict[str, str]:
+        """Facts that read a preserved-historical key, and whether they say so.
+
+        Maps fact name to its ``note``, or to the empty string when it has
+        none. A fact reaching into one of these keys without a note is the
+        accident; requiring the note makes it a decision.
+        """
+        found = {}
+        for name, spec in self.facts.items():
+            pointer = spec.get("ptr", "")
+            if any(mark in pointer.lower() for mark in self.HISTORICAL_KEYS):
+                found[name] = spec.get("note", "")
+        return found
+
     def unused(self) -> list[str]:
         """Facts defined but never cited.
 

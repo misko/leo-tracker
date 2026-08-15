@@ -1,0 +1,180 @@
+{
+ "figure": "a2-common-false-alarm-ranking",
+ "note": "CABLED LOOPBACK on ONE RADIO (TX2 -> splitter -> 2x30 dB -> RX1,RX2). Tests the DETECTORS and the digital pipeline - not LNBs, antennas or sky. Carrier offset is near zero by construction: TX and RX share one reference.",
+ "ranking_old_best_first": [
+  "glrt-32",
+  "full-frame-verify",
+  "full-frame-acquire",
+  "full-frame-full",
+  "glrt-64",
+  "anchor-8",
+  "differential-32",
+  "differential-16"
+ ],
+ "ranking_new_best_first": [
+  "full-frame-verify",
+  "full-frame-full",
+  "glrt-32",
+  "full-frame-acquire",
+  "glrt-64",
+  "anchor-8",
+  "differential-32",
+  "differential-16"
+ ],
+ "snr50_old_db": {
+  "anchor-8": -17.614855279102187,
+  "differential-16": -17.04182382939002,
+  "differential-32": -17.501565365425126,
+  "glrt-32": -18.689777557837612,
+  "glrt-64": -18.222035100580882,
+  "full-frame-full": -18.29311394474056,
+  "full-frame-acquire": -18.504134020689484,
+  "full-frame-verify": -18.57176747075651
+ },
+ "snr50_new_db": {
+  "anchor-8": -17.380009531484642,
+  "differential-16": -16.936950574549993,
+  "differential-32": -17.336767852091246,
+  "glrt-32": -18.56267953227561,
+  "glrt-64": -18.39490131558473,
+  "full-frame-full": -18.57418591066755,
+  "full-frame-acquire": -18.4557569521947,
+  "full-frame-verify": -18.638086532397793
+ },
+ "snr50_new_ci": {
+  "anchor-8": [
+   -17.672986209510476,
+   -17.093085218420715
+  ],
+  "differential-16": [
+   -17.20522114217499,
+   -16.689637552350963
+  ],
+  "differential-32": [
+   -17.629910230967585,
+   -17.042285099071854
+  ],
+  "glrt-32": [
+   -19.041820783246223,
+   -18.13414113269861
+  ],
+  "glrt-64": [
+   -18.87371573615765,
+   -17.984118560429085
+  ],
+  "full-frame-full": [
+   -19.053357393651343,
+   -18.0974861796998
+  ],
+  "full-frame-acquire": [
+   -18.931182422398642,
+   -18.035274783129154
+  ],
+  "full-frame-verify": [
+   -19.142439909326775,
+   -18.141608001787297
+  ]
+ },
+ "per_cell_false_alarm_old": {
+  "anchor-8": 0.09166666666666666,
+  "differential-16": 0.07083333333333333,
+  "differential-32": 0.07291666666666667,
+  "glrt-32": 0.0625,
+  "glrt-64": 0.08958333333333333,
+  "full-frame-full": 0.09791666666666667,
+  "full-frame-acquire": 0.0625,
+  "full-frame-verify": 0.0875
+ },
+ "per_cell_false_alarm_new": {
+  "anchor-8": 0.05,
+  "differential-16": 0.05,
+  "differential-32": 0.05,
+  "glrt-32": 0.05,
+  "glrt-64": 0.05,
+  "full-frame-full": 0.05,
+  "full-frame-acquire": 0.05,
+  "full-frame-verify": 0.05
+ },
+ "leading_group": [
+  "full-frame-verify",
+  "full-frame-full",
+  "glrt-32",
+  "full-frame-acquire",
+  "glrt-64"
+ ],
+ "leading_group_spread_db": 0.24318521681306393,
+ "pairs_resolved_marginal_old": 21,
+ "pairs_resolved_family_wise_old": 13,
+ "pairs_resolved_marginal_new": 18,
+ "pairs_resolved_family_wise_new": 17,
+ "partial_order_edges_new": [
+  [
+   "anchor-8",
+   "differential-16"
+  ],
+  [
+   "glrt-32",
+   "anchor-8"
+  ],
+  [
+   "glrt-64",
+   "anchor-8"
+  ],
+  [
+   "full-frame-full",
+   "anchor-8"
+  ],
+  [
+   "full-frame-acquire",
+   "anchor-8"
+  ],
+  [
+   "full-frame-verify",
+   "anchor-8"
+  ],
+  [
+   "differential-32",
+   "differential-16"
+  ],
+  [
+   "glrt-32",
+   "differential-16"
+  ],
+  [
+   "glrt-64",
+   "differential-16"
+  ],
+  [
+   "full-frame-full",
+   "differential-16"
+  ],
+  [
+   "full-frame-acquire",
+   "differential-16"
+  ],
+  [
+   "full-frame-verify",
+   "differential-16"
+  ],
+  [
+   "glrt-32",
+   "differential-32"
+  ],
+  [
+   "glrt-64",
+   "differential-32"
+  ],
+  [
+   "full-frame-full",
+   "differential-32"
+  ],
+  [
+   "full-frame-acquire",
+   "differential-32"
+  ],
+  [
+   "full-frame-verify",
+   "differential-32"
+  ]
+ ]
+}

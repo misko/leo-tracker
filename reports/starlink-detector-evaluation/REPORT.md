@@ -1922,8 +1922,9 @@ without re-running anything.
 | 11 | [`cfo-cliff.png`](figures/cfo-cliff.png) | [`cfo-cliff.json`](figures/cfo-cliff.json) | 2,339 | 178,399 live target points from 1,146 paired sweeps |
 | 12 | [`port-bias.png`](figures/port-bias.png) | [`port-bias.json`](figures/port-bias.json) | 2,547 | 1,258 paired sweeps, 398,435 points, all four ports with `lnb-a` on its **measured** +567,402 Hz centre |
 | 13 | [`absolute-centres.png`](figures/absolute-centres.png) | [`absolute-centres.json`](figures/absolute-centres.json) | **not stamped** | narrow sky sweeps and live narrow reports, the 2026-08-14 sync corpus; 22,259 detections before correction and 21,407 after |
+| 14 | [`cross-receiver-bias.png`](figures/cross-receiver-bias.png) | [`cross-receiver-bias.json`](figures/cross-receiver-bias.json) | **census either side** | 5,328 scored sidecars and 340,992 cross-receiver checks; the scored census moved 5,328 → 5,352 *while the audit read it*, which is why it records both rather than claiming a frozen count |
 
-Figures 1–6, 8–10 and 13 are new. Figures 7, 11 and 12 are carried unchanged from
+Figures 1–6, 8–10, 13 and 14 are new. Figures 7, 11 and 12 are carried unchanged from
 [the detailed record](../sync-scan-cross-radio-2026-08-14/REPORT.md) together
 with their scripts and sidecars, which is why they carry an earlier freeze.
 
@@ -1980,3 +1981,13 @@ description. Summary:
 the run files but the schedule is not separately tabulated here; and no
 environmental conditions were logged, which matters for any later attempt to
 reproduce a level-dependent result on different hardware.
+
+**Two artefacts carry no figure, and are committed anyway.** Both support claims
+in [section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+about hardware state rather than about the corpus, and hardware state is
+overwritten:
+
+| Artefact | Measured | What it pins |
+|---|---|---|
+| [`live-calibration-snapshot.json`](figures/live-calibration-snapshot.json) | 2026-08-15T02:19:46+00:00 | the calibration in force, and the timer that rewrites it. Section 16c's miscentring table is a claim about a file on the shared store; quoting it without capturing it would leave that claim unreproducible at the next firing |
+| [`rate-limits.json`](figures/rate-limits.json) | 2026-08-15T04:16:20+00:00 | what sample rates the two capture radios accept, and that neither has a FIR loaded. This is why the 1.25 MS/s arm stopped working, and why its historical captures went through a filter nothing recorded |

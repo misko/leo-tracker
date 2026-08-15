@@ -22,8 +22,9 @@ without re-running anything.
 | 11 | [`cfo-cliff.png`](figures/cfo-cliff.png) | [`cfo-cliff.json`](figures/cfo-cliff.json) | {{s900_f11_frozen}} | {{s900_f11_points}} live target points from {{s900_f11_pairs}} paired sweeps |
 | 12 | [`port-bias.png`](figures/port-bias.png) | [`port-bias.json`](figures/port-bias.json) | {{s900_f12_frozen}} | {{s900_f12_pairs}} paired sweeps, {{s900_f12_points}} points, all four ports with `lnb-a` on its **measured** {{s900_f12_lnba_centre}} centre |
 | 13 | [`absolute-centres.png`](figures/absolute-centres.png) | [`absolute-centres.json`](figures/absolute-centres.json) | **not stamped** | narrow sky sweeps and live narrow reports, the 2026-08-14 sync corpus; {{s900_f13_before}} detections before correction and {{s900_f13_after}} after |
+| 14 | [`cross-receiver-bias.png`](figures/cross-receiver-bias.png) | [`cross-receiver-bias.json`](figures/cross-receiver-bias.json) | **census either side** | {{s900_f14_sampled}} scored sidecars and {{s900_f14_checks}} cross-receiver checks; the scored census moved {{s900_f14_before}} → {{s900_f14_after}} *while the audit read it*, which is why it records both rather than claiming a frozen count |
 
-Figures 1–6, 8–10 and 13 are new. Figures 7, 11 and 12 are carried unchanged from
+Figures 1–6, 8–10, 13 and 14 are new. Figures 7, 11 and 12 are carried unchanged from
 [the detailed record](../sync-scan-cross-radio-2026-08-14/REPORT.md) together
 with their scripts and sidecars, which is why they carry an earlier freeze.
 
@@ -80,3 +81,13 @@ description. Summary:
 the run files but the schedule is not separately tabulated here; and no
 environmental conditions were logged, which matters for any later attempt to
 reproduce a level-dependent result on different hardware.
+
+**Two artefacts carry no figure, and are committed anyway.** Both support claims
+in [section 16](#16-the-150-khz-measured-four-oscillators-and-what-it-costs)
+about hardware state rather than about the corpus, and hardware state is
+overwritten:
+
+| Artefact | Measured | What it pins |
+|---|---|---|
+| [`live-calibration-snapshot.json`](figures/live-calibration-snapshot.json) | {{s900_cal_utc}} | the calibration in force, and the timer that rewrites it. Section 16c's miscentring table is a claim about a file on the shared store; quoting it without capturing it would leave that claim unreproducible at the next firing |
+| [`rate-limits.json`](figures/rate-limits.json) | {{s900_rl_utc}} | what sample rates the two capture radios accept, and that neither has a FIR loaded. This is why the 1.25 MS/s arm stopped working, and why its historical captures went through a filter nothing recorded |

@@ -286,5 +286,48 @@
       "fraction": "s900_inj_far_fraction"
     },
     "note": "pct1 would print 1.0%; the report writes a whole percent, so the scaling is explicit here"
+  },
+  "s900_f14_sampled": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/sampled",
+    "fmt": "int"
+  },
+  "s900_f14_before": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/census_scored_before",
+    "fmt": "int"
+  },
+  "s900_f14_after": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/census_scored_after",
+    "fmt": "int"
+  },
+  "s900_f14_checks_a": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/0/checks",
+    "fmt": "int"
+  },
+  "s900_f14_checks_b": {
+    "src": "figures/cross-receiver-bias.json",
+    "ptr": "/rows/1/checks",
+    "fmt": "int"
+  },
+  "s900_f14_checks": {
+    "expr": "a + b",
+    "inputs": {
+      "a": "s900_f14_checks_a",
+      "b": "s900_f14_checks_b"
+    },
+    "fmt": "int"
+  },
+  "s900_rl_utc": {
+    "src": "figures/rate-limits.json",
+    "ptr": "/measured_utc",
+    "fmt": "raw"
+  },
+  "s900_cal_utc": {
+    "src": "figures/live-calibration-snapshot.json",
+    "ptr": "/captured_utc",
+    "fmt": "raw"
   }
 }

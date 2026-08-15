@@ -1385,6 +1385,7 @@
     "s16e_gate",
     "s16e_ratio",
     "s16e_sampled",
+    "s900_cal_utc",
     "s900_coincidence_sidecars_removed",
     "s900_coincidence_sweeps_added",
     "s900_f10_frozen",
@@ -1398,6 +1399,12 @@
     "s900_f12_points",
     "s900_f13_after",
     "s900_f13_before",
+    "s900_f14_after",
+    "s900_f14_before",
+    "s900_f14_checks",
+    "s900_f14_checks_a",
+    "s900_f14_checks_b",
+    "s900_f14_sampled",
     "s900_f1_frozen",
     "s900_f1_ranked",
     "s900_f2_frozen",
@@ -1437,9 +1444,10 @@
     "s900_inj_rate_hz",
     "s900_inj_rx_gain",
     "s900_recheck_sidecars_removed",
-    "s900_recheck_sweeps_added"
+    "s900_recheck_sweeps_added",
+    "s900_rl_utc"
   ],
-  "fact_count": 1456,
+  "fact_count": 1464,
   "facts": {
     "corpus_entries_imported": {
       "defined_in": "030.json",
@@ -16306,6 +16314,14 @@
       "src": "figures/cross-receiver-bias.json",
       "value": 5328
     },
+    "s900_cal_utc": {
+      "defined_in": "900.json",
+      "fact": "s900_cal_utc",
+      "format": "raw",
+      "ptr": "/captured_utc",
+      "src": "figures/live-calibration-snapshot.json",
+      "value": "2026-08-15T02:19:46+00:00"
+    },
     "s900_coincidence_sidecars_removed": {
       "defined_in": "900.json",
       "fact": "s900_coincidence_sidecars_removed",
@@ -16409,6 +16425,71 @@
       "ptr": "/panel_b/n_before",
       "src": "figures/absolute-centres.json",
       "value": 22259
+    },
+    "s900_f14_after": {
+      "defined_in": "900.json",
+      "fact": "s900_f14_after",
+      "format": "int",
+      "ptr": "/census_scored_after",
+      "src": "figures/cross-receiver-bias.json",
+      "value": 5352
+    },
+    "s900_f14_before": {
+      "defined_in": "900.json",
+      "fact": "s900_f14_before",
+      "format": "int",
+      "ptr": "/census_scored_before",
+      "src": "figures/cross-receiver-bias.json",
+      "value": 5328
+    },
+    "s900_f14_checks": {
+      "defined_in": "900.json",
+      "expr": "a + b",
+      "fact": "s900_f14_checks",
+      "format": "int",
+      "inputs": {
+        "a": {
+          "defined_in": "900.json",
+          "fact": "s900_f14_checks_a",
+          "format": "int",
+          "ptr": "/rows/0/checks",
+          "src": "figures/cross-receiver-bias.json",
+          "value": 196160
+        },
+        "b": {
+          "defined_in": "900.json",
+          "fact": "s900_f14_checks_b",
+          "format": "int",
+          "ptr": "/rows/1/checks",
+          "src": "figures/cross-receiver-bias.json",
+          "value": 144832
+        }
+      },
+      "value": 340992.0
+    },
+    "s900_f14_checks_a": {
+      "defined_in": "900.json",
+      "fact": "s900_f14_checks_a",
+      "format": "int",
+      "ptr": "/rows/0/checks",
+      "src": "figures/cross-receiver-bias.json",
+      "value": 196160
+    },
+    "s900_f14_checks_b": {
+      "defined_in": "900.json",
+      "fact": "s900_f14_checks_b",
+      "format": "int",
+      "ptr": "/rows/1/checks",
+      "src": "figures/cross-receiver-bias.json",
+      "value": 144832
+    },
+    "s900_f14_sampled": {
+      "defined_in": "900.json",
+      "fact": "s900_f14_sampled",
+      "format": "int",
+      "ptr": "/sampled",
+      "src": "figures/cross-receiver-bias.json",
+      "value": 5328
     },
     "s900_f1_frozen": {
       "defined_in": "900.json",
@@ -16808,6 +16889,14 @@
       },
       "note": "summed over the two runs whose recheck records the delta as a scalar; the opening pair records it as an empty list of names, which is the same claim in another shape",
       "value": 0.0
+    },
+    "s900_rl_utc": {
+      "defined_in": "900.json",
+      "fact": "s900_rl_utc",
+      "format": "raw",
+      "ptr": "/measured_utc",
+      "src": "figures/rate-limits.json",
+      "value": "2026-08-15T04:16:20+00:00"
     }
   },
   "schema": "report-facts/1",

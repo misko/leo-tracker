@@ -12,9 +12,14 @@ here rather than trusted:
   silently compares two dwells apart and calls it simultaneous.  The
   transposition inverts the whole experiment without changing a single count,
   which is why it gets its own test in both directions.
-* ``lnb-a`` is dead — flat ~1.19 at every tuning since 04:44 UTC — and a dead
-  receiver in the population is a receiver that never coincides, which drags
-  every occupancy estimate down while looking like quiet sky.
+* a receiver with **no signal path** must leave both the target and the null
+  population, because one that never coincides drags every occupancy estimate
+  down while looking like quiet sky.  ``lnb-a`` was excluded on exactly that
+  reasoning and it was wrong: its oscillator had moved out of the *narrow*
+  search grid, while the survey path this module reads spans ±700 kHz about raw
+  zero and still sees it.  The mechanism is pinned below, and so is the fact
+  that nothing uses it by default any more — the fixtures that predate the
+  withdrawal ask for the old exclusion explicitly, via ``legacy_dead_lnb_a``.
 * the estimator uses the **calibrated** per-cell false-alarm rate.  With ``p``
   forced to zero the same three counts give a different occupancy and a
   different detection probability, and nothing in the output would say so.
@@ -40,6 +45,7 @@ import math
 
 import pytest
 
+from leo_tracker.radio.beacon import cross_radio
 from leo_tracker.radio.beacon.cross_radio import (
     AXIS_MIN_CELLS, AXIS_MIN_METHODS, CONSISTENT_VERDICT, CONTROL_SHIFT,
     CROSS_RADIO_SCHEMA, DEAD_RECEIVERS, OFFSET_BINS_HZ, UNTESTED_VERDICT,
@@ -49,6 +55,23 @@ from leo_tracker.radio.beacon.cross_radio import (
     join_null_cells, load_pairs, method_roc, negative_controls, null_thresholds,
     review, scrambled_cells, shifted_cells, solve_coincidence)
 from leo_tracker.radio.beacon.survey_scoring import SCORES_SCHEMA
+
+@pytest.fixture
+def legacy_dead_lnb_a(monkeypatch):
+    """Score with ``lnb-a`` excluded, the way the corpus figures were produced.
+
+    The planted skies below give radio B a single live receiver, so their
+    arithmetic — P(A), P(B), P(AB) and every cell count counted off them by eye
+    — assumes ``lnb-a`` contributes nothing.  That assumption came from the
+    production default, which has since been withdrawn.  Restoring it here keeps
+    these tests pinning what they were written to pin, the estimator's
+    bookkeeping, rather than silently retesting how a permanently silent
+    receiver perturbs it.  The withdrawal itself is pinned separately, by
+    :func:`test_no_receiver_is_excluded_by_default`.
+    """
+    monkeypatch.setattr(cross_radio, "DEAD_RECEIVERS", ("lnb-a",))
+    return ("lnb-a",)
+
 
 #: A point score that clears any threshold these fixtures calibrate, and one
 #: that clears none.  Two values keep the fixtures readable: what is being
@@ -283,14 +306,19 @@ def test_a_sweep_only_one_radio_scored_is_not_joined_against_itself(tmp_path):
 # the dead receiver
 # --------------------------------------------------------------------------
 
-def test_the_dead_receiver_is_excluded_from_target_and_from_null(tmp_path):
-    """lnb-a has been flat ~1.19 at every tuning since 04:44 UTC.
+def test_a_receiver_with_no_signal_path_leaves_target_and_null_alike(
+        tmp_path, legacy_dead_lnb_a):
+    """The mechanism, exercised against an exclusion this test sets itself.
 
     A receiver with no signal path never coincides with anything, so leaving it
     in the population lowers every occupancy estimate and every detection
     probability while looking exactly like quiet sky.  It has to be gone from
     the null too: a dead port's null is not a null, it is silence, and a
     false-alarm rate measured on it is optimistic in the same direction.
+
+    The exclusion is set by the fixture rather than taken from the production
+    default, because the default is now empty -- and a test that reads the
+    default would pass whether or not the mechanism still worked.
     """
     _sweep(tmp_path, "20260814T000004Z", order_a="U", order_b="U",
            channels=(1,), target_a=_loud, target_b=_loud,
@@ -300,7 +328,6 @@ def test_the_dead_receiver_is_excluded_from_target_and_from_null(tmp_path):
     cells = join_cells(pairs[0])
     nulls = join_null_cells(pairs[0])
 
-    assert "lnb-a" in DEAD_RECEIVERS
     labels = {cell["a"]["receiver_label"] for cell in cells}
     labels |= {cell["b"]["receiver_label"] for cell in cells}
     assert labels == {"lnb-c", "lnb-d", "lnb-b"}
@@ -311,6 +338,34 @@ def test_the_dead_receiver_is_excluded_from_target_and_from_null(tmp_path):
     # two instants a single channel has.
     assert len(cells) == 4
     assert pairs[0]["excluded_receivers"] == {"lnb-a": 4}
+
+
+def test_no_receiver_is_excluded_by_default(tmp_path):
+    """lnb-a is back, and this is the test that keeps it back.
+
+    It was excluded for reading flat at every tuning, which looked exactly like
+    a port with nothing connected.  The cause was its local oscillator moving
+    about +566 kHz, which puts it outside the *narrow* acquisition grid --
+    ``arange(-350_000, 350_001, 25_000) + centre`` -- and nowhere near the edge
+    of the survey bank this module scores, which spans +/-700 kHz about raw
+    zero.  On the corpus it fires on 15.52% of its target points against
+    lnb-b's 17.98%: quieter, and not silent.
+
+    Excluding it cost twice over, because the exclusion took its null as well
+    and so moved every threshold drawn beside it.
+    """
+    assert DEAD_RECEIVERS == ()
+    assert cross_radio.DEAD_RECEIVERS == ()
+
+    _sweep(tmp_path, "20260814T000004Z", order_a="U", order_b="U",
+           channels=(1,), target_a=_loud, target_b=_loud,
+           nulls_a=_loud, nulls_b=_loud)
+    pairs, _census = load_pairs(tmp_path)
+
+    labels = {cell["a"]["receiver_label"] for cell in join_cells(pairs[0])}
+    labels |= {cell["b"]["receiver_label"] for cell in join_cells(pairs[0])}
+    assert labels == {"lnb-c", "lnb-d", "lnb-a", "lnb-b"}
+    assert pairs[0]["excluded_receivers"] == {}
 
 
 # --------------------------------------------------------------------------
@@ -392,7 +447,7 @@ def test_an_anticoincident_pair_is_reported_unsolvable_rather_than_clamped():
     assert solved["covariance"] == pytest.approx(0.01 - 0.04)
 
 
-def test_the_estimator_uses_the_calibrated_false_alarm_rate_not_zero(tmp_path):
+def test_the_estimator_uses_the_calibrated_false_alarm_rate_not_zero(tmp_path, legacy_dead_lnb_a):
     """p = 0 is a different experiment, and it reads as the same one.
 
     With the empty-sky rate forced to zero every firing becomes evidence of sky,
@@ -420,7 +475,7 @@ def test_the_estimator_uses_the_calibrated_false_alarm_rate_not_zero(tmp_path):
         "solving with p fixed at 0 must not reproduce the calibrated estimate")
 
 
-def test_the_false_alarm_rate_is_per_cell_and_says_how_many_cells(tmp_path):
+def test_the_false_alarm_rate_is_per_cell_and_says_how_many_cells(tmp_path, legacy_dead_lnb_a):
     """A per-point rate and a per-cell rate differ by the points in a cell.
 
     The coincidence model is over cells — one chain, one tuning, one instant,
@@ -502,7 +557,7 @@ def test_recall_is_scored_across_the_hardware_boundary(tmp_path):
 # the guard band
 # --------------------------------------------------------------------------
 
-def test_the_guard_band_curve_splits_by_sample_rate_not_by_sample_count(tmp_path):
+def test_the_guard_band_curve_splits_by_sample_rate_not_by_sample_count(tmp_path, legacy_dead_lnb_a):
     """Rate sets the guard; sample count does not, and the two alias.
 
     80 ms at 2.5 MS/s and 160 ms at 1.25 MS/s are both 200,000 samples and their
@@ -674,7 +729,12 @@ def test_the_review_leads_with_the_spread_of_f_across_the_algorithms(tmp_path):
     # is computed and printed either way.
     assert spread["spread"] == pytest.approx(0.0)
     assert "OCCUPANCY f" in text
-    assert "lnb-a" in text and "excluded" in text
+    # The exclusion state is stated either way.  Asserting only that "lnb-a" and
+    # "excluded" appear would pass on the sentence that WITHDRAWS the exclusion
+    # just as happily as on one applying it, which is how this assertion
+    # survived the withdrawal without noticing it.
+    assert report["excluded_receivers"]["labels"] == []
+    assert "no receivers excluded" in text
     # The pooled f mixes the two geometries, and they do not mean quite the same
     # thing: on a same-edge cell both chains observe one tuning, while on an
     # opposite-edge cell "coincidence" means both edges of the channel were live
@@ -801,7 +861,7 @@ def _corpus(root, sweeps, **kwargs):
         _sweep(root, f"20260814T0100{index:02d}Z", **kwargs)
 
 
-def test_the_review_builds_both_negative_controls_every_run(tmp_path):
+def test_the_review_builds_both_negative_controls_every_run(tmp_path, legacy_dead_lnb_a):
     """The controls are not a flag, and the report is not correct without them.
 
     The f-agreement check passed on the corpus and also passed on a join of two
@@ -912,7 +972,7 @@ def test_the_shifted_control_moves_the_second_radio_off_the_instant(tmp_path):
         assert cell["a"]["instant"] != cell["b"]["instant"]
 
 
-def test_a_check_the_controls_also_pass_is_printed_vacuous_never_certified(tmp_path):
+def test_a_check_the_controls_also_pass_is_printed_vacuous_never_certified(tmp_path, legacy_dead_lnb_a):
     """The whole point. Two reviews measured this on the real corpus:
 
     ``f`` spread 0.050 on the real pairing, 0.075 on the scrambled join and
@@ -981,7 +1041,7 @@ def test_the_pass_token_does_print_once_the_controls_come_apart(tmp_path):
     assert "not sufficient" in text
 
 
-def test_the_banner_names_the_control_that_failed_rather_than_summarising(tmp_path):
+def test_the_banner_names_the_control_that_failed_rather_than_summarising(tmp_path, legacy_dead_lnb_a):
     """One control separating and the other not is its own state.
 
     A fixed sentence reading "neither control separates" would print over the
@@ -1147,7 +1207,7 @@ def test_a_gap_smaller_than_the_algorithm_spread_still_counts_when_unanimous(tmp
     assert dwarfed["unresolved"] is True
 
 
-def test_an_axis_level_too_thin_to_carry_an_f_is_listed_but_not_counted(tmp_path):
+def test_an_axis_level_too_thin_to_carry_an_f_is_listed_but_not_counted(tmp_path, legacy_dead_lnb_a):
     """A four-cell level swings by tenths on one extra coincidence.
 
     The axis table exists to compare gaps between levels, so a gap set by a

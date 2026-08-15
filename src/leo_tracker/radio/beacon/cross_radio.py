@@ -140,11 +140,27 @@ CROSS_RADIO_SCHEMA = "leo-tracker.cross-radio-occupancy/v1"
 
 #: Receivers with no signal path, excluded from target and null alike.
 #:
-#: ``lnb-a`` is rx0 on pluto-5d4d and has been flat ~1.19 at every tuning since
-#: 04:44 UTC.  This is a list rather than a flag because the next port to die
-#: should be one edit, and because a reader has to be able to see which
-#: exclusions were in force when a number was produced.
-DEAD_RECEIVERS = ("lnb-a",)
+#: **Empty, and the reason it is empty is the point.**  This held ``lnb-a`` for
+#: as long as that port read flat ~1.19 at every tuning after 04:44 UTC, which
+#: looked exactly like a receiver with nothing connected to it.  It was not.
+#: Its local oscillator moved about +566 kHz across the window that brackets
+#: pluto-19f2's LNB swap, and the *narrow* acquisition path -- which searches
+#: ``arange(-350_000, 350_001, 25_000) + centre`` -- could no longer reach it,
+#: so the port stopped producing candidates and was read as dead.
+#:
+#: This module scores the **survey** path, whose coarse bank spans +/-700 kHz
+#: about raw zero and never consults ``receiver_centers``.  lnb-a is inside that
+#: bank in both epochs, and on this corpus it fires on 15.52% of its 60,095
+#: target points against lnb-b's 17.98% of 59,604 -- a live port, not a silent
+#: one.  Excluding it discarded a working receiver and, because the exclusion
+#: took its null as well, pulled every threshold that was drawn beside it.
+#:
+#: Anything produced before this was emptied carries the old exclusion; see
+#: ``hardware/epochs.json`` for the per-epoch record and section 14 of the
+#: detector-evaluation report for the withdrawal.  Kept as a list rather than
+#: deleted because a port really can die, and because a reader has to be able
+#: to see which exclusions were in force when a number was produced.
+DEAD_RECEIVERS: tuple[str, ...] = ()
 
 #: Where the manifest sits beside the scores.
 MANIFEST_FILENAME = "manifest.json"
@@ -1577,8 +1593,13 @@ def review(corpus_root, *, limit: int | None = None,
         "methods": methods,
         "excluded_receivers": {"labels": list(DEAD_RECEIVERS),
                                "observations_dropped": dropped,
-                               "reason": "flat ~1.19 at every tuning since "
-                                         "04:44 UTC: no signal path"},
+                               "reason": ("no receiver is excluded; lnb-a's "
+                                          "exclusion was withdrawn once its "
+                                          "flat reading was traced to a "
+                                          "+566 kHz oscillator move that only "
+                                          "blinds the narrow path")
+                                         if not DEAD_RECEIVERS else
+                                         "no signal path"},
         "pairs": {
             "joined": len(pairs),
             "same_edge": sum(1 for pair in pairs if pair["geometry"] == "same-edge"),
@@ -1946,13 +1967,20 @@ def format_review(report: dict) -> str:
             f"{name} n={count}" for name, count in cells["receiver_pairs"].items())
         + f"   arms {len(pairs['arms'])}")
     dropped = report["excluded_receivers"]["observations_dropped"]
-    lines.append(
-        "excluded " + (", ".join(f"{label} ({count} observations)"
-                                 for label, count in sorted(dropped.items()))
-                       or ", ".join(DEAD_RECEIVERS))
-        + f": {report['excluded_receivers']['reason']}. Out of target AND null, "
-          "because a dead port's null is silence and would pull every threshold "
-          "down with it")
+    if dropped or report["excluded_receivers"]["labels"]:
+        lines.append(
+            "excluded " + (", ".join(f"{label} ({count} observations)"
+                                     for label, count in sorted(dropped.items()))
+                           or ", ".join(report["excluded_receivers"]["labels"]))
+            + f": {report['excluded_receivers']['reason']}. Out of target AND "
+              "null, because a dead port's null is silence and would pull every "
+              "threshold down with it")
+    else:
+        # Said rather than omitted: a run with no exclusions and a run whose
+        # exclusion line was dropped look identical in a log otherwise, and this
+        # corpus has already been read both ways.
+        lines.append("no receivers excluded: "
+                     f"{report['excluded_receivers']['reason']}")
     lines.append(
         f"skew median {_cell(skew.get('p50'), '.4f', 'n/a')} ms, max "
         f"{_cell(skew.get('max'), '.4f', 'n/a')} ms over {skew.get('count', 0)} "

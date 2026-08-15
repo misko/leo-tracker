@@ -88,10 +88,24 @@ if [[ -n "${limit}" ]] && { ! [[ "${limit}" =~ ^[0-9]+$ ]] || (( limit < 1 )); }
   echo "--limit must be a positive integer" >&2; exit 2
 fi
 
-radio() {
-  env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync \
-    leo-radio "$@"
-}
+# How to reach the package. `uv run` is the fallback, not the default: it locks
+# the environment before doing anything, and a stale lock waits in silence with
+# no output and no CPU -- indistinguishable from a job that is working.
+py_bin=""
+for candidate in "${LEO_PYTHON:-}" "${VIRTUAL_ENV:-}/bin/python" \
+                 "${repo_dir}/.venv/bin/python"; do
+  [[ -n "${candidate}" && -x "${candidate}" ]] || continue
+  "${candidate}" -c 'import leo_tracker' >/dev/null 2>&1 || continue
+  py_bin="${candidate}"; break
+done
+if [[ -n "${py_bin}" ]]; then
+  py()    { "${py_bin}" "$@"; }
+  radio() { "${py_bin}" -m leo_tracker.radio.cli "$@"; }
+else
+  [[ -n "${uv_bin}" ]] || { echo "no usable python and no uv on PATH" >&2; exit 2; }
+  py()    { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync python "$@"; }
+  radio() { env UV_CACHE_DIR="${repo_dir}/.uv-cache" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
+fi
 
 # Shards are symlinks and live on local disk, never on the share: a shard is
 # scratch, and putting scratch on the NFS mount would make every listing a
@@ -175,8 +189,7 @@ echo "dealt ${dealt} entries into ${workers} shards (~$(( (dealt + workers - 1) 
 # object, and N workers starting together would each compile onto the same path.
 # The compile is not atomic, and the live capture path loads the same object.
 echo "warming the kernel cache..."
-env UV_CACHE_DIR="${repo_dir}/.uv-cache" nice -n "${niceness}" \
-  "${uv_bin}" run --active --no-sync python - <<'PY'
+nice -n "${niceness}" py - <<'PY'
 from leo_tracker.radio.beacon import fast_scan
 fast_scan._load_kernel()
 print("kernel ready")
@@ -192,8 +205,7 @@ for shard in $(seq 0 $(( workers - 1 ))); do
   [[ -d "${shard_root}/${shard}" ]] || continue
   extra=()
   (( rebuild )) && extra+=(--rebuild)
-  nice -n "${niceness}" env UV_CACHE_DIR="${repo_dir}/.uv-cache" \
-    "${uv_bin}" run --active --no-sync leo-radio starlink-survey-score run \
+  nice -n "${niceness}" radio starlink-survey-score run \
     "${shared_root}" --corpus-root "${shard_root}/${shard}" "${extra[@]}" \
     > "${shard_root}/${shard}.log" 2>&1 &
   pids+=("$!")

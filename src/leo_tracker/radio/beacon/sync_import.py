@@ -92,6 +92,17 @@ SOURCE_SCHEMA = "leo-tracker.interim-synchronised-scan/v1"
 #: and a reader that treated it as one would enumerate an empty capture.
 MANIFEST_SCHEMA = "leo-tracker.synchronised-sweep-survey/v1"
 
+#: Schemas an entry may carry and still be a finished import.
+#:
+#: The corpus was built by the interim importer in ``deploy/interim/``, which
+#: is what actually ran, and it stamps the capture-manifest schema instead of
+#: the one above.  Reading completeness as "schema == MANIFEST_SCHEMA" therefore
+#: calls every one of those entries unfinished -- and the caller that skips
+#: finished work then skips nothing, so a bounded pass silently re-imports the
+#: whole corpus.  Both names mean the same thing here: a manifest that parses,
+#: names a sha256, and names the byte count the IQ actually has.
+COMPLETE_MANIFEST_SCHEMAS = (MANIFEST_SCHEMA, "leo-tracker.capture-manifest/v1")
+
 #: What the survey record calls itself.  It is a real pre-dwell survey record
 #: -- ``tuning_plan``, ``read_probe`` and ``survey_sample_rate_hz`` all read it
 #: through their ordinary path -- so it carries the schema they were written
@@ -559,7 +570,8 @@ def entry_complete(entry: Path) -> bool:
     except (OSError, ValueError):
         return False
     block = manifest.get("survey_iq") or {}
-    if manifest.get("schema") != MANIFEST_SCHEMA or not block.get("sha256"):
+    if (manifest.get("schema") not in COMPLETE_MANIFEST_SCHEMAS
+            or not block.get("sha256")):
         return False
     try:
         return (Path(entry) / SURVEY_IQ_FILENAME).stat().st_size == int(

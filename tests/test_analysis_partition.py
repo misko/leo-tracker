@@ -795,3 +795,64 @@ def test_the_manifest_records_what_it_was_built_from(tmp_path):
     assert recorded["pipeline"] == KALMAN and recorded["date"] == "2026-08-11"
     assert set(recorded["sources"]) == {AUGUST_11}
     assert len(recorded["sources"][AUGUST_11]) == 64
+
+
+# ---------------------------------------------------------------------------
+# completeness across the two importers that have written this corpus
+# ---------------------------------------------------------------------------
+
+def _finished_entry(root, schema):
+    """A corpus entry that is finished in every respect except its schema name."""
+    import json
+    from leo_tracker.radio.beacon.sync_import import SURVEY_IQ_FILENAME
+
+    entry = root / "sync-20260814T000315Z-pluto-19f2"
+    entry.mkdir(parents=True)
+    payload = b"\x00" * 64
+    (entry / SURVEY_IQ_FILENAME).write_bytes(payload)
+    (entry / "manifest.json").write_text(json.dumps({
+        "schema": schema,
+        "survey_iq": {"path": SURVEY_IQ_FILENAME, "bytes": len(payload),
+                      "sha256": "0" * 64},
+    }))
+    return entry
+
+
+def test_an_entry_written_by_the_deployed_importer_counts_as_finished(tmp_path):
+    """The corpus was built by deploy/interim/, and it stamps a different name.
+
+    Reading completeness as "schema == MANIFEST_SCHEMA" called all 16,914 of
+    those entries unfinished, so the caller that skips finished work skipped
+    nothing and a bounded pass re-imported the whole corpus -- 1.2 TB over NFS,
+    silently, because the deal happens before any output.
+    """
+    from leo_tracker.radio.beacon.sync_import import (
+        COMPLETE_MANIFEST_SCHEMAS, MANIFEST_SCHEMA, entry_complete)
+
+    assert MANIFEST_SCHEMA in COMPLETE_MANIFEST_SCHEMAS
+    for schema in COMPLETE_MANIFEST_SCHEMAS:
+        root = tmp_path / schema.replace("/", "_")
+        assert entry_complete(_finished_entry(root, schema)), schema
+
+
+def test_a_foreign_schema_is_still_refused(tmp_path):
+    # The pre-dwell survey entries share this corpus directory and must not be
+    # mistaken for synchronised sweeps.
+    from leo_tracker.radio.beacon.sync_import import entry_complete
+
+    entry = _finished_entry(tmp_path, "leo-tracker.beacon-capture/v3")
+    assert not entry_complete(entry)
+
+
+def test_a_truncated_iq_is_refused_whichever_schema_it_carries(tmp_path):
+    import json
+
+    from leo_tracker.radio.beacon.sync_import import (
+        COMPLETE_MANIFEST_SCHEMAS, SURVEY_IQ_FILENAME, entry_complete)
+
+    for schema in COMPLETE_MANIFEST_SCHEMAS:
+        entry = _finished_entry(tmp_path / f"t_{schema.replace('/', '_')}", schema)
+        manifest = json.loads((entry / "manifest.json").read_text())
+        manifest["survey_iq"]["bytes"] = 999_999
+        (entry / "manifest.json").write_text(json.dumps(manifest))
+        assert not entry_complete(entry), schema

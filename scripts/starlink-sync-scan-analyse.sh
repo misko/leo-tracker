@@ -207,10 +207,29 @@ if (( plan )); then
 fi
 
 repo_env=(env "UV_CACHE_DIR=${repo_dir}/.uv-cache")
-radio() {
-  nice -n "${niceness}" "${repo_env[@]}" "${uv_bin}" run --active --no-sync \
-    leo-radio "$@"
-}
+# How to reach the package. `uv run` is the fallback, not the default: it takes
+# a lock on the environment before doing anything, and a stale lock makes it
+# wait in silence with no output and no CPU -- which on a 32-core analysis host
+# looked exactly like a job that had started and was working, for eight hours.
+# A checkout that already has an interpreter with the package importable does
+# not need uv at all, so use it directly and keep uv for the case that does.
+py_bin=""
+for candidate in "${LEO_PYTHON:-}" "${VIRTUAL_ENV:-}/bin/python" \
+                 "${repo_dir}/.venv/bin/python"; do
+  [[ -n "${candidate}" && -x "${candidate}" ]] || continue
+  "${candidate}" -c 'import leo_tracker' >/dev/null 2>&1 || continue
+  py_bin="${candidate}"; break
+done
+if [[ -n "${py_bin}" ]]; then
+  echo "python:         ${py_bin}"
+  py()    { nice -n "${niceness}" "${py_bin}" "$@"; }
+  radio() { nice -n "${niceness}" "${py_bin}" -m leo_tracker.radio.cli "$@"; }
+else
+  [[ -n "${uv_bin}" ]] || { echo "no usable python and no uv on PATH" >&2; exit 2; }
+  echo "python:         via ${uv_bin} run (no importable interpreter found)"
+  py()    { nice -n "${niceness}" "${repo_env[@]}" "${uv_bin}" run --active --no-sync python "$@"; }
+  radio() { nice -n "${niceness}" "${repo_env[@]}" "${uv_bin}" run --active --no-sync leo-radio "$@"; }
+fi
 
 shard_root="$(mktemp -d "${TMPDIR:-/tmp}/leo-sync-import-XXXXXX")"
 pids=()
@@ -248,8 +267,7 @@ if (( do_import )); then
   if (( ! rebuild )); then
     while IFS= read -r entry; do
       [[ -n "${entry}" ]] && committed["${entry}"]=1
-    done < <(nice -n "${niceness}" "${repo_env[@]}" "${uv_bin}" run --active \
-               --no-sync python - "${corpus_root}" <<'PY'
+    done < <(py - "${corpus_root}" <<'PY'
 import sys
 from pathlib import Path
 

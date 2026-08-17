@@ -178,6 +178,8 @@ def event_row(report_name: str, report: dict[str, Any], track: dict[str, Any]
         "median_formal_frequency_sigma_hz": percentile(sigmas, 0.5),
         "capture_rms_rx0_dbfs": capture_rms[0] if len(capture_rms) > 0 else None,
         "capture_rms_rx1_dbfs": capture_rms[1] if len(capture_rms) > 1 else None,
+        "_doppler_times_s": [item[0] for item in consensus],
+        "_doppler_hz": [item[1] for item in consensus],
     }
     row["dual_valid"] = row["dual_valid_count"] >= 2
     row["strong"] = (row["dual_valid"] and finite(row["best_weak_receiver_margin"])
@@ -343,6 +345,144 @@ def stratified_capture_background(captures: list[dict[str, Any]]) -> dict[str, A
     return result
 
 
+def representative_examples(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    eligible = [row for row in rows if row["strong"] and row["slope_qualified"]
+                and float(row["dual_duration_s"]) >= 5.0
+                and finite(row["median_matched_filter_snr_proxy_db"])]
+    strengths = [float(row["median_matched_filter_snr_proxy_db"]) for row in eligible]
+    targets = [
+        ("strong long track", percentile(strengths, 0.99)),
+        ("typical long track", percentile(strengths, 0.50)),
+        ("weak long track", percentile(strengths, 0.05)),
+    ]
+    chosen = []
+    for label, target in targets:
+        available = [row for row in eligible if row not in chosen]
+        row = min(available, key=lambda item: (
+            abs(float(item["median_matched_filter_snr_proxy_db"]) - float(target)),
+            float(item["doppler_fit_rms_hz"]),
+            str(item["event_id"])))
+        row["_example_label"] = label
+        chosen.append(row)
+    public_fields = ("event_id", "date", "radio", "channel", "edge",
+                     "dual_duration_s", "doppler_drift_hz_s", "doppler_fit_rms_hz",
+                     "median_matched_filter_snr_proxy_db", "median_score_margin")
+    return [{"label": row["_example_label"],
+             **{field: row[field] for field in public_fields}} for row in chosen]
+
+
+def save_figures(output_dir: Path, rows: list[dict[str, Any]], captures: list[dict[str, Any]],
+                 examples: list[dict[str, Any]]) -> None:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    main = [row for row in rows if row["strong"] and row["slope_qualified"]]
+    strength = np.asarray([float(row["median_matched_filter_snr_proxy_db"])
+                           for row in main], dtype=float)
+    figure, axis = plt.subplots(figsize=(9.2, 4.8), constrained_layout=True)
+    bins = np.linspace(float(np.percentile(strength, 0.5)),
+                       float(np.percentile(strength, 99.5)), 55)
+    axis.hist(strength, bins=bins, color="#2878b5", alpha=.82, edgecolor="white",
+              linewidth=.35)
+    median = float(np.median(strength))
+    axis.axvline(median, color="#c44e52", lw=2,
+                 label=f"median {median:.2f} dB")
+    axis.axvspan(float(np.percentile(strength, 25)), float(np.percentile(strength, 75)),
+                 color="#dd8452", alpha=.16, label="middle 50%")
+    axis.set(title=f"Matched-filter strength across {len(main):,} strong Doppler tracks",
+             xlabel="Per-track median matched-filter SNR proxy (dB)",
+             ylabel="Track count")
+    axis.grid(axis="y", alpha=.22)
+    axis.legend(frameon=False)
+    figure.savefig(output_dir / "strength-distribution.png", dpi=180)
+    plt.close(figure)
+
+    fields = ("date", "gain_mode", "radio", "channel", "edge")
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in captures:
+        groups.setdefault(tuple(str(row[field]) for field in fields), []).append(row)
+    differences = {0: [], 1: []}
+    for group in groups.values():
+        for receiver in (0, 1):
+            field = f"capture_rms_rx{receiver}_dbfs"
+            baseline = [float(row[field]) for row in group
+                        if int(row["track_count"]) == 0 and finite(row[field])]
+            detected = [float(row[field]) for row in group
+                        if int(row["strong_slope_track_count"]) > 0 and finite(row[field])]
+            if len(baseline) >= 5 and len(detected) >= 5:
+                differences[receiver].append(float(np.median(detected) - np.median(baseline)))
+    figure, axis = plt.subplots(figsize=(8.2, 4.8), constrained_layout=True)
+    clipped = 0
+    for receiver, color in ((0, "#2878b5"), (1, "#dd8452")):
+        values = np.asarray(differences[receiver])
+        visible = values[np.abs(values) <= 2.5]
+        clipped += int(len(values) - len(visible))
+        jitter = np.linspace(-.10, .10, len(visible))
+        axis.scatter(np.full(len(visible), receiver) + jitter, visible, s=30,
+                     color=color, alpha=.64, edgecolor="none")
+        axis.plot([receiver - .20, receiver + .20], [np.median(values)] * 2,
+                  color="#222222", lw=3)
+        axis.text(receiver, np.median(values) + .35,
+                  f"median {np.median(values):+.3f} dB", ha="center", fontsize=10)
+    axis.axhline(0, color="#555555", lw=1)
+    axis.set_xticks([0, 1], ["RX0", "RX1"])
+    axis.set_ylim(-2.5, 3.0)
+    axis.set(title="Broadband RMS lift in matched detection/no-track strata",
+             ylabel="Strong-track minus no-track median RMS (dB)")
+    axis.text(.99, .02, f"{clipped} hardware-state outliers beyond +/-2.5 dB omitted",
+              transform=axis.transAxes, ha="right", va="bottom", fontsize=9,
+              color="#555555")
+    axis.grid(axis="y", alpha=.22)
+    figure.savefig(output_dir / "background-lift.png", dpi=180)
+    plt.close(figure)
+
+    figure, axes = plt.subplots(1, 2, figsize=(11.5, 4.8), constrained_layout=True)
+    for axis, field, order, title in (
+        (axes[0], "channel", ["1", "2", "3", "4"], "By channel"),
+        (axes[1], "date", sorted({str(row["date"]) for row in main}), "By date"),
+    ):
+        for index, key in enumerate(order):
+            values = np.asarray([float(row["median_matched_filter_snr_proxy_db"])
+                                 for row in main if str(row[field]) == key])
+            quantiles = np.percentile(values, [5, 25, 50, 75, 95])
+            axis.plot([index, index], [quantiles[0], quantiles[4]],
+                      color="#777777", lw=1.2)
+            axis.plot([index, index], [quantiles[1], quantiles[3]],
+                      color="#2878b5", lw=7, solid_capstyle="butt")
+            axis.scatter(index, quantiles[2], color="#c44e52", s=32, zorder=3)
+        labels = [key if field == "channel" else key[5:] for key in order]
+        axis.set_xticks(range(len(order)), labels, rotation=35 if field == "date" else 0)
+        axis.set(title=title, xlabel="Channel" if field == "channel" else "2026 date (MM-DD)",
+                 ylabel="Median SNR proxy per track (dB)")
+        axis.grid(axis="y", alpha=.22)
+    figure.suptitle("Matched-filter strength distributions by channel and date")
+    figure.savefig(output_dir / "configuration-strength.png", dpi=180)
+    plt.close(figure)
+
+    lookup = {str(row["event_id"]): row for row in rows}
+    figure, axes = plt.subplots(3, 1, figsize=(10.2, 8.6), constrained_layout=True)
+    for axis, example in zip(axes, examples, strict=True):
+        row = lookup[str(example["event_id"])]
+        times = np.asarray(row["_doppler_times_s"], dtype=float)
+        frequency = np.asarray(row["_doppler_hz"], dtype=float)
+        elapsed = times - times[0]
+        relative = (frequency - frequency[0]) / 1000.0
+        fit = (float(row["doppler_drift_hz_s"]) * elapsed) / 1000.0
+        axis.scatter(elapsed, relative, s=18, color="#2878b5", alpha=.78,
+                     label="consensus Doppler")
+        axis.plot(elapsed, fit, color="#c44e52", lw=1.8, label="linear fit")
+        axis.set(title=(f"{example['label']}: {row['event_id']}  |  "
+                        f"SNR {float(row['median_matched_filter_snr_proxy_db']):.2f} dB, "
+                        f"drift {float(row['doppler_drift_hz_s']) / 1000:.2f} kHz/s"),
+                 xlabel="Elapsed time (s)", ylabel="Relative Doppler (kHz)")
+        axis.grid(alpha=.22)
+    axes[0].legend(frameon=False, loc="best")
+    figure.savefig(output_dir / "example-tracks.png", dpi=180)
+    plt.close(figure)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", type=Path)
@@ -364,6 +504,7 @@ def main() -> int:
     strong = [row for row in rows if row["strong"]]
     slope = [row for row in rows if row["slope_qualified"]]
     strong_slope = [row for row in rows if row["strong"] and row["slope_qualified"]]
+    examples = representative_examples(rows)
     strength_fields = [
         "median_matched_filter_snr_proxy_db",
         "median_template_discrimination_db",
@@ -422,18 +563,21 @@ def main() -> int:
         "strong_by_gain_mode": grouped(strong, "gain_mode"),
         "capture_background_comparison": capture_background_comparison(captures),
         "stratified_capture_background": stratified_capture_background(captures),
+        "representative_examples": examples,
     }
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
-    fields = list(rows[0]) if rows else []
+    fields = [field for field in rows[0] if not field.startswith("_")] if rows else []
     with (arguments.output_dir / "events.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n",
+                                extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
     strongest = sorted(
         (row for row in slope if finite(row["median_matched_filter_snr_proxy_db"])),
         key=lambda row: float(row["median_matched_filter_snr_proxy_db"]), reverse=True)[:50]
     with (arguments.output_dir / "strongest_50.csv").open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n",
+                                extrasaction="ignore")
         writer.writeheader()
         writer.writerows(strongest)
     capture_fields = list(captures[0]) if captures else []
@@ -444,6 +588,7 @@ def main() -> int:
     with (arguments.output_dir / "summary.json").open("w") as handle:
         json.dump(summary, handle, indent=2, sort_keys=True)
         handle.write("\n")
+    save_figures(arguments.output_dir, rows, captures, examples)
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 

@@ -34,6 +34,13 @@ whole-capture broadband power by only about 0.18 dB, or roughly 4%, in a typical
 matched comparison.** This is a population association, not an event-local
 on/off measurement or calibrated satellite flux.
 
+![Matched broadband lift for RX0 and RX1](background-lift.png)
+
+*Each point is one matched date x gain mode x radio x channel x edge stratum.
+The horizontal bars are the medians reported above. Five failed or materially
+different hardware-state strata beyond +/-2.5 dB are omitted from the displayed
+scale but remain in the robust median calculation.*
+
 ## Cohort definitions
 
 - `dual_valid`: both receiver inputs validate at least two observations.
@@ -49,6 +56,12 @@ different satellites: a spacecraft or beam can be detected in more than one
 capture, and individual TLE association remains ambiguous.
 
 ## Strength distributions
+
+![Distribution of matched-filter SNR proxy](strength-distribution.png)
+
+*The broad distribution is centered at -13.28 dB. The shaded interval is the
+middle half of the 5,787-event population, not an uncertainty interval on the
+median.*
 
 | Event-level metric | p05 | p25 | median | p75 | p95 |
 |---|---:|---:|---:|---:|---:|
@@ -76,6 +89,23 @@ The slope population is tightly concentrated on LEO-scale negative drifts. Its
 median duration is only four seconds, explaining why slope is measurable while
 orbital curvature and unique spacecraft identity usually are not.
 
+### Three concrete tracks
+
+![Strong, typical, and weak tracked Doppler examples](example-tracks.png)
+
+| Example | Event | Duration | SNR proxy | Drift | Fit RMS |
+|---|---|---:|---:|---:|---:|
+| Strong long | `ch4-lower-edge-narrow-20260808T192219Z::track-000` | 17.36 s | -8.11 dB | -3.97 kHz/s | 305 Hz |
+| Typical long | `ch4-lower-edge-narrow-20260809T084210Z::track-000` | 38.28 s | -12.75 dB | -3.55 kHz/s | 1,144 Hz |
+| Weak long | `ch4-lower-edge-narrow-20260808T232321Z::track-002` | 10.09 s | -17.48 dB | -3.93 kHz/s | 119 Hz |
+
+All three are lower-edge channel-4 tracks. Frequency is plotted relative to
+each event's first consensus sample because the absolute offset includes the
+LNB/receiver oscillator bias. The weak example is especially instructive: its
+power proxy is low, yet its 10-second slope is clean to 119 Hz RMS. Conversely,
+the longer typical-strength example has visible gaps and 1.14 kHz fit scatter.
+Signal strength and track quality are related, but they are not interchangeable.
+
 ## Configuration splits
 
 | Split | Events | Median SNR proxy | Median margin |
@@ -88,6 +118,12 @@ orbital curvature and unique spacecraft identity usually are not.
 | Upper edge | 720 | -13.84 dB | 0.184 |
 | Manual gain | 2,874 | -13.24 dB | 0.197 |
 | Slow-attack gain | 2,913 | -13.31 dB | 0.195 |
+
+![Strength distributions by channel and date](configuration-strength.png)
+
+*Red dots mark medians, thick bars span p25-p75, and thin whiskers span
+p05-p95. Channel 4 is somewhat stronger, while the larger date-to-date motion
+warns against interpreting the channel split as an EIRP measurement.*
 
 Manual and slow-attack results differ by only 0.06 dB in the normalized
 strength proxy, which is reassuring. Channel 4 dominates the population and is
@@ -142,7 +178,7 @@ channel 4 and 44 of 50 come from the early single-radio naming epoch.
 find /mnt/qnap01/mouse9911/leo/reports/tracks -maxdepth 1 \
   -type f -name '*narrow*.json' -print0 \
   | tar --null -cf - -T - \
-  | python3 scripts/doppler-signal-strength-summary.py \
+  | .venv/bin/python scripts/doppler-signal-strength-summary.py \
       reports/doppler_signal_strength_20260817
 ```
 
@@ -150,4 +186,8 @@ find /mnt/qnap01/mouse9911/leo/reports/tracks -maxdepth 1 \
 - `events.csv`: all 10,152 event-level measurements.
 - `captures.csv`: all 4,751 deduplicated capture-level measurements.
 - `strongest_50.csv`: the requested 50-event audit cohort.
+- `strength-distribution.png`: population strength histogram.
+- `background-lift.png`: matched capture-RMS comparison.
+- `configuration-strength.png`: channel and date quantile comparison.
+- `example-tracks.png`: three observation-level Doppler examples.
 - `scripts/doppler-signal-strength-summary.py`: reproducible analyzer.

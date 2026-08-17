@@ -275,6 +275,47 @@
       "p95": 26.230170125818987
     }
   },
+  "representative_examples": [
+    {
+      "channel": 4,
+      "date": "2026-08-08",
+      "doppler_drift_hz_s": -3969.356444202046,
+      "doppler_fit_rms_hz": 304.7655830437193,
+      "dual_duration_s": 17.361226970491806,
+      "edge": "lower",
+      "event_id": "ch4-lower-edge-narrow-20260808T192219Z::track-000",
+      "label": "strong long track",
+      "median_matched_filter_snr_proxy_db": -8.11394367664596,
+      "median_score_margin": 0.35059176354402266,
+      "radio": "pluto://ip:192.168.2.1"
+    },
+    {
+      "channel": 4,
+      "date": "2026-08-09",
+      "doppler_drift_hz_s": -3552.116142301783,
+      "doppler_fit_rms_hz": 1144.0665553729234,
+      "dual_duration_s": 38.27996530322581,
+      "edge": "lower",
+      "event_id": "ch4-lower-edge-narrow-20260809T084210Z::track-000",
+      "label": "typical long track",
+      "median_matched_filter_snr_proxy_db": -12.752468572990026,
+      "median_score_margin": 0.20953143868661217,
+      "radio": "pluto://ip:192.168.2.1"
+    },
+    {
+      "channel": 4,
+      "date": "2026-08-08",
+      "doppler_drift_hz_s": -3927.0315858802705,
+      "doppler_fit_rms_hz": 119.15841894628245,
+      "dual_duration_s": 10.087224336466178,
+      "edge": "lower",
+      "event_id": "ch4-lower-edge-narrow-20260808T232321Z::track-002",
+      "label": "weak long track",
+      "median_matched_filter_snr_proxy_db": -17.47961897412456,
+      "median_score_margin": 0.1162615198089593,
+      "radio": "pluto://ip:192.168.2.1"
+    }
+  ],
   "schema": "leo-tracker.doppler-signal-strength-summary/v1",
   "slope_qualified_distributions": {
     "best_weak_receiver_margin": {
